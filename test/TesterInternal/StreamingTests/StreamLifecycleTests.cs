@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
-    public class StreamLifecycleTests : HostedTestClusterPerTest, IDisposable
+    public class StreamLifecycleTests : HostedTestClusterPerTest
     {
         protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
         {
@@ -85,7 +85,7 @@ namespace UnitTests.StreamingTests
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
             string testName = "Stream_Lifecycle_AddRemoveProducers";
-            StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger, HostedCluster);
 
             int numProducers = 10;
 
@@ -160,7 +160,7 @@ namespace UnitTests.StreamingTests
 
         private async Task DoStreamCleanupTest_Deactivate(bool uncleanShutdown, bool useStreamAfterDeactivate, [CallerMemberName]string testName = null)
         {
-            StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger, HostedCluster);
 
             var producer1 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
             var producer2 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());

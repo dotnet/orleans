@@ -14,24 +14,24 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class PullingAgentManagementTestsFixture : BaseClusterFixture
+    public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
-        protected override TestingSiloHost CreateClusterHost()
+        public class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(new TestingSiloOptions
+            protected override TestingSiloHost CreateClusterHost()
             {
-                StartSecondary = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-            },
-            new TestingClientOptions()
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            });
+                return new TestingSiloHost(new TestingSiloOptions
+                {
+                    StartSecondary = true,
+                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                },
+                new TestingClientOptions()
+                {
+                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
+                });
+            }
         }
-    }
 
-    public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTestsFixture>
-    {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
 

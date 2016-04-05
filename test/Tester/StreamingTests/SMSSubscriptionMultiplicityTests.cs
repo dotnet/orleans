@@ -11,38 +11,37 @@ using Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class SMSSubscriptionMultiplicityTestsFixture : BaseClusterFixture
+    public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTests.Fixture>
     {
-        public const string SMSStreamProviderName = "SMSProvider";
-
-        protected override TestingSiloHost CreateClusterHost()
+        public class Fixture : BaseClusterFixture
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                },
-                new TestingClientOptions()
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName,
-                            new Dictionary<string, string>());
-                    },
-                });
-        }
-    }
+            public const string SMSStreamProviderName = "SMSProvider";
 
-    public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTestsFixture>
-    {
-        
+            protected override TestingSiloHost CreateClusterHost()
+            {
+                return new TestingSiloHost(
+                    new TestingSiloOptions
+                    {
+                        StartFreshOrleans = true,
+                        SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
+                    },
+                    new TestingClientOptions()
+                    {
+                        AdjustConfig = config =>
+                        {
+                            config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName,
+                                new Dictionary<string, string>());
+                        },
+                    });
+            }
+        }
+
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
         private SubscriptionMultiplicityTestRunner runner;
         
         public SMSSubscriptionMultiplicityTests()
         {
-            runner = new SubscriptionMultiplicityTestRunner(SMSSubscriptionMultiplicityTestsFixture.SMSStreamProviderName, GrainClient.Logger);
+            runner = new SubscriptionMultiplicityTestRunner(Fixture.SMSStreamProviderName, GrainClient.Logger);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

@@ -19,6 +19,7 @@ namespace Orleans.TestingHost.Extensions
             }
 
             AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.DeploymentId);
+            clusterConfig.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
             AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
         }
 
@@ -33,6 +34,7 @@ namespace Orleans.TestingHost.Extensions
             }
 
             AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.DeploymentId);
+            clientConfiguration.DataConnectionString = StorageTestConstants.DataConnectionString;
             AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
         }
 
