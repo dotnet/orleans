@@ -76,6 +76,7 @@ namespace UnitTests
             Assert.AreEqual<IPEndPoint>(new IPEndPoint(IPAddress.IPv6Loopback, 22222), config.Globals.SeedNodes[1], "Second seed node is set incorrectly");
 
             Assert.AreEqual<int>(12345, config.Defaults.Port, "Default port is set incorrectly");
+            Assert.AreEqual<string>("UnitTests.General.TestStartup,Tester", config.Defaults.StartupTypeName);
 
             NodeConfiguration nc;
             bool hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node1", out nc);
@@ -84,6 +85,7 @@ namespace UnitTests
             Assert.IsTrue(nc.IsPrimaryNode, "Node1 should be primary node");
             Assert.IsTrue(nc.IsSeedNode, "Node1 should be seed node");
             Assert.IsFalse(nc.IsGatewayNode, "Node1 should not be gateway node");
+            Assert.AreEqual<string>("UnitTests.General.TestStartup,Tester", nc.StartupTypeName, "Startup type should be copied automatically");
 
             hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node2", out nc);
             Assert.IsTrue(hasNodeConfig, "Node Node2 has config");
