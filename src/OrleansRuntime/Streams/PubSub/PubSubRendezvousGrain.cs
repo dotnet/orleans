@@ -160,73 +160,76 @@ namespace Orleans.Streams
             await WriteStateAsync();
 
             int numProducers = State.Producers.Count;
-            if (numProducers > 0)
-            {
-                if (logger.IsVerbose)
-                    logger.Info("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}", 
-                        numProducers, streamConsumer, Utils.EnumerableToString(State.Producers));
+            if (numProducers <= 0)
+                return;
+
+            if (logger.IsVerbose)
+                logger.Info("Notifying {0} existing producer(s) about new consumer {1}. Producers={2}", 
+                    numProducers, streamConsumer, Utils.EnumerableToString(State.Producers));
                 
-                // Notify producers about a new streamConsumer.
-                var tasks = new List<Task>();
-                var producers = State.Producers.ToList();
-                bool someProducersRemoved = false;
+            // Notify producers about a new streamConsumer.
+            var tasks = new List<Task>();
+            var producers = State.Producers.ToList();
+            int initialProducerCount = producers.Count;
+            foreach (var producerState in producers)
+            {
+                PubSubPublisherState producer = producerState; // Capture loop variable
 
-                foreach (var producerState in producers)
+                if (!IsActiveProducer(producer.Producer))
                 {
-                    PubSubPublisherState producer = producerState; // Capture loop variable
-
-                    if (!IsActiveProducer(producer.Producer))
-                    {
-                        // Producer is not active (could be stopping / shutting down) so skip
-                        if (logger.IsVerbose) logger.Verbose("Producer {0} on stream {1} is not active - skipping.", producer, streamId);
-                        continue;
-                    }
-
-                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)
-                        .ContinueWith(t =>
-                        {
-                            if (t.IsFaulted)
-                            {
-                                var exc = t.Exception.GetBaseException();
-                                if (exc is GrainExtensionNotInstalledException)
-                                {
-                                    logger.Warn((int) ErrorCode.Stream_ProducerIsDead,
-                                        "Producer {0} on stream {1} is no longer active - discarding.", 
-                                        producer, streamId);
-
-                                    // This publisher has gone away, so we should cleanup pub-sub state.
-                                    bool removed = State.Producers.Remove(producer);
-                                    someProducersRemoved = true; // Re-save state changes at end
-                                    counterProducersRemoved.Increment();
-                                    counterProducersTotal.DecrementBy(removed ? 1 : 0);
-
-                                    // And ignore this error
-                                }
-                                else
-                                {
-                                    throw exc;
-                                }
-                            }
-                        }, TaskContinuationOptions.ExecuteSynchronously);
-                    tasks.Add(addSubscriberPromise);
+                    // Producer is not active (could be stopping / shutting down) so skip
+                    if (logger.IsVerbose) logger.Verbose("Producer {0} on stream {1} is not active - skipping.", producer, streamId);
+                    continue;
                 }
 
-                Exception exception = null;
-                try
-                {
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception exc)
-                {
-                    exception = exc;
-                }
-
-                if (someProducersRemoved)
-                    await WriteStateAsync();
-
-                if (exception != null)
-                    throw exception;
+                tasks.Add(NotifyProducer(producer, subscriptionId, streamId, streamConsumer, filter));
             }
+
+            Exception exception = null;
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception exc)
+            {
+                exception = exc;
+            }
+
+            // if the number of producers has been changed, resave state.
+            if (State.Producers.Count != initialProducerCount)
+                await WriteStateAsync();
+
+            if (exception != null)
+                throw exception;
+        }
+
+        private async Task NotifyProducer(PubSubPublisherState producer, GuidId subscriptionId, StreamId streamId,
+            IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        {
+            try
+            {
+                await producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter);
+            }
+            catch (GrainExtensionNotInstalledException)
+            {
+                RemoveProducer(producer);
+            }
+            catch (ClientNotAvailableException)
+            {
+                RemoveProducer(producer);
+            }
+        }
+
+        private void RemoveProducer(PubSubPublisherState producer)
+        {
+            logger.Warn((int)ErrorCode.Stream_ProducerIsDead,
+                "Producer {0} on stream {1} is no longer active - permanently removing producer.",
+                producer, producer.Stream);
+
+            if (!State.Producers.Remove(producer)) return;
+
+            counterProducersRemoved.Increment();
+            counterProducersTotal.DecrementBy(1);
         }
 
         public async Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId)
