@@ -907,32 +907,9 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_BadProvider()
         {
-            try
-            {
-                Guid id = Guid.NewGuid();
-                IBadProviderTestGrain grain = GrainClient.GrainFactory.GetGrain<IBadProviderTestGrain>(id);
-
-                await grain.DoSomething();
-
-                string msg = "BadProviderConfigException exception should have been thrown";
-                output.WriteLine("Test failed: {0}", msg);
-                Assert.Fail(msg);
-            }
-
-            catch (Exception e)
-            {
-                output.WriteLine("Exception caught: {0}", e);
-                var exc = e.GetBaseException();
-                while (exc is OrleansException && exc.InnerException != null)
-                {
-                    exc = exc.InnerException;
-                }
-                output.WriteLine("Checking exception type: {0} Inner type: {1} Details: {2}",
-                    exc.GetType().FullName, exc.InnerException != null ? exc.InnerException.GetType().FullName : "Null", exc);
-                Assert.IsTrue(exc.Message.Contains(typeof(BadProviderConfigException).Name), "Expected BadProviderConfigException, Got: " + exc);
-                // TODO: Currently can't work out why this doesn't work
-                //Assert.IsInstanceOfType(exc, typeof(BadProviderConfigException), "Expected type should be BadProviderConfigException");
-            }
+            IBadProviderTestGrain grain = GrainClient.GrainFactory.GetGrain<IBadProviderTestGrain>(Guid.NewGuid());
+            var oex = await Xunit.Assert.ThrowsAsync<OrleansException>(() => grain.DoSomething());
+            Assert.IsInstanceOfType(oex.InnerException, typeof(BadProviderConfigException));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
