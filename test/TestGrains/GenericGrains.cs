@@ -625,12 +625,35 @@ namespace UnitTests.Grains
     }
 
 
-    public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>
+    public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        Task<string> ISomeGenericGrain<string>.Hello() {
+        public Task DoSomething() {
+            return TaskDone.Done;
+        }
+
+        public Task<string> Hello() {
             return Task.FromResult("Hello!");
         }
     }
+
+
+    public class GenericCastableGrain<T> : Grain, IGenericCastableGrain<T>, INonGenericCastGrain
+    {
+        public Task<string> Hello() {
+            return Task.FromResult("Hello!");
+        }
+    }
+
+
+
+
+    public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
+    {
+        public Task<string> Hello() {
+            return Task.FromResult("I have been independently concretized!");
+        }
+    }
+
 
 
 }

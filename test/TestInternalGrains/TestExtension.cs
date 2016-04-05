@@ -28,6 +28,21 @@ namespace UnitTests.Grains
         }
     }
 
+    public class SimpleExtension : ISimpleExtension
+    {
+        private string someString;
+
+        public SimpleExtension(string someString)
+        {
+            this.someString = someString;
+        }
+
+        public Task<string> CheckExtension_1()
+        {
+            return Task.FromResult(someString);
+        }
+    }
+
     public class GenericTestExtension<T> : IGenericTestExtension<T>
     {
         private readonly GenericExtensionTestGrain<T> grain;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -74,6 +75,41 @@ namespace UnitTests
             {
                 Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
+        }
+
+        [Fact(Skip = "Fix of issue #1624 is still pending"), TestCategory("Functional"), TestCategory("Providers"), 
+            TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
+        public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var extension = grain.AsReference<ISimpleExtension>(); //generic base grain not yet activated - virt refs only
+
+            try
+            {
+                var res = await extension.CheckExtension_1(); //now activation occurs, but with non-generic reference
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail("No exception should have been thrown. Ex: {0}", ex.Message);
+            }
+
+            Assert.IsTrue(true);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
+        public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
+            var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            await grain.DoSomething(); //original generic grain activates here
+
+            var extension = grain.AsReference<ISimpleExtension>();
+            try {
+                var res = await extension.CheckExtension_1();
+            }
+            catch(Exception ex) {
+                Assert.Fail("No exception should have been thrown. Ex: {0}", ex.Message);
+            }
+
+            Assert.IsTrue(true);
         }
     }
 }

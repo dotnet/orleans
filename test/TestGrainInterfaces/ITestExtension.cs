@@ -17,4 +17,9 @@ namespace UnitTests.GrainInterfaces
 
         Task<string> CheckExtension_2();
     }
+
+    public interface ISimpleExtension : IGrainWithIntegerKey, IGrainExtension
+    {
+        Task<string> CheckExtension_1();
+    }
 }
