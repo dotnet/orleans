@@ -765,7 +765,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task PartiallySpecifyingGenericGrainFulfilsInterface() 
+        public async Task Generic_PartiallySpecifyingGenericGrainFulfilsInterface() 
         {
             var grain = GrainFactory.GetGrain<IGrainWithTwoGenArgs<string, int>>(Guid.NewGuid());
 
@@ -791,7 +791,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task GenericGrainCanReuseOwnGenArgRepeatedly() 
+        public async Task Generic_GenericGrainCanReuseOwnGenArgRepeatedly() 
         {
             //resolves correctly but can't be activated: too many gen args supplied for concrete class
 
@@ -806,7 +806,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task PartiallySpecifyingGenericInterfaceIsCastable() 
+        public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable() 
         {
             var grain = GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
 
@@ -821,7 +821,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task PartiallySpecifyingGenericInterfaceIsCastable_Activating() 
+        public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable_Activating() 
         {
             var grain = GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
 
@@ -844,7 +844,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RepeatedRearrangedGenArgsResolved() 
+        public async Task Generic_RepeatedRearrangedGenArgsResolved() 
         {
             //again resolves to the correct generic type definition, but fails on activation as too many args
             //gen args aren't being properly inferred from matched concrete type
@@ -872,7 +872,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RepeatedGenArgsWorkAmongstInterfacesInTypeResolution() 
+        public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInTypeResolution() 
         {
             var grain = GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
 
@@ -885,7 +885,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RepeatedGenArgsWorkAmongstInterfacesInCasting() 
+        public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting() 
         {
             var grain = GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
 
@@ -900,7 +900,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RepeatedGenArgsWorkAmongstInterfacesInCasting_Activating() 
+        public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting_Activating() 
         {
             //Only errors on invocation: wrong arity again
 
@@ -923,7 +923,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RearrangedGenArgsOfCorrectArityAreResolved() 
+        public async Task Generic_RearrangedGenArgsOfCorrectArityAreResolved() 
         {
             var grain = GrainFactory.GetGrain<IReceivingRearrangedGenArgs<int, long>>(Guid.NewGuid());
 
@@ -948,7 +948,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RearrangedGenArgsOfCorrectNumberAreCastable() 
+        public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable() 
         {
             var grain = GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
 
@@ -963,7 +963,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task RearrangedGenArgsOfCorrectNumberAreCastable_Activating() 
+        public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable_Activating() 
         {
             var grain = GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
 
@@ -1032,7 +1032,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs() {
+        public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs() {
             var grain = GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
 
             await grain.Hello();
@@ -1045,7 +1045,7 @@ namespace UnitTests.General
         }
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs_Activating() {
+        public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs_Activating() {
             var grain = GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
 
             var castRef = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
@@ -1069,7 +1069,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task GenArgsCanBeFurtherSpecialized() {
+        public async Task Generic_GenArgsCanBeFurtherSpecialized() {
             var grain = GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
             var concreteGenArgs = await GetConcreteGenArgs(grain);
@@ -1080,7 +1080,7 @@ namespace UnitTests.General
         }
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task GenArgsCanBeFurtherSpecializedIntoArrays() {
+        public async Task Generic_GenArgsCanBeFurtherSpecializedIntoArrays() {
             var grain = GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<long[]>>(Guid.NewGuid());
 
             var concreteGenArgs = await GetConcreteGenArgs(grain);
@@ -1104,7 +1104,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task CanCastBetweenInterfacesWithFurtherSpecializedGenArgs() {
+        public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs() {
             var grain = GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
             await grain.Hello();
@@ -1118,7 +1118,7 @@ namespace UnitTests.General
 
 
         [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
-        public async Task CanCastBetweenInterfacesWithFurtherSpecializedGenArgs_Activating() {
+        public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs_Activating() {
             var grain = GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
             var castRef = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
