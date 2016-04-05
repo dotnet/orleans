@@ -312,7 +312,7 @@ namespace Orleans.Streams
                 if (IsShutdown) return; // timer was already removed, last tick
                 
                 IQueueAdapterReceiver rcvr = receiver;
-                int maxCacheAddCount = queueCache != null ? queueCache.MaxAddCount : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
+                int maxCacheAddCount = queueCache != null ? queueCache.GetMaxAddCount() : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 

@@ -2,34 +2,107 @@
 using System;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 
-namespace OrleansServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
-    public abstract class EventHubQueueCache<TCachedMessage> : PooledQueueCache<EventData, TCachedMessage>, IEventHubQueueCache
+    public abstract class EventHubQueueCache<TCachedMessage> : IEventHubQueueCache
         where TCachedMessage : struct
     {
+        protected readonly int defaultMaxAddCount;
+        protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
+        private readonly AveragingCachePressureMonitor cachePressureMonitor;
+
         protected IStreamQueueCheckpointer<string> Checkpointer { private set; get; }
 
-        protected EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer)
-            : base(cacheDataAdapter, comparer)
+        protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer)
         {
-            cacheDataAdapter.PurgeAction = Purge;
+            this.defaultMaxAddCount = defaultMaxAddCount;
             Checkpointer = checkpointer;
-            OnPurged = CheckpointOnPurged;
-        }
 
-        public void Dispose()
-        {
-            OnPurged = null;
+            cache = new PooledQueueCache<EventData, TCachedMessage>(cacheDataAdapter, comparer);
+            cacheDataAdapter.PurgeAction = cache.Purge;
+            cache.OnPurged = CheckpointOnPurged;
+
+            cachePressureMonitor = new AveragingCachePressureMonitor();
         }
 
         protected abstract string GetOffset(TCachedMessage lastItemPurged);
 
+
+
+        /// <summary>
+        /// cachePressureContribution should be a double between 0-1, indicating how much danger the item is of being removed from the cache.
+        ///   0 indicating  no danger,
+        ///   1 indicating removal is imminent.
+        /// </summary>
+        /// <param name="token"></param>
+        /// <param name="cachePressureContribution"></param>
+        /// <returns></returns>
+        protected abstract bool TryCalculateCachePressureContribution(StreamSequenceToken token, out double cachePressureContribution);
+
+        public void Dispose()
+        {
+            cache.OnPurged = null;
+        }
+
         private void CheckpointOnPurged(TCachedMessage lastItemPurged)
         {
             Checkpointer.Update(GetOffset(lastItemPurged), DateTime.UtcNow);
+        }
+
+        public int GetMaxAddCount()
+        {
+            return cachePressureMonitor.IsUnderPressure() ? 0 : defaultMaxAddCount;
+        }
+
+        public void Add(EventData message)
+        {
+            cache.Add(message);
+        }
+
+        public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        {
+            return cache.GetCursor(streamIdentity, sequenceToken);
+        }
+
+        public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
+        {
+            if (!cache.TryGetNextMessage(cursorObj, out message))
+                return false;
+            double cachePressureContribution;
+            if (TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution))
+            {
+                cachePressureMonitor.RecordCachePressureContribution(cachePressureContribution);
+            }
+            return true;
+        }
+
+        private class AveragingCachePressureMonitor
+        {
+            const double pressureThreshold = 1.0/3.0;
+
+            private double accumulatedCachePressure;
+            private int cachePressureContributionCount;
+
+            public void RecordCachePressureContribution(double cachePressureContribution)
+            {
+                accumulatedCachePressure += cachePressureContribution;
+                cachePressureContributionCount++;
+            }
+
+            public bool IsUnderPressure()
+            {
+                if (cachePressureContributionCount == 0)
+                    return false;
+
+                double pressure = accumulatedCachePressure/cachePressureContributionCount;
+
+                cachePressureContributionCount = 0;
+                accumulatedCachePressure = 0;
+
+                return pressure > pressureThreshold;
+            }
         }
     }
 
@@ -39,7 +112,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
     internal class DefaultEventHubQueueCache : EventHubQueueCache<CachedEventHubMessage>
     {
         public DefaultEventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool)
-            : base(checkpointer, new EventHubDataAdapter(bufferPool), EventHubDataComparer.Instance)
+            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, new EventHubDataAdapter(bufferPool), EventHubDataComparer.Instance)
         {
         }
 
@@ -48,6 +121,28 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
             int readOffset = 0;
             SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read namespace, not needed so throw away.
             return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
+        }
+
+        protected override bool TryCalculateCachePressureContribution(StreamSequenceToken token, out double cachePressureContribution)
+        {
+            cachePressureContribution = 0;
+            // if cache is empty or has few items, don't calculate pressure
+            if (cache.IsEmpty ||
+                !cache.Newest.HasValue ||
+                !cache.Oldest.HasValue ||
+                cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber < 10*defaultMaxAddCount) // not enough items in cache.
+            {
+                return false;
+            }
+
+            IEventHubPartitionLocation location = (IEventHubPartitionLocation) token;
+            double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
+            long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
+
+            // pressure is the ratio of the distance from the front of the cache to the 
+            cachePressureContribution = distanceFromNewestMessage/cacheSize;
+
+            return true;
         }
     }
 }

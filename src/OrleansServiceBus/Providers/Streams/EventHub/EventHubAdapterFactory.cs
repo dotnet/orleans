@@ -9,7 +9,6 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using OrleansServiceBus.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {

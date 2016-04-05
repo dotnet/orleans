@@ -5,6 +5,12 @@ using Orleans.Providers.Streams.Common;
 
 namespace Orleans.ServiceBus.Providers
 {
+    public interface IEventHubPartitionLocation
+    {
+        string EventHubOffset { get; }
+        long SequenceNumber { get; }
+    }
+
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.
     /// EventHubOffset - this is a unique value per partition that is used to start reading from this message in the partition.
@@ -15,7 +21,7 @@ namespace Orleans.ServiceBus.Providers
     ///   and ordering of aplication layer events within an EventHub message.
     /// </summary>
     [Serializable]
-    internal class EventHubSequenceToken : EventSequenceToken
+    internal class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
     {
         public string EventHubOffset { get; private set; }
 

@@ -17,8 +17,10 @@ namespace Orleans.ServiceBus.Providers
         public string Partition { get; set; }
     }
 
+
     internal class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCache
     {
+        public const int MaxMessagesPerRead = 1000;
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionConfig config;
@@ -28,8 +30,9 @@ namespace Orleans.ServiceBus.Providers
         private IEventHubQueueCache cache;
         private EventHubReceiver receiver;
         private IStreamQueueCheckpointer<string> checkpointer;
+        private AggregatedQueueFlowController flowController;
 
-        public int MaxAddCount { get { return 1000; } }
+        public int GetMaxAddCount() { return flowController.GetMaxAddCount(); }
 
         public EventHubAdapterReceiver(EventHubPartitionConfig partitionConfig,
             Func<IStreamQueueCheckpointer<string>,IEventHubQueueCache> cacheFactory,
@@ -45,13 +48,14 @@ namespace Orleans.ServiceBus.Providers
         {
             checkpointer = await checkpointerFactory(config.Partition);
             cache = cacheFactory(checkpointer);
+            flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache };
             string offset = await checkpointer.Load();
             receiver = await CreateReceiver(config, offset);
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (receiver == null)
+            if (receiver == null || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }

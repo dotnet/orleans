@@ -34,6 +34,26 @@ namespace Orleans.Providers.Streams.Common
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
 
+        public TCachedMessage? Newest
+        {
+            get
+            {
+                if (IsEmpty)
+                    return null;
+                return messageBlocks.First.Value.NewestMessage;
+            }
+        }
+
+        public TCachedMessage? Oldest
+        {
+            get
+            {
+                if (IsEmpty)
+                    return null;
+                return messageBlocks.Last.Value.OldestMessage;
+            }
+        }
+
         /// <summary>
         /// Called with the last item puraged after a cache purge has run.
         /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
