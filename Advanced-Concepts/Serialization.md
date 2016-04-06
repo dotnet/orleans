@@ -23,9 +23,9 @@ The rules are:
 
 1) Go over all grain interface and grain class implementation assemblies (these are the assemblies that have the code gen step defined on them via referencing Orleans templates nuget).
 
-2) Out of those assemblies: generate serializers for types that are directly referenced in grain interfaces method signatures or state class signature OR for any type that is marked with  `[Serializable]` attribute.
+2) Out of those assemblies: generate serializers for types that are directly referenced in grain interfaces method signatures or state class signature or for any type that is marked with  `[Serializable]` attribute.
 
-
+3) In addition, a grain interface or implementation project can point to arbitrary types for serialization generation by adding a `[KnownType]` or `[KnownAssembly]` assembly level attributes to tell code generator to generate serializers for a specific types or all eligible types within an assembly.
 
 
 # Writing Custom Serializers
