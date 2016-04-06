@@ -179,6 +179,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "..\test\T
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalDtosRefOrleans", "..\test\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B99C744A-7F62-430C-9255-E64875D39486}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -305,6 +307,10 @@ Global
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{09610024-F5B9-4065-9557-BD9E36A32421}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
