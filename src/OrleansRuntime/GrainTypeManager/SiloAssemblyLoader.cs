@@ -12,7 +12,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    [NonSerializable]
     internal class SiloAssemblyLoader
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
