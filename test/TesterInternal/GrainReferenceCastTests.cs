@@ -9,7 +9,6 @@ using UnitTests.Grains;
 using Xunit;
 using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 using UnitTests.Tester;
-using System.Reflection;
 
 namespace UnitTests
 {
@@ -453,19 +452,5 @@ namespace UnitTests
             isNullStr = cast.StringSet("b").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.IsFalse(isNullStr.Result, "Value should not be null after cast.SetString(b)");
         }
-
-        
-        [Fact, TestCategory("Functional"), TestCategory("Generics"), TestCategory("Cast"), TestCategory("GrainReference")]
-        public void CastToGenericInterfaceSetsArgsOnReference() 
-        {
-            var grain = GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
-
-            var castRef = (GrainReference)grain.AsReference<ISomeGenericGrain<string>>();
-
-            Assert.AreEqual(
-                typeof(ISomeGenericGrain<string>).GetTypeInfo().UnderlyingSystemType.FullName, 
-                castRef.GenericArgumentsForTesting);
-        }
-        
     }
 }

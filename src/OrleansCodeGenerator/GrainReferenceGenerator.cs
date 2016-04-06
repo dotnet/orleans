@@ -80,8 +80,6 @@ namespace Orleans.CodeGenerator
                     .AddMembers(
                         GenerateInterfaceIdProperty(grainType),
                         GenerateInterfaceNameProperty(grainType),
-                        GenerateGenericArgumentsStaticField(grainType),
-                        GenerateGenericArgumentsProperty(grainType),
                         GenerateIsCompatibleMethod(grainType),
                         GenerateGetMethodNameMethod(grainType))
                     .AddMembers(GenerateInvokeMethods(grainType, onEncounteredType))
@@ -330,37 +328,6 @@ namespace Orleans.CodeGenerator
                             .AddBodyStatements(SF.ReturnStatement(returnValue)))
                     .AddModifiers(SF.Token(SyntaxKind.PublicKeyword), SF.Token(SyntaxKind.OverrideKeyword));
         }
-
-
-        private static MemberDeclarationSyntax GenerateGenericArgumentsStaticField(Type grainType) {
-            return
-                SF.FieldDeclaration(
-                        SF.VariableDeclaration(typeof(string).GetTypeSyntax())
-                            .AddVariables(
-                                SF.VariableDeclarator("genericArgs")
-                                    .WithInitializer(
-                                        SF.EqualsValueClause(
-                                            grainType.IsGenericTypeDefinition
-                                                ? (ExpressionSyntax)SF.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, SF.TypeOfExpression(grainType.GetTypeSyntax()), "FullName".ToIdentifierName())
-                                                : SF.DefaultExpression(typeof(string).GetTypeSyntax())
-                                        )))
-                        )
-                    .AddModifiers(SF.Token(SyntaxKind.PrivateKeyword), SF.Token(SyntaxKind.StaticKeyword));
-        }
-
-
-        private static MemberDeclarationSyntax GenerateGenericArgumentsProperty(Type grainType) 
-        {
-            return
-                SF.PropertyDeclaration(typeof(string).GetTypeSyntax(), "GenericArguments")
-                    .AddAccessorListAccessors(
-                        SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                            .AddBodyStatements(
-                                SF.ReturnStatement(SF.IdentifierName("genericArgs"))
-                                ))
-                    .AddModifiers(SF.Token(SyntaxKind.ProtectedKeyword), SF.Token(SyntaxKind.OverrideKeyword));
-        }
-        
 
         private static MethodDeclarationSyntax GenerateGetMethodNameMethod(Type grainType)
         {

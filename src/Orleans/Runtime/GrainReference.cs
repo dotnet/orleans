@@ -14,8 +14,8 @@ namespace Orleans.Runtime
     [Serializable]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
+        private readonly string genericArguments;
         private readonly GuidId observerId;
-        private readonly string genericArgs;
         
         [NonSerialized]
         private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainReference", TraceLogger.LoggerType.Runtime);
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
 
         internal GuidId ObserverId { get { return observerId; } }
         
-        internal bool HasGenericArgument { get { return !String.IsNullOrEmpty(GenericArguments); } }
+        private bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
         internal GrainId GrainId { get; private set; }
 
@@ -56,15 +56,15 @@ namespace Orleans.Runtime
         /// Constructs a reference to the grain with the specified Id.
         /// </summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
-        private GrainReference(GrainId grainId, string genericArguments, SiloAddress systemTargetSilo, GuidId observerId)
+        private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
-            genericArgs = genericArguments;
+            genericArguments = genericArgument;
             SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
-            if (String.IsNullOrEmpty(genericArguments))
+            if (String.IsNullOrEmpty(genericArgument))
             {
-                genericArgs = null; // always keep it null instead of empty.
+                genericArguments = null; // always keep it null instead of empty.
             }
 
             // SystemTarget checks
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.GenericArguments, other.SystemTargetSilo, other.ObserverId) { }
+            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId) { }
 
         #endregion
 
@@ -166,7 +166,7 @@ namespace Orleans.Runtime
             if (other == null)
                 return false;
 
-            if (GenericArguments != other.GenericArguments)
+            if (genericArguments != other.genericArguments)
                 return false;
             if (!GrainId.Equals(other.GrainId))
             {
@@ -268,18 +268,7 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException("Should be overridden by subclass");
             }
         }
-        
-        /// <summary>
-        /// Return the generic type arguments of the interface as a string
-        /// Implemented in generated code.
-        /// </summary>
-        protected virtual string GenericArguments {
-            get 
-            {
-                return genericArgs;
-            }
-        }
-        
+
         /// <summary>
         /// Return the method name associated with the specified interfaceId and methodId values.
         /// </summary>
@@ -348,7 +337,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, GenericArguments);
+            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -537,7 +526,7 @@ namespace Orleans.Runtime
             // store as null, serialize as empty.
             var genericArg = String.Empty;
             if (input.HasGenericArgument)
-                genericArg = input.GenericArguments;
+                genericArg = input.genericArguments;
             stream.Write(genericArg);
         }
 
@@ -596,7 +585,7 @@ namespace Orleans.Runtime
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId, observerId);
             }
             return String.Format("{0}:{1}{2}", GRAIN_REFERENCE_STR, GrainId,
-                   !HasGenericArgument ? String.Empty : String.Format("<{0}>", GenericArguments)); 
+                   !HasGenericArgument ? String.Empty : String.Format("<{0}>", genericArguments)); 
         }
 
         internal string ToDetailedString()
@@ -610,7 +599,7 @@ namespace Orleans.Runtime
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId.ToDetailedString(), observerId.ToDetailedString());
             }
             return String.Format("{0}:{1}{2}", GRAIN_REFERENCE_STR, GrainId.ToDetailedString(),
-                   !HasGenericArgument ? String.Empty : String.Format("<{0}>", GenericArguments)); 
+                   !HasGenericArgument ? String.Empty : String.Format("<{0}>", genericArguments)); 
         }
 
 
@@ -627,7 +616,7 @@ namespace Orleans.Runtime
             }
             if (HasGenericArgument)
             {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), GENERIC_ARGUMENTS_STR, GenericArguments);
+                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), GENERIC_ARGUMENTS_STR, genericArguments);
             }
             return String.Format("{0}={1}", GRAIN_REFERENCE_STR, GrainId.ToParsableString());
         }
@@ -693,7 +682,7 @@ namespace Orleans.Runtime
             }
             string genericArg = String.Empty;
             if (HasGenericArgument)
-                genericArg = GenericArguments;
+                genericArg = genericArguments;
             info.AddValue("GenericArguments", genericArg, typeof(string));
         }
 
@@ -716,22 +705,9 @@ namespace Orleans.Runtime
             var genericArg = info.GetString("GenericArguments");
             if (String.IsNullOrEmpty(genericArg))
                 genericArg = null;
-            genericArgs = genericArg;
+            genericArguments = genericArg;
         }
 
         #endregion
-
-
-        #region Testing
-        
-        internal string GenericArgumentsForTesting {
-            get {
-                return this.GenericArguments;
-            }
-        }
-
-        #endregion
-
     }
-    
 }

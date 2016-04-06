@@ -654,7 +654,7 @@ namespace UnitTests.General
             Assert.AreEqual(1, result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
+        [Fact(Skip = "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastToGenericInterfaceAfterActivation() 
         {
             var grain = GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
@@ -667,7 +667,7 @@ namespace UnitTests.General
             Assert.AreEqual(result, "Hello!");
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
+        [Fact(Skip= "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastToDifferentlyConcretizedGenericInterfaceBeforeActivation() {
             var grain = GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
 
@@ -689,7 +689,7 @@ namespace UnitTests.General
             Assert.AreEqual(result, "Hello!");
         }
         
-        [Fact(Skip = "Fix of issue #1624 is still pending"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
+        [Fact(Skip= "https://github.com/dotnet/orleans/issues/1656 Casting from generic to non-generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation() {
             var grain = GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
 
