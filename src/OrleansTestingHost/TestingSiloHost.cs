@@ -584,6 +584,7 @@ namespace Orleans.TestingHost
                     this.ClientConfig = runningInstance.ClientConfig;
                     this.DeploymentId = runningInstance.DeploymentId;
                     this.DeploymentIdPrefix = runningInstance.DeploymentIdPrefix;
+                    this.GrainFactory = runningInstance.GrainFactory;
                     this.additionalSilos.AddRange(runningInstance.additionalSilos);
                     foreach (var additionalAssembly in runningInstance.additionalAssemblies)
                     {
