@@ -61,7 +61,7 @@
     <Compile Include="TestingClientOptions.cs" />
     <Compile Include="TestingSiloHost.cs" />
     <Compile Include="TestingSiloOptions.cs" />
-    <Compile Include="TestingUtils.cs" />
+    <Compile Include="Utils\TestingUtils.cs" />
     <Compile Include="Utils\ThreadSafeRandom.cs" />
   </ItemGroup>
   <ItemGroup>

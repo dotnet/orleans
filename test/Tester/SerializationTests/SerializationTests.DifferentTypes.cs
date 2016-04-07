@@ -5,6 +5,7 @@ using Xunit;
 using Orleans.Serialization;
 using System.Collections.Generic;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.Serialization
 {

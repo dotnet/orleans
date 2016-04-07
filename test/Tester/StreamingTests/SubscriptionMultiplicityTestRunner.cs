@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.StreamingTests

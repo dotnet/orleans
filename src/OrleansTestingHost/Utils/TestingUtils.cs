@@ -6,7 +6,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.TestingHost
+namespace Orleans.TestingHost.Utils
 {
     public static class TestingUtils
     {
