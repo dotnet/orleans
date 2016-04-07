@@ -19,8 +19,13 @@ namespace Orleans.TestingHost.Extensions
             }
 
             AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.DeploymentId);
-            clusterConfig.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
-            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
+
+            if (string.IsNullOrEmpty(clusterConfig.Globals.DataConnectionString))
+            {
+                clusterConfig.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
+            }
+
+            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", clusterConfig.Globals.DataConnectionString);
         }
 
         /// <summary>
@@ -34,8 +39,12 @@ namespace Orleans.TestingHost.Extensions
             }
 
             AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.DeploymentId);
-            clientConfiguration.DataConnectionString = StorageTestConstants.DataConnectionString;
-            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
+            if (string.IsNullOrEmpty(clientConfiguration.DataConnectionString))
+            {
+                clientConfiguration.DataConnectionString = StorageTestConstants.DataConnectionString;
+            }
+
+            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", clientConfiguration.DataConnectionString);
         }
 
         private static void AdjustProvidersDeploymentId(IEnumerable<KeyValuePair<string, ProviderCategoryConfiguration>> providerConfigurations, string key, string @value)
