@@ -2,9 +2,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
-namespace Orleans.TestingHost
+namespace Orleans.TestingHost.Utils
 {
     /// <summary>
     /// A wrapper on Azure Storage Emulator.

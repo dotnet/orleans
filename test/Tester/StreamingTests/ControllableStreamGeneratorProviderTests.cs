@@ -9,6 +9,7 @@ using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestGrainInterfaces;
 using TestGrains;
 using Tester;

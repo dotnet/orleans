@@ -16,6 +16,7 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;

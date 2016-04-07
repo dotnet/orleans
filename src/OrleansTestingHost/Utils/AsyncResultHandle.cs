@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Orleans.TestingHost
+namespace Orleans.TestingHost.Utils
 {
     /// <summary>
     /// This class is for internal testing use only.

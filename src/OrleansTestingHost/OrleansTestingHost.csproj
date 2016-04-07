@@ -54,14 +54,14 @@
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="OrleansTestSecrets.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="AsyncResultHandle.cs" />
-    <Compile Include="StorageEmulator.cs" />
+    <Compile Include="Utils\AsyncResultHandle.cs" />
+    <Compile Include="Utils\StorageEmulator.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="SiloHandle.cs" />
     <Compile Include="TestingClientOptions.cs" />
     <Compile Include="TestingSiloHost.cs" />
     <Compile Include="TestingSiloOptions.cs" />
-    <Compile Include="TestingUtils.cs" />
+    <Compile Include="Utils\TestingUtils.cs" />
     <Compile Include="Utils\ThreadSafeRandom.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -4,6 +4,7 @@ using Orleans.TestingHost;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Orleans.TestingHost.Utils;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;

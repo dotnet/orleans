@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
