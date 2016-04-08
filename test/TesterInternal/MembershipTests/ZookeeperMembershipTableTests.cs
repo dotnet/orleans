@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
@@ -11,7 +12,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
-        public ZookeeperMembershipTableTests()
+        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
             TraceLogger.AddTraceLevelOverride(typeof (ZookeeperMembershipTableTests).Name, Severity.Verbose3);
         }
@@ -19,6 +20,11 @@ namespace UnitTests.MembershipTests
         protected override IMembershipTable CreateMembershipTable(TraceLogger logger)
         {
             return AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+        }
+
+        protected override IGatewayListProvider CreateGatewayListProvider(TraceLogger logger)
+        {
+            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
         }
 
         protected override string GetConnectionString()
@@ -29,6 +35,12 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public void MembershipTable_ZooKeeper_Init()
         {
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        public async Task MembershipTable_ZooKeeper_GetGateways()
+        {
+            await MembershipTable_GetGateways();
         }
 
         [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]

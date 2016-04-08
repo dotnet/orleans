@@ -63,12 +63,12 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        public Task<IList<Uri>> GetGateways()
+        public async Task<IList<Uri>> GetGateways()
         {
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.GetGateways called.");
             try
             {                
-                return orleansQueries.ActiveGatewaysAsync(deploymentId);
+                return await orleansQueries.ActiveGatewaysAsync(deploymentId);
             }
             catch(Exception ex)
             {
@@ -78,12 +78,12 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task<MembershipTableData> IMembershipTable.ReadRow(SiloAddress key)
+        public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             if (logger.IsVerbose3) logger.Verbose3(string.Format("SqlMembershipTable.ReadRow called with key: {0}.", key));
             try
             {
-                return orleansQueries.MembershipDataAsync(deploymentId, key);                
+                return await orleansQueries.MembershipReadRowAsync(deploymentId, key);                
             }
             catch(Exception ex)
             {
@@ -93,12 +93,12 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task<MembershipTableData> IMembershipTable.ReadAll()
+        public async Task<MembershipTableData> ReadAll()
         {
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.ReadAll called.");
             try
             {
-                return orleansQueries.AllMembershipDataAsync(deploymentId);                
+                return await orleansQueries.MembershipReadAllAsync(deploymentId);                
             }
             catch(Exception ex)
             {
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task<bool> IMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             if (logger.IsVerbose3) logger.Verbose3(string.Format("SqlMembershipTable.InsertRow called with entry {0} and tableVersion {1}.", entry, tableVersion));
 
@@ -130,7 +130,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return orleansQueries.InsertMembershipRowAsync(deploymentId, entry, tableVersion);
+                return await orleansQueries.InsertMembershipRowAsync(deploymentId, entry, tableVersion.VersionEtag);
             }
             catch(Exception ex)
             {
@@ -140,7 +140,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             if (logger.IsVerbose3) logger.Verbose3(string.Format("IMembershipTable.UpdateRow called with entry {0}, etag {1} and tableVersion {2}.", entry, etag, tableVersion));
 
@@ -154,11 +154,6 @@ namespace Orleans.Runtime.MembershipService
                 if (logger.IsVerbose) logger.Verbose("SqlMembershipTable.UpdateRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException("entry");
             }
-            if (etag == null)
-            {
-                if (logger.IsVerbose) logger.Verbose("SqlMembershipTable.UpdateRow aborted due to null check. etag is null.");
-                throw new ArgumentNullException("etag");
-            }
             if (tableVersion == null)
             {
                 if (logger.IsVerbose) logger.Verbose("SqlMembershipTable.UpdateRow aborted due to null check. TableVersion is null ");
@@ -167,7 +162,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return orleansQueries.UpdateMembershipRowAsync(deploymentId, etag, entry, tableVersion);                                
+                return await orleansQueries.UpdateMembershipRowAsync(deploymentId, entry, tableVersion.VersionEtag);                                
             }
             catch(Exception ex)
             {
@@ -177,7 +172,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry)
+        public async Task UpdateIAmAlive(MembershipEntry entry)
         {
             if(logger.IsVerbose3) logger.Verbose3(string.Format("IMembershipTable.UpdateIAmAlive called with entry {0}.", entry));
             if (entry == null)
@@ -187,7 +182,7 @@ namespace Orleans.Runtime.MembershipService
             }
             try
             {
-                return orleansQueries.UpdateIAmAliveTimeAsync(deploymentId, entry);
+                await orleansQueries.UpdateIAmAliveTimeAsync(deploymentId, entry.SiloAddress, entry.IAmAliveTime);
             }
             catch(Exception ex)
             {
@@ -197,12 +192,12 @@ namespace Orleans.Runtime.MembershipService
         }
 
 
-        Task IMembershipTable.DeleteMembershipTableEntries(string deploymentId)
+        public async Task DeleteMembershipTableEntries(string deploymentId)
         {
             if (logger.IsVerbose3) logger.Verbose3(string.Format("IMembershipTable.DeleteMembershipTableEntries called with deploymentId {0}.", deploymentId));
             try
             {
-                return orleansQueries.DeleteMembershipTableEntriesAsync(deploymentId);
+                await orleansQueries.DeleteMembershipTableEntriesAsync(deploymentId);
             }
             catch(Exception ex)
             {
@@ -212,17 +207,17 @@ namespace Orleans.Runtime.MembershipService
         }
                
         
-        private Task<bool> InitTableAsync()
+        private async Task<bool> InitTableAsync()
         {
             try
             {
-                return orleansQueries.InsertMembershipVersionRowAsync(deploymentId, 0);
+                return await orleansQueries.InsertMembershipVersionRowAsync(deploymentId);
             }
             catch(Exception ex)
             {
                 if(logger.IsVerbose2) logger.Verbose2("Insert silo membership version failed: {0}", ex.ToString());
+                throw;
             }
-            return Task.FromResult(false);
         }
     }
 }

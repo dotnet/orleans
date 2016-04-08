@@ -111,12 +111,12 @@ namespace Orleans.Providers.SqlServer
         /// </summary>
         /// <param name="metricsData">Metrics data</param>
         /// <returns>Task for database operation</returns>
-        public Task ReportMetrics(IClientPerformanceMetrics metricsData)
+        public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
             if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
-                return orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
+                await orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -136,12 +136,12 @@ namespace Orleans.Providers.SqlServer
         /// </summary>
         /// <param name="metricsData">Metrics data</param>
         /// <returns>Task for database operation</returns>
-        public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
+        public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
             if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
-                return orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
+                await orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -203,9 +203,9 @@ namespace Orleans.Providers.SqlServer
         /// <param name="counters">The counters to batch.</param>
         /// <param name="maxBatchSizeInclusive">The maximum size of one batch.</param>
         /// <returns>The counters batched.</returns>
-        private static List<IList<ICounter>> BatchCounters(List<ICounter> counters, int maxBatchSizeInclusive)
+        private static List<List<ICounter>> BatchCounters(List<ICounter> counters, int maxBatchSizeInclusive)
         {
-            var batches = new List<IList<ICounter>>();
+            var batches = new List<List<ICounter>>();
             for(int i = 0; i < counters.Count; i += maxBatchSizeInclusive)
             {
                 batches.Add(counters.GetRange(i, Math.Min(maxBatchSizeInclusive, counters.Count - i)));

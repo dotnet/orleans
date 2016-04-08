@@ -115,7 +115,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
     <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
     <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />

@@ -1,9 +1,11 @@
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.AzureUtils;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
-using Tester;
+using UnitTests.StorageTests;
 using Xunit;
 
 namespace UnitTests.MembershipTests
@@ -11,20 +13,23 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests for operation of Orleans Membership Table using AzureStore - Requires access to external Azure storage
     /// </summary>
-    public class AzureMembershipTableTests : MembershipTableTestsBase
+    public class AzureMembershipTableTests : MembershipTableTestsBase, IClassFixture<AzureStorageBasicTestFixture>
     {
-        public AzureMembershipTableTests()
+        public AzureMembershipTableTests(ConnectionStringFixture fixture):base(fixture)
         {
             TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
             TraceLogger.AddTraceLevelOverride("Storage", Severity.Verbose3);
-
-            TestUtils.CheckForAzureStorage();
         }
 
         protected override IMembershipTable CreateMembershipTable(TraceLogger logger)
         {
             return new AzureBasedMembershipTable();
+        }
+
+        protected override IGatewayListProvider CreateGatewayListProvider(TraceLogger logger)
+        {
+            return new AzureGatewayListProvider();
         }
 
         protected override string GetConnectionString()
@@ -35,6 +40,12 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public void MembershipTable_Azure_Init()
         {
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        public async Task MembershipTable_Azure_GetGateways()
+        {
+            await MembershipTable_GetGateways();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]

@@ -13,11 +13,9 @@ namespace UnitTests.RemindersTest
     /// </summary>
     public class MySqlRemindersTableTests : ReminderTableTestsBase
     {
-        private const string testDatabaseName = "OrleansTest";
-
-        public MySqlRemindersTableTests()
+        public MySqlRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride(typeof(MySqlRemindersTableTests).Name, Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride(nameof(MySqlRemindersTableTests), Severity.Verbose3);
         }
 
         protected override IReminderTable CreateRemindersTable()

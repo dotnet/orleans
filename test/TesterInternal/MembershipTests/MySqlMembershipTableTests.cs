@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.SqlUtils;
@@ -13,14 +14,17 @@ namespace UnitTests.MembershipTests
     /// </summary>
     public class MySqlMembershipTableTests : MembershipTableTestsBase
     {
-        private const string testDatabaseName = "OrleansTest";
-
-        public MySqlMembershipTableTests()
+        public MySqlMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
             TraceLogger.AddTraceLevelOverride(typeof (MySqlMembershipTableTests).Name, Severity.Verbose3);
         }
 
         protected override IMembershipTable CreateMembershipTable(TraceLogger logger)
+        {
+            return new SqlMembershipTable();
+        }
+
+        protected override IGatewayListProvider CreateGatewayListProvider(TraceLogger logger)
         {
             return new SqlMembershipTable();
         }
@@ -41,6 +45,12 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Membership"), TestCategory("MySql")]
         public void MembershipTable_MySql_Init()
         {
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task MembershipTable_MySql_GetGateways()
+        {
+            await MembershipTable_GetGateways();
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]
