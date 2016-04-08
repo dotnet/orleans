@@ -18,6 +18,18 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
+
+    public interface IPersistenceTestGenericGrain<T> : IPersistenceTestGrain // IGrainWithGuidKey
+    { }
+    //    Task<bool> CheckStateInit();
+    //    Task<string> CheckProviderType();
+    //    Task DoSomething();
+    //    Task DoWrite(int val);
+    //    Task<int> DoRead();
+    //    Task<int> GetValue();
+    //    Task DoDelete();
+    //}
+
     public interface IMemoryStorageTestGrain : IGrainWithGuidKey
     {
         Task<int> GetValue();

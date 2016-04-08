@@ -91,7 +91,13 @@ namespace UnitTests.Grains
             await ClearStateAsync();
         }
     }
-
+        
+    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
+    public class PersistenceTestGenericGrain<T> : PersistenceTestGrain, IPersistenceTestGenericGrain<T>
+    {
+        //...
+    }
+    
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceProviderErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceProviderErrorGrain
     {
