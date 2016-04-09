@@ -197,33 +197,11 @@ namespace Orleans.SqlUtils
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         private RelationalStorage(string invariantName, string connectionString)
         {
-            //These are private, read-only variables (with a property accessor).
             this.connectionString = connectionString;
             this.invariantName = invariantName;
             supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
         }
-
-
-        /// <summary>
-        /// A cached value if the underlying ADO.NET provider supports cancellation or not.        
-        /// </summary>
-        private bool SupportsCommandCancellation
-        {
-            get { return supportsCommandCancellation; }
-        }
-
-
-        /// <summary>
-        /// If the underlying ADO.NET implementation is natively asynchronous
-        /// (the ADO.NET Db*.XXXAsync classes are overriden) or not.
-        /// </summary>
-        private bool IsSynchronousAdoNetImplementation
-        {
-            get { return isSynchronousAdoNetImplementation; }
-        }
-
-
 
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
@@ -252,11 +230,11 @@ namespace Orleans.SqlUtils
                 CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
                 try
                 {
-                    if(cancellationToken.CanBeCanceled && SupportsCommandCancellation)
+                    if(cancellationToken.CanBeCanceled && supportsCommandCancellation)
                     {
                         cancellationRegistration = cancellationToken.Register(CommandCancellation, Tuple.Create(reader, command), useSynchronizationContext: false);
                     }
-                    return await SelectAsync(reader, selector, cancellationToken).ConfigureAwait(false);
+                    return await SelectAsync(reader, selector, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 }
                 finally
                 {
@@ -286,7 +264,7 @@ namespace Orleans.SqlUtils
                     command.CommandText = query;
 
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
-                    if(IsSynchronousAdoNetImplementation)
+                    if(isSynchronousAdoNetImplementation)
                     {
                         ret = Task.Run(() => executor(command, selector, cancellationToken, commandBehavior), cancellationToken);
                     }

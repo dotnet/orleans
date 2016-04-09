@@ -2,40 +2,46 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Newtonsoft.Json;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using UnitTests.StorageTests;
+using Xunit;
 
 namespace UnitTests.RemindersTest
 {
-    public abstract class ReminderTableTestsBase : IDisposable
+    public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
-        private TraceLogger logger;
+        private readonly TraceLogger logger;
 
-        private IReminderTable remindersTable;
+        private readonly IReminderTable remindersTable;
 
-        public ReminderTableTestsBase()
+        protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
+        
+        protected ReminderTableTestsBase(ConnectionStringFixture fixture)
         {
             TraceLogger.Initialize(new NodeConfiguration());
-
-            // Set shorter init timeout for these tests
-            OrleansSiloInstanceManager.initTimeout = TimeSpan.FromSeconds(20);
-
+            
             logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
 
             logger.Info("DeploymentId={0}", deploymentId);
 
+            lock (fixture.SyncRoot)
+            {
+                if (fixture.ConnectionString == null)
+                    fixture.ConnectionString = GetConnectionString();
+            }
+
             var globalConfiguration = new GlobalConfiguration
             {
                 ServiceId = serviceId,
                 DeploymentId = deploymentId,
                 AdoInvariantForReminders = GetAdoInvariant(),
-                DataConnectionStringForReminders = GetConnectionString()
+                DataConnectionStringForReminders = fixture.ConnectionString
             };
 
             var rmndr = CreateRemindersTable();
@@ -51,7 +57,6 @@ namespace UnitTests.RemindersTest
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 remindersTable.TestOnlyClearTable().Wait();
-                remindersTable = null;
             }
         }
 
@@ -62,40 +67,43 @@ namespace UnitTests.RemindersTest
         {
             return null;
         }
-        internal async Task RemindersParallelUpsert()
+
+        protected async Task RemindersParallelUpsert()
         {
             var upserts = await Task.WhenAll(Enumerable.Range(0, 50).Select(i =>
             {
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j => remindersTable.UpsertRow(reminder)));
             }));
-            Assert.IsFalse(upserts.Any(i => i.Distinct().Count() != 5));
+            Assert.False(upserts.Any(i => i.Distinct().Count() != 5));
         }
 
-        internal async Task ReminderSimple()
+        protected async Task ReminderSimple()
         {
             var reminder = CreateReminder(MakeTestGrainReference(), "0");
             await remindersTable.UpsertRow(reminder);
 
-            reminder = await remindersTable.ReadRow(reminder.GrainRef, reminder.ReminderName);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainRef, reminder.ReminderName);
+            
+            string etagTemp = reminder.ETag = readReminder.ETag;
 
-            string etagTemp = reminder.ETag;
+            Assert.Equal(JsonConvert.SerializeObject(readReminder), JsonConvert.SerializeObject(reminder));
 
-            Assert.IsNotNull(etagTemp);
+            Assert.NotNull(etagTemp);
 
             reminder.ETag = await remindersTable.UpsertRow(reminder);
 
             var removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, etagTemp);
-            Assert.IsFalse(removeRowRes, "should have failed. Etag is wrong");
+            Assert.False(removeRowRes, "should have failed. Etag is wrong");
             removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, "bla", reminder.ETag);
-            Assert.IsFalse(removeRowRes, "should have failed. reminder name is wrong");
+            Assert.False(removeRowRes, "should have failed. reminder name is wrong");
             removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, reminder.ETag);
-            Assert.IsTrue(removeRowRes, "should have succeeded. Etag is right");
+            Assert.True(removeRowRes, "should have succeeded. Etag is right");
             removeRowRes = await remindersTable.RemoveRow(reminder.GrainRef, reminder.ReminderName, reminder.ETag);
-            Assert.IsFalse(removeRowRes, "should have failed. reminder shouldn't exist");
+            Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
         }
 
-        internal async Task RemindersRange(int iterations=1000)
+        protected async Task RemindersRange(int iterations=1000)
         {
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>
             {
@@ -105,11 +113,11 @@ namespace UnitTests.RemindersTest
 
             var rows = await remindersTable.ReadRows(0, uint.MaxValue);
 
-            Assert.AreEqual(rows.Reminders.Count, iterations);
+            Assert.Equal(rows.Reminders.Count, iterations);
 
             rows = await remindersTable.ReadRows(0, 0);
 
-            Assert.AreEqual(rows.Reminders.Count, iterations);
+            Assert.Equal(rows.Reminders.Count, iterations);
 
             var remindersHashes = rows.Reminders.Select(r => r.GrainRef.GetUniformHashCode()).ToArray();
             
@@ -132,16 +140,18 @@ namespace UnitTests.RemindersTest
             var returnedHashes = (await rowsTask).Reminders.Select(r => r.GrainRef.GetUniformHashCode());
             var returnedSet = new HashSet<uint>(returnedHashes);
 
-            Assert.IsTrue(returnedSet.SetEquals(expectedSet));
+            Assert.True(returnedSet.SetEquals(expectedSet));
         }
 
         private static ReminderEntry CreateReminder(GrainReference grainRef, string reminderName)
         {
+            var now = DateTime.UtcNow;
+            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
             return new ReminderEntry
             {
                 GrainRef = grainRef,
                 Period = TimeSpan.FromMinutes(1),
-                StartAt = DateTime.UtcNow.Add(TimeSpan.FromMinutes(1)),
+                StartAt = now,
                 ReminderName = reminderName
             };
         }

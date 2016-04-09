@@ -13,11 +13,9 @@ namespace UnitTests.RemindersTest
     /// </summary>
     public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
-        private const string testDatabaseName = "OrleansTest";
-
-        public SqlServerRemindersTableTests()
+        public SqlServerRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride(typeof (SqlServerRemindersTableTests).Name, Severity.Verbose3);
+            TraceLogger.AddTraceLevelOverride(nameof (SqlServerRemindersTableTests), Severity.Verbose3);
         }
 
         protected override IReminderTable CreateRemindersTable()

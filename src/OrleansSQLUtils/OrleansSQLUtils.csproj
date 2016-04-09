@@ -70,7 +70,6 @@
     <Compile Include="Storage\DbConstantsStore.cs" />
     <Compile Include="Storage\DbExtensions.cs" />
     <Compile Include="Storage\DbConnectionFactory.cs" />
-    <Compile Include="Storage\DictionaryExtensions.cs" />
     <Compile Include="Storage\IRelationalStorage.cs" />
     <Compile Include="Storage\Provider\BatchingOptions.cs" />
     <Compile Include="Storage\Provider\Exensions.cs" />
@@ -99,6 +98,7 @@
     <Compile Include="Storage\RelationalStorageExtensions.cs" />
     <Compile Include="Storage\SqlFormatProvider.cs" />
     <Compile Include="Storage\SqlStatisticsPublisher.cs" />
+    <Compile Include="Storage\DbStoredQueries.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

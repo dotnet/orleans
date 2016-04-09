@@ -8,28 +8,23 @@ namespace Orleans.Runtime.ReminderService
     internal class SqlReminderTable: IReminderTable
     {
         private string serviceId;
-        private string deploymentId;
         private RelationalOrleansQueries orleansQueries;
 
         public async Task Init(GlobalConfiguration config, TraceLogger logger)
         {
             serviceId = config.ServiceId.ToString();
-            deploymentId = config.DeploymentId;
             orleansQueries = await RelationalOrleansQueries.CreateInstance(config.AdoInvariantForReminders, config.DataConnectionStringForReminders);
         }
-
 
         public Task<ReminderTableData> ReadRows(GrainReference grainRef)
         {
             return orleansQueries.ReadReminderRowsAsync(serviceId, grainRef);
         }
 
-
         public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
             return orleansQueries.ReadReminderRowsAsync(serviceId, beginHash, endHash);
         }
-
 
         public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
@@ -45,7 +40,6 @@ namespace Orleans.Runtime.ReminderService
         {
             return orleansQueries.DeleteReminderRowAsync(serviceId, grainRef, reminderName, eTag);            
         }
-
 
         public Task TestOnlyClearTable()
         {
