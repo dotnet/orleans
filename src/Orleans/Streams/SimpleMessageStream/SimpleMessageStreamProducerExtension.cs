@@ -24,13 +24,15 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly IStreamProviderRuntime     providerRuntime;
         private readonly IStreamPubSub              streamPubSub;
         private readonly bool                       fireAndForgetDelivery;
+        private readonly bool                       optimizeForImmutableData;
         private readonly Logger                     logger;
 
-        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, bool fireAndForget)
+        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, bool fireAndForget, bool optimizeForImmutable)
         {
             providerRuntime = providerRt;
             streamPubSub = pubsub;
             fireAndForgetDelivery = fireAndForget;
+            optimizeForImmutableData = optimizeForImmutable;
             remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
             logger = providerRuntime.GetLogger(GetType().Name);
         }
@@ -79,7 +81,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // and the caller immediately does await on the Task 
                 // returned from this method, so we can just direct return here 
                 // without incurring overhead of additional await.
-                return consumers.DeliverItem(streamId, item, fireAndForgetDelivery);
+                return consumers.DeliverItem(streamId, item, fireAndForgetDelivery, optimizeForImmutableData);
             }
             else
             {
@@ -187,10 +189,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 }
             }
 
-            internal Task DeliverItem(StreamId streamId, object item, bool fireAndForgetDelivery)
+            internal Task DeliverItem(StreamId streamId, object item, bool fireAndForgetDelivery, bool optimizeForImmutableData)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                var immutableItem = new Immutable<object>(item);
                 foreach (KeyValuePair<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> subscriptionKvp in consumers)
                 {
                     IStreamConsumerExtension remoteConsumer = subscriptionKvp.Value.Item1;
@@ -203,7 +204,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             continue;
                     }
 
-                    Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, immutableItem);
+                    Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, item, optimizeForImmutableData);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }
@@ -211,11 +212,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 return fireAndForgetDelivery ? TaskDone.Done : Task.WhenAll(tasks);
             }
 
-            private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, Immutable<object> item)
+            private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, object item, bool optimizeForImmutableData)
             {
                 try
                 {
-                    await remoteConsumer.DeliverItem(subscriptionId, item, null, null);
+                    if (optimizeForImmutableData)
+                        await remoteConsumer.DeliverImmutable(subscriptionId, new Immutable<object>(item), null, null);
+                    else
+                        await remoteConsumer.DeliverMutable(subscriptionId, item, null, null);
                 }
                 catch (ClientNotAvailableException)
                 {

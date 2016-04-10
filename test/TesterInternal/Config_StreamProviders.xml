@@ -11,6 +11,7 @@
     </StorageProviders>
     <StreamProviders>
         <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
+        <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProviderDoNotOptimizeForImmutableData" FireAndForgetDelivery="false" OptimizeForImmutableData="false"/>
         <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider" />
         <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider2" />
     </StreamProviders>

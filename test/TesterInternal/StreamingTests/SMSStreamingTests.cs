@@ -199,6 +199,12 @@ namespace UnitTests.StreamingTests
             await runner.StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain();
         }
 
+        [Fact, TestCategory("Streaming"), TestCategory("Functional")]
+        public async Task StreamTest_22_TestImmutabilityDuringStreaming()
+        {
+            await runner.StreamTest_22_TestImmutabilityDuringStreaming();
+        }
+
         #endregion Simple Message Stream Tests
     }
 }

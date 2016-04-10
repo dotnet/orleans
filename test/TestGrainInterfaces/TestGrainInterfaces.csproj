@@ -113,6 +113,7 @@
     <Compile Include="ISimplePersistentGrain.cs" />
     <Compile Include="ILivenessTestGrain.cs" />
     <Compile Include="IStreamingGrain.cs" />
+    <Compile Include="IStreamingImmutabilityTestGrain.cs" />
     <Compile Include="IStreamLifecycleTestGrains.cs" />
     <Compile Include="IStreamLifecycleTestInternalGrains.cs" />
     <Compile Include="IStreamReliabilityTestGrains.cs" />
