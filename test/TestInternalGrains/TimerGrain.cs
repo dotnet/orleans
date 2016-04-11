@@ -44,7 +44,7 @@ namespace UnitTestGrains
             logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current.ActivationContext.ToString());
 
             // make sure we run in the right activation context.
-            logger.Assert(ErrorCode.Runtime_Error_100146, context == RuntimeContext.Current.ActivationContext);
+            logger.Assert(ErrorCode.Runtime_Error_100146, Equals(context, RuntimeContext.Current.ActivationContext));
 
             string name = (string)data;
             IDisposable timer = null;
@@ -57,6 +57,12 @@ namespace UnitTestGrains
                 timer = allTimers[(string)data];
             }
             logger.Assert(ErrorCode.Runtime_Error_100146, timer != null);
+            if (timer != null && counter > 10000)
+            {
+                // do not let orphan timers ticking for long periods
+                timer.Dispose();
+            }
+
             return TaskDone.Done;
         }
 

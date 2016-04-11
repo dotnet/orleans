@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -20,20 +22,27 @@ namespace UnitTests.Management
         private readonly ITestOutputHelper output;
         private IManagementGrain mgmtGrain;
         
-        public ManagementGrainTests(ITestOutputHelper output)
+        public ManagementGrainTests(DefaultClusterFixture fixture, ITestOutputHelper output)
+            : base(fixture)
         {
             this.output = output;
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
-        public void GetHosts()
+        public async Task GetHosts()
         {
+            if (HostedCluster.SecondarySilos.Count == 0)
+            {
+                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+
+            var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
             Dictionary<SiloAddress, SiloStatus> siloStatuses = mgmtGrain.GetHosts(true).Result;
             Assert.IsNotNull(siloStatuses, "Got some silo statuses");
-            Assert.AreEqual(2, siloStatuses.Count, "Number of silo statuses");
+            Assert.AreEqual(numberOfActiveSilos, siloStatuses.Count, "Number of silo statuses");
         }
-
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()

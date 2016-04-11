@@ -27,11 +27,6 @@
     <file src="OrleansTestingHost.dll" target="lib\net451" />
     <file src="OrleansTestingHost.pdb" target="lib\net451" />
     
-    <file src="ClientConfigurationForTesting.xml" target="content" />
-    <file src="OrleansConfigurationForTesting.xml" target="content" />
-
-    <file src="TestingHost.Install.ps1" target="tools\install.ps1" />
-    
     <file src="$SRC_DIR$OrleansTestingHost\**\*.cs" target="src" />
   </files>
 </package>

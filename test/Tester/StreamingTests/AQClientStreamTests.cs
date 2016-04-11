@@ -1,8 +1,4 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
+﻿using System;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
@@ -12,37 +8,27 @@ using Xunit;
 
 namespace Tester.StreamingTests
 {
-    public class AQClientStreamTests : HostedTestClusterPerTest
+    public class AQClientStreamTests : TestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
         private ClientStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var siloHost = new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
-                    {
-                        config.AddMemoryStorageProvider("PubSubStore");
-                        config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName);
-                        config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                    }
-                }, new TestingClientOptions
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName,
-                            new Dictionary<string, string>());
-                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                    }
-                });
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
 
-            runner = new ClientStreamTestRunner(siloHost);
-            return siloHost;
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            return new TestCluster(options);
+        }
+
+        public AQClientStreamTests()
+        {
+            runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         public override void Dispose()

@@ -16,7 +16,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.TimerTests
 {
-    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted, IDisposable
+    public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
         private readonly ITestOutputHelper output;
 
@@ -24,11 +24,6 @@ namespace UnitTests.TimerTests
             : base(fixture)
         {
             this.output = output;
-        }
-
-        public void Dispose()
-        {
-            this.HostedCluster.StopAdditionalSilos();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timers")]
@@ -90,21 +85,31 @@ namespace UnitTests.TimerTests
             output.WriteLine("value = " + last);
             Assert.IsTrue(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
 
-            this.HostedCluster.StartAdditionalSilo();
+            var additionalSilo = this.HostedCluster.StartAdditionalSilo();
+            try
+            {
+                //IManagementGrain mgmtGrain = Orleans.Silo.SystemManagement;
+                //mgmtGrain.SuspendHost(Orleans.SiloAddress).Wait();
 
-            //IManagementGrain mgmtGrain = Orleans.Silo.SystemManagement;
-            //mgmtGrain.SuspendHost(Orleans.SiloAddress).Wait();
+                Thread.Sleep(period.Multiply(10));
+                grain.StopDefaultTimer().Wait();
+                stopwatch.Stop();
 
-            Thread.Sleep(period.Multiply(10));
-            grain.StopDefaultTimer().Wait();
-            stopwatch.Stop();
-
-            last = grain.GetCounter().Result;
-            Assert.IsTrue(last >= 20);
-            double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
-            Assert.IsTrue(last <= maximalNumTicks);
-            //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
-            output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
+                last = grain.GetCounter().Result;
+                Assert.IsTrue(last >= 20);
+                double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
+                Assert.IsTrue(last <= maximalNumTicks);
+                //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
+                output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
+            }
+            finally
+            {
+                if (this.HostedCluster.SecondarySilos.Count > 1)
+                {
+                    // do not leave unnecessarily too many silos running
+                    this.HostedCluster.StopSilo(additionalSilo);
+                }
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timers")]

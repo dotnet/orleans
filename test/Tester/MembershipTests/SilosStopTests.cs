@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -9,21 +10,18 @@ using UnitTests.Tester;
 
 namespace UnitTests.MembershipTests
 {
-    public class SilosStopTests : HostedTestClusterPerTest
+    public class SilosStopTests : TestClusterPerTest
     {
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = true,
-                AdjustConfig = config => {
-                    config.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
-                    config.Globals.NumMissedProbesLimit = 1;
-                    config.Globals.NumVotesForDeathDeclaration = 1;
-                }
-            });
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
+            options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
+            options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
+
+            // use only Primary as the gateway
+            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
@@ -39,7 +37,7 @@ namespace UnitTests.MembershipTests
                 : target.CallOtherLongRunningTask(grain, true, TimeSpan.FromSeconds(7));
 
             await Task.Delay(500);
-            HostedCluster.KillSilo(HostedCluster.Secondary);
+            HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
             try
             {
                 await promise;
@@ -58,7 +56,7 @@ namespace UnitTests.MembershipTests
             var task = grain.LongRunningTask(true, TimeSpan.FromSeconds(7));
             await Task.Delay(500);
 
-            HostedCluster.KillSilo(HostedCluster.Secondary);
+            HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
             HostedCluster.KillSilo(HostedCluster.Primary);
             try
             {
@@ -70,6 +68,6 @@ namespace UnitTests.MembershipTests
                 Assert.AreEqual(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
             }
         }
-        
+
     }
 }

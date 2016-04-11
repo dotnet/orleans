@@ -1,40 +1,32 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Threading.Tasks;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class AQSubscriptionMultiplicityTests : HostedTestClusterPerTest
+    public class AQSubscriptionMultiplicityTests : TestClusterPerTest
     {
-        private const string AQStreamProviderName = "AzureQueueProvider";                 // must match what is in OrleansConfigurationForStreamingUnitTests.xml
+        private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
+        private readonly SubscriptionMultiplicityTestRunner runner;
 
-        private SubscriptionMultiplicityTestRunner runner;
-        
-        public override TestingSiloHost CreateSiloHost()
-        {            
-            var siloHost = new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                }, new TestingClientOptions()
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName, new Dictionary<string, string>());
-                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                    },
-                });
+        public override TestCluster CreateTestCluster()
+        {
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            return new TestCluster(options);
+        }
 
+        public AQSubscriptionMultiplicityTests()
+        {
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, GrainClient.Logger);
-            return siloHost;
         }
 
         public override void Dispose()

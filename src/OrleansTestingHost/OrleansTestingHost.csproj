@@ -58,7 +58,9 @@
     <Compile Include="Utils\StorageEmulator.cs" />
     <Compile Include="StorageTestConstants.cs" />
     <Compile Include="SiloHandle.cs" />
+    <Compile Include="TestClusterOptions.cs" />
     <Compile Include="TestingClientOptions.cs" />
+    <Compile Include="TestCluster.cs" />
     <Compile Include="TestingSiloHost.cs" />
     <Compile Include="TestingSiloOptions.cs" />
     <Compile Include="Utils\TestingUtils.cs" />
@@ -89,9 +91,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="TestingHost.Install.ps1">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

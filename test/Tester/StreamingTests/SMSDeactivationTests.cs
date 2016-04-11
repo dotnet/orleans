@@ -3,37 +3,36 @@ using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using UnitTests.Grains;
 using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class SMSDeactivationTests : HostedTestClusterPerTest
+    public class SMSDeactivationTests : TestClusterPerTest
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
         private DeactivationTestRunner runner;
-        
+
         public SMSDeactivationTests()
         {
             runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
         }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartSecondary = false,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingDeactivationUnitTests.xml"),
-            };
+            var options = new TestClusterOptions();
+            options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromMinutes(1));
+            options.ClusterConfiguration.Globals.Application.SetCollectionAgeLimit(typeof(MultipleSubscriptionConsumerGrain), TimeSpan.FromHours(2));
+            options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(30);
 
-            var clientOptions = new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            };
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
 
-            return new TestingSiloHost(siloOptions, clientOptions);
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]

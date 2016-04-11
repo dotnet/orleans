@@ -7,7 +7,10 @@ using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
+using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.Tester;
@@ -16,19 +19,20 @@ namespace UnitTests.StreamingTests
 {
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartSecondary = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-                });
+                var options = new TestClusterOptions(2);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                // register stream providers
+                // options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
+                // options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
+
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
+                return new TestCluster(options);
             }
         }
 

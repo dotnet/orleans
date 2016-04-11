@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
+using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -8,22 +10,15 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.General
 {
-    using Orleans.Providers;
-    
-    public class InvocationInterceptTests : HostedTestClusterPerTest
+    public class InvocationInterceptTests : TestClusterPerTest
     {
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var host =
-                new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    AdjustConfig =
-                        cfg =>
-                            cfg.Globals.RegisterBootstrapProvider<PreInvokeCallbackBootrstrapProvider>(
-                                "PreInvokeCallbackBootrstrapProvider")
-                });
-            return host;
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+            options.ClusterConfiguration.Globals.RegisterBootstrapProvider<PreInvokeCallbackBootrstrapProvider>(
+                "PreInvokeCallbackBootrstrapProvider");
+            return new TestCluster(options);
         }
 
         /// <summary>

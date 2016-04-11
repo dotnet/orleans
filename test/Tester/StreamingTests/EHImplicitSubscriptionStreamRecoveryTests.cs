@@ -1,9 +1,6 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
@@ -21,7 +18,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
-    public class EHImplicitSubscriptionStreamRecoveryTests :  OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
+    public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest";
@@ -41,34 +38,15 @@ namespace UnitTests.StreamingTests
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
 
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
-                    {
-                        // register stream provider
-                        config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
-                            BuildProviderSettings());
-
-                        // Make sure a node config exist for each silo in the cluster.
-                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                        config.GetOrCreateNodeConfigurationForSilo("Primary");
-                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                    }
-                }, new TestingClientOptions
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName,
-                            BuildProviderSettings());
-                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                    },
-                });
+                var options = new TestClusterOptions(2);
+                // register stream provider
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
+                options.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
+                return new TestCluster(options);
             }
 
             public override void Dispose()
@@ -129,7 +107,7 @@ namespace UnitTests.StreamingTests
                 // send event on each stream
                 for (int j = 0; j < streamCount; j++)
                 {
-                    await producers[j].OnNextAsync(new GeneratedEvent {EventType = GeneratedEvent.GeneratedEventType.Fill});
+                    await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Fill });
                 }
             }
             // send end events

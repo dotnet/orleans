@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Streams;
@@ -14,8 +13,8 @@ namespace Tester.StreamingTests
     {
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
-        private readonly TestingSiloHost testHost;
-        public ClientStreamTestRunner(TestingSiloHost testHost)
+        private readonly TestCluster testHost;
+        public ClientStreamTestRunner(TestCluster testHost)
         {
             this.testHost = testHost;
         }
@@ -31,7 +30,7 @@ namespace Tester.StreamingTests
             testHost.KillClient();
 
             // make sure dead client has had time to drop
-            await Task.Delay(testHost.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
+            await Task.Delay(testHost.ClusterConfiguration.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
 
             // initialize new client
             testHost.InitializeClient();
