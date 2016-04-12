@@ -1,5 +1,5 @@
+
 using System;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
@@ -15,13 +15,12 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-
     public class DelayedQueueRebalancingTests : TestClusterPerTest
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
-        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(20); // matches the config
-        private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan SILO_IMMATURE_PERIOD = TimeSpan.FromSeconds(40); // matches the config
+        private static readonly TimeSpan LEEWAY = TimeSpan.FromSeconds(10);
 
         public override TestCluster CreateTestCluster()
         {
@@ -29,7 +28,6 @@ namespace UnitTests.StreamingTests
             var options = new TestClusterOptions(4);
 
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             var persistentStreamProviderConfig = new PersistentStreamProviderConfig
             {
                 SiloMaturityPeriod = SILO_IMMATURE_PERIOD,
