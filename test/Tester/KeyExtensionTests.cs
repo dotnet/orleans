@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -109,6 +110,25 @@ namespace UnitTests.General
             var remoteGrainRef = await localGrainRef.GetGrainReference();
 
             Assert.AreEqual(localGrainRef, remoteGrainRef, "Mismatched grain ID.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        public void GetPrimaryKeyStringOnGrainReference()
+        {
+            const string key = "foo";
+
+            var grain = GrainClient.GrainFactory.GetGrain<IStringGrain>(key);
+            var key2 = ((GrainReference) grain).GetPrimaryKeyString();
+
+            Assert.AreEqual(key, key2, "Unexpected key was returned.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        public void GetPrimaryKeyStringOnWrongGrainReference()
+        {
+            var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(0);
+            var key = ((GrainReference)grain).GetPrimaryKeyString();
+            Assert.IsNull(key);
         }
     }
 }
