@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Orleans.CodeGeneration;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -101,6 +102,22 @@ namespace UnitTests.CodeGeneration
                 Assert.AreEqual(expected[i], actual[i], "Output list element #{0}", i);
             }
         }
+
+
+
+        public interface IFullySpecified<T> : IGrain
+        { }
+
+        [Fact(Skip = "Currently unsupported"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
+        public void CodeGen_EncounteredFullySpecifiedInterfacesAreEncodedDistinctly() 
+        {
+            var id1 = GrainInterfaceUtils.ComputeInterfaceId(typeof(IFullySpecified<int>));
+            var id2 = GrainInterfaceUtils.ComputeInterfaceId(typeof(IFullySpecified<long>));
+
+            Assert.AreNotEqual(id1, id2);
+        }
+
+
     }
 }
 

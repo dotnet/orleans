@@ -644,9 +644,7 @@ namespace UnitTests.Grains
         }
     }
 
-
-
-
+        
     public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
         public Task<string> Hello() {
@@ -655,5 +653,85 @@ namespace UnitTests.Grains
     }
 
 
+
+
+    namespace Generic.EdgeCases
+    {
+        using System.Linq;
+        using UnitTests.GrainInterfaces.Generic.EdgeCases;
+
+
+        public abstract class BasicGrain : Grain
+        {
+            public Task<string> Hello() {
+                return Task.FromResult("Hello!");
+            }
+
+            public Task<string[]> ConcreteGenArgTypeNames() {
+                var grainType = GetImmediateSubclass(this.GetType());
+
+                return Task.FromResult(
+                                grainType.GetGenericArguments()
+                                            .Select(t => t.FullName)
+                                            .ToArray()
+                                );
+            }
+
+
+            Type GetImmediateSubclass(Type subject) {
+                if(subject.BaseType == typeof(BasicGrain)) {
+                    return subject;
+                }
+
+                return GetImmediateSubclass(subject.BaseType);
+            }
+        }
+
+
+
+        public class PartiallySpecifyingGrain<T> : BasicGrain, IGrainWithTwoGenArgs<string, T>
+        { }
+
+
+        public class GrainWithPartiallySpecifyingInterface<T> : BasicGrain, IPartiallySpecifyingInterface<T>
+        { }
+
+
+        public class GrainSpecifyingSameGenArgTwice<T> : BasicGrain, IGrainReceivingRepeatedGenArgs<T, T>
+        { }
+
+
+        public class SpecifyingRepeatedGenArgsAmongstOthers<T1, T2> : BasicGrain, IReceivingRepeatedGenArgsAmongstOthers<T2, T1, T2>
+        { }
+
+        public class GrainForTestingCastingBetweenInterfacesWithReusedGenArgs : BasicGrain, ISpecifyingGenArgsRepeatedlyToParentInterface<bool>
+        { }
+
+
+        public class SpecifyingSameGenArgsButRearranged<T1, T2> : BasicGrain, IReceivingRearrangedGenArgs<T2, T1>
+        { }
+
+
+        public class GrainForTestingCastingWithRearrangedGenArgs<T1, T2> : BasicGrain, ISpecifyingRearrangedGenArgsToParentInterface<T1, T2>
+        { }
+
+
+        public class GrainWithGenArgsUnrelatedToFullySpecifiedGenericInterface<T1, T2> : BasicGrain, IArbitraryInterface<T1, T2>, IInterfaceUnrelatedToConcreteGenArgs<float>
+        { }
+
+
+        public class GrainSupplyingFurtherSpecializedGenArg<T> : BasicGrain, IInterfaceTakingFurtherSpecializedGenArg<List<T>>
+        { }
+
+        public class GrainSupplyingGenArgSpecializedIntoArray<T> : BasicGrain, IInterfaceTakingFurtherSpecializedGenArg<T[]>
+        { }
+
+
+        public class GrainForCastingBetweenInterfacesOfFurtherSpecializedGenArgs<T>
+            : BasicGrain, IAnotherReceivingFurtherSpecializedGenArg<List<T>>, IYetOneMoreReceivingFurtherSpecializedGenArg<T[]>
+        { }
+
+
+    }
 
 }
