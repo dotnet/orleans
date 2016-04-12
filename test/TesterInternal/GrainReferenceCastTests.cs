@@ -464,7 +464,7 @@ namespace UnitTests
 
             Assert.AreEqual(
                 typeof(ISomeGenericGrain<string>).GetTypeInfo().UnderlyingSystemType.FullName, 
-                castRef.GenericArgumentsForTesting);
+                castRef.GenericArguments);
         }
         
     }

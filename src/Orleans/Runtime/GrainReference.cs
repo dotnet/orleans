@@ -15,7 +15,6 @@ namespace Orleans.Runtime
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
         private readonly GuidId observerId;
-        private readonly string genericArgs;
         
         [NonSerialized]
         private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainReference", TraceLogger.LoggerType.Runtime);
@@ -37,6 +36,8 @@ namespace Orleans.Runtime
 
         internal GrainId GrainId { get; private set; }
 
+        internal string ActivatingGenArgs { get; private set; }
+
         /// <summary>
         /// Called from generated code.
         /// </summary>
@@ -56,25 +57,21 @@ namespace Orleans.Runtime
         /// Constructs a reference to the grain with the specified Id.
         /// </summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
-        private GrainReference(GrainId grainId, string genericArguments, SiloAddress systemTargetSilo, GuidId observerId)
+        private GrainReference(GrainId grainId, string activatingGenArgs, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
-            genericArgs = genericArguments;
+            ActivatingGenArgs = String.IsNullOrEmpty(activatingGenArgs) ? null : activatingGenArgs;
             SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
-            if (String.IsNullOrEmpty(genericArguments))
-            {
-                genericArgs = null; // always keep it null instead of empty.
-            }
-
+            
             // SystemTarget checks
             if (grainId.IsSystemTarget && systemTargetSilo==null)
             {
                 throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));
             }
-            if (grainId.IsSystemTarget && genericArguments != null)
+            if (grainId.IsSystemTarget && activatingGenArgs != null)
             {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, activatingGenArgs), "genericArgument");
             }
             if (grainId.IsSystemTarget && observerId != null)
             {
@@ -90,9 +87,9 @@ namespace Orleans.Runtime
             {
                 throw new ArgumentNullException("observerId", String.Format("Trying to create a GrainReference for Observer with Client grain id {0}, but passing null observerId.", grainId));
             }
-            if (grainId.IsClient && genericArguments != null)
+            if (grainId.IsClient && activatingGenArgs != null)
             {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, activatingGenArgs), "genericArgument");
             }
             if (grainId.IsClient && systemTargetSilo != null)
             {
@@ -111,7 +108,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.GenericArguments, other.SystemTargetSilo, other.ObserverId) { }
+            : this(other.GrainId, other.ActivatingGenArgs, other.SystemTargetSilo, other.ObserverId) { }
 
         #endregion
 
@@ -121,9 +118,9 @@ namespace Orleans.Runtime
         /// Constructs a reference to the grain with the specified ID.
         /// </summary>
         /// <param name="grainId">The ID of the grain to refer to.</param>
-        internal static GrainReference FromGrainId(GrainId grainId, string genericArguments = null, SiloAddress systemTargetSilo = null)
+        internal static GrainReference FromGrainId(GrainId grainId, string activatingGenArgs = null, SiloAddress systemTargetSilo = null)
         {
-            return new GrainReference(grainId, genericArguments, systemTargetSilo, null);
+            return new GrainReference(grainId, activatingGenArgs, systemTargetSilo, null);
         }
 
         internal static GrainReference NewObserverGrainReference(GrainId grainId, GuidId observerId)
@@ -165,10 +162,8 @@ namespace Orleans.Runtime
         {
             if (other == null)
                 return false;
-
-            if (GenericArguments != other.GenericArguments)
-                return false;
-            if (!GrainId.Equals(other.GrainId))
+            
+            if (!GrainId.Equals(other.GrainId) || ActivatingGenArgs != other.ActivatingGenArgs)
             {
                 return false;
             }
@@ -273,10 +268,16 @@ namespace Orleans.Runtime
         /// Return the generic type arguments of the interface as a string
         /// Implemented in generated code.
         /// </summary>
-        protected virtual string GenericArguments {
+        protected virtual string GenericArgumentsInner {
             get 
             {
-                return genericArgs;
+                return null;
+            }
+        }
+
+        internal string GenericArguments {
+            get {
+                return GenericArgumentsInner;
             }
         }
         
@@ -348,7 +349,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, GenericArguments);
+            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, GenericArguments); //and doesn't this trigger activation too?
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -691,10 +692,7 @@ namespace Orleans.Runtime
             {
                 info.AddValue(OBSERVER_ID_STR, observerId.ToParsableString(), typeof(string));
             }
-            string genericArg = String.Empty;
-            if (HasGenericArgument)
-                genericArg = GenericArguments;
-            info.AddValue("GenericArguments", genericArg, typeof(string));
+            info.AddValue("GenericArguments", ActivatingGenArgs ?? string.Empty, typeof(string));
         }
 
         // The special constructor is used to deserialize values. 
@@ -713,25 +711,12 @@ namespace Orleans.Runtime
                 var observerIdStr = info.GetString(OBSERVER_ID_STR);
                 observerId = GuidId.FromParsableString(observerIdStr);
             }
-            var genericArg = info.GetString("GenericArguments");
-            if (String.IsNullOrEmpty(genericArg))
-                genericArg = null;
-            genericArgs = genericArg;
+            var activatingGenArgs = info.GetString("GenericArguments");            
+            ActivatingGenArgs = string.IsNullOrEmpty(activatingGenArgs) ? null : activatingGenArgs;
         }
 
         #endregion
-
-
-        #region Testing
-        
-        internal string GenericArgumentsForTesting {
-            get {
-                return this.GenericArguments;
-            }
-        }
-
-        #endregion
-
+                
     }
     
 }

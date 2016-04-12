@@ -352,7 +352,7 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax GenerateGenericArgumentsProperty(Type grainType) 
         {
             return
-                SF.PropertyDeclaration(typeof(string).GetTypeSyntax(), "GenericArguments")
+                SF.PropertyDeclaration(typeof(string).GetTypeSyntax(), "GenericArgumentsInner")
                     .AddAccessorListAccessors(
                         SF.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                             .AddBodyStatements(
