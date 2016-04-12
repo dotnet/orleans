@@ -501,7 +501,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                if (!(ex.GetBaseException() is KeyNotFoundException))
+                if (ShouldLogError(ex))
                 {
                     logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed,
                         String.Format("SelectTarget failed with {0}", ex.Message),
@@ -510,6 +510,12 @@ namespace Orleans.Runtime
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
                 RejectMessage(message, Message.RejectionTypes.Unrecoverable, ex);
             }
+        }
+
+        private bool ShouldLogError(Exception ex)
+        {
+            return !(ex.GetBaseException() is KeyNotFoundException) &&
+                   !(ex.GetBaseException() is ClientNotAvailableException);
         }
 
         // this is a compatibility method for portions of the code base that don't use

@@ -242,7 +242,7 @@ namespace Orleans.Streams
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
-                         (exception, i) => true,
+                         (exception, i) => !(exception is ClientNotAvailableException),
                          config.MaxEventDeliveryTime,
                          DefaultBackoffProvider);
 
@@ -494,7 +494,7 @@ namespace Orleans.Streams
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
-                                (exception, i) => true,
+                                (exception, i) => !(exception is ClientNotAvailableException),
                                 config.MaxEventDeliveryTime,
                                 DefaultBackoffProvider);
                             if (newToken != null)
@@ -514,7 +514,9 @@ namespace Orleans.Streams
                         }
                         var message = string.Format("Exception while trying to deliver msgs to stream {0} in PersistentStreamPullingAgentGrain.RunConsumerCursor", consumerData.StreamId);
                         logger.Error((int)ErrorCode.PersistentStreamPullingAgent_14, message, exc);
-                        exceptionOccured = new StreamEventDeliveryFailureException(consumerData.StreamId);
+                        exceptionOccured = exc is ClientNotAvailableException
+                            ? exc
+                            : new StreamEventDeliveryFailureException(consumerData.StreamId);
                     }
                     // if we failed to deliver a batch
                     if (exceptionOccured != null)
@@ -577,6 +579,15 @@ namespace Orleans.Streams
 
         private async Task<bool> ErrorProtocol(StreamConsumerData consumerData, Exception exceptionOccured, bool isDeliveryError, IBatchContainer batch, StreamSequenceToken token)
         {
+            // for loss of client, we just remove the subscription
+            if (exceptionOccured is ClientNotAvailableException)
+            {
+                logger.Warn((int)ErrorCode.Stream_ConsumerIsDead,
+                    "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
+                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName).Ignore();
+                return true;
+            }
+
             // notify consumer about the error or that the data is not available.
             await OrleansTaskExtentions.ExecuteAndIgnoreException(
                 () => DeliverErrorToConsumer(

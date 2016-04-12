@@ -1,10 +1,12 @@
-﻿using System;
+﻿
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
@@ -12,7 +14,14 @@ namespace Tester.StreamingTests
     {
         private const string SMSStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
-        private ClientStreamTestRunner runner;
+        private readonly ITestOutputHelper output;
+        private readonly ClientStreamTestRunner runner;
+
+        public SMSClientStreamTests(ITestOutputHelper output)
+        {
+            this.output = output;
+            runner = new ClientStreamTestRunner(this.HostedCluster);
+        }
 
         public override TestCluster CreateTestCluster()
         {
@@ -25,16 +34,18 @@ namespace Tester.StreamingTests
             return new TestCluster(options);
         }
 
-        public SMSClientStreamTests()
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task SMSStreamProducerOnDroppedClientTest()
         {
-            runner = new ClientStreamTestRunner(this.HostedCluster);
+            logger.Info("************************ SMSStreamProducerOnDroppedClientTest *********************************");
+            await runner.StreamProducerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task MSMStreamProducerOnDroppedClientTest()
+        public async Task SMSStreamConsumerOnDroppedClientTest()
         {
-            logger.Info("************************ SMSDeactivationTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace);
+            logger.Info("************************ SMSStreamConsumerOnDroppedClientTest *********************************");
+            await runner.StreamConsumerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace, output);
         }
     }
 }

@@ -215,8 +215,11 @@
     <Compile Include="StreamingTests\StreamFilteringTests.cs" />
     <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
+    <Compile Include="TestStreamProviders\AzureQueue\TestAzureQueueStreamProvider.cs" />
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
+    <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
+    <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="TestUtils.cs" />
   </ItemGroup>
   <ItemGroup>

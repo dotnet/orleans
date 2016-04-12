@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
@@ -21,12 +22,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
     {
         private readonly Dictionary<StreamId, StreamConsumerExtensionCollection> remoteConsumers;
         private readonly IStreamProviderRuntime     providerRuntime;
+        private readonly IStreamPubSub              streamPubSub;
         private readonly bool                       fireAndForgetDelivery;
         private readonly Logger                     logger;
 
-        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, bool fireAndForget)
+        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, bool fireAndForget)
         {
             providerRuntime = providerRt;
+            streamPubSub = pubsub;
             fireAndForgetDelivery = fireAndForget;
             remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
             logger = providerRuntime.GetLogger(GetType().Name);
@@ -39,7 +42,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // so this call is only made once, when StreamProducer is created.
             if (remoteConsumers.TryGetValue(streamId, out obs)) return;
 
-            obs = new StreamConsumerExtensionCollection();
+            obs = new StreamConsumerExtensionCollection(streamPubSub, logger);
             remoteConsumers.Add(streamId, obs);
         }
 
@@ -159,9 +162,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal class StreamConsumerExtensionCollection
         {
             private readonly ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>> consumers;
+            private readonly IStreamPubSub streamPubSub;
+            private readonly Logger logger;
 
-            internal StreamConsumerExtensionCollection()
+            internal StreamConsumerExtensionCollection(IStreamPubSub pubSub, Logger logger)
             {
+                streamPubSub = pubSub;
+                this.logger = logger;
                 consumers = new ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>>();
             }
 
@@ -196,7 +203,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             continue;
                     }
 
-                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, null, null);
+                    Task task = DeliverToRemote(remoteConsumer, streamId, subscriptionKvp.Key, immutableItem);
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }
@@ -204,6 +211,24 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 return fireAndForgetDelivery ? TaskDone.Done : Task.WhenAll(tasks);
             }
 
+            private async Task DeliverToRemote(IStreamConsumerExtension remoteConsumer, StreamId streamId, GuidId subscriptionId, Immutable<object> item)
+            {
+                try
+                {
+                    await remoteConsumer.DeliverItem(subscriptionId, item, null, null);
+                }
+                catch (ClientNotAvailableException)
+                {
+                    Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper> discard;
+                    if (consumers.TryRemove(subscriptionId, out discard))
+                    {
+                        streamPubSub.UnregisterConsumer(subscriptionId, streamId, streamId.ProviderName).Ignore();
+                        logger.Warn((int)ErrorCode.Stream_ConsumerIsDead,
+                            "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", remoteConsumer, streamId);
+                    }
+                }
+            }
+        
             internal Task CompleteStream(StreamId streamId, bool fireAndForgetDelivery)
             {
                 var tasks = fireAndForgetDelivery ? null : new List<Task>();

@@ -1,10 +1,13 @@
-﻿using System;
+﻿
+using System;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester.TestStreamProviders;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
@@ -13,7 +16,14 @@ namespace Tester.StreamingTests
         private const string AQStreamProviderName = "AzureQueueProvider";
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
-        private ClientStreamTestRunner runner;
+        private readonly ITestOutputHelper output;
+        private readonly ClientStreamTestRunner runner;
+
+        public AQClientStreamTests(ITestOutputHelper output)
+        {
+            this.output = output;
+            runner = new ClientStreamTestRunner(this.HostedCluster);
+        }
 
         public override TestCluster CreateTestCluster()
         {
@@ -21,14 +31,8 @@ namespace Tester.StreamingTests
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-
             options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             return new TestCluster(options);
-        }
-
-        public AQClientStreamTests()
-        {
-            runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         public override void Dispose()
@@ -37,6 +41,7 @@ namespace Tester.StreamingTests
             base.Dispose();
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, deploymentId,
                 StorageTestConstants.DataConnectionString).Wait();
+            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
@@ -44,6 +49,14 @@ namespace Tester.StreamingTests
         {
             logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
+        }
+
+        [Fact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQStreamConsumerOnDroppedClientTest()
+        {
+            logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");
+            await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
         }
     }
 }
