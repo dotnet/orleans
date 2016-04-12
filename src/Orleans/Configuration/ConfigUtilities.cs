@@ -18,6 +18,35 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public static class ConfigUtilities
     {
+        internal static void ParseAdditionalAssemblyDirectories(IDictionary<string, SearchOption> directories, XmlElement root)
+        {
+            foreach(var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                
+                if(grandchild == null)
+                {
+                    continue;
+                }
+                else
+                {
+                    if(!grandchild.HasAttribute("Path"))
+                        throw new FormatException("Missing 'Path' attribute on Directory element.");
+
+                    // default to recursive
+                    var recursive = true;
+
+                    if(grandchild.HasAttribute("IncludeSubFolders"))
+                    {
+                        if(!bool.TryParse(grandchild.Attributes["IncludeSubFolders"].Value, out recursive))
+                            throw new FormatException("Attribute 'IncludeSubFolders' has invalid value.");
+
+                        directories[grandchild.Attributes["Path"].Value] = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                    }
+                }
+            }
+        }
+
         internal static void ParseTelemetry(XmlElement root)
         {
             foreach (var node in root.ChildNodes)

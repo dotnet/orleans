@@ -522,6 +522,23 @@
     </xs:attribute>
   </xs:complexType>
 
+  <xs:complexType name="AdditionalAssemblyDirectoriesConfig">
+    <xs:annotation>
+      <xs:documentation> 
+        Additional directories for orleans to scan to load DLLs.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Directory" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>
+            Directory to search.  If attribute 'IncludeSubFolders' is true, then all subfolders will be scanned
+          </xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  
   <xs:complexType name="TracingConfiguration">
     <xs:annotation>
       <xs:documentation>
@@ -1022,6 +1039,7 @@
       <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
       <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
       <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
+      <xs:element name="AdditionalAssemblyDirectories" minOccurs="0" maxOccurs="1" type="tns:AdditionalAssemblyDirectoriesConfig" />
     </xs:sequence>
   </xs:complexType>
   <xs:element name="OrleansConfiguration">

@@ -131,7 +131,9 @@ namespace Orleans.Runtime
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
             : this(name, siloType, config, null)
-        {}
+        {
+            
+        }
 
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -233,7 +235,10 @@ namespace Orleans.Runtime
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
             grainFactory = new GrainFactory();
-            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
+            typeManager = new GrainTypeManager(
+                here.Address.Equals(IPAddress.Loopback),
+                grainFactory, 
+                new SiloAssemblyLoader(OrleansConfig.Defaults.AdditionalAssemblyDirectories));
 
             // Performance metrics
             siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);

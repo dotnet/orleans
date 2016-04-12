@@ -346,6 +346,10 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="ReadMe.md" />
+    <Content Include="Config_AdditionalAssemblies.xml">
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
