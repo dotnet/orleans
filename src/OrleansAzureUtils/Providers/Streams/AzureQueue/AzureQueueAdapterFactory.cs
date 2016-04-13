@@ -1,6 +1,6 @@
+
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Runtime;
 using Orleans.Providers.Streams.Common;
@@ -29,6 +29,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>"DeploymentId".</summary>
         public const string DeploymentIdPropertyName = "DeploymentId";
 
+        /// <summary>
+        /// Application level failure handler override.
+        /// </summary>
+        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
+
         /// <summary> Init the factory.</summary>
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
@@ -51,6 +56,11 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
             adapterCache = new SimpleQueueAdapterCache(cacheSize, logger);
+            if (StreamFailureHandlerFactory == null)
+            {
+                StreamFailureHandlerFactory =
+                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+            }
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
@@ -79,7 +89,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+            return StreamFailureHandlerFactory(queueId);
         }
     }
 }

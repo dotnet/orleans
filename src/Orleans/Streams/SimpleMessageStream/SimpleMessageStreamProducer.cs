@@ -48,7 +48,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, fireAndForgetDelivery));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, fireAndForgetDelivery));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;
