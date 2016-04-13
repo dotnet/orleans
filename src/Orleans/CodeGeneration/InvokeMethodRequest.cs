@@ -11,14 +11,19 @@ namespace Orleans.CodeGeneration
     {
         /// <summary> InterfaceId for this Invoke request. </summary>
         public int InterfaceId { get; private set; }
+        /// <summary> Full name of interface, including generic args - only used when interface is generic and InterfaceId is insufficient. </summary>
+        public string InterfaceGenArgs { get; private set; }
+
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
+
         /// <summary> Arguments for this Invoke request. </summary>
         public object[] Arguments { get; private set; }
 
-        internal InvokeMethodRequest(int interfaceId, int methodId, object[] arguments)
+        internal InvokeMethodRequest(int interfaceId, string interfaceGenArgs, int methodId, object[] arguments)
         {
             InterfaceId = interfaceId;
+            InterfaceGenArgs = interfaceGenArgs;
             MethodId = methodId;
             Arguments = arguments;
         }

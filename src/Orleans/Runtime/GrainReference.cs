@@ -256,7 +256,7 @@ namespace Orleans.Runtime
         /// Return the name of the interface for this GrainReference. 
         /// Implemented in Orleans generated code.
         /// </summary>
-        public virtual string InterfaceName
+        public virtual string InterfaceName   //Just used for debug info
         {
             get
             {
@@ -316,7 +316,7 @@ namespace Orleans.Runtime
                 argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
             }
             
-            var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
+            var request = new InvokeMethodRequest(this.InterfaceId, this.GenericArguments, methodId, argsDeepCopy);
 
             if (IsUnordered)
                 options |= InvokeMethodOptions.Unordered;
@@ -349,7 +349,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, GenericArguments); //and doesn't this trigger activation too?
+            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, ActivatingGenArgs);
             return isOneWayCall ? null : resolver.Task;
         }
 

@@ -1454,6 +1454,7 @@ namespace Orleans.Serialization
             var request = (InvokeMethodRequest)obj;
 
             stream.Write(request.InterfaceId);
+            stream.Write(request.InterfaceGenArgs);
             stream.Write(request.MethodId);
             stream.Write(request.Arguments != null ? request.Arguments.Length : 0);
             if (request.Arguments != null)
@@ -1468,6 +1469,7 @@ namespace Orleans.Serialization
         internal static object DeserializeInvokeMethodRequest(Type expected, BinaryTokenStreamReader stream)
         {
             int iid = stream.ReadInt();
+            string genArgs = stream.ReadString();
             int mid = stream.ReadInt();
 
             int argCount = stream.ReadInt();
@@ -1482,7 +1484,7 @@ namespace Orleans.Serialization
                 }
             }
 
-            return new InvokeMethodRequest(iid, mid, args);
+            return new InvokeMethodRequest(iid, genArgs, mid, args);
         }
 
         internal static object CopyInvokeMethodRequest(object original)
@@ -1499,7 +1501,7 @@ namespace Orleans.Serialization
                 }
             }
 
-            var result = new InvokeMethodRequest(request.InterfaceId, request.MethodId, args);
+            var result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceGenArgs, request.MethodId, args);
             SerializationContext.Current.RecordObject(original, result);
             return result;
         }
