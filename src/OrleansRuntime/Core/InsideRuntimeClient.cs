@@ -337,7 +337,7 @@ namespace Orleans.Runtime
                 {
                     var request = (InvokeMethodRequest) message.BodyObject;
 
-                    var invoker = invokable.GetInvoker(request.InterfaceId, message.GenericGrainType);
+                    var invoker = invokable.GetInvoker(request.InterfaceId, request.InterfaceGenArgs);
 
                     if (invoker is IGrainExtensionMethodInvoker
                         && !(target is IGrainExtension))
