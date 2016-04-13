@@ -70,6 +70,7 @@
     <Compile Include="ReminderTestGrain2.cs" />
     <Compile Include="SerializerPresenceTestGrain.cs" />
     <Compile Include="StreamingGrain.cs" />
+    <Compile Include="StreamingImmutabilityTestGrain.cs" />
     <Compile Include="StreamLifecycleTestGrains.cs" />
     <Compile Include="StreamLifecycleTestInternalGrains.cs" />
     <Compile Include="StreamReliabilityTestGrains.cs" />
