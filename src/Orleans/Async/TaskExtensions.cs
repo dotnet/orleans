@@ -285,15 +285,7 @@ namespace Orleans
 
             if (task.Status == TaskStatus.RanToCompletion)
             {
-                resolver.TrySetResult(task.Result);
-            }
-            else if (task.IsFaulted)
-            {
-                resolver.TrySetException(task.Exception);
-            }
-            else if (task.IsCanceled)
-            {
-                resolver.TrySetException(new TaskCanceledException(task));
+                CompletedTaskToResolver(resolver, task);
             }
             else
             {
@@ -301,21 +293,26 @@ namespace Orleans
 
                 task.ContinueWith(t =>
                 {
-                    if (t.IsFaulted)
-                    {
-                        resolver.TrySetException(t.Exception.InnerExceptions);
-                    }
-                    else if (t.IsCanceled)
-                    {
-                        resolver.TrySetException(new TaskCanceledException(t));
-                    }
-                    else
-                    {
-                        resolver.TrySetResult(t.GetResult());
-                    }
+                    CompletedTaskToResolver(resolver, task);
                 });
             }
             return resolver.Task;
+        }
+
+        private static void CompletedTaskToResolver<T>(TaskCompletionSource<T> resolver, Task<T> task)
+        {
+            if (task.IsFaulted)
+            {
+                resolver.TrySetException(task.Exception.InnerExceptions);
+            }
+            else if (task.IsCanceled)
+            {
+                resolver.TrySetException(new TaskCanceledException(task));
+            }
+            else
+            {
+                resolver.TrySetResult(task.GetResult());
+            }
         }
 
         //The rationale for GetAwaiter().GetResult() instead of .Result
