@@ -720,8 +720,8 @@ namespace UnitTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
-        public void Config_AdditionalAssemblyApths_Config()
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_AdditionalAssemblyPaths_Config()
         {
             const string filename = "Config_AdditionalAssemblies.xml";
             const int numPaths = 2;
