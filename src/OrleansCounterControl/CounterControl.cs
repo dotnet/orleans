@@ -12,7 +12,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Counter.Control
 {
     using Orleans.Serialization;
-
+    using System.Collections.Generic;
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>
@@ -111,12 +111,12 @@ namespace Orleans.Counter.Control
 
             try
             {
-                if (Unregister) 
+                if (Unregister)
                 {
                     ConsoleText.WriteStatus("Unregistering Orleans performance counters with Windows");
                     UnregisterWindowsPerfCounters(this.BruteForce);
                 }
-                else 
+                else
                 {
                     ConsoleText.WriteStatus("Registering Orleans performance counters with Windows");
                     RegisterWindowsPerfCounters(true); // Always reinitialize counter registrations, even if already existed
@@ -125,7 +125,7 @@ namespace Orleans.Counter.Control
                 ConsoleText.WriteStatus("Operation completed successfully.");
                 return 0;
             }
-            catch (Exception exc) 
+            catch (Exception exc)
             {
                 ConsoleText.WriteError("Error running " + typeof(CounterControl).GetTypeInfo().Assembly.GetName().Name + ".exe", exc);
 
@@ -142,7 +142,7 @@ namespace Orleans.Counter.Control
         private static void InitConsoleLogging()
         {
             Trace.Listeners.Clear();
-            var cfg = new NodeConfiguration {TraceFilePattern = null, TraceToConsole = false};
+            var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             TraceLogger.Initialize(cfg);
 
             //TODO: Move it to use the APM APIs
@@ -157,7 +157,7 @@ namespace Orleans.Counter.Control
         /// <remarks>Note: Program needs to be running as Administrator to be able to register Windows perf counters.</remarks>
         private static void RegisterWindowsPerfCounters(bool useBruteForce)
         {
-            try 
+            try
             {
                 if (OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
                 {
@@ -173,13 +173,14 @@ namespace Orleans.Counter.Control
 
                 if (GrainTypeManager.Instance == null)
                 {
-                    var typeManager = new GrainTypeManager(false, null); // We shouldn't need GrainFactory in this case
+                    var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
+                    var typeManager = new GrainTypeManager(false, null, loader); // We shouldn't need GrainFactory in this case
                     GrainTypeManager.Instance.Start(false);
                 }
                 // Register perf counters
                 OrleansPerfCounterManager.InstallCounters();
 
-                if (OrleansPerfCounterManager.AreWindowsPerfCountersAvailable()) 
+                if (OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
                     ConsoleText.WriteStatus("Orleans counters registered successfully");
                 else
                     ConsoleText.WriteError("Orleans counters are NOT registered");
@@ -203,7 +204,7 @@ namespace Orleans.Counter.Control
                 ConsoleText.WriteStatus("Orleans counters are already unregistered");
                 return;
             }
-            
+
             // Delete any old perf counters
             try
             {

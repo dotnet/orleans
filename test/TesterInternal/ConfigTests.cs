@@ -719,6 +719,20 @@ namespace UnitTests
                 }
             }
         }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_AdditionalAssemblyPaths_Config()
+        {
+            const string filename = "Config_AdditionalAssemblies.xml";
+            const int numPaths = 2;
+            var orleansConfig = new ClusterConfiguration();
+            orleansConfig.LoadFromFile(filename);
+
+            Assert.IsNotNull(orleansConfig.Defaults.AdditionalAssemblyDirectories, "Additional Assembly Dictionary");
+            Assert.AreEqual(numPaths, orleansConfig.Defaults.AdditionalAssemblyDirectories.Count, "Additional Assembly count");
+
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProviders_AzureTable_Default()
         {
@@ -792,7 +806,7 @@ namespace UnitTests
         public void ClientConfig_FromFile_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-            Xunit.Assert.Throws<FileNotFoundException>(() => 
+            Xunit.Assert.Throws<FileNotFoundException>(() =>
             ClientConfiguration.LoadFromFile(filename));
         }
 
@@ -801,7 +815,7 @@ namespace UnitTests
         {
             const string filename = "SiloConfig_NotFound.xml";
             var config = new ClusterConfiguration();
-            Xunit.Assert.Throws<FileNotFoundException>(() => 
+            Xunit.Assert.Throws<FileNotFoundException>(() =>
                 config.LoadFromFile(filename));
         }
 
