@@ -26,14 +26,14 @@
   </WizardExtension>
   <WizardData>
     <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
-      <package id="Microsoft.Orleans.Core" version="1.2.0" />
+      <package id="Microsoft.Orleans.Core" version="1.2.0-beta" />
     </packages>
     <Assets>
       <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterface" d:TargetPath="|VSProjectTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
       <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterface" d:TargetPath="|VSItemTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
       <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
       <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-      <Asset Type="Microsoft.Orleans.Core.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Microsoft.Orleans.Core.1.2.0-beta.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0-beta.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
     </Assets>
   </WizardData>

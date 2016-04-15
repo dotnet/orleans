@@ -28,8 +28,8 @@
   </WizardExtension>
   <WizardData>
     <packages repository="extension" repositoryId="462db41f-31a4-48f0-834c-1bdcc0578511">
-      <package id="Microsoft.Orleans.Core" version="1.2.0" />
-      <package id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="1.2.0" />
+      <package id="Microsoft.Orleans.Core" version="1.2.0-beta" />
+      <package id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="1.2.0-beta" />
     </packages>
     <Assets>
       <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainImplementation" d:TargetPath="|VSProjectTemplateGrainImplementation;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
@@ -42,8 +42,8 @@
       <Asset Type="Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Orleans.Core.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Microsoft.Orleans.Core.1.2.0-beta.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0-beta.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0-beta.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0-beta.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.Immutable.1.1.36.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.36.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Reflection.Metadata.1.0.21.nupkg" d:Source="File" Path="Packages\System.Reflection.Metadata.1.0.21.nupkg" d:VsixSubPath="Packages" />

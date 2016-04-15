@@ -193,32 +193,32 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\packages\Microsoft.Orleans.Core.1.2.0\Microsoft.Orleans.Core.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Core.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Core.1.2.0-beta\Microsoft.Orleans.Core.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.Core.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.CounterControl.1.2.0\Microsoft.Orleans.CounterControl.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.CounterControl.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.CounterControl.1.2.0-beta\Microsoft.Orleans.CounterControl.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.CounterControl.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0-beta\Microsoft.Orleans.OrleansCodeGenerator.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansHost.1.2.0\Microsoft.Orleans.OrleansHost.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansHost.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansHost.1.2.0-beta\Microsoft.Orleans.OrleansHost.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansHost.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansProviders.1.2.0\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansProviders.1.2.0-beta\Microsoft.Orleans.OrleansProviders.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansProviders.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0-beta\Microsoft.Orleans.OrleansRuntime.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansRuntime.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Server.1.2.0\Microsoft.Orleans.Server.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Server.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Server.1.2.0-beta\Microsoft.Orleans.Server.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.Server.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <Content Include="..\..\packages\Microsoft.CodeAnalysis.Analyzers.1.0.0\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg">
@@ -253,16 +253,16 @@
       <Link>Packages\System.Reflection.Metadata.1.0.21.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Templates.Grains.1.2.0\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Templates.Grains.1.2.0-beta\Microsoft.Orleans.Templates.Grains.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Grains.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.Templates.Interfaces.1.2.0\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.Templates.Interfaces.1.2.0-beta\Microsoft.Orleans.Templates.Interfaces.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.Templates.Interfaces.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg">
-      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0.nupkg</Link>
+    <Content Include="..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0-beta\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0-beta.nupkg">
+      <Link>Packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0-beta.nupkg</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
     <None Include="OrleansVSTools.snk" />
