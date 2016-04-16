@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -21,7 +22,7 @@ namespace Orleans.Runtime.Scheduler
 
         [ThreadStatic]
         private static WorkerPoolThread current;
-        internal static WorkerPoolThread CurrentWorkerThread { get { return current; } }
+        internal static WorkerPoolThread CurrentWorkerThread { get { return current; }  set { current = value; } }
 
         internal static RuntimeContext CurrentContext { get { return RuntimeContext.Current; } }
 
@@ -100,8 +101,29 @@ namespace Orleans.Runtime.Scheduler
             CurrentWorkItem = null;
             if (StatisticsCollector.CollectTurnsStats)
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
+            executor = new ActionBlock<IWorkItem>(item =>
+            {
+                 try
+                 {
+                   //  CurrentWorkerThread = Thread.CurrentThread;
+                    RuntimeContext.Current = new RuntimeContext
+                    {
+                        Scheduler = TaskScheduler.Current
+                    };
+                    RuntimeContext.SetExecutionContext(item.SchedulingContext, scheduler);
+
+
+                    item.Execute();
+                    RuntimeContext.ResetExecutionContext();
+                }
+                catch (Exception ex)
+                {
+                    var b = ex;
+                }
+            });
         }
 
+        private readonly ActionBlock<IWorkItem> executor;
         protected override void Run()
         {
             try
@@ -162,7 +184,7 @@ namespace Orleans.Runtime.Scheduler
                             // Do the work
                             try
                             {
-                                RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
+                            //    RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
                                 CurrentWorkItem = todo;
 #if TRACK_DETAILED_STATS
                                 if (todo.ItemType != WorkItemType.WorkItemGroup)
@@ -173,7 +195,7 @@ namespace Orleans.Runtime.Scheduler
                                     }
                                 }
 #endif
-                                todo.Execute();
+                                executor.Post(todo);
                             }
                             catch (ThreadAbortException ex)
                             {
@@ -213,7 +235,7 @@ namespace Orleans.Runtime.Scheduler
                                 if (!IsSystem)
                                     pool.RecordIdlingThread();
                                 
-                                RuntimeContext.ResetExecutionContext();
+                             //   RuntimeContext.ResetExecutionContext();
                                 noWorkCount = 0;
                             }
                         }

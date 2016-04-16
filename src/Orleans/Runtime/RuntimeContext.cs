@@ -5,7 +5,7 @@ namespace Orleans.Runtime
 {
     internal class RuntimeContext
     {
-        public TaskScheduler Scheduler { get; private set; }
+        public TaskScheduler Scheduler { get;  set; }
         public ISchedulingContext ActivationContext { get; private set; }
 
         [ThreadStatic]
@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         public static RuntimeContext Current 
         { 
             get { return context; } 
+            set { context = value; }
         }
 
         internal static ISchedulingContext CurrentActivationContext
