@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B888D741-4D06-4228-A2BF-DE088A9E6129}"
 	ProjectSection(SolutionItems) = preProject
@@ -87,6 +87,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansVSTools", "OrleansVSTools\OrleansVSTools.csproj", "{E8BF3F9B-EAA4-48E9-AC31-59DE955B60EE}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "VSItemTemplateGrainImplementationFSharp", "VSItemTemplateGrainImplementationFSharp\VSItemTemplateGrainImplementationFSharp.fsproj", "{0F56F737-7B9D-4546-823B-BCD41565E0DE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{1F71C0F5-F469-49A4-AE5C-9F236805D53D}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
