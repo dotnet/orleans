@@ -155,9 +155,10 @@ namespace Orleans.Runtime.Scheduler
 #endif
                         // Get some work to do
                         IWorkItem todo;
-
-                        todo = IsSystem ? scheduler.RunQueue.GetSystem(Cts.Token, maxWorkQueueWait) : 
-                            scheduler.RunQueue.Get(Cts.Token, maxWorkQueueWait);
+                        Thread.Sleep(1000);
+                        todo = null;
+                        //todo = IsSystem ? scheduler.RunQueue.GetSystem(Cts.Token, maxWorkQueueWait) : 
+                        //    scheduler.RunQueue.Get(Cts.Token, maxWorkQueueWait);
 
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectThreadTimeTrackingStats)
