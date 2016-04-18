@@ -7,7 +7,7 @@
 	</PropertyGroup>
 
 	<Target Name="RestorePackages" BeforeTargets="Build" DependsOnTargets="DownloadNuGet">
-		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot;" />
+		<Exec Command="&quot;$(NuGetExe)&quot; Restore &quot;$(SolutionPath)&quot; -ConfigFile .nuget\NuGet.Config" />
 	</Target>
 
 	<PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
