@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -9,14 +11,35 @@ namespace Orleans.Runtime
     internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
     {
         private readonly IMessagingConfiguration config;
-        private BlockingCollection<T> requestQueue;
+        private ActionBlock<T> requestQueue;
         private QueueTrackingStatistic queueTracking;
 
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)
             : base(nameSuffix)
         {
             config = cfg;
-            requestQueue = new BlockingCollection<T>();
+            requestQueue = new ActionBlock<T>(request =>
+            {
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectQueueStats)
+                {
+                    queueTracking.OnDeQueueRequest(request);
+                }
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStartProcessing();
+                }
+#endif
+                Process(request);
+
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                {
+                    threadTracking.OnStopProcessing();
+                    threadTracking.IncrementNumberOfProcessed();
+                }
+#endif
+            });
             if (StatisticsCollector.CollectQueueStats)
             {
                 queueTracking = new QueueTrackingStatistic(base.Name);
@@ -31,7 +54,7 @@ namespace Orleans.Runtime
                 queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
             }
 #endif
-            requestQueue.Add(request);
+            requestQueue.Post(request);
         }
 
         protected abstract void Process(T request);
@@ -45,60 +68,6 @@ namespace Orleans.Runtime
                 queueTracking.OnStartExecution();
             }
 #endif
-            try
-            {
-                RunNonBatching();
-            }
-            finally
-            {
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopExecution();
-                    queueTracking.OnStopExecution();
-                }
-#endif
-            }
-        }
-
-
-        protected void RunNonBatching()
-        {            
-            while (true)
-            {
-                if (Cts.IsCancellationRequested)
-                {
-                    return;
-                }
-                T request;
-                try
-                {
-                    request = requestQueue.Take();
-                }
-                catch (InvalidOperationException)
-                {
-                    Log.Info(ErrorCode.Runtime_Error_100312, "Stop request processed");
-                    break;
-                }
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(request);
-                }
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStartProcessing();
-                }
-#endif
-                Process(request);
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    threadTracking.OnStopProcessing();
-                    threadTracking.IncrementNumberOfProcessed();
-                }
-#endif
-            }
         }
 
         public override void Stop()
@@ -109,7 +78,7 @@ namespace Orleans.Runtime
                 threadTracking.OnStopExecution();
             }
 #endif
-            requestQueue.CompleteAdding();
+            requestQueue.Complete();
             base.Stop();
         }
 
@@ -117,7 +86,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                return requestQueue.Count;
+                return requestQueue.InputCount;
             }
         }
 
@@ -137,7 +106,6 @@ namespace Orleans.Runtime
 
             if (requestQueue != null)
             {
-                requestQueue.Dispose();
                 requestQueue = null;
             }
         }
