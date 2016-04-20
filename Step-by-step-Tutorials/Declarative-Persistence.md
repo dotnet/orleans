@@ -7,7 +7,7 @@ title: Declarative Persistence
 In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of 'cache with behavior,' an object-oriented cache, if you will.
 That is already very valuable and goes a long way toward achieving server-side scalability with a simple, familiar, programming model and the built-in single-threaded execution guarantees.
 
-However, it is sometimes that case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.
+However, it is sometimes the case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.
 
 Fortunately, Orleans offers a simple declarative model for identifying the state that needs to be stored in a permanent location, while leaving the decision when to save and restore state under programmatic control.
 You are not required to use the declarative persistence mechanism and can still access storage directly from your grain code, but it’s a nice way to save you some boilerplate code and build applications that are portable across various storage services.
