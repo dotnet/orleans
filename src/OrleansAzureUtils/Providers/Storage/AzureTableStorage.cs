@@ -149,7 +149,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    grainState.State = ConvertFromStorageFormat(entity);
+                    var loadedState = ConvertFromStorageFormat(entity);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
                     grainState.ETag = record.ETag;
                 }
             }
