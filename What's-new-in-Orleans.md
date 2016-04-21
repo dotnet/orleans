@@ -10,37 +10,36 @@ title: What's new in Orleans
 
 * Major improvements
  * Added an EventHub stream provider based on the same code that is used in Halo 5.
- * Increased throughput by between 5% and 26% depending on the scenario. https://github.com/dotnet/orleans/pull/1586
+ * [Increased throughput by between 5% and 26% depending on the scenario.](https://github.com/dotnet/orleans/pull/1586)
  * Migrated all but 30 functional tests to GitHub.
  * Grain state doesn't have to extend `GrainState` anymore (marked as `[Obsolete]`) and can be a simple POCO class. 
- * Added support for per-grain-class and global server-side interceptors. https://github.com/dotnet/orleans/pull/965 https://github.com/dotnet/orleans/pull/963
- * Added support for using Consul 0.6.0 as a Membership Provider. https://github.com/dotnet/orleans/pull/1267
- * Support C# 6. https://github.com/dotnet/orleans/pull/1479
- * Switched to xUnit for testing as a step towards CoreCLR compatibility. https://github.com/dotnet/orleans/pull/1455
+ * [Added support for per-grain-class and global server-side interceptors.](https://github.com/dotnet/orleans/pull/965) https://github.com/dotnet/orleans/pull/963
+ * [Added support for using Consul 0.6.0 as a Membership Provider.](https://github.com/dotnet/orleans/pull/1267)
+ * [Support C# 6.] (https://github.com/dotnet/orleans/pull/1479)
+ * [Switched to xUnit for testing as a step towards CoreCLR compatibility.](https://github.com/dotnet/orleans/pull/1455)
 
 * Codegen & serialization
- * Added support for generic type constraints in codegen. https://github.com/dotnet/orleans/pull/1137
- * Added support for Newtonsoft.Json as a fallback serializer. https://github.com/dotnet/orleans/pull/1047
- * Added generation of serializers for type arguments of `IAsyncObserver<T>`. https://github.com/dotnet/orleans/pull/1319
- * Improved support for F# interfaces. https://github.com/dotnet/orleans/pull/1369
- * Consolidated two compile time codegen NuGet packages into one `Microsoft.Orleans.OrleansCodeGenerator.Build`. `Microsoft.Orleans.Templates.Interfaces` and `Microsoft.Orleans.Templates.Grains` are now meta-packages for backward compatibility only. https://github.com/dotnet/orleans/pull/1501
- * Moved to Newtonsoft.Json 7.0.1. https://github.com/dotnet/orleans/pull/1302
+ * [Added support for generic type constraints in codegen.](https://github.com/dotnet/orleans/pull/1137)
+ * [Added support for Newtonsoft.Json as a fallback serializer.](https://github.com/dotnet/orleans/pull/1047)
+ * [Added generation of serializers for type arguments of `IAsyncObserver<T>`.](https://github.com/dotnet/orleans/pull/1319)
+ * [Improved support for F# interfaces.](https://github.com/dotnet/orleans/pull/1369)
+ * [Consolidated two compile time codegen NuGet packages into one `Microsoft.Orleans.OrleansCodeGenerator.Build`. `Microsoft.Orleans.Templates.Interfaces` and `Microsoft.Orleans.Templates.Grains` are now meta-packages for backward compatibility only.](https://github.com/dotnet/orleans/pull/1501)
+ * [Moved to Newtonsoft.Json 7.0.1.](https://github.com/dotnet/orleans/pull/1302)
 
 * Programmatic config
- * Added helper methods for programmatic test configuration. https://github.com/dotnet/orleans/pull/1411
- * Added helper methods to `AzureClient` and `AzureSilo` for easier programmatic config. https://github.com/dotnet/orleans/pull/1622
- * Added extension methods for using programmatic config. https://github.com/dotnet/orleans/pull/1623
- * Remove config filed from Server and Client NuGet packages. https://github.com/dotnet/orleans/pull/1629
+ * [Added helper methods for programmatic test configuration.](https://github.com/dotnet/orleans/pull/1411)
+ * [Added helper methods to `AzureClient` and `AzureSilo` for easier programmatic config.](https://github.com/dotnet/orleans/pull/1622)
+ * [Added extension methods for using programmatic config.](https://github.com/dotnet/orleans/pull/1623)
+ * [Remove config filed from Server and Client NuGet packages.](https://github.com/dotnet/orleans/pull/1629)
 
 * Other
- * Improved support for SQL membership, reminders, and grain storage.
-https://github.com/dotnet/orleans/pull/1060
- * Improved propagation of exception, so that the caller gets the originally thrown exception instead of an `AggregateException` wrapping it. https://github.com/dotnet/orleans/pull/1356
- * Added a storage provider for Azure Blob (graduated from `OrleansContrib`). https://github.com/dotnet/orleans/pull/1376
- * Start Reminder Service initial load in the background. https://github.com/dotnet/orleans/pull/1520
- * Added automatic cleanup of dead client stream producers and consumers. https://github.com/dotnet/orleans/pull/1429 https://github.com/dotnet/orleans/pull/1669
- * Added GetPrimaryKeyString extension method for `IAddressable`. https://github.com/dotnet/orleans/pull/1675
- * Added support for additional application directories. https://github.com/dotnet/orleans/pull/1674
+ * [Improved support for SQL membership, reminders, and grain storage.](https://github.com/dotnet/orleans/pull/1060)
+ * [Improved propagation of exception, so that the caller gets the originally thrown exception instead of an `AggregateException` wrapping it.](https://github.com/dotnet/orleans/pull/1356)
+ * [Added a storage provider for Azure Blob (graduated from `OrleansContrib`).](https://github.com/dotnet/orleans/pull/1376)
+ * [Start Reminder Service initial load in the background.](https://github.com/dotnet/orleans/pull/1520)
+ * [Added automatic cleanup of dead client stream producers and consumers.](https://github.com/dotnet/orleans/pull/1429) https://github.com/dotnet/orleans/pull/1669
+ * [Added GetPrimaryKeyString extension method for `IAddressable`.](https://github.com/dotnet/orleans/pull/1675)
+ * [Added support for additional application directories.](https://github.com/dotnet/orleans/pull/1674)
 
 * Many other fixes and improvements.
 
