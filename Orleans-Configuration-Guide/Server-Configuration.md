@@ -106,12 +106,8 @@ This is a reference only example and SHOULD NOT be used AS-IS - you may need to 
 ```csharp
 var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
 
-var proxyEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansProxyEndpoint"];
-var siloEndpoint = RoleEnvironment.CurrentRoleInstance.InstanceEndpoints["OrleansSiloEndpoint"];
-
 var config = new ClusterConfiguration
 {
-    PrimaryNode = siloEndpoint.IPEndpoint,
     Globals =
     {
         DeploymentId = RoleEnvironment.DeploymentId,
@@ -124,7 +120,6 @@ var config = new ClusterConfiguration
     Defaults =
     {
         PropagateActivityId = true,
-        ProxyGatewayEndpoint = proxyEndpoint.IPEndpoint,
         
         // Tracing
         DefaultTraceLevel = Severity.Info,
