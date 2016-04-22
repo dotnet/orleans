@@ -73,7 +73,7 @@ namespace Orleans
                     var errorStr = String.Format("UnobservedExceptionsHandlerClass Caught an UnobservedTaskException event sent by {0}. Exception = {1}",
                             OrleansTaskExtentions.ToString((Task)sender), TraceLogger.PrintException(aggrException));
                     logger.Error(ErrorCode.Runtime_Error_100005, errorStr);
-                    logger.Error(ErrorCode.Runtime_Error_100006, "Exception remained UnObserved!!! The subsequent behaivour depends on the ThrowUnobservedTaskExceptions setting in app config and .NET version.");
+                    logger.Error(ErrorCode.Runtime_Error_100006, "Exception remained UnObserved!!! The subsequent behavior depends on the ThrowUnobservedTaskExceptions setting in app config and .NET version.");
                 }
             }
         }
