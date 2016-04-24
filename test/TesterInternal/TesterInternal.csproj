@@ -126,6 +126,11 @@
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
+    <Compile Include="StorageTests\SQLAdapter\temp\TestEnvironmentInvariant.cs" />
+    <Compile Include="StorageTests\SQLAdapter\temp\CommonPersistenceStorageTests.cs" />
+    <Compile Include="StorageTests\SQLAdapter\temp\SqlServerRelationalFixture.cs" />
+    <Compile Include="StorageTests\SQLAdapter\temp\SqlServerPersistenceStorageTests.cs" />
+    <Compile Include="StorageTests\SQLAdapter\temp\TestEnvironmentInformation.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
