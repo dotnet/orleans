@@ -35,6 +35,8 @@ _MESHVista_ Smart Cloud IoT Platform leverages Orleans for back-end services mon
 A number of client projects where extreme scale and performance is required
 * <a href="http://www.drawboard.com/" target="_blank">__Drawboard__</a>
 Cloud collaboration and synchronisation platform
+* <a href="https://www.linkedin.com/company/youscan" target="_blank">__YouScan__</a>
+Social media monitoring & analytics provider. Orleans is used as part of its percolator solution
 
 ## Projects and Applications
 
