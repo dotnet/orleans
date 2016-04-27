@@ -63,7 +63,7 @@ It then calls `CreateObjectReference()` method on the grain factory, to turn the
 This model can also be used by other grains to receive asynchronous notifications.
 Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. `this.AsReference<IChirperViewer>`).
 
-###Example
+## Example
 
 Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.
 
