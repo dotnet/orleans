@@ -119,6 +119,7 @@
     <Compile Include="StatsCollectorGrain.cs" />
     <Compile Include="StreamCheckpoint.cs" />
     <Compile Include="StreamInterceptionGrain.cs" />
+    <Compile Include="StuckGrain.cs" />
     <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
