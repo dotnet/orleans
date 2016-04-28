@@ -20,7 +20,7 @@ public interface IHello : Orleans.IGrain
 This is simple enough, and we can see that all replies must be represented as a Task or Task<T> in communication interfaces. The implementation, found in HelloGrain.cs, is similarly trivial:
 
 ``` csharp
-public class HelloGrain : Orleans.GrainBase, HelloWorldInterfaces.IHello
+public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
 {
     Task<string> HelloWorldInterfaces.IHello.SayHello(string greeting)
     {
