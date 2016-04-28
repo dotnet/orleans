@@ -109,7 +109,7 @@ var grain = GrainClient.GrainFactory.GetGrain<IExample>(0, "a string!");
 To access the compound key in the grain, we can call an overload on the `GetPrimaryKey` method:
 
 ``` csharp
-public class ExampleGrain : Orleans.GrainBase, IExampleGrain
+public class ExampleGrain : Orleans.Grain, IExampleGrain
 {
     public Task Hello()
     {
