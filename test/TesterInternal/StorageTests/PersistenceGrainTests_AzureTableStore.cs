@@ -28,6 +28,8 @@ namespace UnitTests.StorageTests
         {
             protected override TestingSiloHost CreateClusterHost()
             {
+                TestUtils.CheckForAzureStorage();
+
                 Guid serviceId = Guid.NewGuid();
                 return new TestingSiloHost(new TestingSiloOptions
                 {
