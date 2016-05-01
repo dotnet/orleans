@@ -13,7 +13,7 @@ title: What's new in Orleans
   * [Increased throughput by between 5% and 26% depending on the scenario.](https://github.com/dotnet/orleans/pull/1586)
   * Migrated all but 30 functional tests to GitHub.
   * Grain state doesn't have to extend `GrainState` anymore (marked as `[Obsolete]`) and can be a simple POCO class. 
-  * [Added support for per-grain-class and global server-side interceptors.](https://github.com/dotnet/orleans/pull/965) https://github.com/dotnet/orleans/pull/963
+  * [Added support for per-grain-class](https://github.com/dotnet/orleans/pull/963) and [global server-side interceptors.](https://github.com/dotnet/orleans/pull/965) 
   * [Added support for using Consul 0.6.0 as a Membership Provider.](https://github.com/dotnet/orleans/pull/1267)
   * [Support C# 6.](https://github.com/dotnet/orleans/pull/1479)
   * [Switched to xUnit for testing as a step towards CoreCLR compatibility.](https://github.com/dotnet/orleans/pull/1455)
@@ -37,7 +37,7 @@ title: What's new in Orleans
   * [Improved propagation of exception, so that the caller gets the originally thrown exception instead of an `AggregateException` wrapping it.](https://github.com/dotnet/orleans/pull/1356)
   * [Added a storage provider for Azure Blob (graduated from `OrleansContrib`).](https://github.com/dotnet/orleans/pull/1376)
   * [Start Reminder Service initial load in the background.](https://github.com/dotnet/orleans/pull/1520)
-  * [Added automatic cleanup of dead client stream producers and consumers.](https://github.com/dotnet/orleans/pull/1429) https://github.com/dotnet/orleans/pull/1669
+  * [Added automatic cleanup of dead client stream producers and consumers](https://github.com/dotnet/orleans/pull/1429) and [this.](https://github.com/dotnet/orleans/pull/1669)
   * [Added GetPrimaryKeyString extension method for `IAddressable`.](https://github.com/dotnet/orleans/pull/1675)
   * [Added support for additional application directories.](https://github.com/dotnet/orleans/pull/1674)
 
