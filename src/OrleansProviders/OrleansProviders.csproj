@@ -51,6 +51,7 @@
     <Compile Include="Streams\Common\PooledCache\PooledQueueCache.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessagePool.cs" />
     <Compile Include="Streams\Common\PooledCache\ObjectPool.cs" />
+    <Compile Include="Streams\Common\PooledCache\StreamPosition.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCache.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueAdapterCache.cs" />

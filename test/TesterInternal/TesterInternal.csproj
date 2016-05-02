@@ -240,7 +240,6 @@
     <Compile Include="StreamingTests\StreamReliabilityTests.cs" />
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
-    <Compile Include="StreamingTests\TestStreamIdentity.cs" />
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />

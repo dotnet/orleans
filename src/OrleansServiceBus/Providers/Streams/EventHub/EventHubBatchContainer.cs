@@ -10,8 +10,11 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
+    /// </summary>
     [Serializable]
-    internal class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer
     {
         [JsonProperty]
         private readonly EventHubSequenceToken token;

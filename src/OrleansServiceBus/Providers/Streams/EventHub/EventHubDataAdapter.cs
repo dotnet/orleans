@@ -12,14 +12,17 @@ namespace Orleans.ServiceBus.Providers
     /// This is a tightly packed cached structure containing an event hub message.  
     /// It should only contain value types.
     /// </summary>
-    internal struct CachedEventHubMessage
+    public struct CachedEventHubMessage
     {
         public Guid StreamGuid;
         public long SequenceNumber;
         public ArraySegment<byte> Segment;
     }
 
-    internal class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
+    /// <summary>
+    /// Default eventhub data comparer.  Implements comparisions against CachedEventHubMessage
+    /// </summary>
+    public class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
     {
         public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
 
@@ -42,7 +45,10 @@ namespace Orleans.ServiceBus.Providers
         }
     }
 
-    internal class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
+    /// <summary>
+    /// Default event hub data adapter.  Users may subclass to override event data to stream mapping.
+    /// </summary>
+    public class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
     {
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
         private FixedSizeBuffer currentBuffer;
@@ -58,20 +64,21 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
         }
 
-        public void QueueMessageToCachedMessage(ref CachedEventHubMessage cachedMessage, EventData queueMessage)
+        public StreamPosition QueueMessageToCachedMessage(ref CachedEventHubMessage cachedMessage, EventData queueMessage)
         {
-            cachedMessage.StreamGuid = Guid.Parse(queueMessage.PartitionKey);
+            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
             cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
-            cachedMessage.Segment = SerializeMessageIntoPooledSegment(queueMessage);
+            cachedMessage.Segment = SerializeMessageIntoPooledSegment(streamPosition, queueMessage.Offset, queueMessage.GetBytes());
+            return streamPosition;
         }
 
         // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
-        private ArraySegment<byte> SerializeMessageIntoPooledSegment(EventData queueMessage)
+        protected ArraySegment<byte> SerializeMessageIntoPooledSegment(StreamPosition streamPosition, string offset, byte[] payloadBytes)
         {
-            byte[] payloadBytes = queueMessage.GetBytes();
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            string streamNamespace = streamPosition.StreamIdentity.Namespace;
             int size = SegmentBuilder.CalculateAppendSize(streamNamespace) +
-                       SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
+                       SegmentBuilder.CalculateAppendSize(offset) +
                        SegmentBuilder.CalculateAppendSize(payloadBytes);
 
             // get segment from current block
@@ -86,13 +93,13 @@ namespace Orleans.ServiceBus.Providers
                 {
                     string errmsg = String.Format(CultureInfo.InvariantCulture,
                         "Message size is to big. MessageSize: {0}", size);
-                    throw new ArgumentOutOfRangeException("queueMessage", errmsg);
+                    throw new ArgumentOutOfRangeException("payloadBytes", errmsg);
                 }
             }
             // encode namespace, offset, and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamNamespace);
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
+            SegmentBuilder.Append(segment, ref writeOffset, offset);
             SegmentBuilder.Append(segment, ref writeOffset, payloadBytes);
 
             return segment;
@@ -111,6 +118,15 @@ namespace Orleans.ServiceBus.Providers
         public StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
         {
             return new EventSequenceToken(cachedMessage.SequenceNumber, 0);
+        }
+
+        public virtual StreamPosition GetStreamPosition(EventData queueMessage)
+        {
+            Guid streamGuid = Guid.Parse(queueMessage.PartitionKey);
+            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
+            StreamSequenceToken token = new EventSequenceToken(queueMessage.SequenceNumber, 0);
+            return new StreamPosition(stremIdentity, token);
         }
 
         public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, IDisposable purgeRequest)

@@ -12,23 +12,26 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Queue adapter factory which allows the PersistentStreamProvider to use EventHub as its backend persistent event queue.
+    /// </summary>
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
-        private Logger logger;
-        private IServiceProvider serviceProvider;
-        private EventHubStreamProviderConfig adapterConfig;
-        private IEventHubSettings hubSettings;
-        private ICheckpointerSettings checkpointerSettings;
+        protected Logger logger;
+        protected IServiceProvider serviceProvider;
+        protected EventHubStreamProviderConfig adapterConfig;
+        protected IEventHubSettings hubSettings;
+        protected ICheckpointerSettings checkpointerSettings;
         private EventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
 
-        public string Name { get { return adapterConfig.StreamProviderName; } }
-        public bool IsRewindable { get { return true; } }
-        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
+        public string Name => adapterConfig.StreamProviderName;
+        public bool IsRewindable => true;
+        public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
-        protected Func<IStreamQueueCheckpointer<string>, IEventHubQueueCache> CacheFactory { get; set; }
+        protected Func<string, IStreamQueueCheckpointer<string>, IEventHubQueueCache> CacheFactory { get; set; }
         protected Func<string, Task<IStreamQueueCheckpointer<string>>> CheckpointerFactory { get; set; }
         protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
         
@@ -66,7 +69,7 @@ namespace Orleans.ServiceBus.Providers
             if (CacheFactory == null)
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
-                CacheFactory = checkpointer => new DefaultEventHubQueueCache(checkpointer, bufferPool);
+                CacheFactory = (partition,checkpointer) => new EventHubQueueCache(checkpointer, bufferPool);
             }
 
             if (StreamFailureHandlerFactory == null)
@@ -138,7 +141,7 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, logger);
         }
 
-        public async Task<string[]> GetPartitionIdsAsync()
+        private async Task<string[]> GetPartitionIdsAsync()
         {
             NamespaceManager namespaceManager = NamespaceManager.CreateFromConnectionString(hubSettings.ConnectionString);
             EventHubDescription hubDescription = await namespaceManager.GetEventHubAsync(hubSettings.Path);

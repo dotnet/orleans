@@ -94,12 +94,14 @@ namespace UnitTests.OrleansRuntime.Streams
                 this.bufferPool = bufferPool;
             }
 
-            public void QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
             {
-                cachedMessage.StreamGuid = queueMessage.StreamGuid;
-                cachedMessage.StreamNamespace = queueMessage.StreamNamespace;
+                StreamPosition streamPosition = GetStreamPosition(queueMessage);
+                cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
+                cachedMessage.StreamNamespace = streamPosition.StreamIdentity.Namespace;
                 cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
+                return streamPosition;
             }
 
             // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
@@ -138,6 +140,13 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
             {
                 return new EventSequenceToken(cachedMessage.SequenceNumber);
+            }
+
+            public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
+            {
+                IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace);
+                StreamSequenceToken sequenceToken = new EventSequenceToken(queueMessage.SequenceNumber);
+                return new StreamPosition(streamIdentity, sequenceToken);
             }
 
             public bool ShouldPurge(ref TestCachedMessage cachedMessage, IDisposable purgeRequest)
@@ -207,8 +216,8 @@ namespace UnitTests.OrleansRuntime.Streams
             int sequenceNumber = startOfCache;
             IBatchContainer batch;
 
-            IStreamIdentity stream1 = new TestStreamIdentity { Guid = Guid.NewGuid(), Namespace = StreamNamespace };
-            IStreamIdentity stream2 = new TestStreamIdentity { Guid = Guid.NewGuid(), Namespace = StreamNamespace };
+            IStreamIdentity stream1 = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
+            IStreamIdentity stream2 = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
 
             // now add messages into cache newer than cursor
             // Adding enough to fill the pool
@@ -300,7 +309,7 @@ namespace UnitTests.OrleansRuntime.Streams
             int sequenceNumber = 10;
             IBatchContainer batch;
 
-            IStreamIdentity streamId = new TestStreamIdentity {Guid = Guid.NewGuid(), Namespace = StreamNamespace};
+            IStreamIdentity streamId = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
 
             // No data in cache, cursors should not throw.
             object cursor = cache.GetCursor(streamId, new EventSequenceToken(sequenceNumber++));

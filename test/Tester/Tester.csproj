@@ -93,6 +93,10 @@
       <HintPath>$(SolutionDir)packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final\lib\net451\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Microsoft.ServiceBus">
+      <HintPath>..\..\src\packages\WindowsAzure.ServiceBus.3.0.8\lib\net45-full\Microsoft.ServiceBus.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
       <Private>False</Private>
     </Reference>
@@ -107,10 +111,12 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+    <Reference Include="System.Management.Automation">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
     </Reference>
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Spatial">
       <HintPath>$(SolutionDir)packages\System.Spatial.5.6.4\lib\net40\System.Spatial.dll</HintPath>
       <Private>True</Private>
@@ -149,6 +155,7 @@
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
     <Compile Include="StreamingTests\EHClientStreamTests.cs" />
     <Compile Include="StreamingTests\EHImplicitSubscriptionStreamRecoveryTests.cs" />
+    <Compile Include="StreamingTests\EHStreamPerPartitionTests.cs" />
     <Compile Include="StreamingTests\EHStreamProviderCheckpointTests.cs" />
     <Compile Include="BasicActivationTests.cs" />
     <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
@@ -218,6 +225,7 @@
     <Compile Include="TestStreamProviders\AzureQueue\TestAzureQueueStreamProvider.cs" />
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
+    <Compile Include="TestStreamProviders\EventHub\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="TestUtils.cs" />
