@@ -70,11 +70,13 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public Action<IDisposable> PurgeAction { private get; set; }
 
-            public void QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
             {
-                cachedMessage.StreamGuid = queueMessage.StreamGuid;
+                StreamPosition streamPosition = GetStreamPosition(queueMessage);
+                cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
                 cachedMessage.SequenceNumber = queueMessage.SequenceToken.SequenceNumber;
                 cachedMessage.EventIndex = queueMessage.SequenceToken.EventIndex;
+                return streamPosition;
             }
 
             public IBatchContainer GetBatchContainer(ref TestCachedMessage cachedMessage)
@@ -89,6 +91,13 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
             {
                 return new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+            }
+
+            public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
+            {
+                IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, null);
+                StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
+                return new StreamPosition(streamIdentity, sequenceToken);
             }
 
             public bool IsInStream(ref TestCachedMessage cachedMessage, Guid streamGuid, string streamNamespace)
@@ -189,7 +198,7 @@ namespace UnitTests.OrleansRuntime.Streams
             int last = 0;
             int sequenceNumber = 0;
             // define 2 streams
-            var streams = new[] { new TestStreamIdentity { Guid = Guid.NewGuid() }, new TestStreamIdentity { Guid = Guid.NewGuid() } };
+            var streams = new[] { new StreamIdentity(Guid.NewGuid(), null), new StreamIdentity(Guid.NewGuid(), null) };
 
             // add both streams interleaved, until lock is full
             while (block.HasCapacity)

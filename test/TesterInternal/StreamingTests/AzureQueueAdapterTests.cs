@@ -98,10 +98,10 @@ namespace UnitTests.StorageTests
                         foreach (AzureQueueBatchContainer message in messages.Cast<AzureQueueBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<IStreamIdentity> { new TestStreamIdentity { Guid = message.StreamGuid, Namespace = message.StreamGuid.ToString() } },
+                                id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },
                                 (id, set) =>
                                 {
-                                    set.Add(new TestStreamIdentity { Guid = message.StreamGuid, Namespace = message.StreamGuid.ToString() });
+                                    set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
                                     return set;
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,

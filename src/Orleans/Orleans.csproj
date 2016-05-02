@@ -129,6 +129,7 @@
     <Compile Include="Runtime\IGrainRuntime.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueCheckpointer.cs" />
