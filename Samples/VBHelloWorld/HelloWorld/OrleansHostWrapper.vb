@@ -1,4 +1,5 @@
-﻿Imports Orleans.Runtime.Host
+﻿Imports Orleans.Runtime.Configuration
+Imports Orleans.Runtime.Host
 
 Friend Class OrleansHostWrapper
     Implements IDisposable
@@ -57,9 +58,8 @@ Friend Class OrleansHostWrapper
 
     Private Function ParseArguments(args As String()) As Boolean
         Dim deploymentId As String = Nothing
-        Dim configFileName = "DevTestServerConfiguration.xml"
         Dim siloName = System.Net.Dns.GetHostName() ' Default to machine name
-
+        Dim config As ClusterConfiguration
         Dim argPos = 1
 
         For i As Integer = 0 To args.Length - 1
@@ -95,9 +95,6 @@ Friend Class OrleansHostWrapper
             ElseIf argPos = 1 Then
                 siloName = a
                 argPos += 1
-            ElseIf argPos = 2 Then
-                configFileName = a
-                argPos += 1
             Else
                 ' Too many command line arguments
                 Console.WriteLine("Too many command line arguments supplied: " + a)
@@ -105,8 +102,8 @@ Friend Class OrleansHostWrapper
             End If
         Next
 
-        siloHost = New SiloHost(siloName)
-        siloHost.ConfigFileName = configFileName
+        config = ClusterConfiguration.LocalhostPrimarySilo()
+        siloHost = New SiloHost(siloName, config)
 
         If deploymentId IsNot Nothing Then
             siloHost.DeploymentId = deploymentId

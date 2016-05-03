@@ -1,7 +1,6 @@
 using System;
 using System.Net;
-using System.Threading.Tasks;
-
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace AdventureSetup
@@ -80,7 +79,6 @@ namespace AdventureSetup
         {
             string deploymentId = null;
 
-            string configFileName = "OrleansConfiguration.xml";
             string siloName = Dns.GetHostName(); // Default to machine name
 
             int argPos = 1;
@@ -115,10 +113,6 @@ namespace AdventureSetup
                         case "deploymentid":
                             deploymentId = split[1];
                             break;
-                        case "deploymentgroup":
-                            // TODO: Remove this at some point in future
-                            Console.WriteLine("Ignoring deprecated command line argument: " + a);
-                            break;
                         default:
                             Console.WriteLine("Bad command line arguments supplied: " + a);
                             return false;
@@ -130,11 +124,6 @@ namespace AdventureSetup
                     siloName = a;
                     argPos++;
                 }
-                else if (argPos == 2)
-                {
-                    configFileName = a;
-                    argPos++;
-                }
                 else
                 {
                     // Too many command line arguments
@@ -143,8 +132,9 @@ namespace AdventureSetup
                 }
             }
 
-            siloHost = new SiloHost(siloName);
-            siloHost.ConfigFileName = configFileName;
+            var config = ClusterConfiguration.LocalhostPrimarySilo();
+            siloHost = new SiloHost(siloName, config);
+
             if (deploymentId != null)
                 siloHost.DeploymentId = deploymentId;
 
@@ -155,12 +145,13 @@ namespace AdventureSetup
         {
             Console.WriteLine(
 @"USAGE: 
-    orleans host [<siloName> [<configFile>]] [DeploymentId=<idString>] [/debug]
+    OrleansHost.exe [<siloName> [<configFile>]] [DeploymentId=<idString>] [/debug]
 Where:
     <siloName>      - Name of this silo in the Config file list (optional)
     <configFile>    - Path to the Config file to use (optional)
     DeploymentId=<idString> 
-                    - Which deployment group this host instance should run in (optional)");
+                    - Which deployment group this host instance should run in (optional)
+    /debug          - Turn on extra debug output during host startup (optional)");
         }
 
         public void Dispose()

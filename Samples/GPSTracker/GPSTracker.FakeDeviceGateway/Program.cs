@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 namespace GPSTracker.FakeDeviceGateway
 {
@@ -21,7 +22,8 @@ namespace GPSTracker.FakeDeviceGateway
 
         static void Main(string[] args)
         {
-            GrainClient.Initialize("LocalConfiguration.xml");
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             // simulate 20 devices
             var devices = new List<Model>();
