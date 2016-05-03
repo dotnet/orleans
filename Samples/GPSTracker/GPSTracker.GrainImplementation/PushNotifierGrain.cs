@@ -23,7 +23,7 @@ namespace GPSTracker.GrainImplementation
             // set up a timer to regularly flush the message queue
             this.RegisterTimer(FlushQueue, null, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
 
-            if (AzureHelper.IsInAzure)
+            if (AzureEnvironment.IsInAzure)
             {
                 // in azure
                 await RefreshHubs(null);

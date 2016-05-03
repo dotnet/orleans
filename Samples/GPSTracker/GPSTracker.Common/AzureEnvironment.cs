@@ -6,7 +6,7 @@ namespace GPSTracker.Common
     /// <summary>
     /// Helper class to isolate from Microsoft.WindowsAzure.ServiceRuntime.dll and its failures to load outside of Azure
     /// </summary>
-    public class AzureHelper
+    public class AzureEnvironment
     {
         private static bool alreadyChecked;
         private static bool inAzure;
@@ -20,7 +20,7 @@ namespace GPSTracker.Common
             {
                 if(alreadyChecked) return inAzure;
 
-                lock (typeof (AzureHelper))
+                lock (typeof (AzureEnvironment))
                 {
                     if (alreadyChecked) return inAzure;
 

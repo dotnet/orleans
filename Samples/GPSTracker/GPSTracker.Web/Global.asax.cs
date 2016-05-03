@@ -14,7 +14,7 @@ namespace GPSTracker.Web
         {
             
 
-            if (AzureHelper.IsInAzure)
+            if (AzureEnvironment.IsInAzure)
             {
                 // running in Azure
                 var config = AzureClient.DefaultConfiguration();

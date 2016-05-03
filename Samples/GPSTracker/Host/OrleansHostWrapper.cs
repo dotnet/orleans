@@ -75,7 +75,6 @@ namespace Host
 
         private void Init()
         {
-            //siloHost.LoadOrleansConfig();
         }
 
         private bool ParseArguments(string[] args)
@@ -135,7 +134,7 @@ namespace Host
                 }
             }
 
-            var config = AzureHelper.IsInAzure ? AzureSilo.DefaultConfiguration() : ClusterConfiguration.LocalhostPrimarySilo();
+            var config = AzureEnvironment.IsInAzure ? AzureSilo.DefaultConfiguration() : ClusterConfiguration.LocalhostPrimarySilo();
 
             siloHost = new SiloHost(siloName, config);
 

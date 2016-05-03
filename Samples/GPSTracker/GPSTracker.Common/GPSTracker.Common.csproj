@@ -40,7 +40,7 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AzureHelper.cs" />
+    <Compile Include="AzureEnvironment.cs" />
     <Compile Include="VelocityMessage.cs" />
     <Compile Include="DeviceMessage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
