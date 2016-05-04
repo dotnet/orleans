@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
@@ -206,21 +207,21 @@ namespace Orleans
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
         public MembershipTableData SupressDuplicateDeads()
         {
-            var dead = new Dictionary<string, Tuple<MembershipEntry, string>>();
+            var dead = new Dictionary<IPEndPoint, Tuple<MembershipEntry, string>>();
             // pick only latest Dead for each instance
             foreach (var next in Members.Where(item => item.Item1.Status == SiloStatus.Dead))
             {
-                var name = next.Item1.InstanceName;
+                var ipEndPoint = next.Item1.SiloAddress.Endpoint;
                 Tuple<MembershipEntry, string> prev;
-                if (!dead.TryGetValue(name, out prev))
+                if (!dead.TryGetValue(ipEndPoint, out prev))
                 {
-                    dead[name] = next;
+                    dead[ipEndPoint] = next;
                 }
                 else
                 {
                     // later dead.
                     if (next.Item1.SiloAddress.Generation.CompareTo(prev.Item1.SiloAddress.Generation) > 0)
-                        dead[name] = next;
+                        dead[ipEndPoint] = next;
                 }
             }
             //now add back non-dead
