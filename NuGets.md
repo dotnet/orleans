@@ -9,7 +9,7 @@ title: Orleans NuGet Packages
 
 There are 4 key NuGet packages you will need to use in most scenarios:
 
-### Microsoft.Orleans.OrleansCodeGenerator.Build <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/)</small>
+### [Microsoft.Orleans.OrleansCodeGenerator.Build](http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/)
 
 ```
 PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build 
