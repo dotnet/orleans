@@ -292,6 +292,13 @@ namespace UnitTests.General
             await g3.GetA();
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Generics")]
+        public async Task Generic_SimpleGrainGenericParameterWithMultipleArguments_GetGrain()
+        {
+            var g1 = GrainFactory.GetGrain<ISimpleGenericGrain1<Dictionary<int, int>>>(GetRandomGrainId());
+            await g1.GetA();
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow2_GetAB()
         {

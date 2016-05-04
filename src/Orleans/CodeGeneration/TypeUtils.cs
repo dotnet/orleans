@@ -30,8 +30,8 @@ namespace Orleans.Runtime
 
             return t.Name;
         }
-        
-        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
+
+        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             var typeInfo = t.GetTypeInfo();
             if (typeInfo.IsNestedPublic || typeInfo.IsNestedPrivate)
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
             }
 
             if (typeInfo.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language));
-            
+
             return fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language: language);
         }
 
@@ -66,7 +66,7 @@ namespace Orleans.Runtime
             {
                 typeName = typeName.Substring(0, i);
             }
-            return typeName;            
+            return typeName;
         }
 
         public static string GetSimpleTypeName(string typeName)
@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             return t.IsArray && IsConcreteTemplateType(t.GetElementType());
         }
 
-        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
+        public static string GetTemplatedName(Type t, Func<Type, bool> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = _ => true; // default to full type names
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + (isVB ? ")" : "]");
             }
-            
+
             return GetSimpleTypeName(t, fullName, language);
         }
 
@@ -168,7 +168,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                if(fullName != null && fullName(t)==true)
+                if (fullName != null && fullName(t) == true)
                 {
                     return t.FullName;
                 }
@@ -221,20 +221,85 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
-        private static string[] typeSeparator = new string[] { "],[" };
         public static Type[] GenericTypeArgs(string className)
         {
-            var typeArgs = new List<Type>();
             var genericTypeDef = GenericTypeArgsString(className).Replace("[]", "##"); // protect array arguments
-            string[] genericArgs = genericTypeDef.Split(typeSeparator, StringSplitOptions.RemoveEmptyEntries);
 
-            foreach (string genericArg in genericArgs)
+            return InnerGenericTypeArgs(genericTypeDef);
+        }
+
+        private static Type[] InnerGenericTypeArgs(string className)
+        {
+            var typeArgs = new List<Type>();
+            var innerTypes = GetInnerTypes(className);
+
+            foreach (var innerType in innerTypes)
             {
-                string typeArg = genericArg.Trim('[', ']');
-                if (typeArg.Length > 0 && typeArg != ",")
-                    typeArgs.Add(Type.GetType(typeArg.Replace("##", "[]"))); // restore array arguments
+                if (innerType.StartsWith("[[")) // Resolve and load generic types recursively
+                {
+                    InnerGenericTypeArgs(GenericTypeArgsString(innerType));
+                    string genericTypeArg = className.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(genericTypeArg.Replace("##", "[]")));
+                }
+
+                else
+                {
+                    string nonGenericTypeArg = innerType.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(nonGenericTypeArg.Replace("##", "[]")));
+                }
             }
+
             return typeArgs.ToArray();
+        }
+
+        private static string[] GetInnerTypes(string input)
+        {
+            // Iterate over strings of length 2 positionwise.
+            var charsWithPositions = input.Zip(Enumerable.Range(0, input.Length), (c, i) => new { Ch = c, Pos = i });
+            var candidatesWithPositions = charsWithPositions.Zip(charsWithPositions.Skip(1), (c1, c2) => new { Str = c1.Ch.ToString() + c2.Ch, Pos = c1.Pos });
+
+            var results = new List<string>();
+            int startPos = -1;
+            int endPos = -1;
+            int endTokensNeeded = 0;
+            string curStartToken = "";
+            string curEndToken = "";
+            var tokenPairs = new[] { new { Start = "[[", End = "]]" }, new { Start = "[", End = "]" } }; // Longer tokens need to come before shorter ones
+
+            foreach (var candidate in candidatesWithPositions)
+            {
+                if (startPos == -1)
+                {
+                    foreach (var token in tokenPairs)
+                    {
+                        if (candidate.Str.StartsWith(token.Start))
+                        {
+                            curStartToken = token.Start;
+                            curEndToken = token.End;
+                            startPos = candidate.Pos;
+                            break;
+                        }
+                    }
+                }
+
+                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken))
+                    endTokensNeeded++;
+
+                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken))
+                {
+                    endPos = candidate.Pos;
+                    endTokensNeeded--;
+                }
+
+                if (endTokensNeeded == 0 && startPos != -1)
+                {
+                    results.Add(input.Substring(startPos, endPos - startPos + 2));
+                    startPos = -1;
+                    curStartToken = "";
+                }
+            }
+
+            return results.ToArray();
         }
 
         public static string GenericTypeArgsString(string className)
@@ -264,7 +329,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + (isVB ? ")" : "]");
             }
-            return t.FullName ?? ( t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
+            return t.FullName ?? (t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
         }
 
         /// <summary>
@@ -302,7 +367,7 @@ namespace Orleans.Runtime
                 grainChevronType = ToReflectionOnlyType(grainChevronType);
             }
 
-            if (grainType == type || grainChevronType == type) return false; 
+            if (grainType == type || grainChevronType == type) return false;
 
             if (!grainType.GetTypeInfo().IsAssignableFrom(type)) return false;
 
@@ -424,9 +489,9 @@ namespace Orleans.Runtime
             {
                 generalType = ToReflectionOnlyType(generalType);
             }
-            return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
+            return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
-        
+
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);
@@ -434,7 +499,7 @@ namespace Orleans.Runtime
 
         public static bool TryResolveType(string fullName, out Type type)
         {
-            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);            
+            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
         }
 
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
