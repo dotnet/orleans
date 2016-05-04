@@ -5,25 +5,17 @@ title: Orleans NuGet Packages
 {% include JB/setup %}
 
 
-## Orleans NuGet packages as of [v1.0.9](https://github.com/dotnet/orleans/releases/tag/v1.0.9)
+## Orleans NuGet packages as of [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0)
 
 There are 4 key NuGet packages you will need to use in most scenarios:
 
-### Microsoft.Orleans.Templates.Interfaces <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.Templates.Interfaces/)</small>
+### Microsoft.Orleans.OrleansCodeGenerator.Build <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/)</small>
 
 ```
-PM> Install-Package Microsoft.Orleans.Templates.Interfaces
+PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build 
 ```
 
-Build support for grain interfaces projects. Add it to your grain interfaces project to enable code generation for grain interfaces.
-
-### Microsoft.Orleans.Templates.Grains <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.Templates.Grains/)</small>
-
-```
-PM> Install-Package Microsoft.Orleans.Templates.Grains
-```
-
-Build support for grain implementation projects. Add it to your grain implementation project to enable code generation for grain classes
+Build support for grain interfaces and implementation projects. Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers.
 
 ### Microsoft.Orleans.Core <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.Core/)</small>
 
@@ -33,21 +25,6 @@ PM> Install-Package Microsoft.Orleans.Core
 
 Contains Orleans.dll, which defines most of Orleans public types and Orleans Client. Reference it for building libraries and client applications that use Orleans types but don't need any of the included providers.
 
-### Microsoft.Orleans.OrleansRuntime <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/)</small>
-
-```
-PM> Install-Package Microsoft.Orleans.OrleansRuntime
-```
-
-Contains the silo runtime. Reference it to host a silo within your process.
-
----
-
-## Bundled Client/Server Packages
-
-If you don't care about fine granularity of the NuGet packages, the Client and Server packages include everything you may (or may not) need on the client or server side.
-
-
 ### Microsoft.Orleans.Server <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.Server/)</small>
 
 ```
@@ -55,7 +32,6 @@ PM> Install-Package Microsoft.Orleans.Server
 ```
 
 Includes everything you need to host a silo.
-
 
 
 ### Microsoft.Orleans.Client <small>[nuget](http://www.nuget.org/packages/Microsoft.Orleans.Client/)</small>
