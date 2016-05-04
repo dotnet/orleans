@@ -4,6 +4,16 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+## [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0) May 4th 2016
+
+### Release notes
+
+In addition to all the changes in 1.2.0-beta.
+
+* Azure storage 7.0 compatibility https://github.com/dotnet/orleans/pull/1704.
+* Updated to latest version of Consul and ZooKeeper NuGets.
+* Added ability to throw exceptions that occur when starting silo https://github.com/dotnet/orleans/pull/1711.
+
 ## [v1.2.0-beta](https://github.com/dotnet/orleans/releases/tag/v1.2.0-beta) April 18th 2016
 
 ### Release notes
