@@ -55,6 +55,9 @@ namespace Orleans.Runtime.Host
         public SiloStatus Status { get; set; }
 
         [JsonProperty]
+        public String SiloName { get; set; }
+
+        [JsonProperty]
         public List<SuspectingSilo> SuspectingSilos { get; set; }
 
         [JsonConstructor]
@@ -136,6 +139,7 @@ namespace Orleans.Runtime.Host
                 ProxyPort = entry.ProxyPort,
                 StartTime = entry.StartTime,
                 Status = entry.Status,
+                SiloName = entry.SiloName,
                 SuspectingSilos = entry.SuspectTimes.Select(silo => new SuspectingSilo { Id = silo.Item1.ToParsableString(), Time = silo.Item2 }).ToList()
             };
 
@@ -168,10 +172,10 @@ namespace Orleans.Runtime.Host
                 StartTime = siloRegistration.StartTime,
                 SuspectTimes = siloRegistration.SuspectingSilos.Select(silo => new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(silo.Id), silo.Time)).ToList(),
                 IAmAliveTime = siloRegistration.IAmAliveTime,
+                SiloName = siloRegistration.SiloName,
 
                 // Optional - only for Azure role so initialised here
                 RoleName = String.Empty,
-                InstanceName = String.Empty,
                 UpdateZone = 0,
                 FaultZone = 0
             };

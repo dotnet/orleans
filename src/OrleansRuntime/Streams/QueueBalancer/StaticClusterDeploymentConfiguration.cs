@@ -21,7 +21,7 @@ namespace Orleans.Streams
             _clusterConfiguration = clusterConfiguration;
         }
 
-        public IList<string> GetAllSiloInstanceNames()
+        public IList<string> GetAllSiloNames()
         {
             return _clusterConfiguration.Overrides.Keys.ToList();
         }
