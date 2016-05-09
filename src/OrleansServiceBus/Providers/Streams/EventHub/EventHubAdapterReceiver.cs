@@ -66,9 +66,10 @@ namespace Orleans.ServiceBus.Providers
             {
                 return batches;
             }
+            DateTime dequeueTimeUtc = DateTime.UtcNow;
             foreach (EventData message in messages)
             {
-                StreamPosition streamPosition = cache.Add(message);
+                StreamPosition streamPosition = cache.Add(message, dequeueTimeUtc);
                 batches.Add(new StreamActivityNotificationBatch(streamPosition.StreamIdentity.Guid,
                     streamPosition.StreamIdentity.Namespace, streamPosition.SequenceToken));
             }

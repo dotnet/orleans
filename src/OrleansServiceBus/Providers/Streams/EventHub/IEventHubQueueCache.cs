@@ -11,7 +11,7 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public interface IEventHubQueueCache : IQueueFlowController, IDisposable
     {
-        StreamPosition Add(EventData message);
+        StreamPosition Add(EventData message, DateTime dequeueTimeUtc);
         object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken);
         bool TryGetNextMessage(object cursorObj, out IBatchContainer message);
     }

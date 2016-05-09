@@ -1,6 +1,5 @@
 ﻿
 using System;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -17,7 +16,7 @@ namespace Orleans.Providers.Streams.Common
         where TQueueMessage : class
         where TCachedMessage : struct
     {
-        StreamPosition QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage);
+        StreamPosition QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage, DateTime dequeueTimeUtc);
         IBatchContainer GetBatchContainer(ref TCachedMessage cachedMessage);
         StreamSequenceToken GetSequenceToken(ref TCachedMessage cachedMessage);
         StreamPosition GetStreamPosition(TQueueMessage queueMessage);

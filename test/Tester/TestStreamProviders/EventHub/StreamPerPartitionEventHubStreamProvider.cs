@@ -1,7 +1,5 @@
 ﻿
 using System;
-using System.Globalization;
-using System.Linq;
 using System.Text;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
@@ -22,38 +20,27 @@ namespace Tester.TestStreamProviders.EventHub
             private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer)
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
-                return new QueueCache(partition, checkpointer, bufferPool);
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool);
+                return new EventHubQueueCache(checkpointer, dataAdapter);
             }
-
         }
 
-        /// <summary>
-        /// Message cache that stores EventData as a CachedEventHubMessage in a pooled message cache
-        /// </summary>
-        private class QueueCache : EventHubQueueCache
+        private class CachedDataAdapter : EventHubDataAdapter
         {
-            public QueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool)
-                : base(checkpointer, new CachedDataAdapter(partition, bufferPool))
+            private readonly Guid partitionStreamGuid;
+
+            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool)
+                : base(bufferPool)
             {
+                partitionStreamGuid = GetPartitionGuid(partitionKey);
             }
 
-            private class CachedDataAdapter : EventHubDataAdapter
+
+            public override StreamPosition GetStreamPosition(EventData queueMessage)
             {
-                private readonly Guid partitionStreamGuid;
-
-                public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool)
-                    : base(bufferPool)
-                {
-                    partitionStreamGuid = GetPartitionGuid(partitionKey);
-                }
-
-
-                public override StreamPosition GetStreamPosition(EventData queueMessage)
-                {
-                    IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
-                    StreamSequenceToken token = new EventSequenceToken(queueMessage.SequenceNumber, 0);
-                    return new StreamPosition(stremIdentity, token);
-                }
+                IStreamIdentity stremIdentity = new StreamIdentity(partitionStreamGuid, null);
+                StreamSequenceToken token = new EventSequenceToken(queueMessage.SequenceNumber, 0);
+                return new StreamPosition(stremIdentity, token);
             }
         }
 

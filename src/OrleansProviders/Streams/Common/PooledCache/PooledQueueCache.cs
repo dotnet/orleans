@@ -260,7 +260,7 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
-        public StreamPosition Add(TQueueMessage message)
+        public StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
         {
             if (message == null)
             {
@@ -271,7 +271,7 @@ namespace Orleans.Providers.Streams.Common
 
             StreamPosition streamPosition;
             // allocate message from pool
-            CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message, out streamPosition);
+            CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message, dequeueTimeUtc, out streamPosition);
 
             // If new block, add message block to linked list
             if (block != messageBlocks.FirstOrDefault())

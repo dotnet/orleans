@@ -70,7 +70,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public Action<IDisposable> PurgeAction { private get; set; }
 
-            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition streamPosition = GetStreamPosition(queueMessage);
                 cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
@@ -264,7 +264,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(last, block.NewestMessageIndex);
             Assert.IsTrue(block.HasCapacity);
 
-            block.Add(message, dataAdapter);
+            block.Add(message, DateTime.UtcNow, dataAdapter);
             last++;
 
             Assert.AreEqual(first > last, block.IsEmpty);
