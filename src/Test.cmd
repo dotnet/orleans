@@ -21,6 +21,7 @@ if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait "Category=BVT"
 call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
 packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTS% %TEST_FILTERS% -xml "%OutDir%/xUnit-Results.xml" -parallel none -noshadow
-
+set testresult=%errorlevel%
 popd
-endlocal
+endlocal&set testresult=%testresult%
+exit /B %testresult%
