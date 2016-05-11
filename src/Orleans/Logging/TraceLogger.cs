@@ -161,9 +161,6 @@ namespace Orleans.Runtime
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
         }
 
-        // constructor used by serializator
-        private TraceLogger() {}
-
         /// <summary>
         /// Constructs a TraceLogger with the given name and type.
         /// </summary>
