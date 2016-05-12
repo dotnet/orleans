@@ -64,7 +64,7 @@ namespace Orleans.Providers.Streams.Generator
                 this.bufferPool = bufferPool;
             }
 
-            public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition setreamPosition = GetStreamPosition(queueMessage);
                 cachedMessage.StreamGuid = setreamPosition.StreamIdentity.Guid;
@@ -178,9 +178,10 @@ namespace Orleans.Providers.Streams.Generator
 
         public void AddToCache(IList<IBatchContainer> messages)
         {
+            DateTime dequeueTimeUtc = DateTime.UtcNow;
             foreach (IBatchContainer container in messages)
             {
-                cache.Add(container as GeneratedBatchContainer);
+                cache.Add(container as GeneratedBatchContainer, dequeueTimeUtc);
             }
         }
 

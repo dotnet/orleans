@@ -94,7 +94,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 this.bufferPool = bufferPool;
             }
 
-            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition streamPosition = GetStreamPosition(queueMessage);
                 cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
@@ -228,7 +228,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
                     StreamNamespace = StreamNamespace,
                     SequenceNumber = sequenceNumber++,
-                });
+                }, DateTime.UtcNow);
             }
 
             // get cursor for stream1, walk all the events in the stream using the cursor
@@ -269,7 +269,7 @@ namespace UnitTests.OrleansRuntime.Streams
                         StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
                         StreamNamespace = StreamNamespace,
                         SequenceNumber = sequenceNumber++,
-                    });
+                    }, DateTime.UtcNow);
                 }
 
                 // walk all the events in the stream using the cursor
@@ -329,7 +329,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     StreamGuid = streamId.Guid,
                     StreamNamespace = StreamNamespace,
                     SequenceNumber = sequenceNumber++,
-                });
+                }, DateTime.UtcNow);
             }
 
             // now that there is data, and the cursor should point to data older than in the cache, using cursor should throw
@@ -368,7 +368,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 StreamGuid = streamId.Guid,
                 StreamNamespace = StreamNamespace,
                 SequenceNumber = sequenceNumber++,
-            });
+            }, DateTime.UtcNow);
             // After purge, use of cursor should throw.
             ex = null;
             try

@@ -62,7 +62,7 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
-        public StreamPosition Add<TQueueMessage>(TQueueMessage queueMessage, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class 
+        public StreamPosition Add<TQueueMessage>(TQueueMessage queueMessage, DateTime dequeueTimeUtc, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class 
         {
             if (queueMessage == null)
             {
@@ -74,7 +74,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             int index = writeIndex++;
-            return dataAdapter.QueueMessageToCachedMessage(ref cachedMessages[index], queueMessage);
+            return dataAdapter.QueueMessageToCachedMessage(ref cachedMessages[index], queueMessage, dequeueTimeUtc);
         }
 
         public TCachedMessage this[int index]

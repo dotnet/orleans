@@ -60,9 +60,9 @@ namespace Orleans.ServiceBus.Providers
             return cachePressureMonitor.IsUnderPressure() ? 0 : defaultMaxAddCount;
         }
 
-        public StreamPosition Add(EventData message)
+        public StreamPosition Add(EventData message, DateTime dequeueTimeUtc)
         {
-            return cache.Add(message);
+            return cache.Add(message, dequeueTimeUtc);
         }
 
         public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)

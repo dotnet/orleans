@@ -7,6 +7,7 @@ namespace Orleans.Streams
     /// Stream identity contains the public stream information use to uniquely identify a stream.
     /// Stream identities are only unique per stream provider.
     /// </summary>
+    [Serializable]
     public class StreamIdentity : IStreamIdentity
     {
         public StreamIdentity(Guid streamGuid, string streamNamespace)
