@@ -110,11 +110,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\OrleansXO.Grains\TicTacToe.Grains.csproj">
       <Project>{bb7b4925-1ef6-4d02-a43d-d7d2e02b968b}</Project>
       <Name>TicTacToe.Grains</Name>
