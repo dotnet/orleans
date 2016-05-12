@@ -49,7 +49,7 @@
       <HintPath>$(SolutionDir)packages\Microsoft.WindowsAzure.ConfigurationManager.2.0.0.0\lib\net40\Microsoft.WindowsAzure.Configuration.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.ServiceRuntime">
-      <HintPath>$(SolutionDir)packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.4.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\Unofficial.Microsoft.WindowsAzure.ServiceRuntime.2.7.0.0\lib\net40\Microsoft.WindowsAzure.ServiceRuntime.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.WindowsAzure.Storage">
       <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.4.2.0\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
@@ -113,4 +113,3 @@
   </Target>
   -->
 </Project>
-
