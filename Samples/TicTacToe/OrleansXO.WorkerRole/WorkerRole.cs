@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.WindowsAzure.ServiceRuntime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace OrleansXO.WorkerRole
@@ -20,12 +21,14 @@ namespace OrleansXO.WorkerRole
             return base.OnStart();
         }
 
-        public override void OnStop() { 
+        public override void OnStop()
+        {
             silo.Stop();
-            base.Stop();
+            base.OnStop();
         }
         
-        public override void Run() { 
+        public override void Run()
+        {
             var config = new ClusterConfiguration();
             config.StandardLoad();
             
