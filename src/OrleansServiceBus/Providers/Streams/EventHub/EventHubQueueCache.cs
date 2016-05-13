@@ -6,6 +6,10 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// EventHub queue cache that allows developers to provide their own cached data structure.
+    /// </summary>
+    /// <typeparam name="TCachedMessage"></typeparam>
     public abstract class EventHubQueueCache<TCachedMessage> : IEventHubQueueCache
         where TCachedMessage : struct
     {
@@ -13,7 +17,7 @@ namespace Orleans.ServiceBus.Providers
         protected readonly PooledQueueCache<EventData, TCachedMessage> cache;
         private readonly AveragingCachePressureMonitor cachePressureMonitor;
 
-        protected IStreamQueueCheckpointer<string> Checkpointer { private set; get; }
+        protected IStreamQueueCheckpointer<string> Checkpointer { get; }
 
         protected EventHubQueueCache(int defaultMaxAddCount, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer)
         {
@@ -56,9 +60,9 @@ namespace Orleans.ServiceBus.Providers
             return cachePressureMonitor.IsUnderPressure() ? 0 : defaultMaxAddCount;
         }
 
-        public void Add(EventData message)
+        public StreamPosition Add(EventData message, DateTime dequeueTimeUtc)
         {
-            cache.Add(message);
+            return cache.Add(message, dequeueTimeUtc);
         }
 
         public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
@@ -109,10 +113,15 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// Message cache that stores EventData as a CachedEventHubMessage in a pooled message cache
     /// </summary>
-    internal class DefaultEventHubQueueCache : EventHubQueueCache<CachedEventHubMessage>
+    public class EventHubQueueCache : EventHubQueueCache<CachedEventHubMessage>
     {
-        public DefaultEventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool)
-            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, new EventHubDataAdapter(bufferPool), EventHubDataComparer.Instance)
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool)
+            : this(checkpointer, new EventHubDataAdapter(bufferPool))
+        {
+        }
+
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter)
+            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, EventHubDataComparer.Instance)
         {
         }
 

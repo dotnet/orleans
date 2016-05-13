@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Schedulers;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -472,39 +471,6 @@ namespace UnitTests.SchedulerTests
             Assert.IsTrue(t1.IsCompleted, "Task-1 completed");
             Assert.IsFalse(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.IsTrue(result1.Task.Result, "Task-1 completed");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
-        public void Sched_Task_NewTask_ContinueWith_Wrapped()
-        {
-            TaskScheduler scheduler = new QueuedTaskScheduler();
-
-            Task wrapped = new Task(() =>
-            {
-                output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                    SynchronizationContext.Current, TaskScheduler.Current);
-
-                Task t0 = new Task(() =>
-                {
-                    output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
-                });
-                Task t1 = t0.ContinueWith(task =>
-                {
-                    Assert.IsFalse(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
-
-                    output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
-                        SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
-                });
-                t0.Start(scheduler);
-                bool ok = t1.Wait(TimeSpan.FromSeconds(15));
-                if (!ok) throw new TimeoutException();
-            });
-            wrapped.Start(scheduler);
-            bool finished = wrapped.Wait(TimeSpan.FromSeconds(30));
-            if (!finished) throw new TimeoutException();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]

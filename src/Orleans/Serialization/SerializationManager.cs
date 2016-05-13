@@ -22,7 +22,7 @@ using System.Runtime.Serialization.Formatters;
 namespace Orleans.Serialization
 {
     /// <summary>
-    /// SerializationManager to oversee the Orleans syrializer system.
+    /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
     public static class SerializationManager
     {
@@ -70,6 +70,27 @@ namespace Orleans.Serialization
             get;
             set;
         }
+
+#if DNXCORE50
+        // Workaround for CoreCLR where FormatterServices.GetUninitializedObject is not public (but might change in RTM so we could remove this then).
+        private static readonly Func<Type, object> getUninitializedObjectDelegate =
+            (Func<Type, object>)
+                typeof(string)
+                    .GetTypeInfo()
+                    .Assembly
+                    .GetType("System.Runtime.Serialization.FormatterServices")
+                    .GetMethod("GetUninitializedObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
+                    .CreateDelegate(typeof(Func<Type, object>));
+
+        /// <summary>
+        /// Returns an unitialized object with FormatterServices.
+        /// </summary>
+        /// <param name="type">The type to create</param>
+        public static object GetUninitializedObjectWithFormatterServices(Type type)
+        {
+            return getUninitializedObjectDelegate.Invoke(type);
+        }
+#endif
 
         #region Privates
 

@@ -21,7 +21,7 @@ namespace Orleans.ServiceBus.Providers
     ///   and ordering of aplication layer events within an EventHub message.
     /// </summary>
     [Serializable]
-    internal class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
+    public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
     {
         public string EventHubOffset { get; private set; }
 

@@ -46,7 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Consul">
-      <HintPath>..\packages\Consul.0.6.1.0\lib\net45\Consul.dll</HintPath>
+      <HintPath>..\packages\Consul.0.6.4.1\lib\net45\Consul.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json">

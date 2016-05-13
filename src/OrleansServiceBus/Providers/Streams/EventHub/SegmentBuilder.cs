@@ -3,7 +3,10 @@ using System;
 
 namespace Orleans.ServiceBus.Providers
 {
-    internal static class SegmentBuilder
+    /// <summary>
+    /// Utility class for encoding data into an ArraySegment.
+    /// </summary>
+    public static class SegmentBuilder
     {
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.

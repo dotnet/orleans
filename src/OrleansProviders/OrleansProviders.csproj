@@ -26,6 +26,7 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -36,6 +37,7 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -51,6 +53,7 @@
     <Compile Include="Streams\Common\PooledCache\PooledQueueCache.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessagePool.cs" />
     <Compile Include="Streams\Common\PooledCache\ObjectPool.cs" />
+    <Compile Include="Streams\Common\PooledCache\StreamPosition.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCache.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueAdapterCache.cs" />

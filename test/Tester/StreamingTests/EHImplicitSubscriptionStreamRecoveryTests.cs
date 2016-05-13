@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Providers.Streams.Generator;
+using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -44,6 +46,7 @@ namespace UnitTests.StreamingTests
             {
                 var options = new TestClusterOptions(2);
                 // register stream provider
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
                 options.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
                 return new TestCluster(options);

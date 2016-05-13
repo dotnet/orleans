@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.Remoting.Messaging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -63,12 +64,14 @@ namespace Orleans.Providers.Streams.Generator
                 this.bufferPool = bufferPool;
             }
 
-            public void QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage, GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
             {
-                cachedMessage.StreamGuid = queueMessage.StreamGuid;
-                cachedMessage.StreamNamespace = queueMessage.StreamNamespace;
+                StreamPosition setreamPosition = GetStreamPosition(queueMessage);
+                cachedMessage.StreamGuid = setreamPosition.StreamIdentity.Guid;
+                cachedMessage.StreamNamespace = setreamPosition.StreamIdentity.Namespace;
                 cachedMessage.SequenceNumber = queueMessage.RealToken.SequenceNumber;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
+                return setreamPosition;
             }
 
             // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
@@ -109,6 +112,11 @@ namespace Orleans.Providers.Streams.Generator
             public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
             {
                 return new EventSequenceToken(cachedMessage.SequenceNumber);
+            }
+
+            public StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
+            {
+                return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
             }
 
             public bool ShouldPurge(ref CachedMessage cachedMessage, IDisposable purgeRequest)
@@ -170,9 +178,10 @@ namespace Orleans.Providers.Streams.Generator
 
         public void AddToCache(IList<IBatchContainer> messages)
         {
+            DateTime dequeueTimeUtc = DateTime.UtcNow;
             foreach (IBatchContainer container in messages)
             {
-                cache.Add(container as GeneratedBatchContainer);
+                cache.Add(container as GeneratedBatchContainer, dequeueTimeUtc);
             }
         }
 

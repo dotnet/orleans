@@ -24,7 +24,7 @@ namespace Orleans.ServiceBus.Providers
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
 
         private readonly EventHubPartitionConfig config;
-        private readonly Func<IStreamQueueCheckpointer<string>, IEventHubQueueCache> cacheFactory;
+        private readonly Func<string, IStreamQueueCheckpointer<string>, IEventHubQueueCache> cacheFactory;
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
 
         private IEventHubQueueCache cache;
@@ -35,7 +35,7 @@ namespace Orleans.ServiceBus.Providers
         public int GetMaxAddCount() { return flowController.GetMaxAddCount(); }
 
         public EventHubAdapterReceiver(EventHubPartitionConfig partitionConfig,
-            Func<IStreamQueueCheckpointer<string>,IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>,IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger log)
         {
@@ -47,7 +47,7 @@ namespace Orleans.ServiceBus.Providers
         public async Task Initialize(TimeSpan timeout)
         {
             checkpointer = await checkpointerFactory(config.Partition);
-            cache = cacheFactory(checkpointer);
+            cache = cacheFactory(config.Partition, checkpointer);
             flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache };
             string offset = await checkpointer.Load();
             receiver = await CreateReceiver(config, offset);
@@ -66,12 +66,12 @@ namespace Orleans.ServiceBus.Providers
             {
                 return batches;
             }
+            DateTime dequeueTimeUtc = DateTime.UtcNow;
             foreach (EventData message in messages)
             {
-                cache.Add(message);
-                batches.Add(new StreamActivityNotificationBatch(Guid.Parse(message.PartitionKey),
-                    message.GetStreamNamespaceProperty(), new EventSequenceToken(message.SequenceNumber, 0)));
-
+                StreamPosition streamPosition = cache.Add(message, dequeueTimeUtc);
+                batches.Add(new StreamActivityNotificationBatch(streamPosition.StreamIdentity.Guid,
+                    streamPosition.StreamIdentity.Namespace, streamPosition.SequenceToken));
             }
 
             if (!checkpointer.CheckpointExists)

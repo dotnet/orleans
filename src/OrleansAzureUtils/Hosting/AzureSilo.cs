@@ -132,8 +132,8 @@ namespace Orleans.Runtime.Host
                 HostName = host.Config.GetOrCreateNodeConfigurationForSilo(host.Name).DNSHostName,
                 ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
-                RoleName = serviceRuntimeWrapper.RoleName, 
-                InstanceName = instanceName,
+                RoleName = serviceRuntimeWrapper.RoleName,
+                SiloName = instanceName,
                 UpdateZone = serviceRuntimeWrapper.UpdateDomain.ToString(CultureInfo.InvariantCulture),
                 FaultZone = serviceRuntimeWrapper.FaultDomain.ToString(CultureInfo.InvariantCulture),
                 StartTime = TraceLogger.PrintDate(DateTime.UtcNow),

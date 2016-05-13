@@ -107,7 +107,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="CreateOrleansTables_MySql.sql" />
+    <Content Include="CreateOrleansTables_MySql.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="CreateOrleansTables_SqlServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

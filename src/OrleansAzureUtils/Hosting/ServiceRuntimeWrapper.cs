@@ -123,7 +123,7 @@ namespace Orleans.Runtime.Host
             }
         }
 
-        public IList<string> GetAllSiloInstanceNames()
+        public IList<string> GetAllSiloNames()
         {
             dynamic instances = role.Instances;
             var list = new List<string>();

@@ -1,10 +1,7 @@
 using AdventureGrainInterfaces;
 using Orleans;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 namespace AdventureClient
 {
@@ -12,7 +9,8 @@ namespace AdventureClient
     {
         static void Main(string[] args)
         {
-            GrainClient.Initialize();
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             Console.WriteLine(@"
   ___      _                 _                  

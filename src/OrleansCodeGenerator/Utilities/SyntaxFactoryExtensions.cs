@@ -6,7 +6,6 @@ namespace Orleans.CodeGenerator.Utilities
     using System.Linq.Expressions;
     using System.Reflection;
 
-    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -126,42 +125,6 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             return SyntaxFactory.ParenthesizedExpression(bindingFlagsBinaryExpression);
-        }
-
-        /// <summary>
-        /// Returns <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
-        /// </summary>
-        /// <param name="separatedSyntaxList">
-        /// Args used in initialization.
-        /// </param>
-        /// <param name="arrayType">
-        /// The array type.
-        /// </param>
-        /// <returns>
-        /// <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
-        /// </returns>
-        public static ArrayCreationExpressionSyntax GetArrayCreationWithInitializerSyntax(this SeparatedSyntaxList<ExpressionSyntax> separatedSyntaxList, TypeSyntax arrayType)
-        {
-            var arrayRankSizes =
-                new SeparatedSyntaxList<ExpressionSyntax>().Add(SyntaxFactory.OmittedArraySizeExpression(
-                    SyntaxFactory.Token(SyntaxKind.OmittedArraySizeExpressionToken)));
-
-            var arrayRankSpecifier = SyntaxFactory.ArrayRankSpecifier(
-                SyntaxFactory.Token(SyntaxKind.OpenBracketToken),
-                arrayRankSizes,
-                SyntaxFactory.Token(SyntaxKind.CloseBracketToken));
-
-            var arrayRankSpecifierSyntaxList = new SyntaxList<ArrayRankSpecifierSyntax>().Add(arrayRankSpecifier);
-
-            var arrayCreationExpressionSyntax = SyntaxFactory.ArrayCreationExpression(
-                SyntaxFactory.Token(SyntaxKind.NewKeyword),
-                SyntaxFactory.ArrayType(arrayType, arrayRankSpecifierSyntaxList),
-                SyntaxFactory.InitializerExpression(SyntaxKind.ArrayInitializerExpression,
-                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken),
-                    separatedSyntaxList,
-                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)));
-
-            return arrayCreationExpressionSyntax;
         }
 
         /// <summary>

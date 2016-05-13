@@ -21,7 +21,7 @@ namespace OrleansSQLUtils.Storage
         {
             var fields = typeof (DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
-            var missingQueryKeys = queries.Keys.Except(fields).ToArray();
+            var missingQueryKeys = fields.Except(queries.Keys).ToArray();
             if (missingQueryKeys.Length > 0)
             {
                 throw new ArgumentException(

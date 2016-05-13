@@ -10,27 +10,27 @@ using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
+    /// </summary>
     [Serializable]
-    internal class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer
     {
+        [JsonProperty]
+        private readonly EventHubMessage eventHubMessage;
+
         [JsonProperty]
         private readonly EventHubSequenceToken token;
 
-        [JsonProperty]
-        private readonly byte[] payloadBytes;
-
-        public Guid StreamGuid { get; private set; }
-        public string StreamNamespace { get; private set; }
-        public StreamSequenceToken SequenceToken { get { return token; } }
+        public Guid StreamGuid => eventHubMessage.StreamIdentity.Guid;
+        public string StreamNamespace => eventHubMessage.StreamIdentity.Namespace;
+        public StreamSequenceToken SequenceToken => token;
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
         private Body payload;
-        private Body Payload
-        {
-            get { return payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(payloadBytes)); }
-        }
-        
+        private Body Payload => payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+
         [Serializable]
         private class Body
         {
@@ -38,12 +38,10 @@ namespace Orleans.ServiceBus.Providers
             public Dictionary<string, object> RequestContext { get; set; }
         }
 
-        public EventHubBatchContainer(Guid streamGuid, string streamNamespace, string offset, long sequenceNumber, byte[] data)
+        public EventHubBatchContainer(EventHubMessage eventHubMessage)
         {
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
-            token = new EventHubSequenceToken(offset, sequenceNumber, 0);
-            payloadBytes = data;
+            this.eventHubMessage = eventHubMessage;
+            token = new EventHubSequenceToken(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FortuneCookies;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Chirper.GrainInterfaces;
 using Orleans.Samples.Chirper.Network.Loader;
 
@@ -42,9 +43,10 @@ namespace Orleans.Samples.Chirper.Network.Driver
             this.PipelineLength = 500;
             this.fortune = new Fortune("fortune.txt");
 
-            if (!Orleans.GrainClient.IsInitialized)
+            if (!GrainClient.IsInitialized)
             {
-                Orleans.GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
             }
         }
 

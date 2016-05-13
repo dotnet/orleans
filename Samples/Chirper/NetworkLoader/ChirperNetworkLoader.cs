@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Chirper.GrainInterfaces;
 
 namespace Orleans.Samples.Chirper.Network.Loader
@@ -43,9 +44,10 @@ namespace Orleans.Samples.Chirper.Network.Loader
             this.Users = new Dictionary<long, IChirperAccount>();
             this.PipelineSize = (pipeline == null) ? DefaultPipelineSize : pipeline.Capacity;
             
-            if (!Orleans.GrainClient.IsInitialized)
+            if (!GrainClient.IsInitialized)
             {
-                Orleans.GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
             }
             runtimeStopwatch.Start();
         }

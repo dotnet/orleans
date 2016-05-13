@@ -35,9 +35,11 @@ namespace Orleans.Providers.Streams.Common
         /// Allocates a message in a block and returns the block the message is in.
         /// </summary>
         /// <param name="queueMessage"></param>
+        /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage)
+        public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage, DateTime dequeueTimeUtc, out StreamPosition streamPosition)
         {
+            streamPosition = default(StreamPosition);
             if (queueMessage == null)
             {
                 throw new ArgumentNullException("queueMessage");
@@ -49,7 +51,7 @@ namespace Orleans.Providers.Streams.Common
                 currentMessageBlock = messagePool.Allocate();
             }
 
-            currentMessageBlock.Add(queueMessage, dataAdapter);
+            streamPosition = currentMessageBlock.Add(queueMessage, dequeueTimeUtc, dataAdapter);
 
             return currentMessageBlock;
         }

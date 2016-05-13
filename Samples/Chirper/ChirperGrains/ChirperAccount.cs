@@ -11,7 +11,7 @@ using Orleans.Providers;
 
 namespace Orleans.Samples.Chirper.Grains
 {
-    public class ChirperAccountState : GrainState
+    public class ChirperAccountState
     {
         /// <summary>The list of publishers who this user is following</summary>
         public Dictionary<ChirperUserInfo, IChirperPublisher> Subscriptions { get; set; }
