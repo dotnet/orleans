@@ -25,7 +25,8 @@ namespace Orleans.AzureUtils
         public string ProxyPort { get; set; }       // Optional
 
         public string RoleName { get; set; }        // Optional - only for Azure role
-        public string InstanceName { get; set; }    // Optional - only for Azure role
+        public string SiloName { get; set; }
+        public string InstanceName { get; set; }    // For backward compatability we leave the old column, untill all clients update the code to new version.
         public string UpdateZone { get; set; }         // Optional - only for Azure role
         public string FaultZone { get; set; }          // Optional - only for Azure role
 
@@ -98,7 +99,7 @@ namespace Orleans.AzureUtils
                 sb.Append(" ProxyPort=").Append(ProxyPort);
 
                 if (!string.IsNullOrEmpty(RoleName)) sb.Append(" RoleName=").Append(RoleName);
-                sb.Append(" Instance=").Append(InstanceName);
+                sb.Append(" SiloName=").Append(SiloName);
                 sb.Append(" UpgradeZone=").Append(UpdateZone);
                 sb.Append(" FaultZone=").Append(FaultZone);
 
@@ -261,14 +262,14 @@ namespace Orleans.AzureUtils
                 {
                     if (e1 == null) return (e2 == null) ? 0 : -1;
                     if (e2 == null) return (e1 == null) ? 0 : 1;
-                    if (e1.InstanceName == null) return (e2.InstanceName == null) ? 0 : -1;
-                    if (e2.InstanceName == null) return (e1.InstanceName == null) ? 0 : 1;
-                    return String.CompareOrdinal(e1.InstanceName, e2.InstanceName);
+                    if (e1.SiloName == null) return (e2.SiloName == null) ? 0 : -1;
+                    if (e2.SiloName == null) return (e1.SiloName == null) ? 0 : 1;
+                    return String.CompareOrdinal(e1.SiloName, e2.SiloName);
                 });
             foreach (SiloInstanceTableEntry entry in entries)
             {
                 sb.AppendLine(String.Format("[IP {0}:{1}:{2}, {3}, Instance={4}, Status={5}]", entry.Address, entry.Port, entry.Generation,
-                    entry.HostName, entry.InstanceName, entry.Status));
+                    entry.HostName, entry.SiloName, entry.Status));
             }
             return sb.ToString();
         }

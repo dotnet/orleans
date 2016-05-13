@@ -152,7 +152,7 @@ namespace Orleans
                {
                    if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
                    if (y.Item1.Status.Equals(SiloStatus.Dead)) return -1; // put Deads at the end
-                   return String.Compare(x.Item1.InstanceName, y.Item1.InstanceName, StringComparison.Ordinal);
+                   return String.Compare(x.Item1.SiloName, y.Item1.SiloName, StringComparison.Ordinal);
                });
             Members = list.AsReadOnly();
             Version = version;
@@ -238,10 +238,10 @@ namespace Orleans
 
         public string HostName { get; set; }          
         public SiloStatus Status { get; set; }          
-        public int ProxyPort { get; set; }                   
+        public int ProxyPort { get; set; }
 
-        public string RoleName { get; set; }              // Optional - only for Azure role
-        public string InstanceName { get; set; }          // Optional - only for Azure role
+        public string RoleName { get; set; }           // Optional - only for Azure role  
+        public string SiloName { get; set; }
         public int UpdateZone { get; set; }            // Optional - only for Azure role
         public int FaultZone { get; set; }             // Optional - only for Azure role
 
@@ -271,7 +271,7 @@ namespace Orleans
             ProxyPort = updatedSiloEntry.ProxyPort;
 
             RoleName = updatedSiloEntry.RoleName;
-            InstanceName = updatedSiloEntry.InstanceName;
+            SiloName = updatedSiloEntry.SiloName;
             UpdateZone = updatedSiloEntry.UpdateZone;
             FaultZone = updatedSiloEntry.FaultZone;
 
@@ -305,7 +305,7 @@ namespace Orleans
 
         public override string ToString()
         {
-            return string.Format("SiloAddress={0} InstanceName={1} Status={2}", SiloAddress.ToLongString(), InstanceName, Status);
+            return string.Format("SiloAddress={0} SiloName={1} Status={2}", SiloAddress.ToLongString(), SiloName, Status);
         }
 
         internal string ToFullString(bool full = false)
@@ -319,10 +319,10 @@ namespace Orleans
             List<DateTime> timestamps = SuspectTimes == null
                 ? null
                 : SuspectTimes.Select(tuple => tuple.Item2).ToList();
-            return string.Format("[SiloAddress={0} InstanceName={1} Status={2} HostName={3} ProxyPort={4} " +
+            return string.Format("[SiloAddress={0} SiloName={1} Status={2} HostName={3} ProxyPort={4} " +
                                  "RoleName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
                 SiloAddress.ToLongString(),
-                InstanceName,
+                SiloName,
                 Status,
                 HostName,
                 ProxyPort,
