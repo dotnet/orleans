@@ -8,8 +8,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{DE39343E-D0FB-48E7-9E4D-F9908CCBED7B}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
-		.nuget\NuGet.exe = .nuget\NuGet.exe
-		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test Projects", "Test Projects", "{0DA63EC3-AE2D-4D6F-85E5-42E37BE0E11F}"
@@ -56,3 +54,4 @@ Global
 		{09334D17-203E-455D-B6B2-36138F51044E} = {0DA63EC3-AE2D-4D6F-85E5-42E37BE0E11F}
 	EndGlobalSection
 EndGlobal
+

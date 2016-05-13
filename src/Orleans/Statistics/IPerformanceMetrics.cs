@@ -1,29 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -63,6 +42,7 @@ namespace Orleans.Runtime
 
     public interface ISiloMetricsDataPublisher
     {
+        Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName);
         Task ReportMetrics(ISiloPerformanceMetrics metricsData);
     }
 
@@ -73,6 +53,7 @@ namespace Orleans.Runtime
 
     public interface IClientMetricsDataPublisher
     {
+        Task Init(ClientConfiguration config, IPAddress address, string clientId);
         Task ReportMetrics(IClientPerformanceMetrics metricsData);
     }
 
@@ -84,6 +65,7 @@ namespace Orleans.Runtime
     public interface IStatisticsPublisher
     {
         Task ReportStats(List<ICounter> statsCounters);
+        Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName);
     }
 
     public interface IConfigurableStatisticsPublisher : IStatisticsPublisher
@@ -152,6 +134,11 @@ namespace Orleans.Runtime
         /// </summary>
         public long ClientCount { get; internal set; }
 
+        public long ReceivedMessages { get; internal set; }
+
+        public long SentMessages { get; internal set; }
+
+
         /// <summary>
         /// The DateTime when this statistics was created.
         /// </summary>
@@ -172,6 +159,8 @@ namespace Orleans.Runtime
             IsOverloaded = metrics.IsOverloaded;
             ClientCount = metrics.ClientCount;
             TotalPhysicalMemory = metrics.TotalPhysicalMemory;
+            ReceivedMessages = metrics.ReceivedMessages;
+            SentMessages = metrics.SentMessages;
             DateTime = dateTime;
         }
 
@@ -266,20 +255,21 @@ namespace Orleans.Runtime
         {
             return string.Format(Environment.NewLine 
                 + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
-                + "   LocalCacheActivationAddresses={4}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={5}"  + Environment.NewLine
-                + "   PrimaryForGrain={6}" + Environment.NewLine 
-                + "   GrainClassTypeName={7}" + Environment.NewLine
+                + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
+                + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
+                + "   PrimaryForGrain={5}" + Environment.NewLine 
+                + "   GrainClassTypeName={6}" + Environment.NewLine
                 + "   LocalActivations:" + Environment.NewLine
-                + "{3}." + Environment.NewLine,
-                        Grain.ToDetailedString(), 
-                        SiloName,
-                        SiloAddress.ToLongString(),
-                        Utils.EnumerableToString(LocalCacheActivationAddresses),
-                        Utils.EnumerableToString(LocalDirectoryActivationAddresses),
-                        PrimaryForGrain,
-                        GrainClassTypeName, 
-                        Utils.EnumerableToString(LocalActivations, str => string.Format("      {0}", str), "\n"));
+                + "{7}." + Environment.NewLine,
+                    Grain.ToDetailedString(),                                   // {0}
+                    SiloName,                                                   // {1}
+                    SiloAddress.ToLongString(),                                 // {2}
+                    Utils.EnumerableToString(LocalCacheActivationAddresses),    // {3}
+                    Utils.EnumerableToString(LocalDirectoryActivationAddresses),// {4}
+                    PrimaryForGrain,                                            // {5}
+                    GrainClassTypeName,                                         // {6}
+                    Utils.EnumerableToString(LocalActivations,                  // {7}
+                        str => string.Format("      {0}", str), "\n"));
         }
     }
 }

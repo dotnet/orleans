@@ -1,31 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
-﻿using System.Linq;
-﻿using System.Linq.Expressions;
-﻿using System.Threading.Tasks;
+using System.Linq;
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -85,7 +61,7 @@ namespace Orleans.Runtime
             // That way, when we refresh it in the directiry, it's the same one.
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
-                () => ExecuteWithRetries(() => grainDirectory.RegisterAsync(addr), ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr)), 
+                () => ExecuteWithRetries(() => grainDirectory.RegisterAsync(addr, singleActivation:false), ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr)),
                 this.SchedulingContext)
                         .Ignore();
         }
@@ -94,7 +70,7 @@ namespace Orleans.Runtime
         {
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
-                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
+                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, force:true), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
                 this.SchedulingContext)
                         .Ignore();
         }
@@ -109,7 +85,7 @@ namespace Orleans.Runtime
                 // If failed to register after that time, it will be retried further on by clientRefreshTimer.
                 // In the unregsiter case just drop it. At the worst, where will be garbage in the directory.
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
-                    (int _) =>
+                    _ =>
                     {
                         return functionToExecute();
                     },
@@ -133,7 +109,7 @@ namespace Orleans.Runtime
                 foreach (GrainId clientId in clients)
                 {
                     var addr = GetClientActivationAddress(clientId);
-                    Task task = grainDirectory.RegisterAsync(addr).
+                    Task task = grainDirectory.RegisterAsync(addr, singleActivation:false).
                         LogException(logger, ErrorCode.ClientRegistrarFailedToRegister_2, String.Format("Directory.RegisterAsync {0} failed.", addr));
                     tasks.Add(task);
                 }
@@ -156,7 +132,10 @@ namespace Orleans.Runtime
 
         private ActivationAddress GetClientActivationAddress(GrainId clientId)
         {
-            return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(clientId));
+            // Need to pick a unique deterministic ActivationId for this client.
+            // We store it in the grain directory and there for every GrainId we use ActivationId as a key
+            // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
+            return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetClientGWActivation(clientId, myAddress));
         }
      }
 }

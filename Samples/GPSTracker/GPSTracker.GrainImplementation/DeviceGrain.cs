@@ -1,19 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using GPSTracker.Common;
 using GPSTracker.GrainInterface;
 using Orleans;
@@ -36,7 +20,7 @@ namespace GPSTracker.GrainImplementation
             if (null == this.LastMessage || this.LastMessage.Latitude != message.Latitude || this.LastMessage.Longitude != message.Longitude)
             {
                 // only sent a notification if the position has changed
-                var notifier = PushNotifierGrainFactory.GetGrain(0);
+                var notifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
                 var speed = GetSpeed(this.LastMessage, message);
 
                 // record the last message

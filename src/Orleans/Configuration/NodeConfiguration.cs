@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -36,7 +13,7 @@ namespace Orleans.Runtime.Configuration
     /// Individual node-specific silo configuration parameters.
     /// </summary>
     [Serializable]
-    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class NodeConfiguration : ITraceConfiguration, IStatisticsConfiguration
     {
         private readonly DateTime creationTimestamp;
         private string siloName;
@@ -50,7 +27,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 siloName = value;
-                ConfigUtilities.SetTraceFileName(this, SiloName, creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
 
@@ -64,8 +41,8 @@ namespace Orleans.Runtime.Configuration
         /// The host name or IP address of this silo.
         /// This is a configurable IP address or Hostname.
         /// </summary>
-        public string HostNameOrIPAddress { get; set; } 
-        private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType); } }
+        public string HostNameOrIPAddress { get; set; }
+        private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType).GetResult(); } }
 
         /// <summary>
         /// The port this silo uses for silo-to-silo communication.
@@ -154,18 +131,15 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The values for various silo limits.
         /// </summary>
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private string traceFilePattern;
         /// <summary>
         /// </summary>
-        public Logger.Severity DefaultTraceLevel { get; set; }
+        public Severity DefaultTraceLevel { get; set; }
         /// <summary>
         /// </summary>
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
-        /// <summary>
-        /// </summary>
-        public bool WriteMessagingTraces { get; set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         /// <summary>
         /// </summary>
         public bool TraceToConsole { get; set; }
@@ -177,7 +151,7 @@ namespace Orleans.Runtime.Configuration
             set
             {
                 traceFilePattern = value;
-                ConfigUtilities.SetTraceFileName(this, this.SiloName, this.creationTimestamp);
+                ConfigUtilities.SetTraceFileName(this, siloName, creationTimestamp);
             }
         }
         /// <summary>
@@ -193,6 +167,10 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public int BulkMessageLimit { get; set; }
 
+        /// <summary>
+        /// Specifies the name of the Startup class in the configuration file.
+        /// </summary>
+        public string StartupTypeName { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -241,12 +219,16 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
 
+        public Dictionary<string, SearchOption> AdditionalAssemblyDirectories { get; set; }
+
+        public string SiloShutdownEventName { get; set; }
+
         internal const string DEFAULT_NODE_NAME = "default";
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_LOG_WRITE_PERIOD = TimeSpan.FromMinutes(5);
         internal static readonly StatisticsLevel DEFAULT_STATS_COLLECTION_LEVEL = StatisticsLevel.Info;
-        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(1, System.Environment.ProcessorCount);
+        private static readonly int DEFAULT_MAX_ACTIVE_THREADS = Math.Max(4, System.Environment.ProcessorCount);
         internal static readonly int DEFAULT_MAX_LOCAL_ACTIVATIONS = System.Environment.ProcessorCount;
         private const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
         private static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
@@ -265,7 +247,7 @@ namespace Orleans.Runtime.Configuration
             AddressType = AddressFamily.InterNetwork;
             ProxyGatewayEndpoint = null;
 
-            MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS; 
+            MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS;
             DelayWarningThreshold = TimeSpan.FromMilliseconds(10000); // 10,000 milliseconds
             ActivationSchedulingQuantum = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
             TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
@@ -274,11 +256,10 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingEnabled = false;
             LoadSheddingLimit = 95;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
-            WriteMessagingTraces = false;
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
@@ -289,7 +270,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = DEFAULT_STATS_COLLECTION_LEVEL;
 
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
 
             MinDotNetThreadPoolSize = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
 
@@ -297,6 +278,8 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = false;
             DefaultConnectionLimit = DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
             UseNagleAlgorithm = false;
+
+            AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
         }
 
         public NodeConfiguration(NodeConfiguration other)
@@ -321,11 +304,10 @@ namespace Orleans.Runtime.Configuration
             LoadSheddingLimit = other.LoadSheddingLimit;
 
             DefaultTraceLevel = other.DefaultTraceLevel;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>(other.TraceLevelOverrides);
+            TraceLevelOverrides = new List<Tuple<string, Severity>>(other.TraceLevelOverrides);
             TraceToConsole = other.TraceToConsole;
             TraceFilePattern = other.TraceFilePattern;
             TraceFileName = other.TraceFileName;
-            WriteMessagingTraces = other.WriteMessagingTraces;
             LargeMessageWarningThreshold = other.LargeMessageWarningThreshold;
             PropagateActivityId = other.PropagateActivityId;
             BulkMessageLimit = other.BulkMessageLimit;
@@ -337,7 +319,7 @@ namespace Orleans.Runtime.Configuration
             StatisticsWriteLogStatisticsToTable = other.StatisticsWriteLogStatisticsToTable;
             StatisticsCollectionLevel = other.StatisticsCollectionLevel;
 
-            LimitValues = new Dictionary<string, LimitValue>(other.LimitValues); // Shallow copy
+            LimitManager = new LimitManager(other.LimitManager); // Shallow copy
 
             Subnet = other.Subnet;
 
@@ -345,6 +327,9 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = other.Expect100Continue;
             DefaultConnectionLimit = other.DefaultConnectionLimit;
             UseNagleAlgorithm = other.UseNagleAlgorithm;
+
+            StartupTypeName = other.StartupTypeName;
+            AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
         }
 
         public override string ToString()
@@ -384,30 +369,12 @@ namespace Orleans.Runtime.Configuration
             sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
             sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
+            sb.Append("   SiloShutdownEventName: ").Append(SiloShutdownEventName).AppendLine();
             sb.Append("   Debug: ").AppendLine();
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-
-            if (LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-            }
-
+            sb.Append(LimitManager);
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// Returns the value of silo limit.
-        /// </summary>
-        /// <param name="limitName">The name of the limit return.</param>
-        /// <returns>Limit value</returns>
-        public LimitValue GetLimit(string limitName)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(limitName, out limit);
-            return limit;
         }
 
         internal void Load(XmlElement root)
@@ -439,7 +406,7 @@ namespace Orleans.Runtime.Configuration
                         }
                         break;
                     case "ProxyingGateway":
-                        ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, Subnet);
+                        ProxyGatewayEndpoint = ConfigUtilities.ParseIPEndPoint(child, Subnet).GetResult();
                         break;
                     case "Scheduler":
                         if (child.HasAttribute("MaxActiveThreads"))
@@ -490,12 +457,12 @@ namespace Orleans.Runtime.Configuration
                     case "LoadShedding":
                         if (child.HasAttribute("Enabled"))
                         {
-                            LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"), 
+                            LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"),
                                 "Invalid boolean value for Enabled attribute on LoadShedding attribute for " + SiloName);
                         }
                         if (child.HasAttribute("LoadLimit"))
                         {
-                            LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"), 
+                            LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"),
                                 "Invalid integer value for LoadLimit attribute on LoadShedding attribute for " + SiloName);
                             if (LoadSheddingLimit < 0)
                             {
@@ -514,8 +481,21 @@ namespace Orleans.Runtime.Configuration
                         ConfigUtilities.ParseStatistics(this, child, SiloName);
                         break;
                     case "Limits":
-                        ConfigUtilities.ParseLimitValues(this, child, SiloName);
+                        ConfigUtilities.ParseLimitValues(LimitManager, child, SiloName);
                         break;
+                    case "Startup":
+                        if (child.HasAttribute("Type"))
+                        {
+                            StartupTypeName = child.GetAttribute("Type");
+                        }
+                        break;
+                    case "Telemetry":
+                        ConfigUtilities.ParseTelemetry(child);
+                        break;
+                    case "AdditionalAssemblyDirectories":
+                        ConfigUtilities.ParseAdditionalAssemblyDirectories(AdditionalAssemblyDirectories, child);
+                        break;
+
                 }
             }
         }

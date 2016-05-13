@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
@@ -37,11 +14,11 @@ namespace Orleans.Streams
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;
         [NonSerialized]
-        private IStreamProviderImpl                             provider;
+        private IInternalStreamProvider                         provider;
         [NonSerialized]
-        private volatile IAsyncBatchObserver<T>                 producerInterface;
+        private volatile IInternalAsyncBatchObserver<T>         producerInterface;
         [NonSerialized]
-        private IAsyncObservable<T>                             consumerInterface;
+        private IInternalAsyncObservable<T>                     consumerInterface;
         [NonSerialized]
         private readonly object                                 initLock; // need the lock since the same code runs in the provider on the client and in the silo.
         
@@ -52,14 +29,13 @@ namespace Orleans.Streams
         public string Namespace                                 { get { return streamId.Namespace; } }
         public string ProviderName                              { get { return streamId.ProviderName; } }
 
-
         // IMPORTANT: This constructor needs to be public for Json deserialization to work.
         public StreamImpl()
         {
             initLock = new object();
         }
 
-        internal StreamImpl(StreamId streamId, IStreamProviderImpl provider, bool isRewindable)
+        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable)
         {
             if (null == streamId)
                 throw new ArgumentNullException("streamId");
@@ -76,34 +52,30 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return GetConsumerInterface().SubscribeAsync(observer, null, null, null);
+            return GetConsumerInterface().SubscribeAsync(observer, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token, StreamFilterPredicate filterFunc, object filterData)
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
+            StreamFilterPredicate filterFunc = null,
+            object filterData = null)
         {
             return GetConsumerInterface().SubscribeAsync(observer, token, filterFunc, filterData);
         }
 
-        public Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
-        {
-            return GetConsumerInterface().UnsubscribeAsync(handle);
-        }
-
-        public Task UnsubscribeAllAsync()
-        {
-            return GetConsumerInterface().UnsubscribeAllAsync();
-        }
-
-        public async Task Cleanup()
+        public async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
             // Cleanup producers
-            if (producerInterface != null)
+            if (cleanupProducers && producerInterface != null)
             {
-                var producer = producerInterface as IStreamControl;
-                if (producer != null)
-                    await producer.Cleanup();
-                
+                await producerInterface.Cleanup();
                 producerInterface = null;
+            }
+
+            // Cleanup consumers
+            if (cleanupConsumers && consumerInterface != null)
+            {
+                await consumerInterface.Cleanup();
+                consumerInterface = null;
             }
         }
 
@@ -126,6 +98,24 @@ namespace Orleans.Streams
             return GetProducerInterface().OnErrorAsync(ex);
         }
 
+        internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token)
+        {
+            return GetConsumerInterface().ResumeAsync(handle, observer, token);
+        }
+
+        public Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
+        {
+            return GetConsumerInterface().GetAllSubscriptions();
+        }
+
+        internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
+        {
+            return GetConsumerInterface().UnsubscribeAsync(handle);
+        }
+
         internal IAsyncBatchObserver<T> GetProducerInterface()
         {
             if (producerInterface != null) return producerInterface;
@@ -143,7 +133,7 @@ namespace Orleans.Streams
             return producerInterface;
         }
 
-        internal IAsyncObservable<T> GetConsumerInterface()
+        internal IInternalAsyncObservable<T> GetConsumerInterface()
         {
             if (consumerInterface == null)
             {
@@ -161,9 +151,9 @@ namespace Orleans.Streams
             return consumerInterface;
         }
 
-        private IStreamProviderImpl GetStreamProvider()
+        private IInternalStreamProvider GetStreamProvider()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IStreamProviderImpl;
+            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         #region IComparable<IAsyncStream<T>> Members

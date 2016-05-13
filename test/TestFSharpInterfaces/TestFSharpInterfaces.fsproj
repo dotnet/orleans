@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>2375d7d5-9b30-493f-9c2e-a6b2811a3c5a</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>TestFSharpInterfaces</RootNamespace>
+    <AssemblyName>TestFSharpInterfaces</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Name>TestFSharpInterfaces</Name>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <Tailcalls>false</Tailcalls>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>bin\Debug\TestFSharpInterfaces.XML</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <WarningLevel>3</WarningLevel>
+    <DocumentationFile>bin\Release\TestFSharpInterfaces.XML</DocumentationFile>
+  </PropertyGroup>
+  <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
+  <Choose>
+    <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
+      <PropertyGroup>
+        <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
+        <PackagesRestored>true</PackagesRestored>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <FSharpTargets>$(MSBuildBinPath)\Microsoft.Common.targets</FSharpTargets>
+        <PackagesRestored>false</PackagesRestored>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Target Name="CreateManifestResourceNames" Condition="'@(EmbeddedResource)' != '' And '$(PackagesRestored)' == 'false'">
+  </Target>
+  <Target Name="CoreCompile" Condition="'$(PackagesRestored)' == 'false'" Inputs="$(MSBuildAllProjects); @(CompileBefore); @(Compile); @(CompileAfter); @(_CoreCompileResourceInputs); @(ManifestNonResxWithNoCultureOnDisk); $(ApplicationIcon); $(AssemblyOriginatorKeyFile); @(ReferencePath); @(CompiledLicenseFile); @(EmbeddedDocumentation); $(Win32Resource); $(Win32Manifest); @(CustomAdditionalCompileInputs); $(VersionFile); $(KeyOriginatorFile)" Outputs="@(DocFileItem); @(IntermediateAssembly); @(_DebugSymbolsIntermediatePath); $(NonExistentFile); @(CustomAdditionalCompileOutputs)">
+    <!--Recursively invoking the build allows for the discovery of restored packages-->
+    <!--Note that we are only attempting this once, in order to avoid an infinite loop-->
+    <MSBuild Condition="'$(HasBuilt)' == ''" Projects="$(ProjectPath)" Properties="HasBuilt=true;Platform=$(Platform);Configuration=$(Configuration)" ContinueOnError="false" />
+  </Target>
+  <Import Project="$(FSharpTargets)" />
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="IFSharpBaseInterface.fs" />
+    <Compile Include="IFSharpParameters.fs" />
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.fs">
+      <Link>GlobalAssemblyInfo.fs</Link>
+    </Compile>
+    <Content Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\..\src\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+  <!--END: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
+</Project>

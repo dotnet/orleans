@@ -2,7 +2,7 @@
 ''' Orleans grain communication interface $safeitemname$
 ''' </summary>
 Public Interface $safeitemname$
-    Inherits Orleans.IGrain
+    Inherits Orleans.IGrainWithGuidKey
 
     ' TODO: add your interface methods.
     '

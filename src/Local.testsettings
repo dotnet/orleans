@@ -4,8 +4,11 @@
   <Deployment>
     <DeploymentItem filename="Tester\bin\Debug\TestInput\" />
     <DeploymentItem filename="TestInput\" />
+    <DeploymentItem filename="CreateOrleansTables_MySql.sql" />
+    <DeploymentItem filename="CreateOrleansTables_SqlServer.sql" />
   </Deployment>
   <NamingScheme baseName="BuildResults" appendTimeStamp="false" />
+  <Scripts setupScript=".\SetupTestScript.cmd" />
   <Execution hostProcessPlatform="MSIL">
     <Timeouts runTimeout="14400000" testTimeout="300000" />
     <TestTypeSpecific>

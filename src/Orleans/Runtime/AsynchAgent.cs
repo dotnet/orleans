@@ -1,32 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime
 {
@@ -50,9 +23,6 @@ namespace Orleans.Runtime
         internal protected ThreadTrackingStatistic threadTracking;
 #endif
 
-        static protected readonly Dictionary<Type, int> SequenceNumbers = new Dictionary<Type, int>();
-        static private readonly object classLockable = new object();
-
         public ThreadState State { get; private set; }
         internal string Name { get; private set; }
         internal int ManagedThreadId { get { return t==null ? -1 : t.ManagedThreadId;  } } 
@@ -61,14 +31,6 @@ namespace Orleans.Runtime
         {
             Cts = new CancellationTokenSource();
             var thisType = GetType();
-            int n = 0;
-
-            lock (classLockable)
-            {
-                SequenceNumbers.TryGetValue(thisType, out n);
-                n++;
-                SequenceNumbers[thisType] = n;
-            }
             
             type = thisType.Namespace + "." + thisType.Name;
             if (type.StartsWith("Orleans.", StringComparison.Ordinal))
@@ -77,18 +39,18 @@ namespace Orleans.Runtime
             }
             if (!string.IsNullOrEmpty(nameSuffix))
             {
-                Name = type + "." + nameSuffix + "/" + n;
+                Name = type + "/" + nameSuffix;
             }
             else
             {
-                Name = type + "/" + n;
+                Name = type;
             }
 
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
             Log = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
-            AppDomain.CurrentDomain.DomainUnload += new EventHandler(CurrentDomain_DomainUnload);
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -96,24 +58,12 @@ namespace Orleans.Runtime
                 threadTracking = new ThreadTrackingStatistic(Name);
             }
 #endif
-
             t = new Thread(AgentThreadProc) { IsBackground = true, Name = this.Name };
         }
 
-        protected AsynchAgent() : this(null)
+        protected AsynchAgent()
+            : this(null)
         {
-        }
-
-        protected int GetThreadTypeSequenceNumber()
-        {
-            var thisType = GetType();
-            int n;
-
-            lock (classLockable)
-            {
-                SequenceNumbers.TryGetValue(thisType, out n);
-            }
-            return n;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -121,7 +71,10 @@ namespace Orleans.Runtime
         {
             try
             {
-                Stop();
+                if (State != ThreadState.Stopped)
+                {
+                    Stop();
+                }
             }
             catch (Exception exc)
             {
@@ -165,6 +118,7 @@ namespace Orleans.Runtime
                         State = ThreadState.Stopped;
                     }
                 }
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
             }
             catch (Exception exc)
             {
@@ -178,6 +132,23 @@ namespace Orleans.Runtime
         {
             if(t!=null)
                 t.Abort(stateInfo);
+        }
+
+        public void Join(TimeSpan timeout)
+        {
+            try
+            {
+                var agentThread = t;
+                if (agentThread != null)
+                {
+                    bool joined = agentThread.Join(timeout);
+                    Log.Verbose("{0} the agent thread {1} after {2} time.", joined ? "Joined" : "Did not join", Name, timeout);
+                }
+            }catch(Exception exc)
+            {
+                // ignore. Just make sure Join does not throw.
+                Log.Verbose("Ignoring error during Join: {0}", exc);
+            }
         }
 
         protected abstract void Run();

@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Presence.GrainInterfaces;
 
 namespace LoadGenerator
@@ -18,7 +17,8 @@ namespace LoadGenerator
         {
             try
             {
-                GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
 
                 int nGames = 10; // number of games to simulate
                 int nPlayersPerGame = 4; // number of players in each game
@@ -39,7 +39,7 @@ namespace LoadGenerator
                 }
 
                 int iteration = 0;
-                IPresenceGrain presence = PresenceGrainFactory.GetGrain(0); // PresenceGrain is a StatelessWorker, so we use a single grain ID for auto-scale
+                IPresenceGrain presence = GrainClient.GrainFactory.GetGrain<IPresenceGrain>(0); // PresenceGrain is a StatelessWorker, so we use a single grain ID for auto-scale
                 List<Task> promises = new List<Task>();
 
                 while (iteration++ < nIterations)

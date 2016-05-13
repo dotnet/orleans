@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -33,7 +9,7 @@ namespace Orleans.Runtime
     /// Interface for system management functions of silos, 
     /// exposed as a grain for receiving remote requests / commands.
     /// </summary>
-    public interface IManagementGrain : IGrain
+    public interface IManagementGrain : IGrainWithIntegerKey
     {
         /// <summary>
         /// Get the list of silo hosts and statuses currently known about in this cluster.
@@ -109,8 +85,29 @@ namespace Orleans.Runtime
         /// <param name="grainReference">Reference to the grain to be queried.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<int> GetGrainActivationCount(GrainReference grainReference);
+        /// <summary>
+        /// Return the total count of all current grain activations across all silos.
+        /// </summary>
+        /// <returns>Completion promise for this operation.</returns>
         Task<int> GetTotalActivationCount();
 
+        /// <summary>
+        /// Execute a control command on the specified providers on all silos in the cluster.
+        /// Commands are sent to all known providers on each silo which match both the <c>providerTypeFullName</c> AND <c>providerName</c> parameters.
+        /// </summary>
+        /// <remarks>
+        /// Providers must implement the <c>Orleans.Providers.IControllable</c> 
+        /// interface in order to receive these control channel commands.
+        /// </remarks>
+        /// <param name="providerTypeFullName">Class full name for the provider type to send this command to.</param>
+        /// <param name="providerName">Provider name to send this command to.</param>
+        /// <param name="command">An id / serial number of this command. 
+        /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
+        /// <param name="arg">An opaque command argument.
+        /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
+        /// <returns>Completion promise for this operation.</returns>
+        Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
+        
         /// <summary>
         /// Update the configuration information dynamically. Only a subset of configuration information
         /// can be updated - will throw an error (and make no config changes) if you specify attributes

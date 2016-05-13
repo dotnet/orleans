@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +7,7 @@ using System.IO;
 using System.Xml;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 
 
 namespace Orleans.Runtime.Configuration
@@ -68,7 +46,7 @@ namespace Orleans.Runtime.Configuration
         public IDictionary<string, NodeConfiguration> Overrides { get; private set; }
 
         private Dictionary<string, string> overrideXml;
-        private readonly Dictionary<string, List<Action>> listeners;
+        private readonly Dictionary<string, List<Action>> listeners = new Dictionary<string, List<Action>>();
         internal bool IsRunningAsUnitTest { get; set; }
 
         /// <summary>
@@ -76,7 +54,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public ClusterConfiguration()
         {
-            listeners = new Dictionary<string, List<Action>>();
             Init();
         }
 
@@ -145,10 +122,15 @@ namespace Orleans.Runtime.Configuration
 
         private static string WriteXml(XmlElement element)
         {
-            var text = new StringWriter();
-            var xml = new XmlTextWriter(text);
-            element.WriteTo(xml);
-            return text.ToString();
+            using(var sw = new StringWriter())
+            {
+                using(var xw = XmlWriter.Create(sw))
+                { 
+                    element.WriteTo(xw);
+                    xw.Flush();
+                    return sw.ToString();
+                }
+            }
         }
 
         private void CalculateOverrides()
@@ -163,6 +145,10 @@ namespace Orleans.Runtime.Configuration
                 else if (Globals.UseAzureSystemStore)
                 {
                     Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+                }
+                else if (Globals.UseZooKeeperSystemStore)
+                {
+                    Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
                 }
                 else
                 {
@@ -184,6 +170,10 @@ namespace Orleans.Runtime.Configuration
                 {
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
                 }
+                else if (Globals.UseZooKeeperSystemStore)
+                {
+                    Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.Disabled);
+                }
                 else
                 {
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
@@ -199,15 +189,6 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        /// <summary>
-        /// This method may be called by the silo host or test host to tweak a provider configuration after it has been already loaded.
-        /// Its is optional and should NOT be automaticaly called by the runtime.
-        /// </summary>
-        internal void AdjustConfiguration()
-        {
-            ProviderConfigurationUtility.AdjustConfiguration(Globals.ProviderConfigurations, Globals.DeploymentId);
-        }
-
         private void InitNodeSettingsFromGlobals(NodeConfiguration n)
         {
             if (n.Endpoint.Equals(this.PrimaryNode)) n.IsPrimaryNode = true;
@@ -216,32 +197,46 @@ namespace Orleans.Runtime.Configuration
 
         public void LoadFromFile(string fileName)
         {
-            TextReader input = File.OpenText(fileName);
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 Load(input);
                 SourceFile = fileName;
             }
-            finally
-            {
-                input.Close();
-            }
         }
 
         /// <summary>
-        /// Returns the configuration for a given silo.
+        /// Obtains the configuration for a given silo.
         /// </summary>
-        /// <param name="name">Silo name.</param>
-        /// <returns>NodeConfiguration associated with the specified silo.</returns>
-        public NodeConfiguration GetConfigurationForNode(string name)
+        /// <param name="siloName">Silo name.</param>
+        /// <param name="siloNode">NodeConfiguration associated with the specified silo.</param>
+        /// <returns>true if node was found</returns>
+        public bool TryGetNodeConfigurationForSilo(string siloName, out NodeConfiguration siloNode)
         {
-            NodeConfiguration n;
-            if (Overrides.TryGetValue(name, out n)) return n;
+            return Overrides.TryGetValue(siloName, out siloNode);
+        }
 
-            n = new NodeConfiguration(Defaults) {SiloName = name};
-            InitNodeSettingsFromGlobals(n);
-            Overrides[name] = n;
-            return n;
+        /// <summary>
+        /// Creates a configuration node for a given silo.
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration CreateNodeConfigurationForSilo(string siloName)
+        {
+            var siloNode = new NodeConfiguration(Defaults) { SiloName = siloName };
+            InitNodeSettingsFromGlobals(siloNode);
+            Overrides[siloName] = siloNode;
+            return siloNode;
+        }
+
+        /// <summary>
+        /// Creates a node config for the specified silo if one does not exist.  Returns existing node if one already exists
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration GetOrCreateNodeConfigurationForSilo(string siloName)
+        {
+            NodeConfiguration siloNode;
+            return !TryGetNodeConfigurationForSilo(siloName, out siloNode) ? CreateNodeConfigurationForSilo(siloName) : siloNode;
         }
 
         private void SetPrimaryNode(IPEndPoint primary)
@@ -410,13 +405,16 @@ namespace Orleans.Runtime.Configuration
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());
-            NodeConfiguration nc = GetConfigurationForNode(siloName);
-            sb.AppendLine("Silo configuration:").Append(nc.ToString());
+            NodeConfiguration nc;
+            if (TryGetNodeConfigurationForSilo(siloName, out nc))
+            {
+                sb.AppendLine("Silo configuration:").Append(nc);
+            }
             sb.AppendLine();
             return sb.ToString();
         }
 
-        internal static IPAddress ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
 
@@ -436,10 +434,14 @@ namespace Orleans.Runtime.Configuration
                 if (String.IsNullOrEmpty(addrOrHost))
                 {
                     addrOrHost = Dns.GetHostName();
+
+                    // If for some reason we get "localhost" back. This seems to have happened to somebody.
+                    if (addrOrHost.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                        return loopback;
                 }
 
                 var candidates = new List<IPAddress>();
-                IPAddress[] nodeIps = Dns.GetHostAddresses(addrOrHost);
+                IPAddress[] nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
                 foreach (var nodeIp in nodeIps)
                 {
                     if (nodeIp.AddressFamily != family || nodeIp.Equals(loopback)) continue;
@@ -532,7 +534,7 @@ namespace Orleans.Runtime.Configuration
                 if (!string.IsNullOrWhiteSpace(interfaceName) &&
                     !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
 
-                bool isLoopbackInterface = (i == NetworkInterface.LoopbackInterfaceIndex);
+                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
                 // get list of all unicast IPs from current interface
                 UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
 
@@ -559,6 +561,29 @@ namespace Orleans.Runtime.Configuration
             var xmlReader = XmlReader.Create(input);
             doc.Load(xmlReader);
             return doc.DocumentElement;
+        }
+
+        /// <summary>
+        /// Returns a prepopulated ClusterConfiguration object for a primary local silo (for testing)
+        /// </summary>
+        /// <param name="siloPort">TCP port for silo to silo communication</param>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClusterConfiguration object that can be passed to Silo or SiloHost classes for initialization</returns>
+        public static ClusterConfiguration LocalhostPrimarySilo(int siloPort = 22222, int gatewayPort = 40000)
+        {
+            var config = new ClusterConfiguration();
+            var siloAddress = new IPEndPoint(IPAddress.Loopback, siloPort);
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+            config.Globals.SeedNodes.Add(siloAddress);
+            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+            config.Defaults.HostNameOrIPAddress = "localhost";
+            config.Defaults.Port = siloPort;
+            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+            
+            config.PrimaryNode = siloAddress;
+
+            return config;
         }
     }
 }

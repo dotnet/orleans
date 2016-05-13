@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -104,28 +81,12 @@ namespace Orleans.Runtime.MembershipService
 
         internal bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
         {
-            siloName = null;
             if (siloAddress.Equals(MyAddress))
             {
                 siloName = SiloName;
                 return true;
             }
             return localNamesTableCopy.TryGetValue(siloAddress, out siloName);
-        }
-
-        internal bool IsValidSilo(SiloAddress silo)
-        {
-            if (silo.Equals(MyAddress)) return true;
-
-            var status = GetApproximateSiloStatus(silo);
-            return status != SiloStatus.ShuttingDown && status != SiloStatus.Stopping && status != SiloStatus.Dead;
-        }
-
-        internal bool IsDeadSilo(SiloAddress silo)
-        {
-            if (silo.Equals(MyAddress)) return false;
-
-            return GetApproximateSiloStatus(silo) == SiloStatus.Dead;
         }
 
         internal bool SubscribeToSiloStatusEvents(ISiloStatusListener observer)
@@ -148,11 +109,6 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        internal bool IsFunctional(SiloStatus status)
-        {
-            return status.Equals(SiloStatus.Active) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping);
-        }
-
         internal void UpdateMyStatusLocal(SiloStatus status)
         {
             if (CurrentStatus == status) return;
@@ -160,7 +116,7 @@ namespace Orleans.Runtime.MembershipService
             // make copies
             var tmpLocalTableCopy = GetSiloStatuses(st => true, true); // all the silos including me.
             var tmpLocalTableCopyOnlyActive = GetSiloStatuses(st => st.Equals(SiloStatus.Active), true);    // only active silos including me.
-            var tmpLocalTableNamesCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.InstanceName);   // all the silos excluding me.
+            var tmpLocalTableNamesCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
 
             CurrentStatus = status;
 
@@ -212,7 +168,7 @@ namespace Orleans.Runtime.MembershipService
 
         private static MembershipEntry CreateNewMembershipEntry(NodeConfiguration nodeConf, SiloAddress myAddress, string myHostname, SiloStatus myStatus, DateTime startTime)
         {
-            var assy = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+            var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipOracleData).GetTypeInfo().Assembly;
             var roleName = assy.GetName().Name;
 
             var entry = new MembershipEntry
@@ -220,11 +176,10 @@ namespace Orleans.Runtime.MembershipService
                 SiloAddress = myAddress,
 
                 HostName = myHostname,
-                InstanceName = nodeConf.SiloName,
+                SiloName = nodeConf.SiloName,
 
                 Status = myStatus,
                 ProxyPort = (nodeConf.IsGatewayNode ? nodeConf.ProxyGatewayEndpoint.Port : 0),
-                IsPrimary = nodeConf.IsPrimaryNode,
 
                 RoleName = roleName,
                 
@@ -241,7 +196,7 @@ namespace Orleans.Runtime.MembershipService
 
             localTableCopy = GetSiloStatuses(status => true, true); // all the silos including me.
             localTableCopyOnlyActive = GetSiloStatuses(status => status.Equals(SiloStatus.Active), true);    // only active silos including me.
-            localNamesTableCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.InstanceName);   // all the silos excluding me.
+            localNamesTableCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
 
             if (logger.IsVerbose) logger.Verbose("-Updated my local view of {0} status. It is now {1}.", entry.SiloAddress.ToLongString(), GetSiloStatus(entry.SiloAddress));
 

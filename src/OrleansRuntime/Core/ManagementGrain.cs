@@ -1,33 +1,11 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Orleans.Runtime.MembershipService;
+using Orleans.MultiCluster;
 
 
 namespace Orleans.Runtime.Management
@@ -35,6 +13,7 @@ namespace Orleans.Runtime.Management
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
+    [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
         private Logger logger;
@@ -184,13 +163,19 @@ namespace Orleans.Runtime.Management
                     parent.AppendChild(child);
                 }
             }
-            var sw = new StringWriter();
-            document.WriteTo(new XmlTextWriter(sw));
-            var xml = sw.ToString();
-            // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
-            await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
-            await Task.WhenAll(silos.Skip(1).Select(s =>
-                GetSiloControlReference(s).UpdateConfiguration(xml)));
+            
+            using(var sw = new StringWriter())
+            { 
+                using(var xw = XmlWriter.Create(sw))
+                { 
+                    document.WriteTo(xw);
+                    xw.Flush();
+                    var xml = sw.ToString();
+                    // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
+                    await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
+                    await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
+                }
+            }
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -209,13 +194,33 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
+        public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        {
+            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
+                String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
+        }
+
+        private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
+        {
+            var silos = await GetHosts(true);
+            logger.Info("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+
+            var actionPromises = new List<Task<object>>();
+            foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+                actionPromises.Add(action(GetSiloControlReference(siloAddress)));
+
+            return await Task.WhenAll(actionPromises);
+        }
 
         private async Task<IMembershipTable> GetMembershipTable()
         {
             if (membershipTable == null)
             {
                 var factory = new MembershipFactory();
-                membershipTable = await factory.GetMembershipTable(Silo.CurrentSilo);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
+
+                await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
+                    TraceLogger.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }
@@ -269,6 +274,8 @@ namespace Orleans.Runtime.Management
 
         private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
         {
+            if (path == null) return;
+
             var first = path.FirstOrDefault();
             if (first == null) return;
 
@@ -301,7 +308,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return SiloControlFactory.GetSystemTarget(Constants.SiloControlId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
     }
 }

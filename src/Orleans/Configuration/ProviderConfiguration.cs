@@ -1,30 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
-﻿using System.Linq;
-﻿using System.Text;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Text;
 using System.Xml;
 using Orleans.Providers;
 
@@ -38,40 +16,53 @@ namespace Orleans.Runtime.Configuration
     {
         private IDictionary<string, string> properties;
         private readonly IList<ProviderConfiguration> childConfigurations = new List<ProviderConfiguration>();
+        [NonSerialized]
         private IList<IProvider> childProviders;
         [NonSerialized]
         private IProviderManager providerManager;
 
-        internal string Type { get; private set; }
+        public string Type { get; private set; }
         public string Name { get; private set; }
 
+        private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
         /// Properties of this provider.
         /// </summary>
-        public IDictionary<string, string> Properties { get { return new Dictionary<string, string>(properties); } }
+        public ReadOnlyDictionary<string, string> Properties 
+        {
+            get
+            {
+                if (readonlyCopyOfProperties == null)
+                {
+                    readonlyCopyOfProperties = new ReadOnlyDictionary<string, string>(properties);
+                }
+                return readonlyCopyOfProperties;
+            } 
+        }
 
         internal ProviderConfiguration()
         {
             properties = new Dictionary<string, string>();
         }
 
-        public ProviderConfiguration(IDictionary<string, string> properties, string type, string name)
+        public ProviderConfiguration(IDictionary<string, string> properties, string providerType, string name)
         {
-            this.properties = properties;
-            Type = type;
+            this.properties = properties ?? new Dictionary<string, string>(1);
+            Type = providerType;
             Name = name;
         }
 
         // for testing purposes
         internal ProviderConfiguration(IDictionary<string, string> properties, IList<IProvider> childProviders)
         {
-            this.properties = properties;
+            this.properties = properties ?? new Dictionary<string, string>(1);
             this.childProviders = childProviders;
         }
 
         // Load from an element with the format <Provider Type="..." Name="...">...</Provider>
         internal void Load(XmlElement child, IDictionary<string, IProviderConfiguration> alreadyLoaded, XmlNamespaceManager nsManager)
         {
+            readonlyCopyOfProperties = null; // cause later refresh of readonlyCopyOfProperties
             if (nsManager == null)
             {
                 nsManager = new XmlNamespaceManager(new NameTable());
@@ -145,6 +136,7 @@ namespace Orleans.Runtime.Configuration
 
         public void SetProperty(string key, string val)
         {
+            readonlyCopyOfProperties = null; // cause later refresh of readonlyCopyOfProperties
             if (!properties.ContainsKey(key))
             {
                 properties.Add(key, val);
@@ -155,6 +147,12 @@ namespace Orleans.Runtime.Configuration
                 properties.Remove(key);
                 properties.Add(key, val);
             }
+        }
+
+        public bool RemoveProperty(string key)
+        {
+            readonlyCopyOfProperties = null; // cause later refresh of readonlyCopyOfProperties
+            return properties.Remove(key);
         }
 
         public override string ToString()
@@ -201,19 +199,27 @@ namespace Orleans.Runtime.Configuration
         public string Name { get; set; }
         public IDictionary<string, IProviderConfiguration> Providers { get; set; }
 
+        public ProviderCategoryConfiguration(string name)
+        {
+            Name = name;
+            Providers = new Dictionary<string, IProviderConfiguration>();
+        }
+
         // Load from an element with the format <NameProviders>...</NameProviders>
         // that contains a sequence of Provider elements (see the ProviderConfiguration type)
-        internal void Load(XmlElement child)
+        internal static ProviderCategoryConfiguration Load(XmlElement child)
         {
-            Name = child.LocalName.Substring(0, child.LocalName.Length - 9);
-            Providers = new Dictionary<string, IProviderConfiguration>();
+            string name = child.LocalName.Substring(0, child.LocalName.Length - 9);
+
+            var category = new ProviderCategoryConfiguration(name);
 
             var nsManager = new XmlNamespaceManager(new NameTable());
             nsManager.AddNamespace("orleans", "urn:orleans");
 
             ProviderConfiguration.LoadProviderConfigurations(
-                child, nsManager, Providers, 
-                c => Providers.Add(c.Name, c));
+                child, nsManager, category.Providers,
+                c => category.Providers.Add(c.Name, c));
+            return category;
         }
 
         internal void Merge(ProviderCategoryConfiguration other)
@@ -231,7 +237,6 @@ namespace Orleans.Runtime.Configuration
                 ((ProviderConfiguration)config).SetProperty(key, val);
             }
         }
-
 
         internal static string ProviderConfigsToXmlString(IDictionary<string, ProviderCategoryConfiguration> providerConfig)
         {
@@ -285,11 +290,7 @@ namespace Orleans.Runtime.Configuration
             ProviderCategoryConfiguration category;
             if (!providerConfigurations.TryGetValue(providerCategory, out category))
             {
-                category = new ProviderCategoryConfiguration()
-                {
-                    Name = providerCategory,
-                    Providers = new Dictionary<string, IProviderConfiguration>()
-                };
+                category = new ProviderCategoryConfiguration(providerCategory);
                 providerConfigurations.Add(category.Name, category);
             }
 
@@ -304,14 +305,27 @@ namespace Orleans.Runtime.Configuration
             category.Providers.Add(config.Name, config);
         }
 
-        internal static void AdjustConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, string deploymentId)
+        internal static bool TryGetProviderConfiguration(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, 
+            string providerTypeFullName, string providerName, out IProviderConfiguration config)
         {
-            if (String.IsNullOrEmpty(deploymentId)) return;
-
-            foreach (ProviderCategoryConfiguration providerConfig in providerConfigurations.Where(kv => kv.Key.Equals(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME)).Select(kv => kv.Value))
+            foreach (ProviderCategoryConfiguration category in providerConfigurations.Values)
             {
-                providerConfig.SetConfiguration("DeploymentId", deploymentId);
+                foreach (IProviderConfiguration providerConfig in category.Providers.Values)
+                {
+                    if (providerConfig.Type.Equals(providerTypeFullName) && providerConfig.Name.Equals(providerName))
+                    {
+                        config = providerConfig;
+                        return true;
+                    }
+                }
             }
+            config = null;
+            return false;
+        }
+
+        internal static IEnumerable<IProviderConfiguration> GetAllProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)
+        {
+            return providerConfigurations.Values.SelectMany(category => category.Providers.Values);
         }
 
         internal static string PrintProviderConfigurations(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations)

@@ -1,18 +1,4 @@
-﻿'*********************************************************
-'    Copyright (c) Microsoft. All rights reserved.
-'    
-'    Apache 2.0 License
-'    
-'    You may obtain a copy of the License at
-'    http://www.apache.org/licenses/LICENSE-2.0
-'    
-'    Unless required by applicable law or agreed to in writing, software 
-'    distributed under the License is distributed on an "AS IS" BASIS, 
-'    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-'    implied. See the License for the specific language governing 
-'    permissions and limitations under the License.
-'
-'*********************************************************
+﻿Imports Orleans.Runtime.Configuration
 Imports Orleans.Runtime.Host
 
 Friend Class OrleansHostWrapper
@@ -72,9 +58,8 @@ Friend Class OrleansHostWrapper
 
     Private Function ParseArguments(args As String()) As Boolean
         Dim deploymentId As String = Nothing
-        Dim configFileName = "DevTestServerConfiguration.xml"
         Dim siloName = System.Net.Dns.GetHostName() ' Default to machine name
-
+        Dim config As ClusterConfiguration
         Dim argPos = 1
 
         For i As Integer = 0 To args.Length - 1
@@ -110,9 +95,6 @@ Friend Class OrleansHostWrapper
             ElseIf argPos = 1 Then
                 siloName = a
                 argPos += 1
-            ElseIf argPos = 2 Then
-                configFileName = a
-                argPos += 1
             Else
                 ' Too many command line arguments
                 Console.WriteLine("Too many command line arguments supplied: " + a)
@@ -120,8 +102,8 @@ Friend Class OrleansHostWrapper
             End If
         Next
 
-        siloHost = New SiloHost(siloName)
-        siloHost.ConfigFileName = configFileName
+        config = ClusterConfiguration.LocalhostPrimarySilo()
+        siloHost = New SiloHost(siloName, config)
 
         If deploymentId IsNot Nothing Then
             siloHost.DeploymentId = deploymentId

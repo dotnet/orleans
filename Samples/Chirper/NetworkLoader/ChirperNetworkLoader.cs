@@ -1,19 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Chirper.GrainInterfaces;
 
 namespace Orleans.Samples.Chirper.Network.Loader
@@ -59,9 +44,10 @@ namespace Orleans.Samples.Chirper.Network.Loader
             this.Users = new Dictionary<long, IChirperAccount>();
             this.PipelineSize = (pipeline == null) ? DefaultPipelineSize : pipeline.Capacity;
             
-            if (!Orleans.GrainClient.IsInitialized)
+            if (!GrainClient.IsInitialized)
             {
-                Orleans.GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
             }
             runtimeStopwatch.Start();
         }
@@ -267,7 +253,7 @@ namespace Orleans.Samples.Chirper.Network.Loader
             // Create Chirper account grain for this user
             long userId = userData.UserId;
             string userAlias = userData.UserAlias;
-            IChirperAccount grain = ChirperAccountFactory.GetGrain(userId);
+            IChirperAccount grain = GrainClient.GrainFactory.GetGrain<IChirperAccount>(userId);
             this.Users[userId] = grain;
             try
             {

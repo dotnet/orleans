@@ -18,12 +18,14 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="1.0.3" />
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansManager.exe" target="lib\net45" />
-    <file src="OrleansManager.exe.config" target="lib\net45" />
-    <file src="ClientConfiguration.xml" target="lib\net45" />
+    <file src="OrleansManager.exe" target="lib\net451" />
+    <file src="OrleansManager.pdb" target="lib\net451" />
+    <file src="OrleansManager.exe.config" target="lib\net451" />
+    <file src="ClientConfiguration.xml" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansManager\**\*.cs" target="src" />
   </files>
 </package>

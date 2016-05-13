@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -32,6 +9,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Runtime;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -40,6 +18,86 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public static class ConfigUtilities
     {
+        internal static void ParseAdditionalAssemblyDirectories(IDictionary<string, SearchOption> directories, XmlElement root)
+        {
+            foreach(var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                
+                if(grandchild == null)
+                {
+                    continue;
+                }
+                else
+                {
+                    if(!grandchild.HasAttribute("Path"))
+                        throw new FormatException("Missing 'Path' attribute on Directory element.");
+
+                    // default to recursive
+                    var recursive = true;
+
+                    if(grandchild.HasAttribute("IncludeSubFolders"))
+                    {
+                        if(!bool.TryParse(grandchild.Attributes["IncludeSubFolders"].Value, out recursive))
+                            throw new FormatException("Attribute 'IncludeSubFolders' has invalid value.");
+
+                        directories[grandchild.Attributes["Path"].Value] = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                    }
+                }
+            }
+        }
+
+        internal static void ParseTelemetry(XmlElement root)
+        {
+            foreach (var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                if (grandchild == null) continue;
+
+                if (!grandchild.LocalName.Equals("TelemetryConsumer"))
+                {
+                    continue;
+                }
+                else
+                {
+                    if (!grandchild.HasAttribute("Type"))
+                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+
+                    if (!grandchild.HasAttribute("Assembly"))
+                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+
+                    var className = grandchild.Attributes["Type"].Value;
+                    var assemblyName = new AssemblyName(grandchild.Attributes["Assembly"].Value);
+
+                    Assembly assembly = null;
+                    try
+                    {
+                        assembly = Assembly.Load(assemblyName);
+                        
+                        var pluginType = assembly.GetType(className);
+                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+
+                        var args = grandchild.Attributes.Cast<XmlAttribute>().Where(a => a.LocalName != "Type" && a.LocalName != "Assembly").ToArray();
+
+                        var plugin = Activator.CreateInstance(pluginType, args);
+                        
+                        if (plugin is ITelemetryConsumer)
+                        {
+                            Logger.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
+                        }
+                        else
+                        {
+                            throw new InvalidCastException("TelemetryConsumer class " + className + " must implement one of Orleans.Runtime.ITelemetryConsumer based interfaces");
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        throw new TypeLoadException("Cannot load TelemetryConsumer class " + className + " from assembly " + assembly + " - Error=" + exc);
+                    }
+                }
+            }
+        }
+
         internal static void ParseTracing(ITraceConfiguration config, XmlElement root, string nodeName)
         {
             if (root.HasAttribute("DefaultTraceLevel"))
@@ -55,11 +113,6 @@ namespace Orleans.Runtime.Configuration
             if (root.HasAttribute("TraceToFile"))
             {
                 config.TraceFilePattern = root.GetAttribute("TraceToFile");
-            }
-            if (root.HasAttribute("WriteMessagingTraces"))
-            {
-                config.WriteMessagingTraces = ParseBool(root.GetAttribute("WriteMessagingTraces"),
-                    "Invalid boolean value for WriteMessagingTraces attribute on Tracing element for " + nodeName);
             }
             if (root.HasAttribute("LargeMessageWarningThreshold"))
             {
@@ -84,7 +137,7 @@ namespace Orleans.Runtime.Configuration
 
                 if (grandchild.LocalName.Equals("TraceLevelOverride") && grandchild.HasAttribute("TraceLevel") && grandchild.HasAttribute("LogPrefix"))
                 {
-                    config.TraceLevelOverrides.Add(new Tuple<string, Logger.Severity>(grandchild.GetAttribute("LogPrefix"),
+                    config.TraceLevelOverrides.Add(new Tuple<string, Severity>(grandchild.GetAttribute("LogPrefix"),
                         ParseSeverity(grandchild.GetAttribute("TraceLevel"),
                             "Invalid trace level TraceLevel attribute value on TraceLevelOverride element for " + nodeName + " prefix " +
                             grandchild.GetAttribute("LogPrefix"))));
@@ -100,14 +153,15 @@ namespace Orleans.Runtime.Configuration
                         {
                             var assemblyName = className.Substring(pos + 1).Trim();
                             className = className.Substring(0, pos).Trim();
-                            assembly = Assembly.Load(assemblyName);
+                            assembly = Assembly.Load(new AssemblyName(assemblyName));
                         }
                         else
                         {
-                            assembly = Assembly.GetExecutingAssembly();
+                            assembly = typeof(ConfigUtilities).GetTypeInfo().Assembly;
                         }
-                        var plugin = assembly.CreateInstance(className);
-                        if (plugin == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+                        var pluginType = assembly.GetType(className);
+                        if (pluginType == null) throw new TypeLoadException("Cannot locate plugin class " + className + " in assembly " + assembly.FullName);
+                        var plugin = Activator.CreateInstance(pluginType);
 
                         if (plugin is ILogConsumer)
                         {
@@ -161,7 +215,7 @@ namespace Orleans.Runtime.Configuration
             }
         }
 
-        internal static void ParseLimitValues(ILimitsConfiguration config, XmlElement root, string nodeName)
+        internal static void ParseLimitValues(LimitManager limitManager, XmlElement root, string nodeName)
         {
             foreach (XmlNode node in root.ChildNodes)
             {
@@ -172,7 +226,7 @@ namespace Orleans.Runtime.Configuration
                     && (grandchild.HasAttribute("SoftLimit") || grandchild.HasAttribute("HardLimit")))
                 {
                     var limitName = grandchild.GetAttribute("Name");
-                    config.LimitValues.Add(limitName, new LimitValue
+                    limitManager.AddLimitValue(limitName, new LimitValue
                     {
                         Name = limitName,
                         SoftLimitThreshold = ParseInt(grandchild.GetAttribute("SoftLimit"),
@@ -203,19 +257,19 @@ namespace Orleans.Runtime.Configuration
             }
             else
             {
-                string traceFileDir = null;
-                string traceFileName = Path.GetFileName(config.TraceFilePattern);
-                string[] dirLocations = { Path.GetDirectoryName(config.TraceFilePattern), "appdir", "." };
-                foreach (var d in dirLocations)
+                string traceFileDir = Path.GetDirectoryName(config.TraceFilePattern);
+                if (!String.IsNullOrEmpty(traceFileDir) && !Directory.Exists(traceFileDir))
                 {
-                    if (!Directory.Exists(d)) continue;
-
-                    traceFileDir = d;
-                    break;
-                }
-                if (traceFileDir != null && !Directory.Exists(traceFileDir))
-                {
-                    config.TraceFilePattern = Path.Combine(traceFileDir, traceFileName);
+                    string traceFileName = Path.GetFileName(config.TraceFilePattern);
+                    string[] alternateDirLocations = { "appdir", "." };
+                    foreach (var d in alternateDirLocations)
+                    {
+                        if (Directory.Exists(d))
+                        {
+                            config.TraceFilePattern = Path.Combine(d, traceFileName);
+                            break;
+                        }
+                    }
                 }
                 config.TraceFileName = String.Format(config.TraceFilePattern, nodeName, timestamp.ToUniversalTime().ToString(dateFormat), Dns.GetHostName());
             }
@@ -280,12 +334,66 @@ namespace Orleans.Runtime.Configuration
             return p;
         }
 
+        internal static Type ParseFullyQualifiedType(string input, string errorMessage)
+        {
+            Type returnValue;
+            try
+            {
+                returnValue = Type.GetType(input);
+            }
+            catch(Exception e)
+            {
+                throw new FormatException(errorMessage, e);
+            }
+
+            if (returnValue == null)
+            {
+                throw new FormatException(errorMessage);
+            }
+
+            return returnValue;
+        }
+
+        internal static void ValidateSerializationProvider(Type type)
+        {
+            if (type.IsClass == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} was not a class", type.FullName));
+            }
+
+            if (type.IsAbstract)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} was an abstract class", type.FullName));
+            }
+
+            if (type.IsPublic == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
+            }
+
+            if (type.IsGenericType && type.IsConstructedGenericType == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
+            }
+
+            var constructor = type.GetConstructor(Type.EmptyTypes);
+            if (constructor == null)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} does not have a parameterless constructor", type.FullName));
+            }
+
+            if (constructor.IsPublic == false)
+            {
+                throw new FormatException(string.Format("The serialization provider type {0} has a non-public parameterless constructor", type.FullName));
+            }
+        }
+
         // Time spans are entered as a string of decimal digits, optionally followed by a unit string: "ms", "s", "m", "hr"
         internal static TimeSpan ParseTimeSpan(string input, string errorMessage)
         {
             int unitSize;
             string numberInput;
-            var trimmedInput = input.Trim().ToLower(CultureInfo.InvariantCulture);
+            var trimmedInput = input.Trim().ToLowerInvariant();
             if (trimmedInput.EndsWith("ms", StringComparison.Ordinal))
             {
                 unitSize = 1;
@@ -319,6 +427,11 @@ namespace Orleans.Runtime.Configuration
             return TimeSpan.FromMilliseconds(rawTimeSpan * unitSize);
         }
 
+        internal static string ToParseableTimeSpan(TimeSpan input)
+        {
+            return $"{input.TotalMilliseconds.ToString(CultureInfo.InvariantCulture)}ms";
+        }
+
         internal static byte[] ParseSubnet(string input, string errorMessage)
         {
             return string.IsNullOrEmpty(input) ? null : input.Split('.').Select(s => (byte) ParseInt(s, errorMessage)).ToArray();
@@ -335,17 +448,17 @@ namespace Orleans.Runtime.Configuration
             return s;
         }
 
-        internal static Logger.Severity ParseSeverity(string input, string errorMessage)
+        internal static Severity ParseSeverity(string input, string errorMessage)
         {
-            Logger.Severity s;
-            if (!Enum.TryParse<Logger.Severity>(input, out s))
+            Severity s;
+            if (!Enum.TryParse<Severity>(input, out s))
             {
                 throw new FormatException(errorMessage + ". Tried to parse " + input);
             }
             return s;
         }
 
-        internal static IPEndPoint ParseIPEndPoint(XmlElement root, byte[] subnet = null)
+        internal static async Task<IPEndPoint> ParseIPEndPoint(XmlElement root, byte[] subnet = null)
         {
             if (!root.HasAttribute("Address")) throw new FormatException("Missing Address attribute for " + root.LocalName + " element");
             if (!root.HasAttribute("Port")) throw new FormatException("Missing Port attribute for " + root.LocalName + " element");
@@ -360,7 +473,7 @@ namespace Orleans.Runtime.Configuration
                 family = ParseEnum<AddressFamily>(root.GetAttribute("PreferredFamily"),
                     "Invalid preferred addressing family for " + root.LocalName + " element");
             }
-            IPAddress addr = ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
+            IPAddress addr = await ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
             int port = ParseInt(root.GetAttribute("Port"), "Invalid Port attribute for " + root.LocalName + " element");
             return new IPEndPoint(addr, port);
         }
@@ -384,7 +497,6 @@ namespace Orleans.Runtime.Configuration
             }
             sb.Append("     Trace to Console: ").Append(config.TraceToConsole).AppendLine();
             sb.Append("     Trace File Name: ").Append(string.IsNullOrWhiteSpace(config.TraceFileName) ? "" : Path.GetFullPath(config.TraceFileName)).AppendLine();
-            sb.Append("     Write Messaging Traces: ").Append(config.WriteMessagingTraces).AppendLine();
             sb.Append("     LargeMessageWarningThreshold: ").Append(config.LargeMessageWarningThreshold).AppendLine();
             sb.Append("     PropagateActivityId: ").Append(config.PropagateActivityId).AppendLine();
             sb.Append("     BulkMessageLimit: ").Append(config.BulkMessageLimit).AppendLine();
@@ -457,15 +569,7 @@ namespace Orleans.Runtime.Configuration
                 throw new ArgumentException("The XML element must be a <Deactivate/> element.");
             if (!xmlElement.HasAttribute("AgeLimit"))
                 throw new ArgumentException("The AgeLimit attribute is required for a <Deactivate/> element.");
-            TimeSpan ageLimit = ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
-#if DEBUG
-            TimeSpan minAgeLimit = GlobalConfiguration.DEFAULT_COLLECTION_QUANTUM;
-            if (ageLimit < minAgeLimit)
-            {
-                throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
-            }
-#endif
-            return ageLimit;
+            return ParseTimeSpan(xmlElement.GetAttribute("AgeLimit"), "Invalid TimeSpan value for Deactivation.AgeLimit");
         }
 
         private static readonly string[] defaultClientConfigFileNames = { "ClientConfiguration.xml", "OrleansClientConfiguration.xml", "Client.config", "Client.xml" };
@@ -483,7 +587,7 @@ namespace Orleans.Runtime.Configuration
         public static string FindConfigFile(bool isSilo)
         {
             // Add directory containing Orleans binaries to the search locations for config files
-            defaultConfigDirs[0] = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).GetTypeInfo().Assembly.Location);
 
             var notFound = new List<string>();
             foreach (string dir in defaultConfigDirs)

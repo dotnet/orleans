@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 //#define TRACE_SERIALIZATION
 using System;
 using System.Collections.Generic;
@@ -33,6 +10,7 @@ using System.Text;
 
 using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Serialization
 {
@@ -76,8 +54,26 @@ namespace Orleans.Serialization
             Trace("Starting new stream reader");
         }
 
+        /// <summary>
+        /// Create a new BinaryTokenStreamReader to read from the specified input buffer.
+        /// </summary>
+        /// <param name="buff">ArraySegment to use for the data.</param>
+        public BinaryTokenStreamReader(ArraySegment<byte> buff)
+            : this(new[] { buff })
+        {
+        }
+
         /// <summary> Current read position in the stream. </summary>
         public int CurrentPosition { get { return currentOffset + totalProcessedBytes - currentSegment.Offset; } }
+
+        /// <summary>
+        /// Creates a copy of the current stream reader.
+        /// </summary>
+        /// <returns>The new copy</returns>
+        public BinaryTokenStreamReader Copy()
+        {
+            return new BinaryTokenStreamReader(this.buffers);
+        }
 
         private void StartNextSegment()
         {
@@ -427,6 +423,12 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
+        internal MultiClusterStatus ReadMultiClusterStatus()
+        {
+            byte val = ReadByte();
+            return (MultiClusterStatus) val;
+        }
+
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal ActivationAddress ReadActivationAddress()
@@ -434,6 +436,7 @@ namespace Orleans.Serialization
             var silo = ReadSiloAddress();
             var grain = ReadGrainId();
             var act = ReadActivationId();
+            var mcstatus = ReadMultiClusterStatus();
 
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
@@ -441,7 +444,7 @@ namespace Orleans.Serialization
             if (act.Equals(ActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act);
+            return ActivationAddress.GetAddress(silo, grain, act, mcstatus);
         }
 
         /// <summary>
@@ -539,7 +542,7 @@ namespace Orleans.Serialization
                     result = new Guid(bytes);
                     break;
                 case SerializationTokenType.Date:
-                    result = new DateTime(ReadLong());
+                    result = DateTime.FromBinary(ReadLong());
                     break;
                 case SerializationTokenType.TimeSpan:
                     result = new TimeSpan(ReadLong());

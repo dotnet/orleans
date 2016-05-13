@@ -1,33 +1,11 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
-using Orleans.Providers;
 using Orleans.Concurrency;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
@@ -35,22 +13,44 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloProviderRuntime : IProviderRuntime, IStreamProviderRuntime
+    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     { 
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();
 
-        private IStreamPubSub pubSub;
+        private IStreamPubSub grainBasedPubSub;
+        private IStreamPubSub implictPubSub;
+        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private InvokeInterceptor invokeInterceptor;
+
+        public IGrainFactory GrainFactory { get; private set; }
+        public IServiceProvider ServiceProvider { get; private set; }
+
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            this.invokeInterceptor = interceptor;
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
+
         public Guid ServiceId { get; private set; }
+        public string SiloIdentity { get; private set; }
 
         private SiloProviderRuntime()
         {
         }
 
-        internal static void Initialize(GlobalConfiguration config)
+        internal static void Initialize(GlobalConfiguration config, string siloIdentity, IGrainFactory grainFactory, IServiceProvider serviceProvider)
         {
             Instance.ServiceId = config.ServiceId;
+            Instance.SiloIdentity = siloIdentity;
+            Instance.GrainFactory = grainFactory;
+            Instance.ServiceProvider = serviceProvider;
         }
 
         public static SiloProviderRuntime Instance
@@ -71,10 +71,13 @@ namespace Orleans.Runtime.Providers
 
         public ImplicitStreamSubscriberTable ImplicitStreamSubscriberTable { get { return implicitStreamSubscriberTable; } }
 
-        public static void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             Instance.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(), implicitStreamSubscriberTable);
+            Instance.grainBasedPubSub = new GrainBasedPubSubRuntime(grainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            Instance.implictPubSub = tmp;
+            Instance.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(Instance.grainBasedPubSub, tmp);
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -106,16 +109,19 @@ namespace Orleans.Runtime.Providers
             Silo.CurrentSilo.UnregisterSystemTarget((SystemTarget)target);
         }
 
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-        {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period);
-            timer.Start();
-            return timer;
-        }
-
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
+                    return combinedGrainBasedAndImplicitPubSub;
+                case StreamPubSubType.ExplicitGrainBasedOnly:
+                    return grainBasedPubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -129,8 +135,6 @@ namespace Orleans.Runtime.Providers
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
         {
-            // Hookup Extension.
-            IAddressable currentGrain = RuntimeClient.Current.CurrentActivationData.GrainInstance;
             TExtension extension;
             if (!TryGetExtensionHandler(out extension))
             {
@@ -139,13 +143,8 @@ namespace Orleans.Runtime.Providers
                     throw new OrleansException("Failed to register " + typeof(TExtension).Name);
             }
 
-            var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-            var currentTypedGrain = (TExtensionInterface) GrainClient.InvokeStaticMethodThroughReflection(
-                typeof(TExtensionInterface).Assembly.FullName,
-                factoryName,
-                "Cast",
-                new Type[] { typeof(IAddressable) },
-                new object[] { currentGrain });
+            IAddressable currentGrain = RuntimeClient.Current.CurrentActivationData.GrainInstance;
+            var currentTypedGrain = currentGrain.AsReference<TExtensionInterface>();
 
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
         }
@@ -204,29 +203,16 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceData.GetRemoteInterfaces(handlerType).Values;
+            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if(interfaces.Count != 1)
                 throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
 
-            var interfaceId = CodeGeneration.GrainInterfaceData.ComputeInterfaceId(interfaces.First());
+            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
             var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker) invoker;
             
             throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
-        }
-        
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (null == asyncFunc)
-                throw new ArgumentNullException("asyncFunc");
-            if (null == context)
-                throw new ArgumentNullException("context");
-            if (!(context is ISchedulingContext))
-                throw new ArgumentNullException("context object is not of a ISchedulingContext type.");
-
-            // copied from InsideRuntimeClient.ExecAsync().
-            return OrleansTaskScheduler.Instance.RunOrQueueTask(asyncFunc, (ISchedulingContext) context);
         }
 
         public object GetCurrentSchedulingContext()
@@ -234,22 +220,27 @@ namespace Orleans.Runtime.Providers
             return RuntimeContext.CurrentActivationContext;
         }
 
-        public async Task StartPullingAgents(
+        public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
-            StreamQueueBalancerType balancerType,
+            IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
-            TimeSpan getQueueMsgsTimerPeriod,
-            TimeSpan initQueueTimeout)
+            PersistentStreamProviderConfig config)
         {
             IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                balancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, this, queueAdapter.GetStreamQueueMapper());
+                config.BalancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, queueBalancer, getQueueMsgsTimerPeriod, initQueueTimeout);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
-            var managerGrainRef = PersistentStreamPullingManagerFactory.Cast(manager.AsReference());
+            var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.
-            await managerGrainRef.Initialize(queueAdapter.AsImmutable());
+            await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
+            return pullingAgentManager;
+        }
+
+        public Task<object> CallInvokeInterceptor(MethodInfo method, InvokeMethodRequest request, IAddressable target, IGrainMethodInvoker invoker)
+        {
+            return this.invokeInterceptor(method, request, (IGrain)target, invoker);
         }
     }
 }

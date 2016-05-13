@@ -1,28 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿//#define TRACK_DETAILED_STATS
-//#define SHOW_CPU_LOCKS
 using System;
 using System.Diagnostics;
 using System.Text;
@@ -37,7 +12,6 @@ namespace Orleans.Runtime.Scheduler
         private const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
 
-        private readonly AutoResetEvent e;
         private readonly WorkerPool pool;
         private readonly OrleansTaskScheduler scheduler;
         private readonly TimeSpan maxWorkQueueWait;
@@ -54,14 +28,16 @@ namespace Orleans.Runtime.Scheduler
         // For status reporting
         private IWorkItem currentWorkItem;
         private Task currentTask;
+        private DateTime currentWorkItemStarted;
+        private DateTime currentTaskStarted;
+
         internal IWorkItem CurrentWorkItem
         {
             get { return currentWorkItem; }
             set
             {
                 currentWorkItem = value;
-                currentTask = null;
-                CurrentStateStarted = DateTime.UtcNow;
+                currentWorkItemStarted = DateTime.UtcNow;
             }
         }
         internal Task CurrentTask
@@ -70,41 +46,57 @@ namespace Orleans.Runtime.Scheduler
             set
             {
                 currentTask = value;
-                currentWorkItem = null;
-                CurrentStateStarted = DateTime.UtcNow;
+                currentTaskStarted = DateTime.UtcNow;
             }
         }
-        
-        internal DateTime CurrentStateStarted { get; private set; }
 
-        internal string GetThreadStatus()
+        internal string GetThreadStatus(bool detailed)
         {
             // Take status snapshot before checking status, to avoid race
             Task task = currentTask;
             IWorkItem workItem = currentWorkItem;
-            TimeSpan since = Utils.Since(CurrentStateStarted);
 
-            if (task != null)
-                return string.Format("Executing Task Id={0} Status={1} for {2}", task.Id, task.Status, since);
+            if (task != null) 
+                return string.Format("Executing Task Id={0} Status={1} for {2} on {3}.",
+                    task.Id, task.Status, Utils.Since(currentTaskStarted), GetWorkItemStatus(detailed));
 
-            return workItem != null ? 
-                string.Format("Executing Work Item {0} for {1}", workItem, since) : 
-                string.Format("Idle for {0}", since);
+            if (workItem != null)
+                return string.Format("Executing {0}.", GetWorkItemStatus(detailed));
+
+            var becomeIdle = currentWorkItemStarted < currentTaskStarted ? currentTaskStarted : currentWorkItemStarted;
+            return string.Format("Idle for {0}", Utils.Since(becomeIdle));
+        }
+
+        private string GetWorkItemStatus(bool detailed)
+        {
+            IWorkItem workItem = currentWorkItem;
+            if (workItem == null) return String.Empty;
+
+            string str = string.Format("WorkItem={0} Executing for {1}. ", workItem, Utils.Since(currentWorkItemStarted));
+            if (detailed && workItem.ItemType == WorkItemType.WorkItemGroup)
+            {
+                WorkItemGroup group = workItem as WorkItemGroup;
+                if (group != null)
+                {
+                    str += string.Format("WorkItemGroup Details: {0}", group.DumpStatus());
+                }
+            }
+            return str;
         }
 
         internal readonly int WorkerThreadStatisticsNumber;
 
-        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, bool system = false)
-            : base(system ? "System" : null)
+        internal WorkerPoolThread(WorkerPool gtp, OrleansTaskScheduler sched, int threadNumber, bool system = false)
+            : base((system ? "System." : "") + threadNumber)
         {
-            e = new AutoResetEvent(false);
             pool = gtp;
             scheduler = sched;
             ownsSemaphore = false;
             IsSystem = system;
             maxWorkQueueWait = IsSystem ? Constants.INFINITE_TIMESPAN : gtp.MaxWorkQueueWait;
             OnFault = FaultBehavior.IgnoreFault;
-            CurrentStateStarted = DateTime.UtcNow;
+            currentWorkItemStarted = DateTime.UtcNow;
+            currentTaskStarted = DateTime.UtcNow;
             CurrentWorkItem = null;
             if (StatisticsCollector.CollectTurnsStats)
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
@@ -171,17 +163,16 @@ namespace Orleans.Runtime.Scheduler
                             try
                             {
                                 RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
+                                CurrentWorkItem = todo;
+#if TRACK_DETAILED_STATS
                                 if (todo.ItemType != WorkItemType.WorkItemGroup)
                                 {
-                                    // for WorkItemGroup we will track CurrentWorkItem inside WorkItemGroup. 
-                                    CurrentWorkItem = todo;
-#if TRACK_DETAILED_STATS
                                     if (StatisticsCollector.CollectTurnsStats)
                                     {
                                         SchedulerStatisticsGroup.OnThreadStartsTurnExecution(WorkerThreadStatisticsNumber, todo.SchedulingContext);
                                     }
-#endif
                                 }
+#endif
                                 todo.Execute();
                             }
                             catch (ThreadAbortException ex)
@@ -320,13 +311,12 @@ namespace Orleans.Runtime.Scheduler
             return String.Format("<{0}, ManagedThreadId={1}, {2}>",
                 Name,
                 ManagedThreadId,
-                GetThreadStatus());
+                GetThreadStatus(false));
         }
 
         internal void CheckForLongTurns()
         {
-            if ((CurrentWorkItem == null && CurrentTask == null) ||
-                (Utils.Since(CurrentStateStarted) <= OrleansTaskScheduler.TurnWarningLengthThreshold)) return;
+            if (!IsFrozen()) return;
 
             // Since this thread is running a long turn, which (we hope) is blocked on some IO 
             // or other external process, we'll create a replacement thread and tell this thread to 
@@ -341,7 +331,7 @@ namespace Orleans.Runtime.Scheduler
             // only create a new thread once per slow thread!
             Log.Warn(ErrorCode.SchedulerTurnTooLong2, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}; creating a new worker thread",
-                Name, ManagedThreadId, GetThreadStatus()));
+                Name, ManagedThreadId, GetThreadStatus(true)));
             Cts.Cancel();
             pool.CreateNewThread();
             // Consider: mark the activation running a long turn to reduce it's time quantum
@@ -349,13 +339,23 @@ namespace Orleans.Runtime.Scheduler
 
         internal bool DoHealthCheck()
         {
-            if ((CurrentWorkItem == null && CurrentTask == null) ||
-                (Utils.Since(CurrentStateStarted) <= OrleansTaskScheduler.TurnWarningLengthThreshold)) return true;
+            if (!IsFrozen()) return true;
 
             Log.Error(ErrorCode.SchedulerTurnTooLong, string.Format(
                 "Worker pool thread {0} (ManagedThreadId={1}) has been busy for long time: {2}",
-                Name, ManagedThreadId, GetThreadStatus()));
+                Name, ManagedThreadId, GetThreadStatus(true)));
             return false;
+        }
+
+        private bool IsFrozen()
+        {
+            if (CurrentTask != null)
+            {
+                return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+            } 
+            // If there is no active Task, check current wokr item, if any.
+            bool frozenWorkItem = CurrentWorkItem != null && Utils.Since(currentWorkItemStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;
+            return frozenWorkItem;
         }
     }
 }

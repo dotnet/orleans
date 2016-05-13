@@ -1,35 +1,13 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Storage;
+using Orleans.Streams;
 
 namespace Orleans
 {
@@ -38,26 +16,62 @@ namespace Orleans
     /// </summary>
     public abstract class Grain : IAddressable
     {
-        internal CodeGeneration.GrainState GrainState { get; set; }
+        private IGrainRuntime runtime;
 
+        // Do not use this directly because we currently don't provide a way to inject it;
+        // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
+        // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
+        // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
 
         internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
-        /// <summary>
-        /// This grain's unique identifier.
-        /// </summary>
-        internal GrainId Identity
+        internal IGrainRuntime Runtime
         {
-            get { return Data.Identity; }
+            get { return runtime; }
+            set
+            {
+                runtime = value;
+                GrainFactory = value.GrainFactory;
+            }
+        }
+
+        protected IGrainFactory GrainFactory { get; private set; }
+
+        protected IServiceProvider ServiceProvider { get; private set; }
+
+        internal IGrainIdentity Identity;
+
+        /// <summary>
+        /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
+        /// Client code should use the GrainFactory property to get a reference to a Grain.
+        /// </summary>
+        protected Grain()
+        {
         }
 
         /// <summary>
-        /// String representation of grain's identity including type and primary key.
+        /// Grain implementers do NOT have to expose this constructor but can choose to do so.
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
+        /// </summary>
+        /// <param name="identity"></param>
+        /// <param name="runtime"></param>
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
+        {
+            Identity = identity;
+            Runtime = runtime;
+            GrainFactory = runtime.GrainFactory;
+            ServiceProvider = runtime.ServiceProvider;
+        }
+
+        
+        /// <summary>
+        /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>
         public string IdentityString
         {
-            get { return Data.IdentityString; }
+            get { return Identity.IdentityString; }
         }
 
         /// <summary>
@@ -66,7 +80,7 @@ namespace Orleans
         /// </summary>
         public string RuntimeIdentity
         {
-            get { return Data.RuntimeIdentity; }
+            get { return Runtime.SiloIdentity; }
         }
 
         /// <summary>
@@ -97,10 +111,10 @@ namespace Orleans
         /// <param name="period">Period of subsequent timer ticks.</param>
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            return Data.RegisterTimer(asyncCallback, state, dueTime, period);
+            return Runtime.TimerRegistry.RegisterTimer(this, asyncCallback, state, dueTime, period);
         }
 
         /// <summary>
@@ -114,18 +128,13 @@ namespace Orleans
         /// <param name="dueTime">Due time for this reminder</param>
         /// <param name="period">Frequence period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        protected virtual Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             if (!(this is IRemindable))
             {
                 throw new InvalidOperationException(string.Format("Grain {0} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service", IdentityString));
             }
-            if (period < Constants.MinReminderPeriod)
-            {
-                string msg = string.Format("Cannot register reminder {0}=>{1} as requested period ({2}) is less than minimum allowed reminder period ({3})", IdentityString, reminderName, period, Constants.MinReminderPeriod);
-                throw new ArgumentException(msg);
-            }
-            return RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, dueTime, period);
+            return Runtime.ReminderRegistry.RegisterOrUpdateReminder(reminderName, dueTime, period);
         }
 
         /// <summary>
@@ -133,10 +142,10 @@ namespace Orleans
         /// </summary>
         /// <param name="reminder">Reminder to unregister.</param>
         /// <returns>Completion promise for this operation.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task UnregisterReminder(IGrainReminder reminder)
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual Task UnregisterReminder(IGrainReminder reminder)
         {
-            return RuntimeClient.Current.UnregisterReminder(reminder);
+            return Runtime.ReminderRegistry.UnregisterReminder(reminder);
         }
 
         /// <summary>
@@ -144,34 +153,34 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Reminder to return</param>
         /// <returns>Promise for Reminder handle.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task<IGrainReminder> GetReminder(string reminderName)
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual Task<IGrainReminder> GetReminder(string reminderName)
         {
-            return RuntimeClient.Current.GetReminder(reminderName);
+            return Runtime.ReminderRegistry.GetReminder(reminderName);
         }
 
         /// <summary>
         /// Returns a list of all reminders registered by the grain.
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Task<List<IGrainReminder>> GetReminders()
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual Task<List<IGrainReminder>> GetReminders()
         {
-            return RuntimeClient.Current.GetReminders();
+            return Runtime.ReminderRegistry.GetReminders();
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected IEnumerable<Streams.IStreamProvider> GetStreamProviders()
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual IEnumerable<IStreamProvider> GetStreamProviders()
         {
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
+            return Runtime.StreamProviderManager.GetStreamProviders();
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Streams.IStreamProvider GetStreamProvider(string name)
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
-            return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
+            return Runtime.StreamProviderManager.GetProvider(name) as IStreamProvider;
         }
 
         /// <summary>
@@ -179,21 +188,21 @@ namespace Orleans
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
-        protected void DeactivateOnIdle()
+        protected virtual void DeactivateOnIdle()
         {
-            Data.DeactivateOnIdle();
+            Runtime.DeactivateOnIdle(this);
         }
 
         /// <summary>
         /// Delay Deactivation of this activation at least for the specified time duration.
         /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
-        /// A negative <c>timeSpan</c> value means “unlock, and make this activation available for GC again”.
+        /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.
         /// DeactivateOnIdle method would undo / override any current “keep alive” setting, 
-        /// making this grain immediately available  for deactivation.
+        /// making this grain immediately available for deactivation.
         /// </summary>
-        protected void DelayDeactivation(TimeSpan timeSpan)
+        protected virtual void DelayDeactivation(TimeSpan timeSpan)
         {
-            Data.DelayDeactivation(timeSpan);
+            Runtime.DelayDeactivation(this, timeSpan);
         }
 
         /// <summary>
@@ -218,10 +227,10 @@ namespace Orleans
         /// Returns a logger object that this grain's code can use for tracing.
         /// </summary>
         /// <returns>Name of the logger to use.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        protected Logger GetLogger(string loggerName)
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        protected virtual Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
+            return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
         }
 
         /// <summary>
@@ -234,7 +243,7 @@ namespace Orleans
             return GetLogger(GetType().Name);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
+        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         internal string CaptureRuntimeEnvironment()
         {
             return RuntimeClient.Current.CaptureRuntimeEnvironment();
@@ -244,16 +253,69 @@ namespace Orleans
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
-    /// <typeparam name="TGrainState">The interface of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain
-        where TGrainState : class, IGrainState
+    /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
+    public class Grain<TGrainState> : Grain, IStatefulGrain
     {
+        private readonly GrainState<TGrainState> grainState;
+
+        private IStorage storage;
+
+        /// <summary>
+        /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
+        /// Client code should use the GrainFactory to get a reference to a Grain.
+        /// </summary>
+        protected Grain()
+        {
+            grainState = new GrainState<TGrainState>();
+        }
+
+        /// <summary>
+        /// Grain implementers do NOT have to expose this constructor but can choose to do so.
+        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
+        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="identity"></param>
+        /// <param name="runtime"></param>
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
+            : base(identity, runtime)
+        {
+            grainState = new GrainState<TGrainState>(state);
+            this.storage = storage;
+        }
+
         /// <summary>
         /// Strongly typed accessor for the grain state 
         /// </summary>
         protected TGrainState State
         {
-            get { return base.GrainState as TGrainState; }
+            get { return grainState.State; }
+            set { grainState.State = value; }
+        }
+        
+        void IStatefulGrain.SetStorage(IStorage storage)
+        {
+            this.storage = storage;
+        }
+
+        IGrainState IStatefulGrain.GrainState
+        {
+            get { return grainState; }
+        }
+
+        protected virtual Task ClearStateAsync()
+        {
+            return storage.ClearStateAsync();
+        }
+
+        protected virtual Task WriteStateAsync()
+        {
+            return storage.WriteStateAsync();
+        }
+
+        protected virtual Task ReadStateAsync()
+        {
+            return storage.ReadStateAsync();
         }
     }
 }

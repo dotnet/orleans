@@ -1,1 +1,1 @@
-%~dp0src\Build.cmd
+"%~dp0src\Build.cmd"

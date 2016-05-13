@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,13 +5,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-using Orleans.Runtime;
-
 namespace Orleans.Runtime
 {
     internal class AssemblyLoader
     {
-
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
@@ -58,8 +32,11 @@ namespace Orleans.Runtime
             SimulateLoadCriteriaFailure = false;
             SimulateReflectionOnlyLoadFailure = false;
             RethrowDiscoveryExceptions = false;
-        }
 
+            // Ensure that each assembly which is loaded is processed.
+            AssemblyProcessor.Initialize();
+        }
+        
         /// <summary>
         /// Loads assemblies according to caller-defined criteria.
         /// </summary>
@@ -100,6 +77,52 @@ namespace Orleans.Runtime
             }
             loader.logger.Info("{0} assemblies loaded.", count);
             return discoveredAssemblyLocations;
+        }
+
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        {
+            try
+            {
+                var assembly = Assembly.Load(new AssemblyName(assemblyName));
+                var foundType =
+                    TypeUtils.GetTypes(
+                        assembly,
+                        type =>
+                        typeof(T).GetTypeInfo().IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
+                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
+                if (foundType == null)
+                {
+                    return null;
+                }
+
+                return (T)Activator.CreateInstance(foundType, true);
+            }
+            catch (FileNotFoundException exception)
+            {
+                logger.Warn(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exception.Message, exception);
+                return null;
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exc.Message, exc);
+                throw;
+            }
+        }
+
+        public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        {
+            try
+            {
+                var assembly = Assembly.Load(new AssemblyName(assemblyName));
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
+
+                return (T)Activator.CreateInstance(foundType, true);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Loader_LoadAndCreateInstance_Failure, exc.Message, exc);
+                throw;
+            }
         }
 
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
@@ -182,19 +205,19 @@ namespace Orleans.Runtime
                 // that appear not to automatically resolve dependencies.
                 // We are trying to pre-load all dlls we find in the folder, so that if one of these
                 // assemblies happens to be a dependency of an assembly we later on call 
-                // Assembly.GetTypes() on, the dependency will be already loaded and will get
+                // Assembly.DefinedTypes on, the dependency will be already loaded and will get
                 // automatically resolved. Ugly, but seems to solve the problem.
 
                 foreach (var j in candidates)
                 {
                     try
                     {
-                        if(logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.");
+                        if (logger.IsVerbose) logger.Verbose("Trying to pre-load {0} to reflection-only context.", j);
                         Assembly.ReflectionOnlyLoadFrom(j);
                     }
-                    catch (Exception exc)
+                    catch (Exception)
                     {
-                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", exc);
+                        if (logger.IsVerbose) logger.Verbose("Failed to pre-load assembly {0} in reflection-only context.", j);
                     }
                 }
 

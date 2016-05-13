@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
@@ -164,6 +141,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName RUNTIME_GC_LARGEOBJECTHEAPSIZEKB                           = new StatisticName("Runtime.GC.LargeObjectHeapSizeKb");
         public static readonly StatisticName RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB                        = new StatisticName("Runtime.GC.PromotedFinalizationMemoryFromGen0Kb");
         public static readonly StatisticName RUNTIME_GC_NUMBEROFINDUCEDGCS                              = new StatisticName("Runtime.GC.NumberOfInducedGCs");
+        public static readonly StatisticName RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB                       = new StatisticName("Runtime.Memory.TotalPhysicalMemoryMb");
+        public static readonly StatisticName RUNTIME_MEMORY_AVAILABLEMEMORYMB                           = new StatisticName("Runtime.Memory.AvailableMemoryMb");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS             = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.WorkerThreads");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS     = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.CompletionPortThreads");
         public static readonly StatisticName RUNTIME_IS_OVERLOADED                                      = new StatisticName("Runtime.IsOverloaded");
@@ -204,7 +183,8 @@ namespace Orleans.Runtime
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_ALLOCATED_BUFFERS                         = new StatisticName("Serialization.BufferPool.AllocatedBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS                       = new StatisticName("Serialization.BufferPool.CheckedOutBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS                        = new StatisticName("Serialization.BufferPool.CheckedInBuffers");
-        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_CHECKED_IN_DROPPED_BUFFERS                = new StatisticName("Serialization.BufferPool.CheckedInDroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_BUFFERS                           = new StatisticName("Serialization.BufferPool.DroppedBuffers");
+        public static readonly StatisticName SERIALIZATION_BUFFERPOOL_DROPPED_TOO_LARGE_BUFFERS                 = new StatisticName("Serialization.BufferPool.DroppedTooLargeBuffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS  = new StatisticName("Serialization.BufferPool.InUse.CheckedOutAndNotCheckedIn_Buffers");
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_INUSE_ALLOCATED_NOT_INPOOL_BUFFERS        = new StatisticName("Serialization.BufferPool.InUse.AllocatedAndNotInPool_Buffers");
         public static readonly StatisticName SERIALIZATION_BODY_DEEPCOPIES                      = new StatisticName("Serialization.Body.DeepCopies");
@@ -348,6 +328,8 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS = new StatisticNameFormat("Streams.PersistentStream.{0}.NumPullingAgents");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumReadMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
+        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
     }
 }
  

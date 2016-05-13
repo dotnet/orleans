@@ -1,30 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Providers;
 
 
 namespace Orleans.Runtime
@@ -50,7 +28,7 @@ namespace Orleans.Runtime
 
         public Task SetSystemLogLevel(int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetSystemLogLevel={0}", newTraceLevel);
             TraceLogger.SetRuntimeLogLevel(newTraceLevel);
             silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
@@ -59,7 +37,7 @@ namespace Orleans.Runtime
 
         public Task SetAppLogLevel(int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetAppLogLevel={0}", newTraceLevel);
             TraceLogger.SetAppLogLevel(newTraceLevel);
             return TaskDone.Done;
@@ -67,7 +45,7 @@ namespace Orleans.Runtime
 
         public Task SetLogLevel(string logName, int traceLevel)
         {
-            var newTraceLevel = (Logger.Severity)traceLevel;
+            var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
             TraceLogger log = TraceLogger.FindLogger(logName);
             
@@ -133,6 +111,36 @@ namespace Orleans.Runtime
         public Task<int> GetActivationCount()
         {
             return Task.FromResult(InsideRuntimeClient.Current.Catalog.ActivationCount);
+        }
+
+        public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        {
+            IReadOnlyCollection<IProvider> allProviders = silo.AllSiloProviders;
+            IProvider provider = allProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
+            if (provider == null)
+            {
+                string allProvidersList = Utils.EnumerableToString(
+                    allProviders.Select(p => string.Format(
+                        "[Name = {0} Type = {1} Location = {2}]",
+                        p.Name, p.GetType().FullName, p.GetType().Assembly.Location)));
+                string error = string.Format(
+                    "Could not find provider for type {0} and name {1} \n"
+                    + " Providers currently loaded in silo are: {2}", 
+                    providerTypeFullName, providerName, allProvidersList);
+                logger.Error(ErrorCode.Provider_ProviderNotFound, error);
+                throw new ArgumentException(error);
+            }
+
+            IControllable controllable = provider as IControllable;
+            if (controllable == null)
+            {
+                string error = string.Format(
+                    "The found provider of type {0} and name {1} is not controllable.", 
+                    providerTypeFullName, providerName);
+                logger.Error(ErrorCode.Provider_ProviderNotControllable, error);
+                throw new ArgumentException(error);
+            }
+            return controllable.ExecuteCommand(command, arg);
         }
 
         #endregion

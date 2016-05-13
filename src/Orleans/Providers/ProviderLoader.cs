@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -67,11 +44,10 @@ namespace Orleans.Providers
 
         public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
         {
-
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
-            foreach (var provider in providerConfigs.Values)
-                ((ProviderConfiguration)provider).SetProviderManager(providerManager);
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
+                ((ProviderConfiguration)providerConfig).SetProviderManager(providerManager);
 
             // Load providers
             ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
@@ -81,13 +57,21 @@ namespace Orleans.Providers
 
         private void ValidateProviders()
         {
-            foreach (var providerConfig in providerConfigs.Values)
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
             {
                 TProvider provider;
-                var fullConfig = (ProviderConfiguration) providerConfig;
-                if (providers.TryGetValue(fullConfig.Name, out provider)) continue;
+                ProviderConfiguration fullConfig = (ProviderConfiguration) providerConfig;
+                if (providers.TryGetValue(providerConfig.Name, out provider))
+                {
+                    logger.Verbose(ErrorCode.Provider_ProviderLoadedOk, 
+                        "Provider of type {0} name {1} located ok.", 
+                        fullConfig.Type, fullConfig.Name);
+                    continue;
+                }
 
-                var msg = String.Format("Provider of type {0} name {1} was not loaded.", fullConfig.Type, fullConfig.Name);
+                string msg = string.Format("Provider of type {0} name {1} was not loaded." +
+                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", 
+                    fullConfig.Type, fullConfig.Name);
                 logger.Error(ErrorCode.Provider_ConfiguredProviderNotLoaded, msg);
                 throw new OrleansException(msg);
             }

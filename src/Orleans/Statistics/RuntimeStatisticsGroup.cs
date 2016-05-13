@@ -1,32 +1,10 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 ﻿#define LOG_MEMORY_PERF_COUNTERS
 using System;
 using System.Diagnostics;
 using System.Management;
 
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -47,6 +25,7 @@ namespace Orleans.Runtime
 #endif
         private SafeTimer cpuUsageTimer;
         private readonly TimeSpan CPU_CHECK_PERIOD = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan INITIALIZATION_TIMEOUT = TimeSpan.FromMinutes(1);
         private bool countersAvailable;
 
 
@@ -61,7 +40,6 @@ namespace Orleans.Runtime
         /// <summary>Amount of memory available to processes running on the machine</summary>
         /// 
         public long AvailableMemory { get { return availableMemoryCounter != null ? Convert.ToInt64(availableMemoryCounter.NextValue()) : 0; } }
-
 
         public float CpuUsage { get; private set; }
 
@@ -84,7 +62,18 @@ namespace Orleans.Runtime
 #endif
         internal RuntimeStatisticsGroup()
         {
-            InitCpuMemoryCounters();
+            try
+            {
+                Task.Run(() =>
+                {
+                    InitCpuMemoryCounters();
+                }).WaitWithThrow(INITIALIZATION_TIMEOUT);  
+            }
+            catch (TimeoutException)
+            {
+                logger.Warn(ErrorCode.PerfCounterConnectError,
+                    "Timeout occurred during initialization of CPU & Memory perf counters");
+            }          
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -108,8 +97,9 @@ namespace Orleans.Runtime
                 largeObjectHeapSize = new PerformanceCounter(".NET CLR Memory", "Large Object Heap size", thisProcess, true);
                 promotedFinalizationMemoryFromGen0 = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
 #endif
-
-                // For Mono one could use PerformanceCounter("Mono Memory", "Total Physical Memory");
+                
+#if !(DNXCORE50 || __MonoCS__)
+                //.NET on Windows without mono
                 const string Query = "SELECT Capacity FROM Win32_PhysicalMemory";
                 var searcher = new ManagementObjectSearcher(Query);
                 long Capacity = 0;
@@ -120,6 +110,13 @@ namespace Orleans.Runtime
                     throw new Exception("No physical ram installed on machine?");
 
                 TotalPhysicalMemory = Capacity;
+#elif __MonoCS__
+                //Cross platform mono
+                var totalPhysicalMemory = new PerformanceCounter("Mono Memory", "Total Physical Memory");
+                TotalPhysicalMemory = Convert.ToInt64(totalPhysicalMemory.NextValue());
+#elif DNXCORE50
+                //Cross platform CoreCLR
+#endif
                 countersAvailable = true;
             }
             catch (Exception)
@@ -161,6 +158,12 @@ namespace Orleans.Runtime
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSize.NextValue() / 11024f);
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0.NextValue() / 1024f);
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_NUMBEROFINDUCEDGCS, () => numberOfInducedGCs.NextValue());
+
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (TotalPhysicalMemory / 1024) / 1024);
+            if (availableMemoryCounter != null)
+            {
+                IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (AvailableMemory/ 1024) / 1024); // Round up
+            }
 #endif
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
             {

@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -61,11 +38,8 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (var partition in directoryPartitionsMap.Values)
             {
                 var result = partition.LookUpGrain(grain);
-                if (result != null)
-                {
-                    // Force the list to be created in order to avoid race conditions
-                    return result.Item1.Select(pair => ActivationAddress.GetAddress(pair.Item1, grain, pair.Item2)).ToList();
-                }
+                if (result.Addresses != null)
+                    return result.Addresses;
             }
             return null;
         }
@@ -231,8 +205,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
                     localDirectory.Scheduler.QueueTask(async () =>
                     {
-                        await localDirectory.GetDirectoryReference(successors[0]).RegisterManySingleActivation(
-                            splitPartListSingle, LocalGrainDirectory.NUM_RETRIES);
+                        await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListSingle, singleActivation:true);
                         splitPartListSingle.ForEach(
                             activationAddress =>
                                 localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
@@ -244,7 +217,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
                     localDirectory.Scheduler.QueueTask(async () =>
                     {
-                        await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti);
+                        await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti, singleActivation:false);
                         splitPartListMulti.ForEach(
                             activationAddress =>
                                 localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));

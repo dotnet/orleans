@@ -2,5 +2,11 @@
 @echo off
 @if NOT "%ECHO%"=="" @echo %ECHO%
 
-"%OrleansSDK%\StartLocalSilo.cmd"
+set CMDHOME=%~dp0.
 
+if exist "%CMDHOME%\Host\bin\Debug\Host.exe" (
+cd "%CMDHOME%\Host\bin\Debug\"
+Host.exe
+) else (
+@echo Build Chirper.sln and then run the program
+)
