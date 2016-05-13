@@ -129,6 +129,20 @@ namespace Orleans.Runtime.Management
             return await GetSimpleGrainStatistics(silos);
         }
 
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds)
+        {
+            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetDetailedGrainStatistics()).ToList();
+            await Task.WhenAll(all);
+            return all.SelectMany(s => s.Result).ToArray();
+        }
+
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics()
+        {
+            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+            SiloAddress[] silos = hosts.Keys.ToArray();
+            return await GetDetailedGrainStatistics(silos);
+        }
+
         public async Task<int> GetGrainActivationCount(GrainReference grainReference)
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);

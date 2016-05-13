@@ -80,6 +80,18 @@ namespace Orleans.Runtime
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
         /// <summary>
+        /// Return the most recent detailed grain statistics information, amalgomated across silos.
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds);
+        /// <summary>
+        /// Return the most recent detailed grain statistics information, amalgomated across silos.
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics();
+        /// <summary>
         /// Return the most recent activation count for a specific grain across all silos.
         /// </summary>
         /// <param name="grainReference">Reference to the grain to be queried.</param>

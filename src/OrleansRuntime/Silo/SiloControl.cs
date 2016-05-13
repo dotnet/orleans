@@ -87,6 +87,20 @@ namespace Orleans.Runtime
             return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetGrainStatistics());
         }
 
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics()
+        {
+            var grainStats = InsideRuntimeClient.Current.Catalog.GetGrainStatistics();
+            return Task.FromResult(
+                grainStats.Where(p => p.Item1.Category == UniqueKey.Category.Grain)
+                    .Select(p => new DetailedGrainStatistic()
+                    {
+                        SiloAddress = silo.SiloAddress,
+                        GrainIdentity = p.Item1,
+                        GrainType = p.Item2,
+                        Category = Convert.ToString(p.Item1.Category)
+                    }).ToList());
+        }
+
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.Info("GetSimpleGrainStatistics");
