@@ -27,6 +27,7 @@
     </dependencies>
   </metadata>
   <files>
+    <file src="OrleansServiceBus.XML" target="lib\net451" />
     <file src="OrleansServiceBus.dll" target="lib\net451" />
     <file src="OrleansServiceBus.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansServiceBus\**\*.cs" target="src" />
