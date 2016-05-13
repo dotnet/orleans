@@ -22,9 +22,11 @@
     </dependencies>
   </metadata>
   <files>
+    <file src="OrleansRuntime.XML" target="lib\net451" />
     <file src="OrleansRuntime.dll" target="lib\net451" />
     <file src="OrleansRuntime.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
+    <file src="OrleansDependencyInjection.XML" target="lib\net451" />
     <file src="OrleansDependencyInjection.dll" target="lib\net451" />
     <file src="OrleansDependencyInjection.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansDependencyInjection\*.cs" target="src" />

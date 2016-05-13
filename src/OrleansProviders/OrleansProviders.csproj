@@ -26,6 +26,7 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -36,6 +37,7 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
