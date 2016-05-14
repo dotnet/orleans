@@ -30,6 +30,7 @@ namespace Orleans.Runtime.ReminderService
         private ReminderServiceStatus status;
         private IRingRange myRange;
         private long localTableSequence;
+        private int rangeSerialNumber;
         private GrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly CancellationTokenSource stoppedCancellationTokenSource;
@@ -62,6 +63,7 @@ namespace Orleans.Runtime.ReminderService
             status = ReminderServiceStatus.Booting;
             myRange = null;
             localTableSequence = 0;
+            rangeSerialNumber = 0;
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
@@ -202,19 +204,35 @@ namespace Orleans.Runtime.ReminderService
         {
             if (stoppedCancellationTokenSource.IsCancellationRequested) return;
 
-            // try to retrieve reminder from all my subranges
-            myRange = ring.GetMyRange();
-            if (logger.IsVerbose2) logger.Verbose2("My range= {0}", myRange);
+            RemoveOutOfRangeReminders();
+
+            // try to retrieve reminders from all my subranges
+            var rangeSerialNumberCopy = rangeSerialNumber;
+            if (logger.IsVerbose2) logger.Verbose2($"My range= {myRange}, RangeSerialNumber {rangeSerialNumber}. Local reminders count {localReminders.Count}");
             var acks = new List<Task>();
             foreach (SingleRange range in RangeFactory.GetSubRanges(myRange))
             {
-                if (logger.IsVerbose2) logger.Verbose2("Reading rows for range {0}", range);
-                acks.Add(ReadTableAndStartTimers(range));
+                acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
             await Task.WhenAll(acks);
             if (logger.IsVerbose3) PrintReminders();
         }
 
+        private void RemoveOutOfRangeReminders()
+        {
+            var remindersOutOfRange = localReminders.Where(r => !myRange.InRange(r.Key.GrainRef)).Select(r => r.Value).ToArray();
+            
+            foreach (var reminder in remindersOutOfRange)
+            {
+                if (logger.IsVerbose2)
+                    logger.Verbose2("Not in my range anymore, so removing. {0}", reminder);
+                // remove locally
+                reminder.StopReminder(logger);
+                localReminders.Remove(reminder.Identity);
+            }
+
+            if (logger.IsInfo && remindersOutOfRange.Length > 0) logger.Info($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
+        }
 
         #region Change in membership, e.g., failure of predecessor
         /// <summary>
@@ -233,6 +251,7 @@ namespace Orleans.Runtime.ReminderService
         {
             logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);
             myRange = newRange;
+            rangeSerialNumber++;
             if (status == ReminderServiceStatus.Started)
                 await ReadAndUpdateReminders();
             else
@@ -310,7 +329,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private async Task ReadTableAndStartTimers(IRingRange range)
+        private async Task ReadTableAndStartTimers(IRingRange range, int rangeSerialNumberCopy)
         {
             if (logger.IsVerbose) logger.Verbose("Reading rows from {0}", range.ToString());
             localTableSequence++;
@@ -321,12 +340,17 @@ namespace Orleans.Runtime.ReminderService
                 var srange = (SingleRange)range;
                 ReminderTableData table = await reminderTable.ReadRows(srange.Begin, srange.End); // get all reminders, even the ones we already have
 
+                if (rangeSerialNumberCopy < rangeSerialNumber)
+                {
+                    if (logger.IsVerbose) logger.Verbose($"My range changed while reading from the table, ignoring the results. Another read has been started. RangeSerialNumber {rangeSerialNumber}, RangeSerialNumberCopy {rangeSerialNumberCopy}.");
+                    return;
+                }
                 if (stoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 // if null is a valid value, it means that there's nothing to do.
                 if (null == table && reminderTable is MockReminderTable) return;
 
-                var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(localReminders); // shallow copy
+                var remindersNotInTable = localReminders.Where(r => range.InRange(r.Key.GrainRef)).ToDictionary(r => r.Key, r => r.Value); // shallow copy
                 if (logger.IsVerbose) logger.Verbose("For range {0}, I read in {1} reminders from table. LocalTableSequence {2}, CachedSequence {3}", range.ToString(), table.Reminders.Count, localTableSequence, cachedSequence);
 
                 foreach (ReminderEntry entry in table.Reminders)
@@ -348,11 +372,7 @@ namespace Orleans.Runtime.ReminderService
                                     if (logger.IsVerbose2) logger.Verbose2("{0} Needs a restart", localRem);
                                     localRem.StopReminder(logger);
                                     localReminders.Remove(localRem.Identity);
-                                    if (ring.GetMyRange().InRange(entry.GrainRef))
-                                    // if its not my responsibility, I shouldn't start it locally
-                                    {
-                                        StartAndAddTimer(entry);
-                                    }
+                                    StartAndAddTimer(entry);
                                 }
                             }
                             else // if not ticking
@@ -379,13 +399,14 @@ namespace Orleans.Runtime.ReminderService
                     {
                         if (logger.IsVerbose2) logger.Verbose2("In table, Not in local, {0}", entry);
                         // create and start the reminder
-                        if (ring.GetMyRange().InRange(entry.GrainRef)) // if its not my responsibility, I shouldn't start it locally
-                            StartAndAddTimer(entry);
+                        StartAndAddTimer(entry);
                     }
                     // keep a track of extra reminders ... this 'reminder' is useful, so remove it from extra list
-                    remindersNotInTable.Remove(new ReminderIdentity(entry.GrainRef, entry.ReminderName));
+                    remindersNotInTable.Remove(key);
                 } // foreach reminder read from table
 
+                int remindersCountBeforeRemove = localReminders.Count;
+                
                 // foreach reminder that is not in global table, but exists locally
                 foreach (var reminder in remindersNotInTable.Values)
                 {
@@ -402,6 +423,7 @@ namespace Orleans.Runtime.ReminderService
                         localReminders.Remove(reminder.Identity);
                     }
                 }
+                if (logger.IsVerbose) logger.Verbose($"Removed {localReminders.Count - remindersCountBeforeRemove} reminders from local table");
             }
             catch (Exception exc)
             {
