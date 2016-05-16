@@ -135,12 +135,14 @@ namespace Host
 
             var config = ClusterConfiguration.LocalhostPrimarySilo();
 
+            //Comment out either one of these
+
             //JSON Files
             var props = new Dictionary<string, string>();
             props["RootDirectory"] = @".\Samples.FileStorage";
             config.Globals.RegisterStorageProvider<Samples.StorageProviders.OrleansFileStorage>("TestStore", props);
 
-            //MongoDB
+//            //MongoDB
 //            var props = new Dictionary<string, string>();
 //            props["Database"] = "orleanssamples";
 //            props["ConnectionString"] = "mongodb://localhost:27017/";

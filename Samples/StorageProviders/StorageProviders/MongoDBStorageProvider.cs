@@ -93,18 +93,18 @@ namespace Samples.StorageProviders
         /// <param name="collectionName">The type of the grain state object.</param>
         /// <param name="key">The grain id string.</param>
         /// <returns>Completion promise for this operation.</returns>
-        public Task<string> Read(string collectionName, string key)
+        public async Task<string> Read(string collectionName, string key)
         {
             var collection = GetCollection(collectionName);
             if (collection == null)
-                return Task.FromResult<string>(null);
+                return null;
 
             var builder = Builders<BsonDocument>.Filter.Eq("key", key);
 
-            var existing = collection.Find(builder).FirstOrDefault();
+            var existing = await collection.Find(builder).FirstOrDefaultAsync();
 
             if (existing == null)
-                return Task.FromResult<string>(null);
+                return null;
 
             existing.Remove("_id");
             existing.Remove("key");
@@ -113,7 +113,7 @@ namespace Samples.StorageProviders
             var writer = new MongoDB.Bson.IO.JsonWriter(strwrtr, new MongoDB.Bson.IO.JsonWriterSettings());
             MongoDB.Bson.Serialization.BsonSerializer.Serialize(writer, existing);
 
-            return Task.FromResult(strwrtr.ToString());
+            return strwrtr.ToString();
         }
 
         /// <summary>
@@ -123,25 +123,25 @@ namespace Samples.StorageProviders
         /// <param name="key">The grain id string.</param>
         /// <param name="entityData">The grain state data to be stored./</param>
         /// <returns>Completion promise for this operation.</returns>
-        public Task Write(string collectionName, string key, string entityData)
+        public async Task Write(string collectionName, string key, string entityData)
         {
             var collection = GetOrCreateCollection(collectionName);
 
             var builder = Builders<BsonDocument>.Filter.Eq("key", key);
 
-            var existing = collection.Find(builder).FirstOrDefault();
+            var existing = await collection.Find(builder).FirstOrDefaultAsync();
 
             var doc = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<BsonDocument>(entityData);
             doc["key"] = key;
 
             if ( existing == null )
             {
-                return collection.InsertOneAsync(doc);
+                await collection.InsertOneAsync(doc);
             }
             else
             {
                 doc["_id"] = existing["_id"];
-                return collection.ReplaceOneAsync(builder, doc);
+                await collection.ReplaceOneAsync(builder, doc);
             }
         }
 
@@ -164,11 +164,10 @@ namespace Samples.StorageProviders
         private IMongoCollection<BsonDocument> GetOrCreateCollection(string name)
         {
             var collection = _database.GetCollection<BsonDocument>(name);
-            if (collection == null)
-            {
-                _database.CreateCollection(name);
-                collection = _database.GetCollection<BsonDocument>(name);
-            }
+            if (collection != null)
+                return collection;
+            _database.CreateCollection(name);
+            collection = _database.GetCollection<BsonDocument>(name);
             return collection;
         }
 

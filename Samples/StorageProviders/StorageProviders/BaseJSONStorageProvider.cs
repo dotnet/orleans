@@ -19,11 +19,6 @@ namespace Samples.StorageProviders
     {
         private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings();
 
-        static BaseJSONStorageProvider()
-        {
-            SerializerSettings.ContractResolver = new OrleansStateContractResolver();
-        }
-
         /// <summary>
         /// Logger object
         /// </summary>
@@ -85,8 +80,10 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
+            var grainTypeName = grainType.Split('.').Last();
+
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
-            var entityData = await DataManager.Read(grainState.State.GetType().Name, grainReference.ToKeyString());
+            var entityData = await DataManager.Read(grainTypeName, grainReference.ToKeyString());
             if (entityData != null)
             {
                 ConvertFromStorageFormat(grainState, entityData);
@@ -102,9 +99,11 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
+            var grainTypeName = grainType.Split('.').Last();
+
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
             var entityData = ConvertToStorageFormat(grainState);
-            return DataManager.Write(grainState.State.GetType().Name, grainReference.ToKeyString(), entityData);
+            return DataManager.Write(grainTypeName, grainReference.ToKeyString(), entityData);
         }
 
         /// <summary>
@@ -116,8 +115,10 @@ namespace Samples.StorageProviders
         /// <returns></returns>
         public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
+            var grainTypeName = grainType.Split('.').Last();
+
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
-            DataManager.Delete(grainState.State.GetType().Name, grainReference.ToKeyString());
+            DataManager.Delete(grainTypeName, grainReference.ToKeyString());
             return TaskDone.Done;
         }
 
@@ -143,15 +144,6 @@ namespace Samples.StorageProviders
         protected static void ConvertFromStorageFormat(IGrainState grainState, string entityData)
         {
             JsonConvert.PopulateObject(entityData, grainState.State);
-        }
-    }
-
-    public class OrleansStateContractResolver : DefaultContractResolver
-    {
-        protected override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization)
-        {
-            var properties = base.CreateProperties(type, memberSerialization);
-            return properties.Where(p => p.PropertyName != "Etag").ToList();
         }
     }
 }
