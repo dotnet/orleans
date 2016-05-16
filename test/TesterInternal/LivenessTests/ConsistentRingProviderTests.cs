@@ -53,7 +53,7 @@ namespace UnitTests.LivenessTests
             for (int i = 1; i <= 10; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddress.NewLocalAddress(i), SiloStatus.Active);
-                var range = new EquallyDevidedMultiRange(ring.GetMyRange(), 5);
+                var range = RangeFactory.CreateEquallyDividedMultiRange(ring.GetMyRange(), 5);
                 output.WriteLine("\n\n*** Silo1 range: {0}. \n*** The whole ring with {1} silos is:\n{2}\n\n", range.ToCompactString(), i + 1, ring.ToString());
             }
         }
@@ -83,7 +83,7 @@ namespace UnitTests.LivenessTests
             Dictionary<SiloAddress, List<IRingRangeInternal>> allAgentRanges = new Dictionary<SiloAddress, List<IRingRangeInternal>>();
             foreach (var siloRange in siloRanges)
             {
-                var multiRange = new EquallyDevidedMultiRange(siloRange.Value, NUM_AGENTS);
+                var multiRange = RangeFactory.CreateEquallyDividedMultiRange(siloRange.Value, NUM_AGENTS);
                 List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
                 for(int i=0; i < NUM_AGENTS; i++)
                 {

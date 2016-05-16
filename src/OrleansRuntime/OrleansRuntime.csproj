@@ -80,7 +80,7 @@
     <Compile Include="ConsistentRing\IConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\ConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\VirtualBucketsRingProvider.cs" />
-    <Compile Include="ConsistentRing\EquallyDevidedRangeRingProvider.cs" />
+    <Compile Include="ConsistentRing\EquallyDividedRangeRingProvider.cs" />
     <Compile Include="Core\IHealthCheckParticipant.cs" />
     <Compile Include="MembershipService\IMembershipOracle.cs" />
     <Compile Include="MembershipService\MembershipOracleData.cs" />
