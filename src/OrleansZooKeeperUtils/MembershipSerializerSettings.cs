@@ -30,7 +30,8 @@ namespace Orleans.Runtime.Host
                 writer.WriteStartObject();
                 writer.WritePropertyName("SiloAddress"); serializer.Serialize(writer, me.SiloAddress);
                 writer.WritePropertyName("HostName"); writer.WriteValue(me.HostName);
-                writer.WritePropertyName("InstanceName"); writer.WriteValue(me.InstanceName);
+                writer.WritePropertyName("SiloName"); writer.WriteValue(me.SiloName);
+                writer.WritePropertyName("InstanceName"); writer.WriteValue(me.SiloName);
                 writer.WritePropertyName("Status"); serializer.Serialize(writer, me.Status);
                 writer.WritePropertyName("ProxyPort"); writer.WriteValue(me.ProxyPort);
                 writer.WritePropertyName("StartTime"); writer.WriteValue(me.StartTime);
@@ -46,7 +47,7 @@ namespace Orleans.Runtime.Host
                 {
                     SiloAddress = jo["SiloAddress"].ToObject<SiloAddress>(serializer),
                     HostName = jo["HostName"].ToObject<string>(),
-                    InstanceName = jo["InstanceName"].ToObject<string>(),
+                    SiloName = (jo["SiloName"] ?? jo["InstanceName"]).ToObject<string>(),
                     Status = jo["Status"].ToObject<SiloStatus>(serializer),
                     ProxyPort = jo["ProxyPort"].Value<int>(),
                     StartTime = jo["StartTime"].Value<DateTime>(),

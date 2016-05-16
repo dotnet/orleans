@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 using Orleans.Runtime;
 using Orleans.Providers;
+using static System.Net.WebRequestMethods;
 
 namespace Orleans.Storage
 {
@@ -23,7 +24,7 @@ namespace Orleans.Storage
     /// is bridged over to the appropriate underlying provider for execution.
     /// </para>
     /// <para>
-    /// <see cref="http://en.wikipedia.org/wiki/Jenkins_hash"/> for more information 
+    /// <see cref="Http://en.wikipedia.org/wiki/Jenkins_hash"/> for more information 
     /// about the Jenkins Hash function.
     /// </para>
     /// </remarks>
@@ -57,11 +58,11 @@ namespace Orleans.Storage
         }
 
         /// <summary> Name of this storage provider instance. </summary>
-        /// <see cref="IProvider#Name"/>
+        /// <see cref="IProvider.Name"/>
         public string Name { get; private set; }
 
         /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider#Log"/>
+        /// <see cref="IStorageProvider.Log"/>
         public Logger Log { get; private set; }
 
         /// <summary>
@@ -76,7 +77,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider#Init"/>
+        /// <see cref="IProvider.Init"/>
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             Name = name;
@@ -102,7 +103,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#Close"/>
+        /// <see cref="IStorageProvider.Close"/>
         public Task Close()
         {
             var closeTasks = new List<Task>();
@@ -113,7 +114,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#ReadStateAsync"/>
+        /// <see cref="IStorageProvider.ReadStateAsync"/>
         public Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);
@@ -122,7 +123,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#WriteStateAsync"/>
+        /// <see cref="IStorageProvider.WriteStateAsync"/>
         public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);
@@ -131,7 +132,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Deleet / Clear state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider#ClearStateAsync"/>
+        /// <see cref="IStorageProvider.ClearStateAsync"/>
         public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             int num = FindStorageShard(grainType, grainReference);

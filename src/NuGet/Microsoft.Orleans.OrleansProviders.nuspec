@@ -22,6 +22,7 @@
     </dependencies>
   </metadata>
   <files>
+    <file src="OrleansProviders.XML" target="lib\net451" />
     <file src="OrleansProviders.dll" target="lib\net451" />
     <file src="OrleansProviders.pdb" target="lib\net451" />    
     <file src="$SRC_DIR$OrleansProviders\**\*.cs" target="src" />

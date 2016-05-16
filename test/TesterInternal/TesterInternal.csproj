@@ -314,10 +314,6 @@
       <Project>{b99c744a-7f62-430c-9255-e64875d39486}</Project>
       <Name>TestInternalDtosRefOrleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\TestInternalDtos\TestInternalDtos.csproj">
-      <Project>{d2c5f0e3-e9c3-46f5-82e3-26d221246f59}</Project>
-      <Name>TestInternalDtos</Name>
-    </ProjectReference>
     <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
       <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
       <Name>TestInternalGrainInterfaces</Name>

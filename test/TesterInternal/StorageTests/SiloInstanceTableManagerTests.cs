@@ -234,7 +234,7 @@ namespace UnitTests.StorageTests
                 ProxyPort = "30000",
 
                 RoleName = "MyRole",
-                InstanceName = "MyInstance",
+                SiloName = "MyInstance",
                 UpdateZone = "0",
                 FaultZone = "0",
                 StartTime = TraceLogger.PrintDate(DateTime.UtcNow),
@@ -268,7 +268,7 @@ namespace UnitTests.StorageTests
             //Assert.AreEqual(referenceEntry.Status, entry.Status, "Status");
             Assert.AreEqual(referenceEntry.ProxyPort, entry.ProxyPort, "ProxyPort");
             Assert.AreEqual(referenceEntry.RoleName, entry.RoleName, "RoleName");
-            Assert.AreEqual(referenceEntry.InstanceName, entry.InstanceName, "InstanceName");
+            Assert.AreEqual(referenceEntry.SiloName, entry.SiloName, "SiloName");
             Assert.AreEqual(referenceEntry.UpdateZone, entry.UpdateZone, "UpdateZone");
             Assert.AreEqual(referenceEntry.FaultZone, entry.FaultZone, "FaultZone");
             Assert.AreEqual(referenceEntry.StartTime, entry.StartTime, "StartTime");

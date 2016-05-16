@@ -198,7 +198,15 @@ namespace Orleans.Runtime.MembershipService
             parse.SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(tableEntry.Address), port), gen);
 
             parse.RoleName = tableEntry.RoleName;
-            parse.InstanceName = tableEntry.InstanceName;
+            if (!string.IsNullOrEmpty(tableEntry.SiloName))
+            {
+                parse.SiloName = tableEntry.SiloName;
+            }else if (!string.IsNullOrEmpty(tableEntry.InstanceName))
+            {
+                // this is for backward compatability: in a mixed cluster of old and new version,
+                // some entries will have the old InstanceName column.
+                parse.SiloName = tableEntry.InstanceName;
+            }
             if (!string.IsNullOrEmpty(tableEntry.UpdateZone))
                 parse.UpdateZone = int.Parse(tableEntry.UpdateZone);
 
@@ -251,7 +259,10 @@ namespace Orleans.Runtime.MembershipService
                 Status = memEntry.Status.ToString(),
                 ProxyPort = memEntry.ProxyPort.ToString(CultureInfo.InvariantCulture),
                 RoleName = memEntry.RoleName,
-                InstanceName = memEntry.InstanceName,
+                SiloName = memEntry.SiloName,
+                // this is for backward compatability: in a mixed cluster of old and new version,
+                // we need to populate both columns.
+                InstanceName = memEntry.SiloName,
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
                 StartTime = TraceLogger.PrintDate(memEntry.StartTime),
