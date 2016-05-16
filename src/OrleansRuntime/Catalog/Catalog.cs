@@ -263,6 +263,44 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics()
+        {
+            var checkedTypes = new Dictionary<Type,bool>();
+            var stats = new List<DetailedGrainStatistic>();
+            lock (activations)
+            {
+                foreach (var activation in activations)
+                {
+                    ActivationData data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    //we do not want to get the attribute for the same type of grain everytime
+                    if (checkedTypes.ContainsKey(data.GrainInstanceType) && checkedTypes[data.GrainInstanceType] == false)
+                        continue;
+
+
+                    var isManagementFilterableGrain = data.GrainInstanceType.IsDefined(typeof (ManagementFilterableGrain), false);
+                    //we need to add the new type to the dictionary now,so that we do not need to get attribute for everygrain.
+                    if (!checkedTypes.ContainsKey(data.GrainInstanceType))
+                    {
+                        checkedTypes.Add(data.GrainInstanceType, isManagementFilterableGrain);
+                    }
+
+                    if (isManagementFilterableGrain)
+                    {
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = data.GrainInstanceType,
+                            GrainIdentity = data.Grain,
+                            SiloAddress = data.Silo,
+                            Category = data.Grain.Category.ToString()
+                        });
+                    }
+                }
+            }
+            return stats;
+        }
+
         public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
         {
             return activations.GetSimpleGrainStatistics();

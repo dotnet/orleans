@@ -246,12 +246,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// The type of the grain for this DetailedGrainStatistic.
         /// </summary>
-        public string GrainType { get; set; }
+        public Type GrainType { get; set; }
         /// <summary>
         /// The silo address for this DetailedGrainStatistic.
         /// </summary>
         public SiloAddress SiloAddress { get; set; }
-
 
         /// <summary>
         /// Unique Id for the grain.

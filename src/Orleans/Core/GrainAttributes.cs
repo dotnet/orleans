@@ -318,4 +318,12 @@ namespace Orleans
             Namespace = streamNamespace;
         }
     }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class ManagementFilterableGrain : Attribute
+    {
+        
+    }
+
+
 }

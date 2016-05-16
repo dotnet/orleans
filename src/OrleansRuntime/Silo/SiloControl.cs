@@ -89,16 +89,8 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics()
         {
-            var grainStats = InsideRuntimeClient.Current.Catalog.GetGrainStatistics();
-            return Task.FromResult(
-                grainStats.Where(p => p.Item1.Category == UniqueKey.Category.Grain)
-                    .Select(p => new DetailedGrainStatistic()
-                    {
-                        SiloAddress = silo.SiloAddress,
-                        GrainIdentity = p.Item1,
-                        GrainType = p.Item2,
-                        Category = Convert.ToString(p.Item1.Category)
-                    }).ToList());
+            if (logger.IsVerbose) logger.Verbose("GetDetailedGrainStatistics");
+            return Task.FromResult(InsideRuntimeClient.Current.Catalog.GetDetailedGrainStatistics());
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
