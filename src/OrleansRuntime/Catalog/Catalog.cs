@@ -278,7 +278,6 @@ namespace Orleans.Runtime
                     if (checkedTypes.ContainsKey(data.GrainInstanceType) && checkedTypes[data.GrainInstanceType] == false)
                         continue;
 
-
                     var isManagementFilterableGrain = data.GrainInstanceType.IsDefined(typeof (ManagementFilterableGrain), false);
                     //we need to add the new type to the dictionary now,so that we do not need to get attribute for everygrain.
                     if (!checkedTypes.ContainsKey(data.GrainInstanceType))
@@ -290,7 +289,7 @@ namespace Orleans.Runtime
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {
-                            GrainType = data.GrainInstanceType,
+                            GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
                             GrainIdentity = data.Grain,
                             SiloAddress = data.Silo,
                             Category = data.Grain.Category.ToString()
