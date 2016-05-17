@@ -138,7 +138,8 @@ namespace Orleans.Runtime.Management
 
         public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds)
         {
-            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetDetailedGrainStatistics()).ToList();
+            var all = GetSiloAddresses(hostsIds).Select(s => 
+                GetSiloControlReference(s).GetDetailedGrainStatistics()).ToList();
             await Task.WhenAll(all);
             return all.SelectMany(s => s.Result).ToArray();
         }
