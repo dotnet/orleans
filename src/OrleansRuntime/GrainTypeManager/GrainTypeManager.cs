@@ -220,7 +220,6 @@ namespace Orleans.Runtime
                         .Where(grainTypeData => grainTypes[grainTypeData].Type.IsDefined(typeof (ManagementFilterableGrain), false))
                         .ToList();
             }
-
             return grainTypes.Keys.ToList();
         }
 
