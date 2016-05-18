@@ -265,7 +265,7 @@ namespace Orleans.Runtime
 
         public List<DetailedGrainStatistic> GetDetailedGrainStatistics()
         {
-            var checkedTypes = new Dictionary<Type,bool>();
+            var validReturnTypes = GrainTypeManager.GetGrainTypeList(true);
             var stats = new List<DetailedGrainStatistic>();
             lock (activations)
             {
@@ -274,31 +274,16 @@ namespace Orleans.Runtime
                     ActivationData data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
-                    bool isManagementFilterableGrain = false;
-
-                    //we do not want to get the attribute for the same type of grain everytime
-                    if (!checkedTypes.ContainsKey(data.GrainInstanceType))
+                    if (validReturnTypes.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
                     {
-                        isManagementFilterableGrain =
-                            data.GrainInstanceType.IsDefined(typeof (ManagementFilterableGrain), false);
-                        //we need to add the new type to the dictionary now,so that we do not need to get attribute for everygrain.
-                        checkedTypes.Add(data.GrainInstanceType, isManagementFilterableGrain);
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
+                            GrainIdentity = data.Grain,
+                            SiloAddress = data.Silo,
+                            Category = data.Grain.Category.ToString()
+                        });
                     }
-                    else
-                    {
-                        isManagementFilterableGrain = checkedTypes[data.GrainInstanceType];
-                    }
-
-                    if (!isManagementFilterableGrain)
-                        continue;
-
-                    stats.Add(new DetailedGrainStatistic()
-                    {
-                        GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
-                        GrainIdentity = data.Grain,
-                        SiloAddress = data.Silo,
-                        Category = data.Grain.Category.ToString()
-                    });
                 }
             }
             return stats;
