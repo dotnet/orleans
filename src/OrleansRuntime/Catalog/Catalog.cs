@@ -282,10 +282,7 @@ namespace Orleans.Runtime
                         isManagementFilterableGrain =
                             data.GrainInstanceType.IsDefined(typeof (ManagementFilterableGrain), false);
                         //we need to add the new type to the dictionary now,so that we do not need to get attribute for everygrain.
-                        if (!checkedTypes.ContainsKey(data.GrainInstanceType))
-                        {
-                            checkedTypes.Add(data.GrainInstanceType, isManagementFilterableGrain);
-                        }
+                        checkedTypes.Add(data.GrainInstanceType, isManagementFilterableGrain);
                     }
                     else
                     {

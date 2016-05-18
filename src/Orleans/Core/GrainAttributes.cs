@@ -322,8 +322,5 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class ManagementFilterableGrain : Attribute
     {
-        
     }
-
-
 }
