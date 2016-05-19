@@ -87,10 +87,10 @@ namespace Orleans.Runtime
             return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetGrainStatistics());
         }
 
-        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics()
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
             if (logger.IsVerbose) logger.Verbose("GetDetailedGrainStatistics");
-            return Task.FromResult(InsideRuntimeClient.Current.Catalog.GetDetailedGrainStatistics());
+            return Task.FromResult(InsideRuntimeClient.Current.Catalog.GetDetailedGrainStatistics(types));
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
@@ -147,6 +147,11 @@ namespace Orleans.Runtime
                 throw new ArgumentException(error);
             }
             return controllable.ExecuteCommand(command, arg);
+        }
+
+        public Task<string[]> GetGrainTypeList()
+        {
+            return Task.FromResult(GrainTypeManager.Instance.GetGrainTypeList());
         }
 
         #endregion

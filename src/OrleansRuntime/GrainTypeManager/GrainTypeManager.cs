@@ -209,18 +209,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a list of all graintypes in the system.
         /// </summary>
-        /// <param name="managementFilterableTypesOnly">Return only grains marked with the <see cref="ManagementFilterableGrain"/> attribute</param>
         /// <returns></returns>
-        internal List<string> GetGrainTypeList(bool managementFilterableTypesOnly = false)
+        internal string[] GetGrainTypeList()
         {
-            if (managementFilterableTypesOnly)
-            {
-                return grainTypes
-                        .Keys
-                        .Where(grainTypeData => grainTypes[grainTypeData].Type.IsDefined(typeof (ManagementFilterableGrain), false))
-                        .ToList();
-            }
-            return grainTypes.Keys.ToList();
+            return grainTypes.Keys.ToArray();
         }
 
         internal IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)

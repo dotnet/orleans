@@ -68,39 +68,55 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
+
         /// <summary>
         /// Return the most recent grain statistics information, amalgomated across silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
+
         /// <summary>
         /// Return the most recent grain statistics information, amalgomated across all silos.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
+
         /// <summary>
-        /// Return the most recent detailed grain statistics information, amalgomated across silos.
-        /// </summary>
-        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns></returns>
-        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds);
-        /// <summary>
-        /// Return the most recent detailed grain statistics information, amalgomated across silos.
+        /// Returns the most recent detailed grain statistics information, amalgomated across silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns></returns>
         Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics();
+
         /// <summary>
-        /// Return the most recent activation count for a specific grain across all silos.
+        /// Returns the most recent detailed grain statistics information, amalgomated across silos.
         /// </summary>
-        /// <param name="grainReference">Reference to the grain to be queried.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <param name="types">Array of grain types to filter the results with</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types);
+
+        /// <summary>
+        /// Returns the most recent detailed grain statistics information, amalgomated across silos.
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds);
+
+        /// <summary>
+        /// Returns the most recent detailed grain statistics information, amalgomated across silos for the specified types.
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <param name="types">Array of grain types to filter the results with</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds, string[] types);
+
         Task<int> GetGrainActivationCount(GrainReference grainReference);
         /// <summary>
         /// Return the total count of all current grain activations across all silos.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
+        /// 
         Task<int> GetTotalActivationCount();
 
         /// <summary>
@@ -146,5 +162,17 @@ namespace Orleans.Runtime
         /// <param name="configuration">XML elements and attributes to update</param>
         /// <returns></returns>
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
+
+        /// <summary>
+        /// Returns a list of all grain types that is active in the system.
+        /// </summary>
+        /// <returns></returns>
+        Task<string[]> GetActiveGrainTypes();
+        /// <summary>
+        /// Returns an array of all the active grain types in the system
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <returns></returns>
+        Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds);
     }
 }

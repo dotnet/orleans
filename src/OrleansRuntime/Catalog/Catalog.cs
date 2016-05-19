@@ -263,9 +263,8 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
-        public List<DetailedGrainStatistic> GetDetailedGrainStatistics()
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
         {
-            var validReturnTypes = GrainTypeManager.GetGrainTypeList(true);
             var stats = new List<DetailedGrainStatistic>();
             lock (activations)
             {
@@ -274,7 +273,7 @@ namespace Orleans.Runtime
                     ActivationData data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
-                    if (validReturnTypes.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                    if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {
