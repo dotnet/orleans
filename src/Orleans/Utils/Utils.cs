@@ -311,31 +311,6 @@ namespace Orleans.Runtime
             return DateTime.UtcNow.Subtract(start);
         }
 
-        public static List<T> ObjectToList<T>(object data)
-        {
-            if (data is List<T>) return (List<T>) data;
-
-            T[] dataArray;
-            if (data is ArrayList)
-            {
-                dataArray = (T[]) (data as ArrayList).ToArray(typeof(T));
-            }
-            else if (data is ICollection<T>)
-            {
-                dataArray = (data as ICollection<T>).ToArray();
-            }
-            else
-            {
-                throw new InvalidCastException(string.Format(
-                    "Cannot convert type {0} to type List<{1}>",
-                    TypeUtils.GetFullName(data.GetType()),
-                    TypeUtils.GetFullName(typeof(T))));
-            }
-            var list = new List<T>();
-            list.AddRange(dataArray);
-            return list;
-        }
-
         public static List<Exception> FlattenAggregate(this Exception exc)
         {
             var result = new List<Exception>();
@@ -374,44 +349,6 @@ namespace Orleans.Runtime
             {
                 yield return batch; //batch.ToArray();
             }
-        }
-
-        internal static MethodInfo GetStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes)
-        {
-            var asm = Assembly.Load(new AssemblyName(assemblyName));
-            if (asm == null)
-                throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null)
-                throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            MethodInfo method;
-            method = argumentTypes == null
-                ? cl.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Where(m=>m.Name == methodName).FirstOrDefault()
-                : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
-
-            if (method == null)
-                throw new InvalidOperationException(string.Format("Cannot find static method {0} of class {1} in assembly {2}", methodName, className, assemblyName));
-
-            return method;
-        }
-
-        internal static object InvokeStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes, object[] arguments)
-        {
-            var method = GetStaticMethodThroughReflection(assemblyName, className, methodName, argumentTypes);
-            return method.Invoke(null, arguments);
-        }
-
-        internal static Type LoadTypeThroughReflection(string assemblyName, string className)
-        {
-            var asm = Assembly.Load(new AssemblyName(assemblyName));
-            if (asm == null) throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            return cl;
         }
     }
 }
