@@ -368,7 +368,7 @@ namespace Orleans.Runtime.Configuration
             }
             var typeInfo = type.GetTypeInfo();
             // postcondition: returned type must implement IGrain.
-            if (!typeof(IGrain).GetTypeInfo().IsAssignableFrom(type))
+            if (!typeof(IGrain).IsAssignableFrom(type))
             {
                 string errStr = String.Format("Type {0} must implement IGrain to be used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_3, errStr);

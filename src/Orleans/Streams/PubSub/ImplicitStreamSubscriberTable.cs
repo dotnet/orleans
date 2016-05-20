@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -246,13 +247,12 @@ namespace Orleans.Streams
                 throw new ArgumentException(string.Format("{0} is not a grain class.", grainClass.FullName), "grainClass");
             }
 
-            object[] attribs = grainClass.GetCustomAttributes(typeof(ImplicitStreamSubscriptionAttribute), inherit: false);
+            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(inherit: false);
 
             // otherwise, we'll consider all of them and aggregate the specifications. duplicates will not be permitted.
             var result = new HashSet<string>();
-            foreach (var ob in attribs)
+            foreach (var attrib in attribs)
             {
-                var attrib = (ImplicitStreamSubscriptionAttribute)ob;
                 if (string.IsNullOrWhiteSpace(attrib.Namespace))
                 {
                     throw new InvalidOperationException("ImplicitConsumerActivationAttribute argument cannot be null nor whitespace");
