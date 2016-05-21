@@ -25,30 +25,15 @@ Implementation notes:
 		https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
 */
 
--- Information of this view can be used to tune queries in database and deployment specific ways if needed.
-CREATE VIEW OrleansDatabaseInfo AS
--- Version information derived from https://support.microsoft.com/en-us/kb/321185.
-SELECT
-	N'ProductName' AS Id,
-	CASE 
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 8 THEN 'SQL Server 2000'
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 9 THEN 'SQL Server 2005'
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 10 
-		AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = '0.' THEN 'SQL Server 2008'
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 10 
-		AND RIGHT(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), 5), 2) = '50' THEN 'SQL Server 2008 R2' 
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 11 THEN 'SQL Server 2012'
-	WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 12 THEN 'SQL Server 2014'
-		WHEN LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR)) - 1) = 13 THEN 'SQL Server 2016' 				
-	END AS Value,
-	N'The database product name.' AS Description
-UNION ALL
-SELECT
-	N'Database version' AS Id, 
-	CAST(SERVERPROPERTY('productversion') AS NVARCHAR) AS Value,
-	N'The version number of the database.' AS Description;
+-- These settings improves throughput of the database by reducing locking by better separating readers from writers.
+-- SQL Server 2012 and newer can refer to itself as CURRENT. Older ones need a workaround.
+DECLARE @current NVARCHAR(256);
+DECLARE @snapshotSettings NVARCHAR(612);
 
-GO
+SELECT @current = (SELECT DB_NAME());
+SET @snapshotSettings = N'ALTER DATABASE ' + @current + N' SET READ_COMMITTED_SNAPSHOT ON; ALTER DATABASE ' + @current + N' SET ALLOW_SNAPSHOT_ISOLATION ON;';
+
+EXECUTE sp_executesql @snapshotSettings;
 
 -- This table defines Orleans operational queries. Orleans uses these to manage its operations,
 -- these are the only queries Orleans issues to the database.
@@ -65,7 +50,7 @@ CREATE TABLE OrleansQuery
 CREATE TABLE OrleansMembershipVersionTable
 (
 	DeploymentId NVARCHAR(150) NOT NULL,
---	Timestamp - added later
+	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 	Version INT NOT NULL DEFAULT 0,
 
 	CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId)
@@ -82,8 +67,8 @@ CREATE TABLE OrleansMembershipTable
 	Status INT NOT NULL,
 	ProxyPort INT NULL,
 	SuspectTimes VARCHAR(8000) NULL,
---	StartTime - added later 
---	IAmAliveTime - added later
+	StartTime DATETIME2(3) NOT NULL,
+	IAmAliveTime DATETIME2(3) NOT NULL,
 	
 	CONSTRAINT PK_MembershipTable_DeploymentId PRIMARY KEY(DeploymentId, Address, Port, Generation),
 	CONSTRAINT FK_MembershipTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
@@ -95,7 +80,7 @@ CREATE TABLE OrleansRemindersTable
 	ServiceId NVARCHAR(150) NOT NULL,
 	GrainId VARCHAR(150) NOT NULL,
 	ReminderName NVARCHAR(150) NOT NULL,
---	StartTime - added later
+	StartTime DATETIME2(3) NOT NULL,
 	Period INT NOT NULL,
 	GrainHash INT NOT NULL,
 	Version INT NOT NULL,
@@ -107,7 +92,7 @@ CREATE TABLE OrleansStatisticsTable
 (
 	OrleansStatisticsTableId INT IDENTITY(1,1) NOT NULL,
 	DeploymentId NVARCHAR(150) NOT NULL,
---	Timestamp - added later
+	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 	Id NVARCHAR(250) NOT NULL,
 	HostName NVARCHAR(150) NOT NULL,
 	Name NVARCHAR(150) NOT NULL,
@@ -122,7 +107,7 @@ CREATE TABLE OrleansClientMetricsTable
 (
 	DeploymentId NVARCHAR(150) NOT NULL,
 	ClientId NVARCHAR(150) NOT NULL,
---	Timestamp - added later
+	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 	Address VARCHAR(45) NOT NULL,
 	HostName NVARCHAR(150) NOT NULL,
 	CpuUsage FLOAT NOT NULL,
@@ -140,7 +125,7 @@ CREATE TABLE OrleansSiloMetricsTable
 (
 	DeploymentId NVARCHAR(150) NOT NULL,
 	SiloId NVARCHAR(150) NOT NULL,
---	Timestamp - added later	
+	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE(),
 	Address VARCHAR(45) NOT NULL,
 	Port INT NOT NULL,
 	Generation INT NOT NULL,
@@ -162,52 +147,6 @@ CREATE TABLE OrleansSiloMetricsTable
 	CONSTRAINT PK_SiloMetricsTable_DeploymentId_SiloId PRIMARY KEY (DeploymentId , SiloId),
 	CONSTRAINT FK_SiloMetricsTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
 );
-
--- The following IF-ELSE does SQL Server version detection and define
-IF(NOT EXISTS(SELECT Value FROM OrleansDatabaseInfo WHERE Id = N'ProductName' AND Value IN (N'SQL Server 2000')))
-BEGIN -- SQL SERVER 2005 and up
-	-- These settings improves throughput of the database by reducing locking by better separating readers from writers.
-	-- SQL Server 2012 and newer can refer to itself as CURRENT. Older ones need a workaround.
-	DECLARE @current NVARCHAR(256);
-	DECLARE @snapshotSettings NVARCHAR(612);
-	
-	SELECT @current = (SELECT DB_NAME());
-	SET @snapshotSettings = N'ALTER DATABASE ' + @current + N' SET READ_COMMITTED_SNAPSHOT ON; ALTER DATABASE ' + @current + N' SET ALLOW_SNAPSHOT_ISOLATION ON;';
-	
-	EXECUTE sp_executesql @snapshotSettings;
-
-	ALTER TABLE OrleansMembershipTable
-	  ADD	StartTime DATETIME2(3) NOT NULL, 
-			IAmAliveTime DATETIME2(3) NOT NULL;
-	ALTER TABLE OrleansRemindersTable
-	  ADD	StartTime DATETIME2(3) NOT NULL;
-	ALTER TABLE OrleansMembershipVersionTable
-	  ADD	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansStatisticsTable
-	  ADD	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansClientMetricsTable
-	  ADD	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansSiloMetricsTable
-	  ADD	Timestamp DATETIME2(3) NOT NULL DEFAULT GETUTCDATE();
-END
-ELSE
-BEGIN -- SQL SERVER 2000
-	ALTER TABLE OrleansMembershipTable
-	  ADD	StartTime DATETIME NOT NULL, 
-			IAmAliveTime DATETIME NOT NULL;
-	ALTER TABLE OrleansRemindersTable
-	  ADD	StartTime DATETIME NOT NULL;
-	ALTER TABLE OrleansMembershipVersionTable
-	  ADD	Timestamp DATETIME NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansStatisticsTable
-	  ADD	Timestamp DATETIME NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansClientMetricsTable
-	  ADD	Timestamp DATETIME NOT NULL DEFAULT GETUTCDATE();
-	ALTER TABLE OrleansSiloMetricsTable
-	  ADD	Timestamp DATETIME NOT NULL DEFAULT GETUTCDATE();
-END 
-
-GO
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
