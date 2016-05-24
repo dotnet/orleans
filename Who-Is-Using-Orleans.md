@@ -37,6 +37,7 @@ A number of client projects where extreme scale and performance is required
 Cloud collaboration and synchronisation platform
 * <a href="https://www.linkedin.com/company/youscan" target="_blank">__YouScan__</a>
 Social media monitoring & analytics provider. Orleans is used as part of its percolator solution
+* <a href="https://visa.com/" target="_blank">__Visa__</a>
 
 ## Projects and Applications
 
