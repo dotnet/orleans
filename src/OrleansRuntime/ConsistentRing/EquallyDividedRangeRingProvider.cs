@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ConsistentRing
 {
-    internal class EquallyDevidedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
+    internal class EquallyDividedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
     {
         private readonly IConsistentRingProvider ringProvider;
         private readonly List<IAsyncRingRangeListener> grainStatusListeners;
@@ -15,7 +15,7 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly int mySubRangeIndex;
         private IRingRange myRange;
 
-        internal EquallyDevidedRangeRingProvider(IConsistentRingProvider provider, int mySubRangeIndex, int numSubRanges)
+        internal EquallyDividedRangeRingProvider(IConsistentRingProvider provider, int mySubRangeIndex, int numSubRanges)
         {
             if (mySubRangeIndex < 0 || mySubRangeIndex >= numSubRanges)
                 throw new IndexOutOfRangeException("mySubRangeIndex is out of the range. mySubRangeIndex = " + mySubRangeIndex + " numSubRanges = " + numSubRanges);
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.ConsistentRing
             this.mySubRangeIndex = mySubRangeIndex;
             grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
-            logger = TraceLogger.GetLogger(typeof(EquallyDevidedRangeRingProvider).Name);
+            logger = TraceLogger.GetLogger(typeof(EquallyDividedRangeRingProvider).Name);
         }
 
         public IRingRange GetMyRange()
@@ -35,7 +35,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private IRingRange CalcMyRange()
         {
-            var equallyDevidedMultiRange = new EquallyDevidedMultiRange(ringProvider.GetMyRange(), numSubRanges);
+            var equallyDevidedMultiRange = RangeFactory.CreateEquallyDividedMultiRange(ringProvider.GetMyRange(), numSubRanges);
             return equallyDevidedMultiRange.GetSubRange(mySubRangeIndex);
         }
 
@@ -62,9 +62,9 @@ namespace Orleans.Runtime.ConsistentRing
         {
             myRange = CalcMyRange();
 
-            var oldMultiRange = new EquallyDevidedMultiRange(old, numSubRanges);
+            var oldMultiRange = RangeFactory.CreateEquallyDividedMultiRange(old, numSubRanges);
             IRingRange oldSubRange = oldMultiRange.GetSubRange(mySubRangeIndex);
-            var newMultiRange = new EquallyDevidedMultiRange(now, numSubRanges);
+            var newMultiRange = RangeFactory.CreateEquallyDividedMultiRange(now, numSubRanges);
             IRingRange newSubRange = newMultiRange.GetSubRange(mySubRangeIndex);
 
             if (oldSubRange.Equals(newSubRange)) return;
