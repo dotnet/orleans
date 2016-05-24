@@ -330,7 +330,8 @@ namespace Orleans.CodeGenerator
             var result = new List<MemberDeclarationSyntax>();
 
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Expression<Action<Type>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
             Expression<Action> getGetter = () => SerializationManager.GetGetter(default(FieldInfo));
             Expression<Action> getReferenceSetter = () => SerializationManager.GetReferenceSetter(default(FieldInfo));
             Expression<Action> getValueSetter = () => SerializationManager.GetValueSetter(default(FieldInfo));
@@ -346,7 +347,7 @@ namespace Orleans.CodeGenerator
             foreach (var field in fields)
             {
                 var fieldInfo =
-                    getField.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax()))
+                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
                         .AddArgumentListArguments(
                             SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
                             SF.Argument(bindingFlags));
