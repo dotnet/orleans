@@ -64,11 +64,11 @@ Orleans Reminders table durably stores all the reminders registered in the syste
 
 1. *PartitionKey* - ServiceId + "_" + GrainRefConsistentHash
 2. *RowKey* -  GrainReference + "-" ReminderName
-3. *GrainReference* - the grain refernce of the grain that created this reminder.
+3. *GrainReference* - the grain reference of the grain that created this reminder.
 4. *ReminderName* - the name of this reminder
 5. *ServiceId* - the service id of the currently running Orleans service
-6. *DeploymentId* - the deployment  id of the currently running Orleans service
-7. *StartAt* - the time when this reminder was suppoused to tick in the first time
+6. *DeploymentId* - the deployment id of the currently running Orleans service
+7. *StartAt* - the time when this reminder was supposed to tick in the first time
 8. *Period* - the time period for this reminder
 9. *GrainRefConsistentHash* - the consistent hash of the GrainReference
 
