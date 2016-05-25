@@ -23,7 +23,7 @@ In some cases grain code might need to “break out” of the Orleans task sched
 Below is a sample code that demonstrates the usage of `TaskScheduler.Current`, `Task.Run` and a special custom scheduler to escape from Orlean grain context and how to get back to it.
 
 ``` csharp
-   public Task MyGrainMethod()
+   public async Task MyGrainMethod()
    {
         // Grab the Orleans task scheduler
         var orleansTs = TaskScheduler.Current; 
