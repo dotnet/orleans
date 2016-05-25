@@ -94,7 +94,7 @@ public interface IGrain1 : IGrainWithIntegerKey
 ```
 
 
-One of the important things is choosing a Key type for your grains, in this example we are using Integer there are Guids, strings and various compound keys that may meet your needs.
+One of the important things is choosing a Key type for your grains, in this example we are using the Integer Key type.  There are also Guids, strings and various compound keys that may meet your needs.
 
 Additionally, Orleans relies on TPL tasks in the interface method's return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so.
 Use `Task` or `Task<T>` as the return type of all methods of communication interfaces.
