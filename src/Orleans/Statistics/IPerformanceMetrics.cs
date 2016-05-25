@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime.Configuration;
 
 
@@ -237,6 +238,30 @@ namespace Orleans.Runtime
         {
             return string.Format("SimpleGrainStatistic: GrainType={0} Silo={1} NumActivations={2} ", GrainType, SiloAddress, ActivationCount);
         }
+    }
+
+    [Serializable]
+    public class DetailedGrainStatistic
+    {
+        /// <summary>
+        /// The type of the grain for this DetailedGrainStatistic.
+        /// </summary>
+        public string GrainType { get; set; }
+
+        /// <summary>
+        /// The silo address for this DetailedGrainStatistic.
+        /// </summary>
+        public SiloAddress SiloAddress { get; set; }
+
+        /// <summary>
+        /// Unique Id for the grain.
+        /// </summary>
+        public IGrainIdentity GrainIdentity { get; set; }
+
+        /// <summary>
+        /// The grains Category
+        /// </summary>
+        public string Category { get; set; }
     }
 
     [Serializable]

@@ -206,6 +206,15 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Returns a list of all graintypes in the system.
+        /// </summary>
+        /// <returns></returns>
+        internal string[] GetGrainTypeList()
+        {
+            return grainTypes.Keys.ToArray();
+        }
+
         internal IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
             try

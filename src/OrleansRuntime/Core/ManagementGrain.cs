@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Xml;
 using Orleans.Runtime.MembershipService;
@@ -129,6 +130,20 @@ namespace Orleans.Runtime.Management
             return await GetSimpleGrainStatistics(silos);
         }
 
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null)
+        {
+            if (hostsIds == null)
+            {
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                hostsIds = hosts.Keys.ToArray();
+            }
+
+            var all = GetSiloAddresses(hostsIds).Select(s =>
+              GetSiloControlReference(s).GetDetailedGrainStatistics(types)).ToList();
+            await Task.WhenAll(all);
+            return all.SelectMany(s => s.Result).ToArray();
+        }
+
         public async Task<int> GetGrainActivationCount(GrainReference grainReference)
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
@@ -176,6 +191,18 @@ namespace Orleans.Runtime.Management
                     await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
                 }
             }
+        }
+
+        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
+        {
+            if (hostsIds == null)
+            {
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                SiloAddress[] silos = hosts.Keys.ToArray();
+            }
+            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
+            await Task.WhenAll(all);
+            return all.SelectMany(s => s.Result).Distinct().ToArray();
         }
 
         public async Task<int> GetTotalActivationCount()

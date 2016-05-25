@@ -263,6 +263,31 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
+        {
+            var stats = new List<DetailedGrainStatistic>();
+            lock (activations)
+            {
+                foreach (var activation in activations)
+                {
+                    ActivationData data = activation.Value;
+                    if (data == null || data.GrainInstance == null) continue;
+
+                    if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                    {
+                        stats.Add(new DetailedGrainStatistic()
+                        {
+                            GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
+                            GrainIdentity = data.Grain,
+                            SiloAddress = data.Silo,
+                            Category = data.Grain.Category.ToString()
+                        });
+                    }
+                }
+            }
+            return stats;
+        }
+
         public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
         {
             return activations.GetSimpleGrainStatistics();
