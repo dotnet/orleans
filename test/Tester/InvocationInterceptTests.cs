@@ -6,7 +6,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.General
 {
@@ -32,8 +31,8 @@ namespace UnitTests.General
             
             // This grain method reads the context and returns it
             var context = await grain.GetRequestContext();
-            Assert.IsNotNull(context);
-            Assert.IsTrue((int)context == 38);
+            Assert.NotNull(context);
+            Assert.True((int)context == 38);
         }
     }
 

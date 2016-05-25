@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using UnitTests.Tester;
 
@@ -31,7 +30,7 @@ namespace UnitTests.MembershipTests
             var instanceId = await grain.GetRuntimeInstanceId();
             var target = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
             var targetInstanceId = await target.GetRuntimeInstanceId();
-            Assert.AreNotEqual(instanceId, targetInstanceId, "Activations must be placed on different silos");
+            Assert.NotEqual(instanceId, targetInstanceId, "Activations must be placed on different silos");
             var promise = instanceId.Contains(HostedCluster.Primary.Endpoint.ToString()) ?
                 grain.CallOtherLongRunningTask(target, true, TimeSpan.FromSeconds(7))
                 : target.CallOtherLongRunningTask(grain, true, TimeSpan.FromSeconds(7));
@@ -41,11 +40,11 @@ namespace UnitTests.MembershipTests
             try
             {
                 await promise;
-                Assert.Fail("The broken promise exception was not thrown");
+                Assert.True(false, "The broken promise exception was not thrown");
             }
             catch (Exception ex)
             {
-                Assert.AreEqual(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
+                Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
             }
         }
 
@@ -61,11 +60,11 @@ namespace UnitTests.MembershipTests
             try
             {
                 await task;
-                Assert.Fail("The broken promise exception was not thrown");
+                Assert.True(false, "The broken promise exception was not thrown");
             }
             catch (Exception ex)
             {
-                Assert.AreEqual(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
+                Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
             }
         }
 

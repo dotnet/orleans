@@ -7,7 +7,6 @@ using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.General
 {
@@ -53,7 +52,7 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -71,7 +70,7 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -91,16 +90,16 @@ namespace UnitTests.General
             if (callbackCounter == 1)
             {
                 // Allow for callbacks occurring in any order
-                Assert.IsTrue(callbacksRecieved[0] || callbacksRecieved[1], "Received one callback ok");
+                Assert.True(callbacksRecieved[0] || callbacksRecieved[1], "Received one callback ok");
             }
             else if (callbackCounter == 2)
             {
-                Assert.IsTrue(callbacksRecieved[0] && callbacksRecieved[1], "Received two callbacks ok");
+                Assert.True(callbacksRecieved[0] && callbacksRecieved[1], "Received two callbacks ok");
                 result.Done = true;
             }
             else
             {
-                Assert.Fail("Callback has been called more times than was expected.");
+                Assert.True(false, "Callback has been called more times than was expected.");
             }
         }
 
@@ -127,15 +126,15 @@ namespace UnitTests.General
             {
                 Exception baseException = exc.GetBaseException();
                 logger.Info("Received exception: {0}", baseException);
-                Assert.IsInstanceOfType(baseException, typeof(OrleansException));
+                Assert.IsAssignableFrom(baseException, typeof(OrleansException));
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
-                    Assert.Fail("Unexpected exception message: " + baseException);
+                    Assert.True(false, "Unexpected exception message: " + baseException);
                 }
             }
             await grain.SetA(2); // Use grain
 
-            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetA(2)");
+            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetA(2)");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -144,7 +143,7 @@ namespace UnitTests.General
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", callbackCounter, a, b);
-            Assert.IsTrue(callbackCounter <= 2, "Callback has been called more times than was expected {0}", callbackCounter);
+            Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected {0}", callbackCounter);
 
             if (callbackCounter == 2)
             {
@@ -163,11 +162,11 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
             await grain.Unsubscribe(reference);
             await grain.SetB(3);
 
-            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -176,10 +175,10 @@ namespace UnitTests.General
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
-            Assert.IsTrue(callbackCounter < 2, "Callback has been called more times than was expected.");
+            Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
-            Assert.AreEqual(5, a);
-            Assert.AreEqual(0, b);
+            Assert.Equal(5, a);
+            Assert.Equal(0, b);
 
             result.Continue = true;
         }
@@ -206,7 +205,7 @@ namespace UnitTests.General
             {
                 Exception baseException = exc.GetBaseException();
                 if (!(baseException is OrleansException))
-                    Assert.Fail("Unexpected exception type {0}", baseException);
+                    Assert.True(false, "Unexpected exception type {0}", baseException);
             }
         }
 
@@ -225,7 +224,7 @@ namespace UnitTests.General
             await grain.Subscribe(reference2);
             grain.SetA(6).Ignore();
 
-            Assert.IsTrue(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
@@ -235,10 +234,10 @@ namespace UnitTests.General
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
-            Assert.IsTrue(callbackCounter < 3, "Callback has been called more times than was expected.");
+            Assert.True(callbackCounter < 3, "Callback has been called more times than was expected.");
 
-            Assert.AreEqual(6, a);
-            Assert.AreEqual(0, b);
+            Assert.Equal(6, a);
+            Assert.Equal(0, b);
 
             if (callbackCounter == 2)
                 result.Done = true;
@@ -255,21 +254,21 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.IsTrue(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             await grain.SetB(3);
 
-            Assert.IsFalse(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
         }
 
         void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", callbackCounter, a, b);
-            Assert.IsTrue(callbackCounter < 2, "Callback has been called more times than was expected.");
+            Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
-            Assert.AreEqual(5, a);
-            Assert.AreEqual(0, b);
+            Assert.Equal(5, a);
+            Assert.Equal(0, b);
 
             result.Continue = true;
         }

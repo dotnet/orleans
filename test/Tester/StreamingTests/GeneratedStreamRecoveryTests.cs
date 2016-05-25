@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -91,11 +90,11 @@ namespace UnitTests.StreamingTests
 
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-            Assert.AreEqual(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length, "expected responses");
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)
             {
-                Assert.AreEqual(true, result, "Control command result");
+                Assert.Equal(true, result, "Control command result");
             }
         }
     }
