@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.Samples.Chirper.GrainInterfaces;
@@ -42,6 +41,7 @@ namespace Orleans.Samples.Chirper.Grains
         private int PublishedMessagesCacheSize;
         private ObserverSubscriptionManager<IChirperViewer> viewers;
         private Logger logger;
+        private Task outstandingWriteStateOperation;
 
         private const int MAX_MESSAGE_LENGTH = 280;
 
@@ -316,6 +316,62 @@ namespace Orleans.Samples.Chirper.Grains
             chirp.Message = message;
             if (chirp.Message.Length > MAX_MESSAGE_LENGTH) chirp.Message = message.Substring(0, MAX_MESSAGE_LENGTH);
             return chirp;
+        }
+
+        // When reentrant grain is doing WriteStateAsync, etag violations are possible due to concurrent writes.
+        // The solution is to serialize and batch writes, and make sure only a single write is outstanding at any moment in time.
+        protected override async Task WriteStateAsync()
+        {
+            var currentWriteStateOperation = this.outstandingWriteStateOperation;
+            if (currentWriteStateOperation != null)
+            {
+                try
+                {
+                    // await the outstanding write, but ignore it since it doesn't include our changes
+                    await currentWriteStateOperation;
+                }
+                catch
+                {
+                    // Ignore all errors from this in-flight write operation, since the original caller(s) of it will observe it.
+                }
+                finally
+                {
+                    if (this.outstandingWriteStateOperation == currentWriteStateOperation)
+                    {
+                        // only null out the outstanding operation if it's the same one as the one we awaited, otherwise
+                        // another request might have already done so.
+                        this.outstandingWriteStateOperation = null;
+                    }
+                }
+            }
+
+            if (this.outstandingWriteStateOperation == null)
+            {
+                // If after the initial write is completed, no other request initiated a new write operation, do it now.
+                currentWriteStateOperation = base.WriteStateAsync();
+                this.outstandingWriteStateOperation = currentWriteStateOperation;
+            }
+            else
+            {
+                // If there were many requests enqueued to persist state, there is no reason to enqueue a new write 
+                // operation for each, since any write (after the initial one that we already awaited) will have cumulative
+                // changes including the one requested by our caller. Just await the new outstanding write.
+                currentWriteStateOperation = this.outstandingWriteStateOperation;
+            }
+
+            try
+            {
+                await currentWriteStateOperation;
+            }
+            finally
+            {
+                if (this.outstandingWriteStateOperation == currentWriteStateOperation)
+                {
+                    // only null out the outstanding operation if it's the same one as the one we awaited, otherwise
+                    // another request might have already done so.
+                    this.outstandingWriteStateOperation = null;
+                }
+            }
         }
     }
 }
