@@ -63,7 +63,7 @@ There is sometimes an even more advanced scenario of a piece of grain code that 
 Below is a code that demonstrates how a grain call can be made from a piece of code that runs inside a grain but not in the grain context.
 
 ``` csharp
-   public Task MyGrainMethod()
+   public async Task MyGrainMethod()
    {
         // Grab the Orleans task scheduler
         var orleansTs = TaskScheduler.Current; 
