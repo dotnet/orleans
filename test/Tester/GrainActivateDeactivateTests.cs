@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -75,7 +74,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
@@ -123,7 +122,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
@@ -147,7 +146,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.AreNotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
 
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
@@ -162,7 +161,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                 await grain.ThrowSomething();
 
-                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (Exception exc)
             {
@@ -170,9 +169,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 Exception e = exc.GetBaseException();
                 Console.WriteLine("Nested exception type: " + e.GetType().FullName);
                 Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsInstanceOfType(e, typeof(Exception), "Did not get expected exception type returned: " + e);
+                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
                 Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.IsTrue(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
             }
             
         }
@@ -187,7 +186,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                 long key = await grain.GetKey();
 
-                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
+                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
             }
             catch (Exception exc)
             {
@@ -195,9 +194,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 Exception e = exc.GetBaseException();
                 Console.WriteLine("Nested exception type: " + e.GetType().FullName);
                 Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsInstanceOfType(e, typeof(Exception), "Did not get expected exception type returned: " + e);
+                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
                 Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.IsTrue(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
             }
         }
 
@@ -211,7 +210,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                 await grain.ForwardCall(GrainClient.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id));
 
-                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (Exception exc)
             {
@@ -219,9 +218,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 Exception e = exc.GetBaseException();
                 Console.WriteLine("Nested exception type: " + e.GetType().FullName);
                 Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsInstanceOfType(e, typeof(Exception), "Did not get expected exception type returned: " + e);
+                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
                 Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.IsTrue(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
             }
         }
 
@@ -235,7 +234,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                 await grain.DoSomething();
 
-                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (TimeoutException te)
             {
@@ -248,11 +247,11 @@ namespace UnitTests.ActivationsLifeCycleTests
                 Exception e = exc.GetBaseException();
                 Console.WriteLine("Nested exception type: " + e.GetType().FullName);
                 Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsInstanceOfType(e, typeof(Exception),
+                Assert.IsAssignableFrom(e, typeof(Exception),
                                         "Did not get expected exception type returned: " + e);
                 Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException),
                                            "Did not get expected exception type returned: " + e);
-                Assert.IsTrue(e.Message.Contains("Constructor"),
+                Assert.True(e.Message.Contains("Constructor"),
                               "Did not get expected exception message returned: " + e.Message);
             }
         }
@@ -264,7 +263,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             ICreateGrainReferenceTestGrain grain = GrainClient.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
             string activation = await grain.DoSomething();
-            Assert.IsNotNull(activation);
+            Assert.NotNull(activation);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
@@ -292,13 +291,13 @@ namespace UnitTests.ActivationsLifeCycleTests
             try
             {
                 string activation = await grain.DoSomething();
-                Assert.Fail("Should have thrown.");
+                Assert.True(false, "Should have thrown.");
             }
             catch(Exception exc)
             {
                 logger.Info("Thrown as expected:", exc);
                 Exception e = exc.GetBaseException();
-                Assert.IsTrue(e.Message.Contains("Forwarding failed"),
+                Assert.True(e.Message.Contains("Forwarding failed"),
                         "Did not get expected exception message returned: " + e.Message);
             }  
         }
@@ -324,19 +323,19 @@ namespace UnitTests.ActivationsLifeCycleTests
             string when = null)
         {
             string[] activateCalls = await watcher.GetActivateCalls();
-            Assert.AreEqual(expectedActivateCalls, activateCalls.Length, "Number of Activate calls {0}", when);
+            Assert.Equal(expectedActivateCalls, activateCalls.Length, "Number of Activate calls {0}", when);
 
             string[] deactivateCalls = await watcher.GetDeactivateCalls();
-            Assert.AreEqual(expectedDeactivateCalls, deactivateCalls.Length, "Number of Deactivate calls {0}", when);
+            Assert.Equal(expectedDeactivateCalls, deactivateCalls.Length, "Number of Deactivate calls {0}", when);
 
             for (int i = 0; i < expectedActivateCalls; i++)
             {
-                Assert.AreEqual(forActivations[i], activateCalls[i], "Activate call #{0} was by expected activation {1}", (i+1), when);
+                Assert.Equal(forActivations[i], activateCalls[i], "Activate call #{0} was by expected activation {1}", (i+1), when);
             }
 
             for (int i = 0; i < expectedDeactivateCalls; i++)
             {
-                Assert.AreEqual(forActivations[i], deactivateCalls[i], "Deactivate call #{0} was by expected activation {1}", (i + 1), when);
+                Assert.Equal(forActivations[i], deactivateCalls[i], "Deactivate call #{0} was by expected activation {1}", (i + 1), when);
             }
         }
     }
