@@ -130,27 +130,7 @@ namespace Orleans.Runtime.Management
             return await GetSimpleGrainStatistics(silos);
         }
 
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics()
-        {
-            return await GetDetailedGrainStats();
-        }
-
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types)
-        {
-            return await GetDetailedGrainStats(types: types);
-        }
-
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds)
-        {
-            return await GetDetailedGrainStats(hostsIds, null);
-        }
-
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(SiloAddress[] hostsIds, string[] types)
-        {
-            return await GetDetailedGrainStats(hostsIds, types);
-        }
-
-        private async Task<DetailedGrainStatistic[]> GetDetailedGrainStats(SiloAddress[] hostsIds = null,string[] types = null)
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null)
         {
             if (hostsIds == null)
             {
@@ -213,15 +193,13 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        public async Task<string[]> GetActiveGrainTypes()
+        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-            SiloAddress[] silos = hosts.Keys.ToArray();
-            return await GetActiveGrainTypes(silos);
-        }
-
-        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds)
-        {
+            if (hostsIds == null)
+            {
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                SiloAddress[] silos = hosts.Keys.ToArray();
+            }
             var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
             await Task.WhenAll(all);
             return all.SelectMany(s => s.Result).Distinct().ToArray();
