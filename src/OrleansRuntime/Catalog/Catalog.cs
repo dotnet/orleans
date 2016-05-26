@@ -135,6 +135,7 @@ namespace Orleans.Runtime
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
         private readonly IGrainRuntime grainRuntime;
+        private readonly GrainCreator grainCreator;
 
         internal Catalog(
             GrainId grainId, 
@@ -158,6 +159,9 @@ namespace Orleans.Runtime
             this.grainRuntime = grainRuntime;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
+
+            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
+            grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
 
             logger = TraceLogger.GetLogger("Catalog", TraceLogger.LoggerType.Runtime);
             this.config = config.Globals;
@@ -630,14 +634,8 @@ namespace Orleans.Runtime
 
             Type grainType = grainTypeData.Type;
 
-            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
-            var services = Runtime.Silo.CurrentSilo.Services;
-            var grain = services != null
-                ? (Grain) services.GetService(grainType)
-                : (Grain) Activator.CreateInstance(grainType);
-
-            // Inject runtime hooks into grain instance
-            grain.Runtime = grainRuntime;
+            //Create a new instance of the given grain type
+            var grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
             grain.Data = data;
 
             Type stateObjectType = grainTypeData.StateObjectType;
@@ -649,7 +647,6 @@ namespace Orleans.Runtime
             
             lock (data)
             {
-                grain.Identity = data.Identity;
                 data.SetGrainInstance(grain);
                 var statefulGrain = grain as IStatefulGrain;
                 if (statefulGrain != null)
