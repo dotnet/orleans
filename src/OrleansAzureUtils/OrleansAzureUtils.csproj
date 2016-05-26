@@ -81,6 +81,8 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="MultiClusterNetwork\AzureTableBasedGossipChannel.cs" />
+    <Compile Include="MultiClusterNetwork\GossipTableInstanceManager.cs" />
     <Compile Include="Providers\AzureConfigurationExtensions.cs" />
     <Compile Include="Providers\Storage\AzureBlobStorage.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />

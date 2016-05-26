@@ -58,6 +58,12 @@
   <ItemGroup>
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
+    <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
+    <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />

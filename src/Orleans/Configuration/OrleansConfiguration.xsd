@@ -921,6 +921,51 @@
       <xs:element minOccurs="0" maxOccurs="1" name="Caching" type="tns:CachingConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="Liveness" type="tns:LivenessConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="ReminderService" type="tns:ReminderServiceConfiguration" />
+      <xs:element name="MultiClusterNetwork" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            The optional MultiClusterNetwork element contains information relating to how this cluster is participating in a multi-cluster network.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>
+                Any number of gossip channels to bootstrap the gossip network.
+              </xs:documentation>
+            </xs:annotation>
+            <xs:element name="GossipChannel" type="tns:GossipChannelConfig" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+          <xs:attribute name="ClusterId" type="xs:string" use="required">
+            <xs:annotation>
+              <xs:documentation>
+                A string that uniquely identifies this cluster with the global service.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="MaxMultiClusterGateways" type="xs:positiveInteger" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The maximum number of silos per cluster should be designated to serve as gateways..
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="BackgroundGossipInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between periodic background gossips.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="DefaultMultiCluster" type="xs:string" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                A comma-separated list of cluster ids, to be used if no multicluster configuration is found in gossip channels.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
       <xs:element minOccurs="0" maxOccurs="1" name="Directory">
         <xs:annotation>
           <xs:documentation>
@@ -1184,4 +1229,26 @@
       <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
     </xs:sequence>
   </xs:complexType>
+  <xs:complexType name="GossipChannelConfig">
+    <xs:annotation>
+      <xs:documentation>
+        Initialization info for one gossip channel.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Type" use="required" type="xs:string">
+      <xs:annotation>
+        <xs:documentation>
+          The type of this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ConnectionString" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>
+          A connection string for connecting to this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+
 </xs:schema>
