@@ -57,6 +57,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Catalog\ActivationState.cs" />
+    <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
