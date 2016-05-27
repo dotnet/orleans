@@ -45,6 +45,22 @@ namespace UnitTests.Management
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
+        public async Task GetDetailedHosts()
+        {
+            if (HostedCluster.SecondarySilos.Count == 0)
+            {
+                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+
+            var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
+            var siloStatuses = mgmtGrain.GetDetailedHosts(true).Result;
+            Assert.IsNotNull(siloStatuses, "Got some silo statuses");
+            Assert.AreEqual(numberOfActiveSilos, siloStatuses.Length, "Number of silo statuses");
+        }
+
+
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
             SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Initial");
