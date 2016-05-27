@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
+using Assert = Xunit.Assert;
 
 namespace Tests.GeoClusterTests
 {
@@ -57,8 +57,8 @@ namespace Tests.GeoClusterTests
             var silos_in_A = clientA.GetHosts().Count;
             var silos_in_B = clientB.GetHosts().Count;
 
-            Assert.AreEqual(1, silos_in_A);
-            Assert.AreEqual(5, silos_in_B);
+            Assert.Equal(1, silos_in_A);
+            Assert.Equal(5, silos_in_B);
 
             StopAllClientsAndClusters(); // don't rely on VS to clean up in a timely way... do it explicitly
         }

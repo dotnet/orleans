@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [DebuggerDisplay("SiloAddress {ToString()}")]
-    public class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>
+    public class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
     {
         internal static readonly int SizeBytes = 24; // 16 for the address, 4 for the port, 4 for the generation
 
@@ -228,6 +228,14 @@ namespace Orleans.Runtime
 
         #endregion
 
+
+        // non-generic version of CompareTo is needed by some contexts. Just calls generic version.
+        public int CompareTo(object obj)
+        {
+            return CompareTo((SiloAddress)obj);
+        }
+
+
         public int CompareTo(SiloAddress other)
         {
             if (other == null) return 1;
@@ -278,5 +286,6 @@ namespace Orleans.Runtime
             }
             return returnVal;
         }
-    }
+
+      }
 }
