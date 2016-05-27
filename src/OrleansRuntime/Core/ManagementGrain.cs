@@ -36,6 +36,26 @@ namespace Orleans.Runtime.Management
             return t;
         }
 
+        public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+        {
+            logger.Info("GetDetailedHosts onlyActive={0}", onlyActive);
+
+            var mTable = await GetMembershipTable();
+            var table = await mTable.ReadAll();
+
+            if (onlyActive)
+            {
+                return table.Members
+                    .Where(item => item.Item1.Status.Equals(SiloStatus.Active))
+                    .Select(x => x.Item1)
+                    .ToArray();
+            }
+
+            return table.Members
+                .Select(x => x.Item1)
+                .ToArray();
+        }
+
         public Task SetSystemLogLevel(SiloAddress[] siloAddresses, int traceLevel)
         {
             var silos = GetSiloAddresses(siloAddresses);
