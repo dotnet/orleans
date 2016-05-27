@@ -497,12 +497,13 @@ namespace UnitTests.Serialization
             SerializationManager.UseStandardSerializer = false;
 
             const string message = "This is a test message";
-            var source = new UnserializableException(message);
+            // throw the exception so that stack trace is populated
+            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(message); }));
             object deserialized = OrleansSerializationLoop(source);
             var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
             var expectedMessage = "Non-serializable exception of type " +
                                   typeof(UnserializableException).OrleansTypeName() + ": " + message;
-            Assert.True(result.Message.StartsWith(expectedMessage)); //Exception message is wrong after round trip of unserializable exception
+            Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
