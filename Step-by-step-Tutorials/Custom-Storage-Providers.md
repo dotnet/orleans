@@ -33,16 +33,17 @@ With a little bit of massaging of the code, it should look something like this:
 ``` csharp
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using Orleans;
 using Orleans.Storage;
-using Orleans.RuntimeCore;
+using Orleans.Runtime;
 
 namespace StorageProviders
 {
     public class FileStorageProvider : IStorageProvider
     {
-        public OrleansLogger Log { get; set; }
+        public Logger Log { get; set; }
 
         public string Name { get; set; }
 
@@ -58,21 +59,21 @@ namespace StorageProviders
         }
 
         public Task ReadStateAsync(string grainType,
-                                   Orleans.GrainReference grainRef,
+                                   GrainReference grainRef,
                                    IGrainState grainState)
         {
             throw new NotImplementedException();
         }
 
         public Task WriteStateAsync(string grainType,
-                                    Orleans.GrainReference grainRef,
+                                    GrainReference grainRef,
                                     IGrainState grainState)
         {
              throw new NotImplementedException();
         }
 
         public Task ClearStateAsync(string grainType,
-                                    Orleans.GrainReference grainRef,
+                                    GrainReference grainRef,
                                     IGrainState grainState)
         {
             throw new NotImplementedException();
@@ -85,7 +86,7 @@ The first thing we have to figure out is what data we need to provider through c
 The name is a required property, but we will also need the path to the root directory for our file store. 
 That is, in fact, the only piece of information we need, so we'll add a `RootDirectory` string property and edit the configuration file as in the previous section. 
 In doing so, it's critical to pay attention to the namespace and class name of the provider. 
-Add this to the `<StorageProviders>` element in the `DevTestServerConfiguration.xml` configuration file of your silo host project where you will be testing the provider:
+Add this to the `<StorageProviders>` element in the `OrleansConfiguration.xml` configuration file of your silo host project where you will be testing the provider:
 
 
      <Provider Type="StorageProviders.FileStorageProvider"
@@ -157,8 +158,8 @@ using (var stream = fileInfo.OpenText())
 
     JavaScriptSerializer deserializer = new JavaScriptSerializer();
     object data = deserializer.Deserialize(storedData, grainState.GetType());
-    var dict = ((IGrainState)data).AsDictionary();
-    grainState.SetAll(dict);
+    var dict = ((GrainState)data).AsDictionary();
+    ((GrainState)grainState.State).SetAll(dict);
 } 
 ```
 
@@ -167,9 +168,9 @@ The format decisions have already been made, so coding up the `WriteStateAsync` 
 
 
 ``` csharp
-public async Task WriteStateAsync(string grainType, Orleans.GrainReference grainRef, IGrainState grainState)
+public async Task WriteStateAsync(string grainType, GrainReference grainRef, IGrainState grainState)
 {
-    Dictionary<string, object> dataValues = grainState.AsDictionary();
+    IDictionary<string, object> dataValues = ((GrainState)grainState.State).AsDictionary();
     JavaScriptSerializer serializer = new JavaScriptSerializer();
     var storedData = serializer.Serialize(dataValues);
 
