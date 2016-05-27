@@ -16,9 +16,10 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// <summary>
         /// Initialize the channel with given configuration.
         /// </summary>
-        /// <param name="config"></param>
+        /// <param name="serviceId"></param>
+        /// <param name="connectionString"></param>
         /// <returns></returns>
-        Task Initialize(Guid serviceid, string connectionstring);
+        Task Initialize(Guid serviceId, string connectionString);
 
         /// <summary>
         /// A name for the channel.

@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 
 using Orleans.Runtime;
 using Orleans.Providers;
-using static System.Net.WebRequestMethods;
 
 namespace Orleans.Storage
 {
@@ -24,8 +23,7 @@ namespace Orleans.Storage
     /// is bridged over to the appropriate underlying provider for execution.
     /// </para>
     /// <para>
-    /// <see cref="Http://en.wikipedia.org/wiki/Jenkins_hash"/> for more information 
-    /// about the Jenkins Hash function.
+    /// See http://en.wikipedia.org/wiki/Jenkins_hash for more information about the Jenkins Hash function.
     /// </para>
     /// </remarks>
     /// <example>
@@ -103,7 +101,6 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.Close"/>
         public Task Close()
         {
             var closeTasks = new List<Task>();

@@ -487,7 +487,7 @@ namespace Orleans.Runtime
         /// Send an outgoing message
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
-        /// - add ordering info & maintain send order
+        /// - add ordering info and maintain send order
         /// 
         /// </summary>
         /// <param name="message"></param>
@@ -529,7 +529,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Resolve target address for a message
         /// - use transaction info
-        /// - check ordering info in message & sending activation
+        /// - check ordering info in message and sending activation
         /// - use sender's placement strategy
         /// </summary>
         /// <param name="message"></param>

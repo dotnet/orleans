@@ -443,7 +443,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Allows silo config to be programmatically set.
         /// </summary>
-        /// <param name="config">Configuration data for this silo & cluster.</param>
+        /// <param name="config">Configuration data for this silo and cluster.</param>
         private void SetSiloConfig(ClusterConfiguration config)
         {
             Config = config;
@@ -528,6 +528,8 @@ namespace Orleans.Runtime.Host
             GC.SuppressFinalize(this);
         }
 
+        /// <summary> Perform the Dispose / cleanup operation. </summary>
+        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (!disposed)

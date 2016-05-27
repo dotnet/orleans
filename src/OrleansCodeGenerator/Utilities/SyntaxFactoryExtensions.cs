@@ -217,15 +217,9 @@ namespace Orleans.CodeGenerator.Utilities
         /// If the parameter has no name (possible in F#),
         /// it returns a name computed by suffixing "arg" with the parameter's index
         /// </summary>
-        /// <param name="arg">
-        /// The parameter.
-        /// </param>
-        /// <param name="argIndex">
-        /// The parameter index in the list of parameters.
-        /// </param>
-        /// <returns>
-        /// The parameter name.
-        /// </returns>
+        /// <param name="parameter"> The parameter. </param>
+        /// <param name="parameterIndex"> The parameter index in the list of parameters. </param>
+        /// <returns> The parameter name. </returns>
         public static string GetOrCreateName(this ParameterInfo parameter, int parameterIndex)
         {
             var argName = parameter.Name;

@@ -39,13 +39,17 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
     {
+        /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
 
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
+            /// <summary> No silo type specified. </summary>
             None = 0,
+            /// <summary> Primary silo. </summary>
             Primary,
+            /// <summary> Secondary silo. </summary>
             Secondary,
         }
 
@@ -115,6 +119,7 @@ namespace Orleans.Runtime
 
         internal IServiceProvider Services { get { return services; } }
 
+        /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
         {
             get { return globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null; } 
@@ -875,9 +880,9 @@ namespace Orleans.Runtime
                 get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
             }
             
-            public bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
+            internal bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
 
-            public object StatisticsProvider
+            internal object StatisticsProvider
             {
                 get
                 {
