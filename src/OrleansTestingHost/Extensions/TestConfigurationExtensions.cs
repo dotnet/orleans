@@ -6,6 +6,9 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost.Extensions
 {
+    /// <summary>
+    /// Test silo configuration extensions.
+    /// </summary>
     public static class TestConfigurationExtensions
     {
         /// <summary>
