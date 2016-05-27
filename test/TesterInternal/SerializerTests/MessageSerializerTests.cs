@@ -21,8 +21,7 @@ namespace UnitTests.SerializerTests
             this.output = output;
             MessagingStatisticsGroup.Init(false);
 
-            var orleansConfig = new ClusterConfiguration();
-            orleansConfig.StandardLoad();
+            var orleansConfig = ClusterConfiguration.LocalhostPrimarySilo();
             BufferPool.InitGlobalBufferPool(orleansConfig.Globals);
 
             SerializationManager.InitializeForTesting();
