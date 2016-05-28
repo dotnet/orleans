@@ -16,7 +16,7 @@ Keep in mind, this is only a tutorial and lacks appropriate error handling and o
 ## Project Setup
 
 
-For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (Called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.
+For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.
 
 The Solution will eventually look like this.  (Missing files will be added in sections below)
 
@@ -41,9 +41,9 @@ We use just the default project types in c#.
 
 #### Add the following References
 
-1. GrainCollection References GrainInterfaces
-2. Host References GrainInterfaces
-3. Host References GrainCollection
+1. GrainCollection references GrainInterfaces
+2. Host references GrainInterfaces
+3. Host references GrainCollection
 
 
 ## Adding Orleans
@@ -58,7 +58,7 @@ Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Co
 
 ## Creating our Grain Interface
 
-In GrainInterfaces Create an interface IHello.cs
+In GrainInterfaces create an interface IHello.cs
 
 
 ``` csharp
@@ -220,18 +220,9 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
 
 ## Further Reading
 
-List of Orleans Packages
-http://dotnet.github.io/orleans/NuGets
-
-Orleans Configuration Guide
-http://dotnet.github.io/orleans/Orleans-Configuration-Guide/
-
-Orleans Best Practices
-http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf
-
-Running in a Stand Alone Silo
-http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo
-
-Azure Web Sample
-http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample
+ - [List of Orleans Packages](http://dotnet.github.io/orleans/NuGets)
+ - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/)
+ - [Orleans Best Practices](http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf)
+ - [Running in a Stand Alone Silo](http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo)
+ - [Azure Web Sample](http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample)
 
