@@ -117,7 +117,7 @@ Make sure it is set to Copy to Output directory:
   </Globals>
   <Defaults>
     <Networking Address="localhost" Port="11111" />
-    <ProxyingGateway Address="localhost" Port="30000" />
+    <ProxyingGateway Address="localhost" Port="40000" />
   </Defaults>
 </OrleansConfiguration>
 
