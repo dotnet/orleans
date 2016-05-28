@@ -202,8 +202,7 @@ Executing it, you should see something like this:
 
 ![](../Images/Multiple Actors1.PNG)
 
-The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise.
-
+The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise. If you want to do this exercise, please keep the rule for always using asynchronous code inside grains. The Result of a Task will block execution if the task hasn’t completed. This should be avoided in Orleans grains; tasks should always be awaited before Result is read.
 
 `TaskDone.Done`, used in the code above, is a convenience object defined by Orleans to allow code to succinctly return an already completed `Task`.
 
