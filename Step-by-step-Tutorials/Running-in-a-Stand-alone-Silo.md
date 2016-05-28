@@ -41,7 +41,7 @@ static void Main(string[] args)
 Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the OrleansConfiguration.xml file added to the collection project by Microsoft.Orleans.Server to match the programmatically defined `config` object, which is `30000`. if OrleansConfiguration.xml does not exist, you can create one using the instruction in [Minimal Orleans Application tutorial](Minimal-Orleans-Application#host--orleansconfigurationxml). Then, open OrleansConfiguration.xml, find the `ProxyingGateway` element inside its Defaults section, and change it to.
 
 ```xml
-<ProxyingGateway Address="localhost" Port="40000" />
+<ProxyingGateway Address="localhost" Port="30000" />
 ```
 
 OrleansHost.exe is a ready-made host executable intended for running Orleans silo code. It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:
