@@ -7,6 +7,7 @@ using System.Text;
 using System.Xml;
 using Orleans.Providers;
 using System.Reflection;
+using System.Threading;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -459,6 +460,13 @@ namespace Orleans.Runtime.Configuration
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
+            sb.Append("   .NET: ").AppendLine();
+            int workerThreads;
+            int completionPortThreads;
+            ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
             sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
