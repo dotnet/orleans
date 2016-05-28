@@ -414,6 +414,7 @@ namespace Orleans.Runtime
         /// <param name="newPlacement">Creation of new activation was requested by the placement director.</param>
         /// <param name="grainType">The type of grain to be activated or created</param>
         /// <param name="genericArguments">Specific generic type of grain to be activated or created</param>
+        /// <param name="requestContextData">Request context data.</param>
         /// <param name="activatedPromise"></param>
         /// <returns></returns>
         public ActivationData GetOrCreateActivation(
@@ -1216,6 +1217,7 @@ namespace Orleans.Runtime
         /// Invoke the activate method on a newly created activation
         /// </summary>
         /// <param name="activation"></param>
+        /// <param name="requestContextData"></param>
         /// <returns></returns>
         private Task InvokeActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {

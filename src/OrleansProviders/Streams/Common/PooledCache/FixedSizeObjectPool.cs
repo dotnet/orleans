@@ -27,6 +27,7 @@ namespace Orleans.Providers.Streams.Common
         ///   itself and return to the pool.
         /// </summary>
         /// <param name="poolSize"></param>
+        /// <param name="factoryFunc"></param>
         public FixedSizeObjectPool(int poolSize, Func<IObjectPool<T>,T> factoryFunc)
             : base(factoryFunc, poolSize)
         {

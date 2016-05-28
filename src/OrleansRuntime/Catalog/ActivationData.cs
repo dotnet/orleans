@@ -100,9 +100,7 @@ namespace Orleans.Runtime
             /// The base invoker will throw an appropriate exception if the request is not recognized.
             /// </summary>
             /// <param name="grain"></param>
-            /// <param name="interfaceId"></param>
-            /// <param name="methodId"></param>
-            /// <param name="arguments"></param>
+            /// <param name="request"></param>
             /// <returns></returns>
             public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
             {
