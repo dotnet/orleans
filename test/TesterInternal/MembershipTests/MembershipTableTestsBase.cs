@@ -347,6 +347,7 @@ namespace UnitTests.MembershipTests
             {
                 SiloAddress = siloAddress,
                 HostName = hostName,
+                SiloName = "TestSiloName",
                 Status = SiloStatus.Joining,
                 ProxyPort = siloAddress.Endpoint.Port,
                 StartTime = GetUtcNowWithSecondsResolution(),

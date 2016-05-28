@@ -162,6 +162,7 @@ namespace OrleansSQLUtils.Storage
                     entry = new MembershipEntry
                     {
                         SiloAddress = GetSiloAddress(record, nameof(Columns.Port)),
+                        SiloName = TryGetSiloName(record),
                         HostName = record.GetValue<string>(nameof(Columns.HostName)),
                         Status = record.GetValue<SiloStatus>(nameof(Columns.Status)),
                         ProxyPort = record.GetValue<int>(nameof(Columns.ProxyPort)),
@@ -183,6 +184,22 @@ namespace OrleansSQLUtils.Storage
                 }
 
                 return Tuple.Create(entry, GetVersion(record));
+            }
+
+            /// <summary>
+            /// This method is for compatibility with membership tables that
+            /// do not contain a SiloName field
+            /// </summary>
+            private static string TryGetSiloName(IDataRecord record)
+            {
+                for (var i = 0; i < record.FieldCount; ++i)
+                {
+                    if (record.GetName(i) == nameof(Columns.SiloName))
+                    {
+                        return (string) record.GetValue(i);
+                    }
+                }
+                return null;
             }
 
             internal static int GetVersion(IDataRecord record)
@@ -368,6 +385,11 @@ namespace OrleansSQLUtils.Storage
             internal string DeploymentId
             {
                 set { Add(nameof(DeploymentId), value); }
+            }
+
+            internal string SiloName
+            {
+                set { Add(nameof(SiloName), value); }
             }
 
             internal string HostName
