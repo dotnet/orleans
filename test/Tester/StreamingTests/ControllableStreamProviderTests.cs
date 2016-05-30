@@ -63,12 +63,12 @@ namespace UnitTests.StreamingTests
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
-            Assert.Equal(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)
             {
-                Assert.Equal(command, echo.Item1, "command");
-                Assert.Equal(echoArg, echo.Item2, "echo");
+                Assert.Equal(command, echo.Item1);
+                Assert.Equal(echoArg, echo.Item2);
             }
         }
     }

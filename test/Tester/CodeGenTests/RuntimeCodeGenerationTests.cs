@@ -31,7 +31,8 @@ namespace Tester.CodeGenTests
             };
 
             var actual = await grain.SetState(expected);
-            Assert.NotNull(actual, "Result of SetState should be a non-null value.");
+            Assert.NotNull(actual);
+
             Assert.True(expected.Equals(actual));
 
             var newActual = await grain.@static();
@@ -46,14 +47,14 @@ namespace Tester.CodeGenTests
             
             var nestedGeneric = new NestedGeneric<int> { Payload = new NestedGeneric<int>.Nested { Value = Expected } };
             var actual = await grain.Do(nestedGeneric);
-            Assert.Equal(Expected, actual, "NestedGeneric<int>.Nested value should round-trip correctly.");
-            
+            Assert.Equal(Expected, actual); // NestedGeneric<int>.Nested value should round-trip correctly.
+
             var nestedConstructedGeneric = new NestedConstructedGeneric
             {
                 Payload = new NestedConstructedGeneric.Nested<int> { Value = Expected }
             };
             actual = await grain.Do(nestedConstructedGeneric);
-            Assert.Equal(Expected, actual, "NestedConstructedGeneric.Nested<int> value should round-trip correctly.");
+            Assert.Equal(Expected, actual); // NestedConstructedGeneric.Nested<int> value should round-trip correctly.
         }
     }
 }

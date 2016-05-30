@@ -278,7 +278,7 @@ namespace UnitTests.General
             grain.SetB(b).Wait();
 
             Task<string> stringPromise = grain.GetAxB();
-            Assert.AreEqual(expected, stringPromise.Result);
+            Assert.Equal(expected, stringPromise.Result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -295,7 +295,7 @@ namespace UnitTests.General
             var stringPromise = Task.WhenAll(setAPromise, setBPromise).ContinueWith((_) => grain.GetAxB()).Unwrap();
 
             var x = await stringPromise;
-            Assert.Equal(expected, x, "Got expected result");
+            Assert.Equal(expected, x);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Generics")]
@@ -369,7 +369,7 @@ namespace UnitTests.General
 
             Assert.True(
                 (a == r1[0] && b == r1[1]) || (b == r1[0] && a == r1[1]), // Message ordering was not necessarily preserved.
-                "Result: r[0]={0}, r[1]={1}", r1[0], r1[1]);
+                string.Format("Result: r[0]={0}, r[1]={1}", r1[0], r1[1]));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -389,7 +389,7 @@ namespace UnitTests.General
 
             Assert.True(
                 (a == r1[0] && b == r1[1]) || (b == r1[0] && a == r1[1]), // Message ordering was not necessarily preserved.
-                "Result: r[0]={0}, r[1]={1}", r1[0], r1[1]);
+                string.Format("Result: r[0]={0}, r[1]={1}", r1[0], r1[1]));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -491,7 +491,7 @@ namespace UnitTests.General
             IEchoGenericChainGrain<string> g1 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g1.Echo(msg1);
-            Assert.Equal(msg1, received, "Echo");
+            Assert.Equal(msg1, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -502,7 +502,7 @@ namespace UnitTests.General
             IEchoGenericChainGrain<string> g2 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g2.Echo2(msg2);
-            Assert.Equal(msg2, received, "Echo");
+            Assert.Equal(msg2, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -513,7 +513,7 @@ namespace UnitTests.General
             IEchoGenericChainGrain<string> g3 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g3.Echo3(msg3);
-            Assert.Equal(msg3, received, "Echo");
+            Assert.Equal(msg3, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -524,7 +524,7 @@ namespace UnitTests.General
             var g4 = GrainClient.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g4.Echo4(msg4);
-            Assert.Equal(msg4, received, "Echo");
+            Assert.Equal(msg4, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -535,7 +535,7 @@ namespace UnitTests.General
             var g5 = GrainClient.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g5.Echo5(msg5);
-            Assert.Equal(msg5, received, "Echo");
+            Assert.Equal(msg5, received);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
@@ -546,7 +546,7 @@ namespace UnitTests.General
             var g6 = GrainClient.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g6.Echo6(msg6);
-            Assert.Equal(msg6, received, "Echo");
+            Assert.Equal(msg6, received);
         }
 
 

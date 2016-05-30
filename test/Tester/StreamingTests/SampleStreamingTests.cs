@@ -201,7 +201,7 @@ namespace UnitTests.StreamingTests
             logger.Info("CheckCounters: numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             if (assertIsTrue)
             {
-                Assert.Equal(numProduced, numConsumed, String.Format("numProduced = {0}, numConsumed = {1}", numProduced, numConsumed));
+                Assert.Equal(numProduced, numConsumed);
                 return true;
             }
             else

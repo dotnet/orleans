@@ -57,10 +57,10 @@ namespace Tester.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.Equal(streamCount, report.Count, "Stream count");
+                Assert.Equal(streamCount, report.Count);
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.Equal(eventsInStream, eventsPerStream, "Events per stream");
+                    Assert.Equal(eventsInStream, eventsPerStream);
                 }
             }
             else if (streamCount != report.Count ||

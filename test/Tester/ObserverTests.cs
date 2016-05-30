@@ -52,7 +52,7 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.True(await result.WaitForFinished(timeout));
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -70,7 +70,7 @@ namespace UnitTests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.True(await result.WaitForFinished(timeout));
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -90,16 +90,16 @@ namespace UnitTests.General
             if (callbackCounter == 1)
             {
                 // Allow for callbacks occurring in any order
-                Assert.True(callbacksRecieved[0] || callbacksRecieved[1], "Received one callback ok");
+                Assert.True(callbacksRecieved[0] || callbacksRecieved[1]);
             }
             else if (callbackCounter == 2)
             {
-                Assert.True(callbacksRecieved[0] && callbacksRecieved[1], "Received two callbacks ok");
+                Assert.True(callbacksRecieved[0] && callbacksRecieved[1]);
                 result.Done = true;
             }
             else
             {
-                Assert.True(false, "Callback has been called more times than was expected.");
+                Assert.True(false);
             }
         }
 
@@ -126,15 +126,16 @@ namespace UnitTests.General
             {
                 Exception baseException = exc.GetBaseException();
                 logger.Info("Received exception: {0}", baseException);
-                Assert.IsAssignableFrom(baseException, typeof(OrleansException));
+                Assert.IsAssignableFrom<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
                     Assert.True(false, "Unexpected exception message: " + baseException);
                 }
             }
+
             await grain.SetA(2); // Use grain
 
-            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetA(2)");
+            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetA(2)", timeout));
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -143,8 +144,7 @@ namespace UnitTests.General
         {
             callbackCounter++;
             logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", callbackCounter, a, b);
-            Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected {0}", callbackCounter);
-
+            Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected " + callbackCounter);
             if (callbackCounter == 2)
             {
                 result.Continue = true;
@@ -162,11 +162,12 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.True(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForContinue(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
+
             await grain.Unsubscribe(reference);
             await grain.SetB(3);
 
-            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
@@ -205,7 +206,7 @@ namespace UnitTests.General
             {
                 Exception baseException = exc.GetBaseException();
                 if (!(baseException is OrleansException))
-                    Assert.True(false, "Unexpected exception type {0}", baseException);
+                    Assert.True(false);
             }
         }
 
@@ -224,7 +225,7 @@ namespace UnitTests.General
             await grain.Subscribe(reference2);
             grain.SetA(6).Ignore();
 
-            Assert.True(await result.WaitForFinished(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForFinished(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
 
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference1);
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
@@ -254,11 +255,11 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer1);
             await grain.Subscribe(reference);
             await grain.SetA(5);
-            Assert.True(await result.WaitForContinue(timeout), "Should not timeout waiting {0} for {1}", timeout, "SetA");
+            Assert.True(await result.WaitForContinue(timeout), string.Format("Should not timeout waiting {0} for SetA", timeout));
             await GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
             await grain.SetB(3);
 
-            Assert.False(await result.WaitForFinished(timeout), "Should timeout waiting {0} for {1}", timeout, "SetB");
+            Assert.False(await result.WaitForFinished(timeout), string.Format("Should timeout waiting {0} for SetB", timeout));
         }
 
         void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)

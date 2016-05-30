@@ -55,7 +55,9 @@ namespace UnitTests.StreamingTests
             await producer.Produce();
 
             var count = await consumer.GetNumberConsumed();
-            Assert.Equal(count[subscriptionHandle].Item1, 1, "Consumer grain has not received stream message");
+
+            var consumerGrainReceivedStreamMessage = count[subscriptionHandle].Item1 == 1;
+            Assert.True(consumerGrainReceivedStreamMessage);
 
             //TODO: trigger deactivation programmatically
             await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
@@ -68,7 +70,8 @@ namespace UnitTests.StreamingTests
 
             // consumer grain should continue to receive stream messages:
             count = await consumer.GetNumberConsumed();
-            Assert.Equal(count[subscriptionHandle].Item1, 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
+
+            Assert.True(count[subscriptionHandle].Item1 == 2, "Consumer did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
         }
         public async Task DeactivationTest_ClientConsumer(Guid streamGuid, string streamNamespace)
         {
@@ -85,7 +88,7 @@ namespace UnitTests.StreamingTests
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
             await producer.Produce();
 
-            Assert.Equal(count.Value, 1, "Client consumer grain has not received stream message");
+            Assert.Equal(1, count.Value);
 
             //TODO: trigger deactivation programmatically
             await Task.Delay(TimeSpan.FromMilliseconds(130000)); // wait for the PubSubRendezvousGrain and the SampleStreaming_ProducerGrain to be deactivated
@@ -95,7 +98,7 @@ namespace UnitTests.StreamingTests
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName).WithTimeout(Timeout, "BecomeProducer is hung due to deactivation deadlock");
             await producer.Produce().WithTimeout(Timeout, "Produce is hung due to deactivation deadlock");
 
-            Assert.Equal(count.Value, 2, "Client consumer grain did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation");
+            Assert.Equal(2, count.Value); // Client consumer grain did not receive stream messages after PubSubRendezvousGrain and SampleStreaming_ProducerGrain reactivation
         }
 
     }

@@ -155,7 +155,7 @@ namespace UnitTests.StreamingTests
             // Resume
             StreamSubscriptionHandle<int> resumeHandle = await consumer.Resume(firstSubscriptionHandle);
 
-            Assert.Equal(firstSubscriptionHandle, resumeHandle, "Handle matches");
+            Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
             await producer.StartPeriodicProducing();
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
@@ -196,7 +196,7 @@ namespace UnitTests.StreamingTests
             // Resume
             StreamSubscriptionHandle<int> resumeHandle = await consumer.Resume(firstSubscriptionHandle);
 
-            Assert.Equal(firstSubscriptionHandle, resumeHandle, "Handle matches");
+            Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
             await producer.StartPeriodicProducing();
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
@@ -225,8 +225,8 @@ namespace UnitTests.StreamingTests
             IList<StreamSubscriptionHandle<int>> actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.Equal(subscriptionCount, actualSubscriptions.Count, "Subscription Count");
-            Assert.Equal(subscriptionCount, expectedSubscriptions.Count, "Reported subscription Count");
+            Assert.Equal(subscriptionCount, actualSubscriptions.Count);
+            Assert.Equal(subscriptionCount, expectedSubscriptions.Count);
             foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
             {
                 Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");
@@ -241,8 +241,8 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.Equal(subscriptionCount-1, actualSubscriptions.Count, "Subscription Count");
-            Assert.Equal(subscriptionCount-1, expectedSubscriptions.Count, "Reported subscription Count");
+            Assert.Equal(subscriptionCount-1, actualSubscriptions.Count);
+            Assert.Equal(subscriptionCount-1, expectedSubscriptions.Count);
             foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
             {
                 Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");
@@ -255,7 +255,7 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.Equal(0, actualSubscriptions.Count, "Subscription Count");
+            Assert.Equal(0, actualSubscriptions.Count);
         }
 
         public async Task TwoIntermitentStreamTest(Guid streamGuid)
@@ -338,10 +338,10 @@ namespace UnitTests.StreamingTests
             {
                 Assert.True(numConsumed.Values.All(v => v.Item2 == 0), "Errors");
                 Assert.True(numProduced > 0, "Events were not produced");
-                Assert.Equal(consumerCount, numConsumed.Count, "Incorrect number of consumers");
+                Assert.Equal(consumerCount, numConsumed.Count);
                 foreach (int consumed in numConsumed.Values.Select(v => v.Item1))
                 {
-                    Assert.Equal(numProduced, consumed, "Produced and consumed counts do not match");
+                    Assert.Equal(numProduced, consumed);
                 }
             }
             else if (numProduced <= 0 || // no events produced?
@@ -381,7 +381,7 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 Assert.True(numProduced > 0, "Events were not produced");
-                Assert.Equal(numProduced, numConsumed, "Produced and consumed counts do not match");
+                Assert.Equal(numProduced, numConsumed);
             }
             else if (numProduced <= 0 || // no events produced?
                      numProduced != numConsumed)

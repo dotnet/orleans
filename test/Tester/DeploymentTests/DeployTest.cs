@@ -108,12 +108,12 @@ namespace UnitTests
 
             }
 
-            Assert.Equal(0, nonPdbFiles.Count, "{0} files (non-.pdb) were not removed from the target directory ({1}).", nonPdbFiles.Count, targetFolder);
+            Assert.Equal(0, nonPdbFiles.Count);
 
             string[] cacheFilesAfterScript = Directory.GetFiles(factoryCacheFolder, "*.*", SearchOption.AllDirectories);
             int cacheFileCountAfterScript = cacheFilesAfterScript.Count();
 
-            Assert.Equal(0, cacheFileCountAfterScript, "{0} files were not deleted from the cache folder ({1}).", cacheFileCountAfterScript, factoryCacheFolder);
+            Assert.Equal(0, cacheFileCountAfterScript);
         }
 
         /// <summary>
@@ -151,14 +151,17 @@ namespace UnitTests
             ProcessStartInfo calcStartInfo = new ProcessStartInfo("calc.exe");
             calcStartInfo.UseShellExecute = false;
             Process calcProcess = Process.Start(calcStartInfo);
+            
             // Give the process time to start up.
             System.Threading.Thread.Sleep(500);
             string processName = string.Format("\"{0}\"", calcProcess.ProcessName);
             Collection<PSObject> results = RunPowerShellCommand(".\\IsProcessRunning.ps1", calcProcess.ProcessName, "localHost");
+
             // Run the script; result should be "True".
-            Assert.NotNull(results, "No results returned (results = null).");
+            Assert.NotNull(results);
             Assert.True(results.Count > 0, "Process not found on target machine (results.Count = 0).");
             Assert.True(results[0].ToString().Contains(calcProcess.Id.ToString()), "The .\\IsProcessRunning script did not detect the running process.");
+            
             // Clean up after the test.
             calcProcess.Kill();
         }
@@ -189,7 +192,7 @@ namespace UnitTests
                 {
                     resultsBuilder.AppendLine(result.ToString());
                 }
-                Assert.True(false, "IsProcessRunning.ps1 script returned information when it should have return nothing: {0}", resultsBuilder);
+                Assert.True(false, string.Format("IsProcessRunning.ps1 script returned information when it should have return nothing: {0}", resultsBuilder));
             }
         }
 
@@ -358,7 +361,6 @@ namespace UnitTests
             usageText = results[1].ToString();
             Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is help");
 
-
             // TODO: Enable when code is added to the script to detect the dash character differently.
             //// Test "-?"
             //results = InvokePowerShellScript(scriptName, "-?");
@@ -410,7 +412,7 @@ namespace UnitTests
                 foreach (KeyValuePair<string, string> searchPair in searchPairs)
                 {
                     bool found = resultString.IndexOf(searchPair.Key, StringComparison.OrdinalIgnoreCase) != -1;
-                    Assert.True(found == assertKeysAreFound, searchPair.Value, resultString);
+                    Assert.True(found == assertKeysAreFound, string.Format(searchPair.Value, resultString));
                 }
             }
         }
@@ -480,12 +482,12 @@ namespace UnitTests
                 throw new SkipException("Cannot Run Test: Could not find configuration file " + configFile);
             }
             XDocument configDoc = XDocument.Load(configFile);
-            Assert.NotNull(configDoc, string.Format("Could not load test configuration file: {0}", configFile));
+            Assert.NotNull(configDoc);
             XNamespace deployNamespace = "urn:xcg-deployment";
             XElement targetElement = configDoc.Root.Element(deployNamespace + "TargetLocation");
-            Assert.NotNull(targetElement, "Could not find the TargetLocation element in the configuration file: {0}", configFile);
+            Assert.NotNull(targetElement); // "Could not find the TargetLocation element in the configuration file: {0}", configFile);
             XAttribute pathAttribute = targetElement.Attribute("Path");
-            Assert.NotNull(pathAttribute, "The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile);
+            Assert.NotNull(pathAttribute); // The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile);
             pathValue = pathAttribute.Value;
             return pathValue;
         }

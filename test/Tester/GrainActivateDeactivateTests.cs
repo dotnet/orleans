@@ -75,7 +75,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2); // New activation created after re-activate
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
@@ -123,7 +123,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2); // New activation created after re-activate
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
@@ -147,7 +147,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Reactivate
             string activation2 = await grain.DoSomething();
 
-            Assert.NotEqual(activation, activation2, "New activation created after re-activate");
+            Assert.NotEqual(activation, activation2); // New activation created after re-activate;
 
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
@@ -166,13 +166,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine("Received exception: " + exc);
-                Exception e = exc.GetBaseException();
-                Console.WriteLine("Nested exception type: " + e.GetType().FullName);
-                Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
-                Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
             }
             
         }
@@ -191,13 +185,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine("Received exception: " + exc);
-                Exception e = exc.GetBaseException();
-                Console.WriteLine("Nested exception type: " + e.GetType().FullName);
-                Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
-                Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
             }
         }
 
@@ -215,13 +203,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine("Received exception: " + exc);
-                Exception e = exc.GetBaseException();
-                Console.WriteLine("Nested exception type: " + e.GetType().FullName);
-                Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsAssignableFrom(e, typeof(Exception), "Did not get expected exception type returned: " + e);
-                Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException), "Did not get expected exception type returned: " + e);
-                Assert.True(e.Message.Contains("Application-OnActivateAsync"), "Did not get expected exception message returned: " + e.Message);
+                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
             }
         }
 
@@ -244,16 +226,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                Console.WriteLine("Received exception: " + exc);
-                Exception e = exc.GetBaseException();
-                Console.WriteLine("Nested exception type: " + e.GetType().FullName);
-                Console.WriteLine("Nested exception message: " + e.Message);
-                Assert.IsAssignableFrom(e, typeof(Exception),
-                                        "Did not get expected exception type returned: " + e);
-                Assert.IsNotInstanceOfType(e, typeof(InvalidOperationException),
-                                           "Did not get expected exception type returned: " + e);
-                Assert.True(e.Message.Contains("Constructor"),
-                              "Did not get expected exception message returned: " + e.Message);
+                AssertIsInvalidOperationException(exc, "Constructor");
             }
         }
 
@@ -324,20 +297,33 @@ namespace UnitTests.ActivationsLifeCycleTests
             string when = null)
         {
             string[] activateCalls = await watcher.GetActivateCalls();
-            Assert.Equal(expectedActivateCalls, activateCalls.Length, "Number of Activate calls {0}", when);
+            Assert.Equal(expectedActivateCalls, activateCalls.Length);
 
             string[] deactivateCalls = await watcher.GetDeactivateCalls();
-            Assert.Equal(expectedDeactivateCalls, deactivateCalls.Length, "Number of Deactivate calls {0}", when);
+            Assert.Equal(expectedDeactivateCalls, deactivateCalls.Length);
 
             for (int i = 0; i < expectedActivateCalls; i++)
             {
-                Assert.Equal(forActivations[i], activateCalls[i], "Activate call #{0} was by expected activation {1}", (i+1), when);
+                Assert.Equal(forActivations[i], activateCalls[i]);
             }
 
             for (int i = 0; i < expectedDeactivateCalls; i++)
             {
-                Assert.Equal(forActivations[i], deactivateCalls[i], "Deactivate call #{0} was by expected activation {1}", (i + 1), when);
+                Assert.Equal(forActivations[i], deactivateCalls[i]);
             }
+        }
+
+        private static void AssertIsInvalidOperationException(Exception thrownException, string expectedMessageSubstring)
+        {
+            Console.WriteLine("Received exception: " + thrownException);
+            Exception e = thrownException.GetBaseException();
+            Console.WriteLine("Nested exception type: " + e.GetType().FullName);
+            Console.WriteLine("Nested exception message: " + e.Message);
+
+            Assert.IsAssignableFrom<Exception>(e);
+            Assert.IsNotType<InvalidOperationException>(e);
+            Assert.True(e.Message.Contains(expectedMessageSubstring), "Did not get expected exception message returned: " + e.Message);
+
         }
     }
 }

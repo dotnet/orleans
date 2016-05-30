@@ -75,10 +75,10 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.Equal(Fixture.AdapterConfig.TotalQueueCount, report.Count, "Stream count");
+                Assert.Equal(Fixture.AdapterConfig.TotalQueueCount, report.Count);
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.Equal(Fixture.GeneratorConfig.EventsInStream, eventsPerStream, "Events per stream");
+                    Assert.Equal(Fixture.GeneratorConfig.EventsInStream, eventsPerStream);
                 }
             }
             else if (Fixture.AdapterConfig.TotalQueueCount != report.Count ||

@@ -39,8 +39,8 @@ namespace UnitTests.Management
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
             Dictionary<SiloAddress, SiloStatus> siloStatuses = mgmtGrain.GetHosts(true).Result;
-            Assert.NotNull(siloStatuses, "Got some silo statuses");
-            Assert.Equal(numberOfActiveSilos, siloStatuses.Count, "Number of silo statuses");
+            Assert.NotNull(siloStatuses);
+            Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -54,8 +54,8 @@ namespace UnitTests.Management
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
             var siloStatuses = mgmtGrain.GetDetailedHosts(true).Result;
-            Assert.IsNotNull(siloStatuses, "Got some silo statuses");
-            Assert.AreEqual(numberOfActiveSilos, siloStatuses.Length, "Number of silo statuses");
+            Assert.NotNull(siloStatuses);
+            Assert.Equal(numberOfActiveSilos, siloStatuses.Length);
         }
 
 
@@ -98,7 +98,7 @@ namespace UnitTests.Management
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
             int expectedActivationsCount = initialActivationsCount + 1;
             int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            Assert.Equal(expectedActivationsCount, actualActivationsCount, "Activation count for grain after activation: " + grainType);
+            Assert.Equal(expectedActivationsCount, actualActivationsCount);
         }
 
         private SimpleGrainStatistic[] GetSimpleGrainStatistics(string when)

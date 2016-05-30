@@ -47,10 +47,7 @@ namespace UnitTests.Tester
                 logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
                 Assert.Equal(
                     SiloStatus.Active,
-                    pair.Value,
-                    "Failed to confirm start of {0} silos ({1} confirmed).",
-                    pair.Value,
-                    SiloStatus.Active);
+                    pair.Value);
             }
             Assert.Equal(expected, statuses.Count);
         }

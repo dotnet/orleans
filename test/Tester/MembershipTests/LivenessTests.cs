@@ -62,12 +62,11 @@ namespace UnitTests.MembershipTests
                     Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
                         || pair.Value.Equals(SiloStatus.Stopping)
                         || pair.Value.Equals(SiloStatus.Dead),
-                        "SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}",
-                        silo, pair.Value);
+                        string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else
                 {
-                    Assert.Equal(SiloStatus.Active, pair.Value, "SiloStatus for {0}", silo);
+                    Assert.Equal(SiloStatus.Active, pair.Value);
                 }
             }
         }

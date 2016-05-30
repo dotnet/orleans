@@ -57,7 +57,7 @@ namespace UnitTests
             {
                 var p1 = extension.CheckExtension_1();
                 p1.Wait();
-                Assert.Equal("test", p1.Result, "Extension value not set correctly");
+                Assert.Equal("test", p1.Result);
             }
             catch (Exception exc)
             {
@@ -68,7 +68,7 @@ namespace UnitTests
             {
                 var p1 = extension.CheckExtension_2();
                 p1.Wait();
-                Assert.Equal("23", p1.Result, "Extension value not set correctly");
+                Assert.Equal("23", p1.Result);
             }
             catch (Exception exc)
             {
@@ -88,7 +88,7 @@ namespace UnitTests
             }
             catch (Exception ex)
             {
-                Assert.True(false, "No exception should have been thrown. Ex: {0}", ex.Message);
+                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);
@@ -104,7 +104,7 @@ namespace UnitTests
                 var res = await extension.CheckExtension_1();
             }
             catch(Exception ex) {
-                Assert.True(false, "No exception should have been thrown. Ex: {0}", ex.Message);
+                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);

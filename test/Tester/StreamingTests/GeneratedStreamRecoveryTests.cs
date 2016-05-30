@@ -90,11 +90,11 @@ namespace UnitTests.StreamingTests
 
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-            Assert.Equal(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)
             {
-                Assert.Equal(true, result, "Control command result");
+                Assert.True(result, "Control command result");
             }
         }
     }
