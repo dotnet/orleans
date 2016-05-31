@@ -17,6 +17,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly List<SiloAddress> membershipRingList;
         private readonly HashSet<SiloAddress> membershipCache;
         private readonly AsynchAgent maintainer;
+        private readonly AsynchAgent globalSingleInstanceActivationMaintainer;
         private readonly TraceLogger log;
         private readonly SiloAddress seed;
         internal ISiloStatusOracle Membership;
@@ -38,6 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public RemoteGrainDirectory RemGrainDirectory { get; private set; }
         public RemoteGrainDirectory CacheValidator { get; private set; }
+        public ClusterGrainDirectory RemClusterGrainDirectory { get; private set; }
 
         private readonly TaskCompletionSource<bool> stopPreparationResolver;
         public Task StopPreparationCompletion { get { return stopPreparationResolver.Task; } }
@@ -95,6 +97,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             });
             maintainer = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(this, DirectoryCache);
+            globalSingleInstanceActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, silo.GlobalConfig);
 
             if (silo.GlobalConfig.SeedNodes.Count > 0)
             {
@@ -107,6 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             RemGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId);
+            RemClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, silo.ClusterId);
 
             // add myself to the list of members
             AddServer(MyAddress);
@@ -173,11 +177,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
+            log.Info("Start (SeverityLevel={0})", log.SeverityLevel);
             Running = true;
             if (maintainer != null)
             {
                 maintainer.Start();
             }
+            if (globalSingleInstanceActivationMaintainer != null)
+            {
+                globalSingleInstanceActivationMaintainer.Start();
+        }
         }
 
         // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised. 

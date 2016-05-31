@@ -19,6 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         RemoteGrainDirectory RemGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
+        ClusterGrainDirectory RemClusterGrainDirectory { get; }
         Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>

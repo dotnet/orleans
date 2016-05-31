@@ -1071,6 +1071,10 @@ namespace Orleans
         MultiClusterNetwork_LocalSubscriberException = MultiClusterNetworkBase + 4,
         MultiClusterNetwork_GossipCommunicationFailure = MultiClusterNetworkBase + 5,
         MultiClusterNetwork_NoChannelsConfigured = MultiClusterNetworkBase + 6,
+
+        GlobalSingleInstanceBase = Runtime + 4000,
+        GlobalSingleInstance_ProtocolError = GlobalSingleInstanceBase + 1,
+       
     }
 }
 // ReSharper restore InconsistentNaming

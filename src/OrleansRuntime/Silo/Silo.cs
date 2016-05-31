@@ -10,8 +10,9 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
+using Orleans.CodeGeneration;
+using Orleans.MultiCluster;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -29,7 +30,6 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
-using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
 {
@@ -176,7 +176,7 @@ namespace Orleans.Runtime
                 TraceLogger.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
-            MultiClusterRegistrationStrategy.Initialize();
+            MultiClusterRegistrationStrategy.Initialize(config.Globals);
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             
@@ -351,6 +351,9 @@ namespace Orleans.Runtime
             logger.Verbose("Creating {0} System Target", "RemGrainDirectory + CacheValidator");
             RegisterSystemTarget(LocalGrainDirectory.RemGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
+
+            logger.Verbose("Creating {0} System Target", "RemClusterGrainDirectory");
+            RegisterSystemTarget(LocalGrainDirectory.RemClusterGrainDirectory);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
             clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
@@ -944,10 +947,23 @@ namespace Orleans.Runtime
             {
                 ExecuteFastKillInProcessExit = false;
             }
- 
-            internal void InjectMultiClusterConfiguration(MultiClusterConfiguration config)
+
+            internal IDictionary<GrainId, IGrainInfo> GetDirectory()
             {
-                silo.LocalMultiClusterOracle.InjectMultiClusterConfiguration(config).Wait();
+                return silo.localGrainDirectory.DirectoryPartition.GetItems();
+            }
+          
+            internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypenamesContaining(string expr)
+            {
+                var x = new Dictionary<GrainId, IGrainInfo>();
+                foreach (var kvp in silo.localGrainDirectory.DirectoryPartition.GetItems())
+                {
+                    if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
+                        continue;// Skip system grains, system targets and clients
+                    if (silo.catalog.GetGrainTypeName(kvp.Key).Contains(expr))
+                        x.Add(kvp.Key, kvp.Value);
+                }
+                return x;
             }
 
             // store silos for which we simulate faulty communication

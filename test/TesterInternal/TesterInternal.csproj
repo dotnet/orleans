@@ -9,7 +9,7 @@
     <ProjectGuid>{09610024-F5B9-4065-9557-BD9E36A32421}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UnitTests</RootNamespace>
+    <RootNamespace>Tests</RootNamespace>
     <AssemblyName>TesterInternal</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -159,6 +159,7 @@
     <Compile Include="GeoClusterTests\AzureGossipTableTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
+    <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
     <Compile Include="GeoClusterTests\MultiClusterNetworkTests.cs" />
     <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
@@ -365,6 +366,7 @@
     <Content Include="..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
       <Link>ClientConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml">
       <Link>OrleansConfigurationForTesting.xml</Link>

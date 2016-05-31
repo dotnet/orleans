@@ -217,6 +217,7 @@
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
+    <Compile Include="GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs" />
     <Compile Include="StreamingTests\SMSClientStreamTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
