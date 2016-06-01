@@ -69,7 +69,7 @@ namespace Tests
 
 ```
 
-As you can see having `ClassCleanup()` is optional but it's good to have it around. 
+Make sure to add `async` to the generated test method for the test to be recognized by Visual Studio. As you can see having `ClassCleanup()` is optional but it's good to have it around. 
 Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.
 
 So writing tests for Orleans is not much different from a normal test project.
