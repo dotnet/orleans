@@ -5,11 +5,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.GrainDirectory;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Helper classes used to create local instances of grains.
+    /// Helper classe used to create local instances of grains.
     /// </summary>
     public class GrainCreator
     {
@@ -42,6 +43,32 @@ namespace Orleans.Runtime
             // Inject runtime hooks into grain instance
             grain.Runtime = _grainRuntime;
             grain.Identity = identity;
+
+            return grain;
+        }
+
+        /// <summary>
+        /// Create a new instance of a grain
+        /// </summary>
+        /// <param name="grainType"></param>
+        /// <param name="identity">Identity for the new grain</param>
+        /// <returns></returns>
+        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType,
+            IStorageProvider storageProvider)
+        {
+            //Create a new instance of the grain
+            var grain = CreateGrainInstance(grainType, identity);
+
+            var statefulGrain = grain as IStatefulGrain;
+
+            if (statefulGrain == null)
+                return grain;
+
+            var storage = new GrainStateStorageBridge(grainType.FullName, statefulGrain, storageProvider);
+
+            //Inject state and storage data into the grain
+            statefulGrain.GrainState.State = Activator.CreateInstance(stateType); ;
+            statefulGrain.SetStorage(storage);
 
             return grain;
         }

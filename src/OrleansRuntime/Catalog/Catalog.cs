@@ -632,33 +632,30 @@ namespace Orleans.Runtime
 
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
+            //Get the grain's type
             Type grainType = grainTypeData.Type;
 
-            //Create a new instance of the given grain type
-            var grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
-            grain.Data = data;
-
+            //Gets the type for the grain's state
             Type stateObjectType = grainTypeData.StateObjectType;
-            object state = null;
-            if (stateObjectType != null)
-            {
-                state = Activator.CreateInstance(stateObjectType);
-            }
             
             lock (data)
             {
-                data.SetGrainInstance(grain);
-                var statefulGrain = grain as IStatefulGrain;
-                if (statefulGrain != null)
+                Grain grain;
+
+                //Create a new instance of a stateless grain
+                if (stateObjectType == null)
                 {
-                    if (state != null)
-                    {
-                        SetupStorageProvider(data);
-                        statefulGrain.GrainState.State = state;
-                        statefulGrain.SetStorage(new GrainStateStorageBridge(data.GrainTypeName, statefulGrain,
-                            data.StorageProvider));
-                    }
+                    //Create a new instance of the given grain type
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
                 }
+                //Create a new instance of a stateful grain
+                else
+                {
+                    SetupStorageProvider(grainType, data);
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, data.StorageProvider);
+                }
+                grain.Data = data;
+                data.SetGrainInstance(grain);
             }
 
             activations.IncrementGrainCounter(grainClassName);
@@ -666,12 +663,12 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
 
-        private void SetupStorageProvider(ActivationData data)
+        private void SetupStorageProvider(Type grainType, ActivationData data)
         {
-            var grainTypeName = data.GrainInstanceType.FullName;
+            var grainTypeName = grainType.FullName;
 
             // Get the storage provider name, using the default if not specified.
-            var attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
+            var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
             var attr = attrs.FirstOrDefault() as StorageProviderAttribute;
             var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
 
