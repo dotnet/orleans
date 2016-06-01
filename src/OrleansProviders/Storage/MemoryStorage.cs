@@ -139,6 +139,7 @@ namespace Orleans.Storage
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
+            grainState.ETag = null;
         }
 
         #endregion

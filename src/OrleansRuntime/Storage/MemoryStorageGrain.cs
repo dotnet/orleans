@@ -132,7 +132,7 @@ namespace Orleans.Storage
                 {
                     if (receivedEtag != currentETag)
                     {
-                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag, receivedEtag);
+                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag ?? "null", receivedEtag);
                         logger.Warn(0, error);
                         throw new InconsistentStateException(error);
                     }
