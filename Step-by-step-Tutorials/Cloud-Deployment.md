@@ -11,7 +11,7 @@ In Azure, one or more worker roles will be used to host the Orleans silos, and a
 
 The same grain interfaces and implementation can run on both Windows Server and Windows Azure, so no special considerations are needed in order to be able to run your application in a Windows Azure hosting environment.
 
-The  [Azure Web Sample](https://orleans.codeplex.com/wikipage?title=Azure%20Web%20Sample&referringTitle=Cloud%20Deployment) sample app provides a working example of how to run a web application with supporting Orleans silo cluster backend in an Azure hosted service, and the details are described below.
+The  [Azure Web Sample](https://github.com/dotnet/orleans/tree/master/Samples/AzureWebSample) sample app provides a working example of how to run a web application with supporting Orleans silo cluster backend in an Azure hosted service, and the details are described below.
 
 ## Pre-requisites
 The following prerequisites are required:
