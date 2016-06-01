@@ -376,6 +376,11 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
+        public Task DoDelete()
+        {
+            return ClearStateAsync();
+        }
+
         [Serializable]
         public class NestedPersistenceTestGrainState
         {
