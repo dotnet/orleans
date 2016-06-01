@@ -82,7 +82,7 @@ namespace StorageProviders
 }
 ```
 
-The first thing we have to figure out is what data we need to provider through configuration. 
+The first thing we have to figure out is what data we need to provide through configuration. 
 The name is a required property, but we will also need the path to the root directory for our file store. 
 That is, in fact, the only piece of information we need, so we'll add a `RootDirectory` string property and edit the configuration file as in the previous section. 
 In doing so, it's critical to pay attention to the namespace and class name of the provider. 
