@@ -277,6 +277,20 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(2, val, "Value after Re-Read");
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        public async Task MemoryStore_Delete()
+        {
+            Guid id = Guid.NewGuid();
+            var grain = GrainClient.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
+            await grain.DoWrite(1);
+            await grain.DoDelete();
+            int val = await grain.GetValue(); // Should this throw instead?
+            Assert.AreEqual(0, val, "Value after Delete");
+            await grain.DoWrite(2);
+            val = await grain.GetValue();
+            Assert.AreEqual(2, val, "Value after Delete + New Write");
+        }
+
         [Fact, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Stress_Read()
         {
