@@ -11,6 +11,7 @@ namespace Orleans.Runtime
     internal class RuntimeStatisticsGroup
     {
         private static readonly TraceLogger logger = TraceLogger.GetLogger("RuntimeStatisticsGroup", TraceLogger.LoggerType.Runtime);
+        private const float KB = 1024f;
 
         private PerformanceCounter cpuCounterPF;
         private PerformanceCounter availableMemoryCounterPF;
@@ -57,7 +58,7 @@ namespace Orleans.Runtime
             get
             {
                 if (genSizesPF == null) return String.Empty;
-                return String.Format("gen0={0:0.00}, gen1={1:0.00}, gen2={2:0.00}", genSizesPF[0].NextValue() / 1024f, genSizesPF[1].NextValue() / 1024f, genSizesPF[2].NextValue() / 1024f);
+                return String.Format("gen0={0:0.00}, gen1={1:0.00}, gen2={2:0.00}", genSizesPF[0].NextValue() / KB, genSizesPF[1].NextValue() / KB, genSizesPF[2].NextValue() / KB);
             }
         }
 #endif
@@ -153,7 +154,7 @@ namespace Orleans.Runtime
             }
 
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage);
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (MemoryUsage + 1023) / 1024); // Round up
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB-1.0) / KB)); // Round up
 #if LOG_MEMORY_PERF_COUNTERS    // print GC stats in the silo log file.
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_GENCOLLECTIONCOUNT, () => GCGenCollectionCount);
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_GENSIZESKB, () => GCGenSizes);
@@ -163,28 +164,28 @@ namespace Orleans.Runtime
             }
             if (allocatedBytesPerSecPF != null)
             {
-                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_ALLOCATEDBYTESINKBPERSEC, () => allocatedBytesPerSecPF.NextValue() / 1024f);
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_ALLOCATEDBYTESINKBPERSEC, () => allocatedBytesPerSecPF.NextValue() / KB);
             }
             if (promotedMemoryFromGen1PF != null)
             {
-                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN1KB, () => promotedMemoryFromGen1PF.NextValue() / 1024f);
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN1KB, () => promotedMemoryFromGen1PF.NextValue() / KB);
             }
             if (largeObjectHeapSizePF != null)
             {
-                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSizePF.NextValue() / 11024f);
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSizePF.NextValue() / KB);
             }
             if (promotedFinalizationMemoryFromGen0PF != null)
             {
-                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0PF.NextValue() / 1024f);
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0PF.NextValue() / KB);
             }
             if (numberOfInducedGCsPF != null)
             {
                 FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_NUMBEROFINDUCEDGCS, () => numberOfInducedGCsPF.NextValue());
             }
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (TotalPhysicalMemory / 1024) / 1024);
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (long)((TotalPhysicalMemory / KB) / KB));
             if (availableMemoryCounterPF != null)
             {
-                IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (AvailableMemory/ 1024) / 1024); // Round up
+                IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (long)((AvailableMemory/ KB) / KB)); // Round up
             }
 #endif
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
