@@ -203,7 +203,10 @@ namespace Orleans.Runtime.Management
         private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
         {
             var silos = await GetHosts(true);
-            logger.Info("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+
+            if(logger.IsVerbose) {
+                logger.Verbose("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+            }
 
             var actionPromises = new List<Task<object>>();
             foreach (SiloAddress siloAddress in silos.Keys.ToArray())
