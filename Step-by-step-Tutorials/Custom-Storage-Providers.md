@@ -41,7 +41,6 @@ using Orleans.Runtime;
 using Newtonsoft.Json;
 using Orleans.Serialization;
 
-
 namespace StorageProviders
 {
     public class FileStorageProvider : IStorageProvider
