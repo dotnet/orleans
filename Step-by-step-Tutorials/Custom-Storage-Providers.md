@@ -25,7 +25,7 @@ Once the project is created, let's also rename the file _Class1.cs_ to _FileStor
 That should also prompt VS to rename the class we find inside. 
 Next, we must add references to [Microsoft.Orleans.Core NuGet package](https://www.nuget.org/packages/Microsoft.Orleans.Core/).
 
-Assuming, of course, that your project is called `StorageProviders`, make you silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.
+Assuming, of course, that your project is called `StorageProviders`, make your silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.
 
 Our storage provider should implement the interface `Orleans.Storage.IStorageProvider`. 
 With a little bit of massaging of the code, it should look something like this:
@@ -38,11 +38,15 @@ using System.Collections.Generic;
 using Orleans;
 using Orleans.Storage;
 using Orleans.Runtime;
+using Newtonsoft.Json;
+using Orleans.Serialization;
 
 namespace StorageProviders
 {
     public class FileStorageProvider : IStorageProvider
     {
+        private JsonSerializerSettings _jsonSettings;
+
         public Logger Log { get; set; }
 
         public string Name { get; set; }
@@ -108,6 +112,8 @@ public Task Init(string name,
                  Orleans.Providers.IProviderRuntime providerRuntime,
                  Orleans.Providers.IProviderConfiguration config)
 {
+     _jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+
     this.Name = name;
     if (string.IsNullOrWhiteSpace(config.Properties["RootDirectory"]))
         throw new ArgumentException("RootDirectory property not set");
@@ -148,18 +154,13 @@ if (!fileInfo.Exists)
 We also need to decide how the data will be stored. 
 To make it easy to inspect the data outside of the application, we're going to use JSON. 
 A more space-conscious design may use a binary serialization format, instead, it's entirely a choice of the provider designer's. 
-The JSON serializer is found in the `System.Web.Extensions` assembly, which you now need to add to the project's references. 
-Also, add a using clause to the top of the file: `using System.Web.Script.Serialization;`
 
 ``` csharp
 using (var stream = fileInfo.OpenText())
 {
     var storedData = await stream.ReadToEndAsync();
 
-    JavaScriptSerializer deserializer = new JavaScriptSerializer();
-    object data = deserializer.Deserialize(storedData, grainState.GetType());
-    var dict = ((GrainState)data).AsDictionary();
-    ((GrainState)grainState.State).SetAll(dict);
+    grainState.State = JsonConvert.DeserializeObject(storeData, grainState.State.GetType(), _jsonSettings);
 } 
 ```
 
@@ -170,9 +171,7 @@ The format decisions have already been made, so coding up the `WriteStateAsync` 
 ``` csharp
 public async Task WriteStateAsync(string grainType, GrainReference grainRef, IGrainState grainState)
 {
-    IDictionary<string, object> dataValues = ((GrainState)grainState.State).AsDictionary();
-    JavaScriptSerializer serializer = new JavaScriptSerializer();
-    var storedData = serializer.Serialize(dataValues);
+    var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
 
     var collectionName = grainState.GetType().Name;
     var key = grainRef.ToKeyString();
