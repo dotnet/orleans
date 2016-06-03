@@ -53,8 +53,8 @@ static void Main(string[] args)
         AppDomainInitializerArguments = args,
     });
 
-    // Orleans comes with a rich XML configuration but we're just going to setup a basic config
-    var config = new Orleans.Runtime.Configuration.ClientConfiguration();
+    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
     GrainClient.Initialize(config);
 
     // TODO: once the previous call returns, the silo is up and running.

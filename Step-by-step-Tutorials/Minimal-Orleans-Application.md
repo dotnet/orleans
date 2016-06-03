@@ -170,11 +170,9 @@ class Program
 
     static void DoSomeClientWork()
     {
-        // Orleans comes with a rich XML configuration but we're just going to setup a basic config
-        var clientconfig = new Orleans.Runtime.Configuration.ClientConfiguration();
-        clientconfig.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000));
-
-        GrainClient.Initialize(clientconfig);
+        // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+        var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+        GrainClient.Initialize(config);
 
         var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
         var result = friend.SayHello("Goodbye").Result;

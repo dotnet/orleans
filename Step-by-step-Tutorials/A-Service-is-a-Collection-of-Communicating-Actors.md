@@ -124,9 +124,8 @@ The role of `OnActivateAsync()` will be explained later on; for now, you may con
 In the client _(Program.cs)_, we can add a few lines to create a couple of employees and their manager:
 
 ``` csharp
-// Orleans comes with a rich XML configuration but we're just going to setup a basic config
-var config = new Orleans.Runtime.Configuration.ClientConfiguration();
-config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000));
+// Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
 GrainClient.Initialize(config);
 
 var grainFactory = GrainClient.GrainFactory;

@@ -30,9 +30,9 @@ static void Main(string[] args)
     Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
     Console.ReadLine();
 
-    // Orleans comes with a rich XML configuration but we're just going to setup a basic config
-    var config = new Orleans.Runtime.Configuration.ClientConfiguration();
-    config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000));
+    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+    GrainClient.Initialize(config);
 
     GrainClient.Initialize(config);
 }
