@@ -41,6 +41,7 @@ using Orleans.Runtime;
 using Newtonsoft.Json;
 using Orleans.Serialization;
 
+
 namespace StorageProviders
 {
     public class FileStorageProvider : IStorageProvider
@@ -160,7 +161,7 @@ using (var stream = fileInfo.OpenText())
 {
     var storedData = await stream.ReadToEndAsync();
 
-    grainState.State = JsonConvert.DeserializeObject(storeData, grainState.State.GetType(), _jsonSettings);
+    grainState.State = JsonConvert.DeserializeObject(storedData, grainState.State.GetType(), _jsonSettings);
 } 
 ```
 
