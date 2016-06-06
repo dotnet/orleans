@@ -53,7 +53,9 @@ static void Main(string[] args)
         AppDomainInitializerArguments = args,
     });
 
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
+    GrainClient.Initialize(config);
 
     // TODO: once the previous call returns, the silo is up and running.
     //       This is the place your custom logic, for example calling client logic

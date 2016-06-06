@@ -116,7 +116,7 @@ public class ManagerState : GrainState
 }
 ```
 
-Then, we change the grain class declaration to identify the state interface and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class.
+Then, we change the grain class declaration to identify the state interface (e.g., from `Orleans.Grain` to `Orleans.Grain<EmployeeState>`) and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class.
 
  We also add an attribute to identify the storage provider:
 
@@ -179,6 +179,10 @@ It should look like this:
 ``` csharp
 public async Task AddDirectReport(IEmployee employee)
 {
+    if (State.Reports == null)
+    {
+        State.Reports = new List<IEmployee>();
+    }
     State.Reports.Add(employee);
     await employee.SetManager(this);
     var data = await employee.Greeting(

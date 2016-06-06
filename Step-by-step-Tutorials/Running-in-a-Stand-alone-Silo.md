@@ -30,11 +30,15 @@ static void Main(string[] args)
     Console.WriteLine("Waiting for Orleans Silo to start. Press Enter to proceed...");
     Console.ReadLine();
 
-    Orleans.GrainClient.Initialize("ClientConfiguration.xml");
+    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+    GrainClient.Initialize(config);
+
+    GrainClient.Initialize(config);
 }
 ```
 
-Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the OrleansConfiguration.xml file added to the collection project by Microsoft.Orleans.Server to match the gateway port specified in DevTestClientConfiguration.xml. Open OrleansConfiguration.xml, find the `ProxyingGateway` element inside its Defaults section, and change it to.
+Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the OrleansConfiguration.xml file added to the collection project by Microsoft.Orleans.Server to match the programmatically defined `config` object, which is `30000`. if OrleansConfiguration.xml does not exist, you can create one using the instruction in [Minimal Orleans Application tutorial](Minimal-Orleans-Application#host--orleansconfigurationxml). Then, open OrleansConfiguration.xml, find the `ProxyingGateway` element inside its Defaults section, and change it to.
 
 ```xml
 <ProxyingGateway Address="localhost" Port="30000" />

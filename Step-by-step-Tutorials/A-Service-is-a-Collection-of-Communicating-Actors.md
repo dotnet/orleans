@@ -124,7 +124,9 @@ The role of `OnActivateAsync()` will be explained later on; for now, you may con
 In the client _(Program.cs)_, we can add a few lines to create a couple of employees and their manager:
 
 ``` csharp
-Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+// Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
+GrainClient.Initialize(config);
 
 var grainFactory = GrainClient.GrainFactory;
 var e0 = grainFactory.GetGrain<IEmployee>(Guid.NewGuid());
@@ -199,8 +201,7 @@ Executing it, you should see something like this:
 
 ![](../Images/Multiple Actors1.PNG)
 
-The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise.
-
+The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise. If you want to do this exercise, please keep the rule for always using asynchronous code inside grains. The Result of a Task will block execution if the task hasn’t completed. This should be avoided in Orleans grains; tasks should always be awaited before Result is read.
 
 `TaskDone.Done`, used in the code above, is a convenience object defined by Orleans to allow code to succinctly return an already completed `Task`.
 
