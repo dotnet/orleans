@@ -4,6 +4,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Threading.Tasks;
+using System.Web.UI;
+using Microsoft.Data.Edm.Library.Expressions;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Microsoft.WindowsAzure.Storage.Table.Queryable;
@@ -114,6 +116,30 @@ namespace Orleans.AzureUtils
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+        /// <summary>
+        /// Deletes all entities the Azure table.
+        /// </summary>
+        /// <returns>Completion promise for this operation.</returns>
+        public async Task ClearTableAsync()
+        {
+            IEnumerable<Tuple<T,string>> items = (await ReadAllTableEntriesAsync()).ToList();
+            List <Tuple<T,string>> batch = new List<Tuple<T, string>>(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
+            foreach (Tuple<T, string> item in items)
+            {
+                batch.Add(item);
+                // delete and clear when we have a full batch
+                if (batch.Count == AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+                {
+                    await DeleteTableEntriesAsync(batch);
+                    batch.Clear();
+                }
+            }
+            if (batch.Count != 0)
+            {
+                await DeleteTableEntriesAsync(batch);
             }
         }
 

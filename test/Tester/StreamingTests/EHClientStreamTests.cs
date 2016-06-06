@@ -57,7 +57,7 @@ namespace Tester.StreamingTests
             base.Dispose();
             var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
             dataManager.InitTableAsync().Wait();
-            dataManager.DeleteTableAsync().Wait();
+            dataManager.ClearTableAsync().Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 

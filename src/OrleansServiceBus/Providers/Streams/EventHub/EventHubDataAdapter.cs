@@ -32,14 +32,12 @@ namespace Orleans.ServiceBus.Providers
         {
             int readOffset = 0;
             StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset));
+            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
             SequenceNumber = cachedMessage.SequenceNumber;
             EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
             DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
             Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties();
             object offsetObj;
-            Offset = Properties.TryGetValue("Offset", out offsetObj)
-                ? offsetObj as string
-                : default(string);
             PartitionKey = Properties.TryGetValue("PartitionKey", out offsetObj)
                 ? offsetObj as string
                 : default(string);
@@ -175,6 +173,7 @@ namespace Orleans.ServiceBus.Providers
             byte[] payload = queueMessage.GetBytes();
             // get size of namespace, offset, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
             SegmentBuilder.CalculateAppendSize(propertiesBytes) +
             SegmentBuilder.CalculateAppendSize(payload);
 
@@ -184,6 +183,7 @@ namespace Orleans.ServiceBus.Providers
             // encode namespace, offset, properties and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);
 
