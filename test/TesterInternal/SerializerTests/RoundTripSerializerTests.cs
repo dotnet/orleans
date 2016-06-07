@@ -1,5 +1,4 @@
-﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans;
+﻿using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -13,7 +12,7 @@ namespace UnitTests.SerializerTests
         {
             var grain = GrainClient.GrainFactory.GetGrain<IEnumResultGrain>(GetRandomGrainId());
             CampaignEnemyTestType result = grain.GetEnemyType().Result;
-            Assert.AreEqual(CampaignEnemyTestType.Enemy2, result, "Enum return value wasn't transmitted properly");
+            Assert.Equal(CampaignEnemyTestType.Enemy2, result); //Enum return value wasn't transmitted properly
         }
     }
 }

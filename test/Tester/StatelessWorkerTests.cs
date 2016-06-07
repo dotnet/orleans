@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -37,7 +36,7 @@ namespace UnitTests.General
 
             stopwatch.Stop();
 
-            //Assert.IsTrue(stopwatch.Elapsed > TimeSpan.FromSeconds(19.5), "50 requests with a 2 second processing time shouldn't take less than 20 seconds on 10 activations. But it took " + stopwatch.Elapsed);
+            //Assert.True(stopwatch.Elapsed > TimeSpan.FromSeconds(19.5), "50 requests with a 2 second processing time shouldn't take less than 20 seconds on 10 activations. But it took " + stopwatch.Elapsed);
 
             promises.Clear();
             for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
@@ -60,7 +59,7 @@ namespace UnitTests.General
                     logger.Info("\t{0}: {1} - {2}", count++, TraceLogger.PrintDate(call.Item1), TraceLogger.PrintDate(call.Item2));
             }
 
-            Assert.IsTrue(activations.Count <= ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);
+            Assert.True(activations.Count <= ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);
         }
     }
 }

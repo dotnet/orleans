@@ -14,7 +14,6 @@ using Orleans.TestingHost.Utils;
 using TestGrainInterfaces;
 using TestGrains;
 using Tester;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using UnitTests.Grains;
 using UnitTests.Tester;
@@ -82,11 +81,11 @@ namespace UnitTests.StreamingTests
 
                 var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
                 object[] results = await mgmt.SendControlCommandToProvider(Fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-                Assert.AreEqual(2, results.Length, "expected responses");
+                Assert.Equal(2, results.Length, "expected responses");
                 bool[] bResults = results.Cast<bool>().ToArray();
                 foreach (var result in bResults)
                 {
-                    Assert.AreEqual(true, result, "Control command result");
+                    Assert.Equal(true, result, "Control command result");
                 }
 
                 await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(generatorConfig, assertIsTrue), Timeout);
@@ -106,10 +105,10 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.AreEqual(Fixture.AdapterConfig.TotalQueueCount, report.Count, "Stream count");
+                Assert.Equal(Fixture.AdapterConfig.TotalQueueCount, report.Count, "Stream count");
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.AreEqual(generatorConfig.EventsInStream, eventsPerStream, "Events per stream");
+                    Assert.Equal(generatorConfig.EventsInStream, eventsPerStream, "Events per stream");
                 }
             }
             else if (Fixture.AdapterConfig.TotalQueueCount != report.Count ||
