@@ -57,7 +57,7 @@ namespace UnitTests.StreamingTests
                 base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
-                dataManager.DeleteTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
             }
 
             private static Dictionary<string, string> BuildProviderSettings()

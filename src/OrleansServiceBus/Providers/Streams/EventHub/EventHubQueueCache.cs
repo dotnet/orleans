@@ -127,6 +127,7 @@ namespace Orleans.ServiceBus.Providers
 
         protected override string GetOffset(CachedEventHubMessage lastItemPurged)
         {
+            // TODO figure out how to get this from the adapter
             int readOffset = 0;
             SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read namespace, not needed so throw away.
             return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset

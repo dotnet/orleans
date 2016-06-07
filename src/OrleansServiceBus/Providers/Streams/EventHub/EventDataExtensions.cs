@@ -1,6 +1,7 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Serialization;
 
@@ -12,6 +13,7 @@ namespace Orleans.ServiceBus.Providers
     public static class EventDataExtensions
     {
         public const string EventDataPropertyStreamNamespaceKey = "StreamNamespace";
+        private static readonly string[] SkipProperties = { nameof(EventData.Offset), nameof(EventData.SequenceNumber), nameof(EventData.EnqueuedTimeUtc), EventDataPropertyStreamNamespaceKey };
 
         public static void SetStreamNamespaceProperty(this EventData eventData, string streamNamespace)
         {
@@ -31,14 +33,14 @@ namespace Orleans.ServiceBus.Providers
         public static byte[] SerializeProperties(this IDictionary<string, object> properties)
         {
             var writeStream = new BinaryTokenStreamWriter();
-            SerializationManager.Serialize(properties, writeStream);
+            SerializationManager.Serialize(properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
             return writeStream.ToByteArray();
         }
 
         public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes)
         {
             var stream = new BinaryTokenStreamReader(bytes);
-            return SerializationManager.Deserialize<IDictionary<string, object>>(stream);
+            return SerializationManager.Deserialize<List<KeyValuePair<string, object>>>(stream).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
     }
 }
