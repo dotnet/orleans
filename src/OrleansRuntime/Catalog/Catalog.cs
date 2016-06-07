@@ -135,6 +135,7 @@ namespace Orleans.Runtime
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
         private readonly IGrainRuntime grainRuntime;
+        private readonly GrainCreator grainCreator;
 
         internal Catalog(
             GrainId grainId, 
@@ -158,6 +159,9 @@ namespace Orleans.Runtime
             this.grainRuntime = grainRuntime;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
+
+            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
+            grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
 
             logger = TraceLogger.GetLogger("Catalog", TraceLogger.LoggerType.Runtime);
             this.config = config.Globals;
@@ -385,6 +389,7 @@ namespace Orleans.Runtime
         /// <param name="newPlacement">Creation of new activation was requested by the placement director.</param>
         /// <param name="grainType">The type of grain to be activated or created</param>
         /// <param name="genericArguments">Specific generic type of grain to be activated or created</param>
+        /// <param name="requestContextData">Request context data.</param>
         /// <param name="activatedPromise"></param>
         /// <returns></returns>
         public ActivationData GetOrCreateActivation(
@@ -627,40 +632,30 @@ namespace Orleans.Runtime
 
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
+            //Get the grain's type
             Type grainType = grainTypeData.Type;
 
-            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
-            var services = Runtime.Silo.CurrentSilo.Services;
-            var grain = services != null
-                ? (Grain) services.GetService(grainType)
-                : (Grain) Activator.CreateInstance(grainType);
-
-            // Inject runtime hooks into grain instance
-            grain.Runtime = grainRuntime;
-            grain.Data = data;
-
+            //Gets the type for the grain's state
             Type stateObjectType = grainTypeData.StateObjectType;
-            object state = null;
-            if (stateObjectType != null)
-            {
-                state = Activator.CreateInstance(stateObjectType);
-            }
             
             lock (data)
             {
-                grain.Identity = data.Identity;
-                data.SetGrainInstance(grain);
-                var statefulGrain = grain as IStatefulGrain;
-                if (statefulGrain != null)
+                Grain grain;
+
+                //Create a new instance of a stateless grain
+                if (stateObjectType == null)
                 {
-                    if (state != null)
-                    {
-                        SetupStorageProvider(data);
-                        statefulGrain.GrainState.State = state;
-                        statefulGrain.SetStorage(new GrainStateStorageBridge(data.GrainTypeName, statefulGrain,
-                            data.StorageProvider));
-                    }
+                    //Create a new instance of the given grain type
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
                 }
+                //Create a new instance of a stateful grain
+                else
+                {
+                    SetupStorageProvider(grainType, data);
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, data.StorageProvider);
+                }
+                grain.Data = data;
+                data.SetGrainInstance(grain);
             }
 
             activations.IncrementGrainCounter(grainClassName);
@@ -668,12 +663,12 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
 
-        private void SetupStorageProvider(ActivationData data)
+        private void SetupStorageProvider(Type grainType, ActivationData data)
         {
-            var grainTypeName = data.GrainInstanceType.FullName;
+            var grainTypeName = grainType.FullName;
 
             // Get the storage provider name, using the default if not specified.
-            var attrs = data.GrainInstanceType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
+            var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
             var attr = attrs.FirstOrDefault() as StorageProviderAttribute;
             var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
 
@@ -1194,6 +1189,7 @@ namespace Orleans.Runtime
         /// Invoke the activate method on a newly created activation
         /// </summary>
         /// <param name="activation"></param>
+        /// <param name="requestContextData"></param>
         /// <returns></returns>
         private Task InvokeActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {

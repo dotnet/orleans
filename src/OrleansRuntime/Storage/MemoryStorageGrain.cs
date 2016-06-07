@@ -8,10 +8,9 @@ namespace Orleans.Storage
 {
 
     /// <summary>
-    /// Implementaiton class for the Storage Grain used by In-memory Storage Provider
+    /// Implementaiton class for the Storage Grain used by In-memory storage provider
+    /// <c>Orleans.Storage.MemoryStorage</c>
     /// </summary>
-    /// <seealso cref="MemoryStorage"/>
-    /// <seealso cref="IMemoryStorageGrain"/>
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
         private IDictionary<string, GrainStateStore> grainStore;
@@ -37,7 +36,7 @@ namespace Orleans.Storage
         {
             if (logger.IsVerbose) logger.Verbose("ReadStateAsync for {0} grain: {1}", stateStore, grainStoreKey);
             GrainStateStore storage = GetStoreForGrain(stateStore);
-            var grainState = storage.GetGrainState(grainStoreKey);;
+            var grainState = storage.GetGrainState(grainStoreKey);
             return Task.FromResult(grainState);
         }
         
@@ -71,7 +70,7 @@ namespace Orleans.Storage
 
         private class GrainStateStore
         {
-            private Logger logger;
+            private readonly Logger logger;
             public GrainStateStore(Logger logger)
             {
                 this.logger = logger;
@@ -124,16 +123,16 @@ namespace Orleans.Storage
                 {
                     if (currentETag != null)
                     {
-                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = null", operation, grainStoreKey, currentETag.ToString());
+                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = null", operation, grainStoreKey, currentETag);
                         logger.Warn(0, error);
                         throw new InconsistentStateException(error);
                     }
                 }
                 else // non first write
                 {
-                    if (receivedEtag != currentETag.ToString())
+                    if (receivedEtag != currentETag)
                     {
-                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag.ToString(), receivedEtag);
+                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag ?? "null", receivedEtag);
                         logger.Warn(0, error);
                         throw new InconsistentStateException(error);
                     }

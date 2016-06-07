@@ -384,7 +384,8 @@ namespace Orleans.Runtime
                     }
                     else
                     {
-                        // The call is not intercepted.
+						// The call is not intercepted.
+                        // TODO: this await here is just grabbing the first exception of the AggregateException. As a framework we shouldn't do that.
                         resultObject = await invoker.Invoke(target, request);
                     }
                 }

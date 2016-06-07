@@ -23,6 +23,7 @@
     </dependencies>
   </metadata>
   <files>
+    <file src="OrleansCodeGenerator.XML" target="lib\net451" />
     <file src="OrleansCodeGenerator.dll" target="lib\net451" />
     <file src="$SRC_DIR$OrleansCodeGenerator\**\*.cs" target="src" />
   </files>

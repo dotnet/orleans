@@ -7,19 +7,12 @@ using Orleans.Runtime;
 namespace Orleans
 {
     /// <summary>
-    /// Utility functions for dealing with Task's.
+    /// Utility functions for dealing with Tasks.
     /// </summary>
-    public static class PublicOrleansTaskExtentions
+    public static class PublicOrleansTaskExtensions
     {
-        private static readonly Task<object> CanceledTask;
-        private static readonly Task<object> CompletedTask = Task.FromResult(default(object));
-
-        static PublicOrleansTaskExtentions()
-        {
-            var completion = new TaskCompletionSource<object>();
-            completion.SetCanceled();
-            CanceledTask = completion.Task;
-        }
+        internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
+        internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
 
         /// <summary>
         /// Observes and ignores a potential exception on a given Task.
@@ -48,12 +41,7 @@ namespace Orleans
         /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
         /// </summary>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <param name="task">The task.</param>
         public static Task<object> Box(this Task task)
         {
             switch (task.Status)
@@ -62,14 +50,10 @@ namespace Orleans
                     return CompletedTask;
 
                 case TaskStatus.Faulted:
-                    {
-                        return TaskFromFaulted(task);
-                    }
+                    return TaskFromFaulted(task);
 
                 case TaskStatus.Canceled:
-                    {
-                        return CanceledTask;
-                    }
+                    return CanceledTask;
 
                 default:
                     return BoxAwait(task);
@@ -79,31 +63,23 @@ namespace Orleans
         /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
         /// </summary>
-        /// <typeparam name="T">
-        /// The underlying type of <paramref name="task"/>.
-        /// </typeparam>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
+        /// <param name="task">The task.</param>
         public static Task<object> Box<T>(this Task<T> task)
         {
+            if (typeof(T) == typeof(object))
+                return task as Task<object>;
+
             switch (task.Status)
             {
                 case TaskStatus.RanToCompletion:
                     return Task.FromResult((object)task.GetResult());
 
                 case TaskStatus.Faulted:
-                    {
-                        return TaskFromFaulted(task);
-                    }
+                    return TaskFromFaulted(task);
 
                 case TaskStatus.Canceled:
-                    {
-                        return CanceledTask;
-                    }
+                    return CanceledTask;
 
                 default:
                     return BoxAwait(task);
@@ -111,17 +87,36 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
+        /// <param name="task">The task.</param>
+        public static Task<T> Unbox<T>(this Task<object> task)
+        {
+            if (typeof(T) == typeof(object))
+                return task as Task<T>;
+
+            switch (task.Status)
+            {
+                case TaskStatus.RanToCompletion:
+                    return Task.FromResult((T)task.GetResult());
+
+                case TaskStatus.Faulted:
+                    return TaskFromFaulted<T>(task);
+
+                case TaskStatus.Canceled:
+                    return TaskFromCanceled<T>();
+
+                default:
+                    return UnboxContinuation<T>(task);
+            }
+        }
+
+        /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{Object}"/>.
         /// </summary>
-        /// <typeparam name="object">
-        /// The underlying type of <paramref name="task"/>.
-        /// </typeparam>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <typeparam name="object">The underlying type of <paramref name="task"/>.</typeparam>
+        /// <param name="task">The task.</param>
         public static Task<object> Box(this Task<object> task)
         {
             return task;
@@ -138,10 +133,29 @@ namespace Orleans
             return await task;
         }
 
+        private static Task<T> UnboxContinuation<T>(Task<object> task)
+        {
+            return task.ContinueWith(t => t.Unbox<T>()).Unwrap();
+        }
+
         private static Task<object> TaskFromFaulted(Task task)
         {
             var completion = new TaskCompletionSource<object>();
             completion.SetException(task.Exception.InnerExceptions);
+            return completion.Task;
+        }
+
+        private static Task<T> TaskFromFaulted<T>(Task task)
+        {
+            var completion = new TaskCompletionSource<T> ();
+            completion.SetException(task.Exception.InnerExceptions);
+            return completion.Task;
+        }
+
+        private static Task<T> TaskFromCanceled<T>()
+        {
+            var completion = new TaskCompletionSource<T>();
+            completion.SetCanceled();
             return completion.Task;
         }
     }
@@ -289,7 +303,7 @@ namespace Orleans
             }
             else if (task.IsFaulted)
             {
-                resolver.TrySetException(task.Exception);
+                resolver.TrySetException(task.Exception.InnerExceptions);
             }
             else if (task.IsCanceled)
             {

@@ -38,7 +38,5 @@
     <file src="Microsoft.CodeAnalysis.dll" target="tools" />
     <file src="System.Reflection.Metadata.dll" target="tools" />
     <file src="System.Collections.Immutable.dll" target="tools" />
-
-    <file src="EmptyFile.cs" target="content\Properties\orleans.codegen.cs" />
   </files>
 </package>

@@ -41,7 +41,23 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     </Otherwise>
   </Choose>
 
-    <!-- This target is run just before Clean for any Orleans project -->
+  <!-- include the codegen file in the project if it isn't there already -->
+  <Target Name="OrleansCodeGenerationFileInclude"
+          BeforeTargets="BeforeBuild">
+
+    <FindInList
+      List="@(Compile)"
+      ItemSpecToFind="Properties\orleans.codegen.cs"
+      CaseSensitive="false">
+      <Output TaskParameter="ItemFound" ItemName="CodegenCsAlreadyDefined"/>
+    </FindInList>
+
+    <ItemGroup Condition="'@(CodegenCsAlreadyDefined)'==''">
+      <Compile Include="Properties\orleans.codegen.cs" />
+    </ItemGroup>
+  </Target>
+
+  <!-- This target is run just before Clean for any Orleans project -->
   <Target Name="OrleansCodeGenerationClean"
           BeforeTargets="Clean"
           Condition="'$(OrleansCodeGenPrecompile)'!='true'"

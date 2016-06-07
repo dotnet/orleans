@@ -35,6 +35,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetValue();
         Task DoWrite(int val);
         Task<int> DoRead();
+        Task DoDelete();
     }
 
     public interface IAzureStorageTestGrain : IGrainWithGuidKey
