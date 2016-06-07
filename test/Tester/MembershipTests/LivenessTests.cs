@@ -196,25 +196,25 @@ namespace UnitTests.MembershipTests
             return new TestCluster(options);
         }
 
-        //[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_2_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_3_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -239,6 +239,8 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
@@ -248,7 +250,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
@@ -266,7 +268,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(2);
         }
 
-        // [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -284,10 +286,12 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
-        [Fact,  TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
             await Do_Liveness_OracleTest_1();
@@ -330,6 +334,8 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
@@ -377,6 +383,8 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
