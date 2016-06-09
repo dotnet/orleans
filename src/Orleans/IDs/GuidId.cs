@@ -69,7 +69,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return this.Guid.ToString().Substring(0, 8);
+            return this.Guid.ToString();
         }
 
         internal string ToDetailedString()
