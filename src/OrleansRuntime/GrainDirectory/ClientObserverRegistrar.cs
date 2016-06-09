@@ -117,16 +117,8 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                int actualExceptions = 1;
-                if (exc is AggregateException)
-                {
-                    AggregateException aggregateException = exc as AggregateException;
-                    actualExceptions = aggregateException.InnerExceptions.Count;
-                    exc = aggregateException.InnerExceptions.First();
-                }
                 logger.Error(ErrorCode.ClientRegistrarTimerFailed, 
-                    String.Format("OnClientRefreshTimer has thrown {0} inner exceptions. Printing the first exception:", actualExceptions), 
-                    exc);
+                    String.Format("OnClientRefreshTimer has thrown an exception."), exc);
             }
         }
 
