@@ -341,7 +341,7 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalGrainDirectory, LocalScheduler, OrleansConfig);
             RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
@@ -551,10 +551,6 @@ namespace Orleans.Runtime
                     mc.StartGateway(clientRegistrar);
                 }
                 if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
-
-                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
 
                 SystemStatus.Current = SystemStatus.Running;
             }

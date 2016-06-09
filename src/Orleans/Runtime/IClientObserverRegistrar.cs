@@ -12,9 +12,5 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface IClientObserverRegistrar : ISystemTarget
     {
-        /// <summary>
-        /// Start this system target.
-        /// </summary>
-        Task Start();
     }
 }
