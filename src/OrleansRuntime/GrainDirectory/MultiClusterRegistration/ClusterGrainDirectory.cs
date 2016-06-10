@@ -170,18 +170,22 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<RemoteClusterActivationResponse[]> ProcessActivationRequestBatch(GrainId[] grains, string sendingClusterId)
         {
-            var responses = new RemoteClusterActivationResponse[grains.Length];
+            var tasks = grains.Select(g => ProcessActivationRequest(g, sendingClusterId)).ToList();
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception)
+            {
+                // Exceptions will be observed and returned in the response
+            }
 
-            var collectDoubtfuls = grains
-                .Select(async (g,i) =>
-                {
-                    var response = await ProcessActivationRequest(g, sendingClusterId);
-                    if (response == null)
-                        response = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted);
-                    responses[i] = response;
-                }).ToList();
+            var responses = tasks.Select(responseTask =>
+                responseTask.Exception == null
+                    ? responseTask.Result
+                    : new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted) { ResponseException = responseTask.Exception })
+                .ToArray();
 
-            await Task.WhenAll(collectDoubtfuls);
             return responses;
         }
     }
