@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -19,7 +20,13 @@ namespace Orleans.SystemTargetInterfaces
     [Serializable]
     internal class RemoteClusterActivationResponse
     {
-        public ActivationResponseStatus ResponseStatus { get; set; }
+        public static readonly RemoteClusterActivationResponse Pass = new RemoteClusterActivationResponse(ActivationResponseStatus.Pass);
+
+        public RemoteClusterActivationResponse(ActivationResponseStatus responseStatus)
+        {
+            this.ResponseStatus = responseStatus;
+        }
+        public ActivationResponseStatus ResponseStatus { get; private set; }
         public AddressAndTag ExistingActivationAddress { get; set; }
         public string ClusterId { get; set; }
         public bool Owned { get; set; }

@@ -227,9 +227,8 @@ namespace Orleans.Runtime.GrainDirectory
             }
             catch (Exception ex)
             {
-                responses[index] = new RemoteClusterActivationResponse
+                responses[index] = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
                 {
-                    ResponseStatus = ActivationResponseStatus.Faulted,
                     ResponseException = ex
                 };
 

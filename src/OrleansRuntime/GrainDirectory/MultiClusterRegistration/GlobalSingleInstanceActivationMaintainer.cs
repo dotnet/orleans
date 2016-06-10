@@ -189,9 +189,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     batchResponses.Add(
                         Enumerable.Repeat<RemoteClusterActivationResponse>(
-                           new RemoteClusterActivationResponse()
+                           new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
                            {
-                               ResponseStatus = ActivationResponseStatus.Faulted,
                                ResponseException = e
                            }, addresses.Count).ToArray());
                 }

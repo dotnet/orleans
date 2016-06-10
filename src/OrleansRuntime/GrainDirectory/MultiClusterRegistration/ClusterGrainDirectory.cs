@@ -12,6 +12,9 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly string clusterId;
         private readonly Logger logger;
 
+        // given that this is the most likely return value, pre-cache it
+        private readonly Task<RemoteClusterActivationResponse> cachedPassTask = Task.FromResult(RemoteClusterActivationResponse.Pass);
+
         public ClusterGrainDirectory(LocalGrainDirectory r, GrainId grainId, string clusterId) : base(grainId, r.MyAddress)
         {
             this.router = r;
@@ -28,7 +31,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public async Task<RemoteClusterActivationResponse> ProcessActivationRequest(GrainId grain, string requestClusterId, bool withRetry = true)
+        public Task<RemoteClusterActivationResponse> ProcessActivationRequest(GrainId grain, string requestClusterId, bool withRetry = true)
         {
             // check if the requesting cluster id is in the current configuration view of this cluster
             // if not, reject the message.
@@ -38,14 +41,17 @@ namespace Orleans.Runtime.GrainDirectory
                 if (logger.IsVerbose)
                     logger.Verbose("GSIP:D {0} From={1} Result={2}", grain.ToString(), requestClusterId, "FAILED not in config");
 
-                return new RemoteClusterActivationResponse { ResponseStatus = ActivationResponseStatus.Failed };
+                return Task.FromResult(new RemoteClusterActivationResponse(ActivationResponseStatus.Failed));
             }
 
             var forwardAddress = router.CheckIfShouldForward(grain, 0, "ProcessActivationRequest");
 
             if (forwardAddress == null)
             {
-                return await ProcessRequestLocal(grain, requestClusterId);
+                var response = ProcessRequestLocal(grain, requestClusterId);
+                return response == RemoteClusterActivationResponse.Pass 
+                    ? cachedPassTask
+                    : Task.FromResult(ProcessRequestLocal(grain, requestClusterId));
             }
             else
             {
@@ -53,13 +59,13 @@ namespace Orleans.Runtime.GrainDirectory
                     logger.Verbose("GSIP:D {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
 
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, forwardAddress);
-                return await clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, false);
+                return clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, false);
             }
         }
 
-        private Task<RemoteClusterActivationResponse> ProcessRequestLocal(GrainId grain, string requestClusterId)
+        private RemoteClusterActivationResponse ProcessRequestLocal(GrainId grain, string requestClusterId)
         {
-            RemoteClusterActivationResponse response = new RemoteClusterActivationResponse();
+            RemoteClusterActivationResponse response;
 
             //This function will be called only on the Owner silo.
     
@@ -77,7 +83,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (localResult.Addresses == null)
                 {
                     //If no activation found in the cluster, return response as PASS.
-                    response.ResponseStatus = ActivationResponseStatus.Pass;
+                    response = RemoteClusterActivationResponse.Pass;
                 }
                 else
                 {
@@ -92,7 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     if (addressAndTag.Address == null)
                     {
-                        response.ResponseStatus = ActivationResponseStatus.Pass;
+                        response = RemoteClusterActivationResponse.Pass;
                     }
                     else
                     {
@@ -101,32 +107,34 @@ namespace Orleans.Runtime.GrainDirectory
                         switch (existingActivationStatus)
                         {
                             case MultiClusterStatus.Owned:
-                                response.ResponseStatus = ActivationResponseStatus.Failed;
-                                response.ExistingActivationAddress = addressAndTag;
-                                response.ClusterId = clusterId;
-                                response.Owned = true;
+                                response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
+                                {
+                                    ExistingActivationAddress = addressAndTag,
+                                    ClusterId = clusterId,
+                                    Owned = true
+                                };
                                 break;
 
                             case MultiClusterStatus.Cached:
                             case MultiClusterStatus.RaceLoser:
-                                response.ResponseStatus = ActivationResponseStatus.Pass;
+                                response = RemoteClusterActivationResponse.Pass;
                                 break;
 
                             case MultiClusterStatus.RequestedOwnership:
                             case MultiClusterStatus.Doubtful:
-
-                                var iWin = MultiClusterUtils.ActivationPrecedenceFunc(grain, clusterId,
-                                    requestClusterId);
+                                var iWin = MultiClusterUtils.ActivationPrecedenceFunc(grain, clusterId, requestClusterId);
                                 if (iWin)
                                 {
-                                    response.ResponseStatus = ActivationResponseStatus.Failed;
-                                    response.ExistingActivationAddress = addressAndTag;
-                                    response.ClusterId = clusterId;
-                                    response.Owned = false;
+                                    response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
+                                    {
+                                        ExistingActivationAddress = addressAndTag,
+                                        ClusterId = clusterId,
+                                        Owned = false
+                                    };
                                 }
                                 else
                                 {
-                                    response.ResponseStatus = ActivationResponseStatus.Pass;
+                                    response = RemoteClusterActivationResponse.Pass;
                                     //update own activation status to race loser.
                                     if (existingActivationStatus == MultiClusterStatus.RequestedOwnership)
                                     {
@@ -139,6 +147,8 @@ namespace Orleans.Runtime.GrainDirectory
                                     }
                                 }
                                 break;
+                            default:
+                                throw new InvalidOperationException("Invalid MultiClusterStatus value");
                         }
                     }
                 }
@@ -146,14 +156,16 @@ namespace Orleans.Runtime.GrainDirectory
             catch (Exception ex)
             {
                 //LOG exception
-                response.ResponseStatus = ActivationResponseStatus.Faulted;
-                response.ResponseException = ex;
+                response = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
+                {
+                    ResponseException = ex
+                };
             }
 
             if (logger.IsVerbose)
-                logger.Verbose("GSIP:D {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response.ToString());
+                logger.Verbose("GSIP:D {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response);
 
-            return Task.FromResult(response);
+            return response;
         }
 
         public async Task<RemoteClusterActivationResponse[]> ProcessActivationRequestBatch(GrainId[] grains, string sendingClusterId)
@@ -165,10 +177,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var response = await ProcessActivationRequest(g, sendingClusterId);
                     if (response == null)
-                        response = new RemoteClusterActivationResponse()
-                        {
-                            ResponseStatus = ActivationResponseStatus.Faulted
-                        };  
+                        response = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted);
                     responses[i] = response;
                 }).ToList();
 
