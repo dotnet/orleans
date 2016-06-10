@@ -24,7 +24,7 @@ This allows us to avoid all use of locks to protect actor state, as it is inhere
 
 ### A Grain Activation - The runtime instance of a Grain
 
-When there is work for a grain, Orleans ensures there is an instance of the grain on one of [Orleans Silos](Silos). When there is no instance of the grain on any silo, the run-time creates one. This process is called Activation. In case a grain is using [Grain Persistence](Orleans/Getting-Stated-With-Orleans/Grain-Persistence), the run-time automatically reads the state from the backing-store upon activation. 
+When there is work for a grain, Orleans ensures there is an instance of the grain on one of [Orleans Silos](Silos). When there is no instance of the grain on any silo, the run-time creates one. This process is called Activation. In case a grain is using [Grain Persistence](Grain-Persistence), the run-time automatically reads the state from the backing-store upon activation. 
 Orleans controls the process of activating and deactivating grains transparently. When coding a grain, a developer assumes all grains are always activated.
 
 A grain activation performs work in chunks and finishes each chunk before it moves on to the next. Chunks of work include method invocations in response to requests from other grains or external clients, and closures scheduled on completion of a previous chunk. The basic unit of execution corresponding to a chunk of work is known as a turn.
