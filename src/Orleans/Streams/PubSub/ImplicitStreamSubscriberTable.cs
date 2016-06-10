@@ -133,28 +133,29 @@ namespace Orleans.Streams
         /// <returns></returns>
         private Guid MakeSubscriptionGuid(int grainIdTypeCode, StreamId streamId)
         {
+            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
+
             // next 2 shorts ing guid are from namespace hash
-            int namespaceHash = streamId.Namespace.GetHashCode();
+            uint namespaceHash = jenkinsHash.ComputeHash(streamId.Namespace);
             byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
             short s1 = BitConverter.ToInt16(namespaceHashByes, 0);
             short s2 = BitConverter.ToInt16(namespaceHashByes, 2);
 
-            // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the full streamId.
-
+            // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the provider name.
             // get streamId guid hash code
-            int streamIdGuidHash = streamId.Guid.GetHashCode();
-            // get full streamId hash code
-            int streamIdHash = streamId.GetHashCode();
+            uint streamIdGuidHash = jenkinsHash.ComputeHash(streamId.Guid.ToByteArray());
+            // get provider name hash code
+            uint providerHash = jenkinsHash.ComputeHash(streamId.ProviderName);
 
-            // build guid tailing 8 bytes from grainIdHash and the hash of the full streamId.
+            // build guid tailing 8 bytes from grainIdHash and the hash of the provider name.
             var tail = new List<byte>();
             tail.AddRange(BitConverter.GetBytes(streamIdGuidHash));
-            tail.AddRange(BitConverter.GetBytes(streamIdHash));
+            tail.AddRange(BitConverter.GetBytes(providerHash));
 
             // make guid.
             // - First int is grain type
             // - Two shorts from namespace hash
-            // - 8 byte tail from streamId Guid and full stream hash.
+            // - 8 byte tail from streamId Guid and provider name hash.
             return SubscriptionMarker.MarkAsImplictSubscriptionId(new Guid(grainIdTypeCode, s1, s2, tail.ToArray()));
         }
 
