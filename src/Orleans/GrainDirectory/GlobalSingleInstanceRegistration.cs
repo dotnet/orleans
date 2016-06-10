@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.GrainDirectory
 {
@@ -13,7 +9,6 @@ namespace Orleans.GrainDirectory
     [Serializable]
     internal class GlobalSingleInstanceRegistration : MultiClusterRegistrationStrategy
     {
-
         private static GlobalSingleInstanceRegistration singleton;
 
         internal static GlobalSingleInstanceRegistration Singleton

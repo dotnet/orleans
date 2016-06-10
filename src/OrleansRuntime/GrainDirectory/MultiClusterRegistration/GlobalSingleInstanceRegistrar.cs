@@ -2,27 +2,24 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
-using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GlobalSingleInstanceRegistrar : IGrainRegistrar
     {
+        private static int NUM_RETRIES = 3;
+        private readonly Logger logger;
+        private readonly GrainDirectoryPartition directoryPartition;
+
         public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger)
              
         {
-            this.DirectoryPartition = partition;
+            this.directoryPartition = partition;
             this.logger = logger;
         }
-
-        private static int NUM_RETRIES = 3;
-        private Logger logger;
-
-        private GrainDirectoryPartition DirectoryPartition;
 
         public bool IsSynchronous { get { return false; } }
 
@@ -41,39 +38,39 @@ namespace Orleans.Runtime.GrainDirectory
             throw new InvalidOperationException();
         }
 
-        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleact)
+        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
         {
-            var globalconfig = Silo.CurrentSilo.OrleansConfig.Globals;
+            var globalConfig = Silo.CurrentSilo.OrleansConfig.Globals;
 
-            if (!singleact)
+            if (!singleActivation)
                 throw new OrleansException("global single instance protocol is incompatible with using multiple activations");
 
-            if (!globalconfig.HasMultiClusterNetwork)
+            if (!globalConfig.HasMultiClusterNetwork)
             {
                 // no multicluster network. Go to owned state directly.
-                return DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Owned);
+                return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Owned);
             }
 
-            var myclusterid = globalconfig.ClusterId;
+            var myClusterId = globalConfig.ClusterId;
 
             // examine the multicluster configuration
             var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
 
-            if (config == null || ! config.Clusters.Contains(myclusterid))
+            if (config == null || !config.Clusters.Contains(myClusterId))
             {
                 // we are not joined to the cluster yet/anymore. Go to doubtful state directly.
-                return DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful);
+                return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful);
             }
 
-            var RemoteClusters = config.Clusters.Where(id => id != myclusterid).ToList();
+            var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
 
             // Try to go into REQUESTED_OWNERSHIP state
-            var MyActivation = DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.RequestedOwnership);
+            var myActivation = directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.RequestedOwnership);
 
-            if (!MyActivation.Address.Equals(address)) 
+            if (!myActivation.Address.Equals(address)) 
             {
                 //This implies that the registration already existed in some state? return the existing activation.
-                return MyActivation;
+                return myActivation;
             }
 
             // Do request rounds until successful or we run out of retries
@@ -83,9 +80,9 @@ namespace Orleans.Runtime.GrainDirectory
             while (retries-- > 0)
             {
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:R {0} Round={1} Act={2}", address.Grain.ToString(), NUM_RETRIES - retries, MyActivation.Address.ToString());
+                    logger.Verbose("GSIP:R {0} Round={1} Act={2}", address.Grain.ToString(), NUM_RETRIES - retries, myActivation.Address.ToString());
 
-                var responses = SendRequestRound(address, RemoteClusters);
+                var responses = SendRequestRound(address, remoteClusters);
 
                 var outcome = await responses.Task;
 
@@ -94,29 +91,29 @@ namespace Orleans.Runtime.GrainDirectory
 
                 switch (outcome)
                 {
-                    case GlobalSingleInstanceResponseTracker.Outcome.REMOTE_OWNER:
-                    case GlobalSingleInstanceResponseTracker.Outcome.REMOTE_OWNER_LIKELY:
+                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwner:
+                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwnerLikely:
                         {
-                            DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, responses.RemoteOwner.Address);
+                            directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, responses.RemoteOwner.Address);
                             return responses.RemoteOwner;
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.SUCCEED:
+                    case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
                         {
-                            if (DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Owned, MultiClusterStatus.RequestedOwnership))
-                                return MyActivation;
+                            if (directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Owned, MultiClusterStatus.RequestedOwnership))
+                                return myActivation;
                             else
                                 break; // concurrently moved to RACE_LOSER
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.INCONCLUSIVE:
+                    case GlobalSingleInstanceResponseTracker.Outcome.Inconclusive:
                         {
                             break;
                         }
                 }
 
                 // we were not successful, reread state to determine what is going on
-                var currentActivations = DirectoryPartition.LookUpGrain(address.Grain).Addresses;
+                var currentActivations = directoryPartition.LookUpGrain(address.Grain).Addresses;
                 address = currentActivations.FirstOrDefault();
-                Debug.Assert(address != null && address.Equals(MyActivation.Address));
+                Debug.Assert(address != null && address.Equals(myActivation.Address));
 
                 if (address.Status == MultiClusterStatus.RequestedOwnership)
                 {
@@ -125,7 +122,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else  if (address.Status == MultiClusterStatus.RaceLoser)
                 {
                     // we failed because an external request moved us to RACE_LOSER. Go back to REQUESTED_OWNERSHIP for retry
-                    var success = DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.RaceLoser);
+                    var success = directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.RaceLoser);
                     if (!success) ProtocolError(address, "unable to transition from RACE_LOSER to REQUESTED_OWNERSHIP");
                     // do not wait before retrying because there is a dominant remote request active so we can probably complete quickly
                 }
@@ -137,11 +134,11 @@ namespace Orleans.Runtime.GrainDirectory
 
             // we are done with the quick retries. Now we go into doubtful state, which means slower retries.
 
-            var ok = DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RequestedOwnership);
+            var ok = directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RequestedOwnership);
            
             if (!ok) ProtocolError(address, "unable to transition into doubtful");
 
-            return MyActivation;
+            return myActivation;
         }
 
         private void ProtocolError(ActivationAddress address, string msg)
@@ -152,7 +149,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task UnregisterAsync(ActivationAddress address, bool force)
         {
-            DirectoryPartition.RemoveActivation(address.Grain, address.Activation, force);
+            directoryPartition.RemoveActivation(address.Grain, address.Activation, force);
             return TaskDone.Done;
 
             /*
@@ -188,7 +185,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public virtual Task DeleteAsync(GrainId gid)
         {
-            DirectoryPartition.RemoveGrain(gid);
+            directoryPartition.RemoveGrain(gid);
             return TaskDone.Done;
         }
 
@@ -231,25 +228,13 @@ namespace Orleans.Runtime.GrainDirectory
             catch (Exception ex)
             {
                 responses[index] = new RemoteClusterActivationResponse
-                 {
-                     ResponseStatus = ActivationResponseStatus.FAULTED,
-                     ResponseException = ex
-                 };
+                {
+                    ResponseStatus = ActivationResponseStatus.Faulted,
+                    ResponseException = ex
+                };
 
                 responseprocessor.Notify();
             }
         }
-
-
-
-
-
-
-
-
-
-
-
     }
-
 }

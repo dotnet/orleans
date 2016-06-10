@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
@@ -12,8 +11,6 @@ using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using UnitTests;
-
 
 // ReSharper disable InconsistentNaming
 
@@ -24,7 +21,6 @@ namespace Tests.GeoClusterTests
 
     public class GlobalSingleInstanceClusterTests : TestingClusterHost, IDisposable
     {
-
         // Kill all clients and silos.
         public void Dispose()
         {
@@ -685,7 +681,7 @@ namespace Tests.GeoClusterTests
             int totalSoFar = 0;
             foreach (var silo in silos)
             {
-                var dir = silo.Silo.TestHook.GetDirectoryForTypenamesContaining("ClusterTestGrain");
+                var dir = silo.Silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
                 foreach (var grainKeyValue in dir)
                 {
                     GrainId grainId = grainKeyValue.Key;
@@ -722,7 +718,7 @@ namespace Tests.GeoClusterTests
             foreach(var kvp in Clusters)
                 foreach (var silo in kvp.Value.Silos)
                 {
-                    var dir = silo.Silo.TestHook.GetDirectoryForTypenamesContaining("ClusterTestGrain");
+                    var dir = silo.Silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
 
                     foreach (var grainKeyValue in dir)
                     {

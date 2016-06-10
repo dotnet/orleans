@@ -1,15 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 
 namespace Orleans.Runtime.GrainDirectory 
 {
-    
     /// <summary>
     /// A class that encapsulates response processing logic.
     /// It is a promise that fires once it has enough responses to make a determination.
@@ -17,21 +13,20 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GlobalSingleInstanceResponseTracker : TaskCompletionSource<GlobalSingleInstanceResponseTracker.Outcome> {
 
         public enum Outcome {
-            SUCCEED,
-            REMOTE_OWNER,
-            REMOTE_OWNER_LIKELY,
-            INCONCLUSIVE
+            Succeed,
+            RemoteOwner,
+            RemoteOwnerLikely,
+            Inconclusive
         }
 
+        private readonly GrainId grain;
         private RemoteClusterActivationResponse[] responses;
-        private GrainId grain;
 
         public AddressAndTag RemoteOwner;
         public string RemoteOwnerCluster;
 
         public GlobalSingleInstanceResponseTracker(RemoteClusterActivationResponse[] responses, GrainId grain)
         {
-
             this.responses = responses;
             this.grain = grain;
 
@@ -45,15 +40,15 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (!this.Task.IsCompleted)
             {
-                if (responses.All(res => res != null && res.ResponseStatus == ActivationResponseStatus.PASS))
+                if (responses.All(res => res != null && res.ResponseStatus == ActivationResponseStatus.Pass))
                 {
                    // All passed, or no other clusters exist
-                    TrySetResult(Outcome.SUCCEED);
+                    TrySetResult(Outcome.Succeed);
                    return;
                 }
 
                 var ownerresponses = responses.Where(
-                        res => (res != null && res.ResponseStatus == ActivationResponseStatus.FAILED && res.Owned == true)).ToList();
+                        res => (res != null && res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true)).ToList();
 
                 if (ownerresponses.Count > 0)
                 {
@@ -65,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
                     
                     RemoteOwner = ownerresponses[0].ExistingActivationAddress;
                     RemoteOwnerCluster = ownerresponses[0].ClusterId;
-                    TrySetResult(Outcome.REMOTE_OWNER);
+                    TrySetResult(Outcome.RemoteOwner);
                 }
 
                 // are all responses here or have failed?
@@ -73,7 +68,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // determine best candidate
                     var candidates = responses
-                        .Where(res => (res.ResponseStatus == ActivationResponseStatus.FAILED && res.ExistingActivationAddress.Address != null))
+                        .Where(res => (res.ResponseStatus == ActivationResponseStatus.Failed && res.ExistingActivationAddress.Address != null))
                         .ToList();
 
                     foreach (var res in candidates)
@@ -88,14 +83,11 @@ namespace Orleans.Runtime.GrainDirectory
                     }
 
                     if (RemoteOwner.Address != null)
-                        TrySetResult(Outcome.REMOTE_OWNER_LIKELY);
+                        TrySetResult(Outcome.RemoteOwnerLikely);
                     else
-                        TrySetResult(Outcome.INCONCLUSIVE);
+                        TrySetResult(Outcome.Inconclusive);
                 }
             }
         }
-
-    
-
     }
 }

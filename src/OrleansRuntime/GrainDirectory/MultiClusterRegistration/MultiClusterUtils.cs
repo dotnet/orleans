@@ -1,9 +1,4 @@
-﻿using Orleans.MultiCluster;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -28,10 +23,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             var precLeft = grain.GetUniformHashCode() ^ clusterLeft.GetHashCode();
             var precRight = grain.GetUniformHashCode() ^ clusterRight.GetHashCode();
-            return (precLeft < precRight) || (precLeft == precRight && (clusterLeft.CompareTo(clusterRight) < 0));
+            return (precLeft < precRight) || (precLeft == precRight && (string.Compare(clusterLeft, clusterRight, StringComparison.Ordinal) < 0));
         }
-
-     
 
     }
 }

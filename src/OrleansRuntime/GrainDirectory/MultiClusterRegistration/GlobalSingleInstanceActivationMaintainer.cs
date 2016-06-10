@@ -26,8 +26,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         }
 
-        protected async override void Run()
+        protected override async void Run()
         {
+            var globalConfig = Silo.CurrentSilo.OrleansConfig.Globals;
+            if (!globalConfig.HasMultiClusterNetwork)
+                return;
+
+            var myClusterId = globalConfig.ClusterId;
+
             while (router.Running)
             {
                 try
@@ -36,17 +42,10 @@ namespace Orleans.Runtime.GrainDirectory
 
                     logger.Verbose("GSIP:M running periodic check (having waited {0})", period);
 
-                    var globalconfig = Silo.CurrentSilo.OrleansConfig.Globals;
-
-                    if (!globalconfig.HasMultiClusterNetwork)
-                        return;
-
-                    var myclusterid = globalconfig.ClusterId;
-
                     // examine the multicluster configuration
                     var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
 
-                    if (config == null || !config.Clusters.Contains(myclusterid))
+                    if (config == null || !config.Clusters.Contains(myClusterId))
                     {
                         // we are not joined to the cluster yet/anymore. 
                         // go through all owned entries and make them doubtful
@@ -83,9 +82,9 @@ namespace Orleans.Runtime.GrainDirectory
 
                         logger.Verbose("GSIP:M retry {0} doubtful entries", doubtfulEntries.Count);
                         
-                        var RemoteClusters = config.Clusters.Where(id => id != myclusterid).ToList();
+                        var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
                         await router.Scheduler.QueueTask(
-                            () => RunBatchedActivationRequests(RemoteClusters, doubtfulEntries),
+                            () => RunBatchedActivationRequests(remoteClusters, doubtfulEntries),
                             router.CacheValidator.SchedulingContext
                         );
                     }
@@ -152,9 +151,8 @@ namespace Orleans.Runtime.GrainDirectory
             return TaskDone.Done;
         }
 
-        private async Task RunBatchedActivationRequests(List<string> RemoteClusters, List<Tuple<GrainId, KeyValuePair<ActivationId,IActivationInfo>>> entries)
+        private async Task RunBatchedActivationRequests(List<string> remoteClusters, List<Tuple<GrainId, KeyValuePair<ActivationId,IActivationInfo>>> entries)
         {
-
             var addresses = new List<ActivationAddress>();
 
             foreach (var entry in entries)
@@ -172,9 +170,9 @@ namespace Orleans.Runtime.GrainDirectory
             if (addresses.Count == 0)
                 return;
 
-            var batchresponses = new List<RemoteClusterActivationResponse[]>();
+            var batchResponses = new List<RemoteClusterActivationResponse[]>();
 
-            var tasks = RemoteClusters.Select(async remotecluster =>
+            var tasks = remoteClusters.Select(async remotecluster =>
             {
                 // find gateway
                 var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
@@ -185,15 +183,15 @@ namespace Orleans.Runtime.GrainDirectory
                     var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
                     var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
                     var r = await clusterGrainDir.ProcessActivationRequestBatch(addresses.Select(a => a.Grain).ToArray(), Silo.CurrentSilo.ClusterId);
-                    batchresponses.Add(r);
+                    batchResponses.Add(r);
                 }
                 catch (Exception e)
                 {
-                    batchresponses.Add(
+                    batchResponses.Add(
                         Enumerable.Repeat<RemoteClusterActivationResponse>(
                            new RemoteClusterActivationResponse()
                            {
-                               ResponseStatus = ActivationResponseStatus.FAULTED,
+                               ResponseStatus = ActivationResponseStatus.Faulted,
                                ResponseException = e
                            }, addresses.Count).ToArray());
                 }
@@ -204,33 +202,53 @@ namespace Orleans.Runtime.GrainDirectory
             await Task.WhenAll(tasks);
 
             if (logger.IsVerbose)
-            foreach (var br in batchresponses)
-            {
-                logger.Verbose("GSIP:M batchresponse PASS:{0} FAILED:{1} FAILED(a){2}: FAILED(o){3}: FAULTED:{4}",
-                    br.Count((r) => r.ResponseStatus == ActivationResponseStatus.PASS),
-                    br.Count((r) => r.ResponseStatus == ActivationResponseStatus.FAILED && !r.Owned && r.ExistingActivationAddress.Address == null),
-                    br.Count((r) => r.ResponseStatus == ActivationResponseStatus.FAILED && !r.Owned && r.ExistingActivationAddress.Address != null),
-                    br.Count((r) => r.ResponseStatus == ActivationResponseStatus.FAILED && r.Owned),
-                    br.Count((r) => r.ResponseStatus == ActivationResponseStatus.FAULTED)
-                );
+            { 
+                foreach (var br in batchResponses)
+                {
+                    var summary = br.Aggregate(new { Pass = 0, Failed = 0, FailedA = 0, FailedOwned = 0, Faulted = 0 }, (agg, r) =>
+                    {
+                        switch (r.ResponseStatus)
+                        {
+                            case ActivationResponseStatus.Pass:
+                                return new { Pass = agg.Pass + 1, agg.Failed, agg.FailedA, agg.FailedOwned, agg.Faulted };
+                            case ActivationResponseStatus.Failed:
+                                if (!r.Owned)
+                                {
+                                    return r.ExistingActivationAddress.Address == null
+                                        ? new { agg.Pass, Failed = agg.Failed + 1, agg.FailedA, agg.FailedOwned, agg.Faulted }
+                                        : new { agg.Pass, agg.Failed, FailedA = agg.FailedA + 1, agg.FailedOwned, agg.Faulted };
+                                }
+                                else
+                                {
+                                    return new { agg.Pass, agg.Failed, agg.FailedA, FailedOwned = agg.FailedOwned + 1, agg.Faulted };
+                                }
+                            default:
+                                return new { agg.Pass, agg.Failed, agg.FailedA, agg.FailedOwned, Faulted = agg.Faulted + 1 };
+                        }
+                    });
+                    logger.Verbose("GSIP:M batchresponse PASS:{0} FAILED:{1} FAILED(a){2}: FAILED(o){3}: FAULTED:{4}",
+                        summary.Pass,
+                        summary.Failed,
+                        summary.FailedA,
+                        summary.FailedOwned,
+                        summary.Faulted);
+                }
             }
 
-            
+
             // process each address
 
             var loser_activations_per_silo = new Dictionary<SiloAddress, List<ActivationAddress>>();
-
-            var deactivationtasks = new List<Task>();
 
             for (int i = 0; i < addresses.Count; i++)
             {
                 var address = addresses[i];
 
                 // array that holds the responses
-                var responses = new RemoteClusterActivationResponse[RemoteClusters.Count];
+                var responses = new RemoteClusterActivationResponse[remoteClusters.Count];
 
-                for (int j = 0; j < batchresponses.Count; j++)
-                    responses[j] = batchresponses[j][i];
+                for (int j = 0; j < batchResponses.Count; j++)
+                    responses[j] = batchResponses[j][i];
 
                 // response processor
                 var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain);
@@ -246,37 +264,37 @@ namespace Orleans.Runtime.GrainDirectory
 
                 switch (outcome)
                 {
-                    case GlobalSingleInstanceResponseTracker.Outcome.REMOTE_OWNER:
-                    case GlobalSingleInstanceResponseTracker.Outcome.REMOTE_OWNER_LIKELY:
-                        {
-                            // record activations that lost and need to be deactivated
-                            List<ActivationAddress> losers;
-                            if (!loser_activations_per_silo.TryGetValue(address.Silo, out losers))
-                                loser_activations_per_silo[address.Silo] = losers = new List<ActivationAddress>();
-                            losers.Add(address);
+                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwner:
+                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwnerLikely:
+                    {
+                        // record activations that lost and need to be deactivated
+                        List<ActivationAddress> losers;
+                        if (!loser_activations_per_silo.TryGetValue(address.Silo, out losers))
+                            loser_activations_per_silo[address.Silo] = losers = new List<ActivationAddress>();
+                        losers.Add(address);
 
-                            router.DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, tracker.RemoteOwner.Address);
+                        router.DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, tracker.RemoteOwner.Address);
+                        continue;
+                    }
+                    case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
+                    {
+                        var ok = (router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Owned, MultiClusterStatus.RequestedOwnership));
+                        if (ok)
                             continue;
-                        }
-                    case GlobalSingleInstanceResponseTracker.Outcome.SUCCEED:
-                        {
-                            var ok = (router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Owned, MultiClusterStatus.RequestedOwnership));
-                            if (ok)
-                                continue;
-                            else
-                                break;
-                        }
-                    case GlobalSingleInstanceResponseTracker.Outcome.INCONCLUSIVE:
-                        {
+                        else
                             break;
-                        }
+                    }
+                    case GlobalSingleInstanceResponseTracker.Outcome.Inconclusive:
+                    {
+                        break;
+                    }
                 }
 
                 // we were not successful, reread state to determine what is going on
                 var currentActivations = router.DirectoryPartition.LookUpGrain(address.Grain).Addresses;
                 address = currentActivations.FirstOrDefault();
-                Debug.Assert(address != null);            
-                
+                Debug.Assert(address != null);
+
                 // in each case, go back to DOUBTFUL
                 if (address.Status == MultiClusterStatus.RequestedOwnership)
                 {
@@ -306,10 +324,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void ProtocolError(ActivationAddress address, string msg)
         {
-            logger.Error((int)ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:R {0} {1}", address.Grain.ToString(), msg));
+            logger.Error((int) ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:R {0} {1}", address.Grain.ToString(), msg));
             Debugger.Break();
         }
-
-
     }
 }

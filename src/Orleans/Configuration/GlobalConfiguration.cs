@@ -241,14 +241,13 @@ namespace Orleans.Runtime.Configuration
         /// Whether to use the global single instance protocol as the default
         /// multicluster registration strategy.
         /// </summary>
-        public bool  UseGlobalSingleInstanceByDefault { get; set; }
+        public bool UseGlobalSingleInstanceByDefault { get; set; }
         
         /// <summary>
         /// The time between retries for DOUBTFUL activations.
         /// </summary>
         public TimeSpan GlobalSingleInstanceRetryInterval { get; set; }
 
- 
         /// <summary>
         /// A list of connection strings for gossip channels.
         /// </summary>

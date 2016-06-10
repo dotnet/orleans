@@ -186,7 +186,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (globalSingleInstanceActivationMaintainer != null)
             {
                 globalSingleInstanceActivationMaintainer.Start();
-        }
+            }
         }
 
         // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised. 

@@ -947,13 +947,8 @@ namespace Orleans.Runtime
             {
                 ExecuteFastKillInProcessExit = false;
             }
-
-            internal IDictionary<GrainId, IGrainInfo> GetDirectory()
-            {
-                return silo.localGrainDirectory.DirectoryPartition.GetItems();
-            }
           
-            internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypenamesContaining(string expr)
+            internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
             {
                 var x = new Dictionary<GrainId, IGrainInfo>();
                 foreach (var kvp in silo.localGrainDirectory.DirectoryPartition.GetItems())
