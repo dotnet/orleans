@@ -35,7 +35,7 @@ namespace UnitTests.SerializerTests
 
         private void RunTest(int numItems)
         {
-            InvokeMethodRequest request = new InvokeMethodRequest(0, 0, null);
+            InvokeMethodRequest request = new InvokeMethodRequest(0, null, 0, null);
             Message resp = Message.CreateMessage(request, InvokeMethodOptions.None);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
