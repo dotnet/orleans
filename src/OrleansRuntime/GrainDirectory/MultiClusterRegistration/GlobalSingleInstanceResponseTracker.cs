@@ -30,13 +30,13 @@ namespace Orleans.Runtime.GrainDirectory
             this.responses = responses;
             this.grain = grain;
 
-            Notify();
+            CheckIfDone();
         }
 
         /// <summary>
-        /// Check responses and transition if warranted
+        /// Check responses; signal completion if we have received enough responses to determine outcome.
         /// </summary>
-        public void Notify()
+        public void CheckIfDone()
         {
             if (!this.Task.IsCompleted)
             {

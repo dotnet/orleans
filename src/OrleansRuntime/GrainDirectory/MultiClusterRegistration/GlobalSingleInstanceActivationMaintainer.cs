@@ -252,7 +252,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // response processor
                 var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain);
 
-                tracker.Notify();
+                tracker.CheckIfDone();
 
                 Debug.Assert(tracker.Task.IsCompleted);
 

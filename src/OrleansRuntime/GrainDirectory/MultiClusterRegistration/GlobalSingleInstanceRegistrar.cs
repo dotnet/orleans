@@ -192,7 +192,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // try to send request
                 responses[index] = await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, true);
 
-                responseprocessor.Notify();
+                responseprocessor.CheckIfDone();
 
             }
             catch (Exception ex)
@@ -202,7 +202,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ResponseException = ex
                 };
 
-                responseprocessor.Notify();
+                responseprocessor.CheckIfDone();
             }
         }
     }
