@@ -28,7 +28,7 @@ namespace UnitTests.General
             await grain.EchoAsync(42);
 
             //ClearState() also exhibits the error, even with the shorter named grain
-            //await grain.ClearState();
+            await grain.ClearState();
         }
 
         [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]

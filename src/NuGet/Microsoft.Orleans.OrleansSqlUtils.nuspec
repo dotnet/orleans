@@ -18,10 +18,8 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      <dependency id="EnterpriseLibrary.TransientFaultHandling" version="6.0.1304.0" />
-      <dependency id="Microsoft.Azure.SqlDatabase.ElasticScale.Client" version="1.1.0" />
-      <dependency id="Microsoft.Tpl.Dataflow" version="4.5.24" />
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />      
+	  <dependency id="Newtonsoft.Json" version="7.0.1" />
     </dependencies>
   </metadata>
   <files>

@@ -39,6 +39,14 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Core, Version=4.4.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Azure.KeyVault.Core">
+      <HintPath>$(SolutionDir)packages\Microsoft.Azure.KeyVault.Core.1.0.0\lib\net40\Microsoft.Azure.KeyVault.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
@@ -55,6 +63,8 @@
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
     <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
@@ -64,6 +74,23 @@
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
+    <Compile Include="StorageTests\Relational\CommonFixture.cs" />
+    <Compile Include="StorageTests\Relational\CommonStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\CommonStorageUtilities.cs" />
+    <Compile Include="StorageTests\Relational\ConstantHasher.cs" />
+    <Compile Include="StorageTests\Relational\MySqlStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\RandomUtilities.cs" />
+    <Compile Include="StorageTests\Relational\Range.cs" />
+    <Compile Include="StorageTests\Relational\RelationalStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\SqlServerStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\SymbolSet.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetPlain.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetGeneric.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\GrainTypeGenerator.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\TestState1.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\TestStateGeneric1.cs" />
+    <Compile Include="StorageTests\Relational\TestEnvironmentInvariant.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
@@ -157,8 +184,6 @@
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="StorageTests\PersistenceProviderTests.cs" />
-    <Compile Include="StorageTests\SQLAdapter\SampleGrainStateMapFactory.cs" />
-    <Compile Include="StorageTests\SQLAdapter\ShardTests.cs" />
     <Compile Include="StorageTests\StorageProviders\BaseJSONStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
