@@ -151,36 +151,6 @@ namespace Orleans.Runtime.GrainDirectory
         {
             directoryPartition.RemoveActivation(address.Grain, address.Activation, force);
             return TaskDone.Done;
-
-            /*
-            if (address.Status == MultiClusterStatus.Owned)
-            {
-
-                var RemoteClusters = MultiClusterUtils.GetRemoteClusters();
-
-                List<Task> responseTasks = new List<Task>();
-
-                //send the request to each of the cluster's gateways and wait for response. 
-                foreach (var remotecluster in RemoteClusters)
-                {
-
-                    // find gateway
-                    var clusterGatewayAddress = Silo.CurrentSilo.LocalGossipOracle.GetRandomClusterGateway(remotecluster);
-                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
-
-                    responseTasks.Add(clusterGrainDir.InvalidateCache(address.Grain));
-                }
-
-                try
-                {
-                    await Task.WhenAll(responseTasks);
-                }
-                catch (Exception ex)
-                {
-                    //nothing to do. further invalidation will be handled by the periodic timer.
-                }
-            }
-            */
         }
 
         public Task DeleteAsync(GrainId gid)
