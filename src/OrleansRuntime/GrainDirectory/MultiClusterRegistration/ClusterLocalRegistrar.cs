@@ -18,7 +18,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool IsSynchronous { get { return true; } }
 
-        public virtual AddressAndTag Register(ActivationAddress address, bool singleActivation)
+        public AddressAndTag Register(ActivationAddress address, bool singleActivation)
         {
             if (singleActivation)
             {
@@ -32,28 +32,28 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
   
-        public virtual void Unregister(ActivationAddress address, bool force)
+        public void Unregister(ActivationAddress address, bool force)
         {
             directoryPartition.RemoveActivation(address.Grain, address.Activation, force);
         }
 
-        public virtual void Delete(GrainId gid)
+        public void Delete(GrainId gid)
         {
             directoryPartition.RemoveGrain(gid);
         }
 
 
-        public virtual Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
+        public Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual Task UnregisterAsync(ActivationAddress address, bool force)
+        public Task UnregisterAsync(ActivationAddress address, bool force)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual Task DeleteAsync(GrainId gid)
+        public Task DeleteAsync(GrainId gid)
         {
             throw new InvalidOperationException();
         }

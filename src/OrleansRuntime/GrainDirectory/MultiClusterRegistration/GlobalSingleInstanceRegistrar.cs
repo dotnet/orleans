@@ -23,17 +23,17 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool IsSynchronous { get { return false; } }
 
-        public virtual AddressAndTag Register(ActivationAddress address, bool singleActivation)
+        public AddressAndTag Register(ActivationAddress address, bool singleActivation)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual void Unregister(ActivationAddress address, bool force)
+        public void Unregister(ActivationAddress address, bool force)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual void Delete(GrainId gid)
+        public void Delete(GrainId gid)
         {
             throw new InvalidOperationException();
         }
@@ -183,7 +183,7 @@ namespace Orleans.Runtime.GrainDirectory
             */
         }
 
-        public virtual Task DeleteAsync(GrainId gid)
+        public Task DeleteAsync(GrainId gid)
         {
             directoryPartition.RemoveGrain(gid);
             return TaskDone.Done;
