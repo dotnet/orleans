@@ -100,7 +100,7 @@ The first step, declaring a state class, simply means identifying the informatio
 For employees, we want to persist all the state:
 
 ``` csharp
-public class  EmployeeState : GrainState
+public class  EmployeeState
 {
     public int Level { get; set; }
     public IManager Manager { get; set; }
@@ -110,7 +110,7 @@ public class  EmployeeState : GrainState
 and for managers, we must store the direct reports, but the `_me` reference may continue to be created during activation.
 
 ``` csharp
-public class ManagerState : GrainState
+public class ManagerState
 {
     public List<IEmployee> Reports { get; set; }
 }
