@@ -31,5 +31,6 @@ namespace Orleans.Runtime.Configuration
                 yield return nodeConfiguration;
             }
         }
+
     }
 }
