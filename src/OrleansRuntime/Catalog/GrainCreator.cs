@@ -36,10 +36,12 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
         {
-            var grain = _services != null
-                ? (Grain) _services.GetService(grainType)
-                : (Grain) Activator.CreateInstance(grainType);
+            var grain = (Grain)_services?.GetService(grainType);
 
+            if(grain == null) {
+                grain = (Grain)Activator.CreateInstance(grainType);
+            }
+            
             // Inject runtime hooks into grain instance
             grain.Runtime = _grainRuntime;
             grain.Identity = identity;
@@ -67,7 +69,7 @@ namespace Orleans.Runtime
             var storage = new GrainStateStorageBridge(grainType.FullName, statefulGrain, storageProvider);
 
             //Inject state and storage data into the grain
-            statefulGrain.GrainState.State = Activator.CreateInstance(stateType); ;
+            statefulGrain.GrainState.State = Activator.CreateInstance(stateType);
             statefulGrain.SetStorage(storage);
 
             return grain;
