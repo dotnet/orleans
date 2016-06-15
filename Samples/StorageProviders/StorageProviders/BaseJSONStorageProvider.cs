@@ -80,9 +80,10 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
+            if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
+
             var grainTypeName = grainType.Split('.').Last();
 
-            if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
             var entityData = await DataManager.Read(grainTypeName, grainReference.ToKeyString());
             if (entityData != null)
             {
@@ -99,9 +100,10 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            var grainTypeName = grainType.Split('.').Last();
-
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
+
+            var grainTypeName = grainType.Split('.').Last();
+            
             var entityData = ConvertToStorageFormat(grainState);
             return DataManager.Write(grainTypeName, grainReference.ToKeyString(), entityData);
         }
@@ -115,9 +117,10 @@ namespace Samples.StorageProviders
         /// <returns></returns>
         public Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            var grainTypeName = grainType.Split('.').Last();
-
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
+
+            var grainTypeName = grainType.Split('.').Last();
+            
             DataManager.Delete(grainTypeName, grainReference.ToKeyString());
             return TaskDone.Done;
         }
