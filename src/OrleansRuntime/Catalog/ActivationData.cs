@@ -373,9 +373,11 @@ namespace Orleans.Runtime
 
         public MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
-        // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
+        // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
 
+        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
+        internal bool IsUsingGrainDirectory { get { return !IsStatelessWorker; } }
 
         public Message Running { get; private set; }
 
