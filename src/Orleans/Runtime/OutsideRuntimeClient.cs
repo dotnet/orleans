@@ -186,7 +186,7 @@ namespace Orleans
                 var gatewayListProvider = GatewayProviderFactory.CreateGatewayListProvider(config)
                     .WithTimeout(initTimeout).Result;
                 transport = new ProxiedMessageCenter(config, localAddress, generation, clientId, gatewayListProvider);
-                
+
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
                 {
                     incomingMessagesThreadTimeTracking = new ThreadTrackingStatistic("ClientReceiver");
