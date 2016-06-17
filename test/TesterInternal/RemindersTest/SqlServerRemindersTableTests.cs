@@ -15,7 +15,7 @@ namespace UnitTests.RemindersTest
     {
         public SqlServerRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride(nameof (SqlServerRemindersTableTests), Severity.Verbose3);
+            LogManager.AddTraceLevelOverride(nameof (SqlServerRemindersTableTests), Severity.Verbose3);
         }
 
         protected override IReminderTable CreateRemindersTable()

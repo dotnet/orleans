@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         private static int workerThreadCounter;
         private static int workItemGroupCounter;
         private static object lockable;
-        private static TraceLogger logger;
+        private static Logger logger;
 
         internal static void Init()
         {
@@ -72,7 +72,7 @@ namespace Orleans.Runtime
 
             NumLongRunningTurns = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_NUM_LONG_RUNNING_TURNS);
             NumLongQueueWaitTimes = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_NUM_LONG_QUEUE_WAIT_TIMES);
-            logger = TraceLogger.GetLogger("SchedulerStatisticsGroup", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("SchedulerStatisticsGroup", LoggerType.Runtime);
         }
 
         internal static int RegisterWorkingThread(string threadName)

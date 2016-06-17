@@ -17,7 +17,7 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly List<IRingRangeListener> statusListeners;
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap;
         private List<Tuple<uint, SiloAddress>> sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
         private readonly object lockable;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.ConsistentRing
             if (nBucketsPerSilo <= 0 )
                 throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + nBucketsPerSilo);
 
-            logger = TraceLogger.GetLogger(typeof(VirtualBucketsRingProvider).Name);
+            logger = LogManager.GetLogger(typeof(VirtualBucketsRingProvider).Name);
                         
             statusListeners = new List<IRingRangeListener>();
             bucketsMap = new SortedDictionary<uint, SiloAddress>();

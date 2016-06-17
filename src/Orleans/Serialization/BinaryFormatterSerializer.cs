@@ -15,8 +15,8 @@ namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
     {
-        private TraceLogger logger;
-        public void Initialize(TraceLogger logger)
+        private Logger logger;
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }

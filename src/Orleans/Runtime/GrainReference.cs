@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         private readonly GuidId observerId;
         
         [NonSerialized]
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainReference", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainReference", LoggerType.Runtime);
 
         [NonSerialized] private const bool USE_DEBUG_CONTEXT = true;
 

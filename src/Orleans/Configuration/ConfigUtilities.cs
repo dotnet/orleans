@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Configuration
                         
                         if (plugin is ITelemetryConsumer)
                         {
-                            Logger.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
+                            LogManager.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
                         }
                         else
                         {
@@ -165,7 +165,7 @@ namespace Orleans.Runtime.Configuration
 
                         if (plugin is ILogConsumer)
                         {
-                            TraceLogger.LogConsumers.Add(plugin as ILogConsumer);
+                            LogManager.LogConsumers.Add(plugin as ILogConsumer);
                         }
                         else
                         {

@@ -24,7 +24,7 @@ namespace UnitTests.StreamingTests
         private ConsumerProxy consumer;
         private const int Many = 3;
         private const int ItemCount = 10;
-        private TraceLogger logger;
+        private Logger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
@@ -33,7 +33,7 @@ namespace UnitTests.StreamingTests
         public SingleStreamTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.streamProviderName = streamProvider;
-            this.logger = TraceLogger.GetLogger("SingleStreamTestRunner", TraceLogger.LoggerType.Application);
+            this.logger = LogManager.GetLogger("SingleStreamTestRunner", LoggerType.Application);
             this.testNumber = testNum;
             this.runFullTest = fullTest;
             this.random = TestConstants.random;

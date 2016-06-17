@@ -27,7 +27,7 @@ namespace UnitTests.StorageTests
             {
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-                TraceLogger.Initialize(cfg);
+                LogManager.Initialize(cfg);
             }
         }
 
@@ -239,7 +239,7 @@ namespace UnitTests.StorageTests
 
             var storage = await InitAzureTableStorageProvider(useJson, testName);
 
-            var logger = TraceLogger.GetLogger("PersistenceProviderTests");
+            var logger = LogManager.GetLogger("PersistenceProviderTests");
             storage.InitLogger(logger);
 
             var initialState = TestStoreGrainState.NewRandomState(stringLength).State;

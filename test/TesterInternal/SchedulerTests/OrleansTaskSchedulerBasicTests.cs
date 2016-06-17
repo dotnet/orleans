@@ -50,8 +50,8 @@ namespace UnitTests.SchedulerTests
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
-            TraceLogger.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
-            //TraceLogger.UnInitialize();
+            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>()); // Reset Log level overrides
+            //LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -730,11 +730,11 @@ namespace UnitTests.SchedulerTests
 
         internal static void InitSchedulerLogging()
         {
-            TraceLogger.UnInitialize();
-            //TraceLogger.LogConsumers.Add(new LogWriterToConsole());
-            if (!Logger.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
+            LogManager.UnInitialize();
+            //LogManager.LogConsumers.Add(new LogWriterToConsole());
+            if (!LogManager.TelemetryConsumers.OfType<ConsoleTelemetryConsumer>().Any())
             {
-                Logger.TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
+                LogManager.TelemetryConsumers.Add(new ConsoleTelemetryConsumer());
             }
 
             var traceLevels = new[]
@@ -742,7 +742,7 @@ namespace UnitTests.SchedulerTests
                 Tuple.Create("Scheduler", Severity.Verbose3),
                 Tuple.Create("Scheduler.WorkerPoolThread", Severity.Verbose2),
             };
-            TraceLogger.SetTraceLevelOverrides(new List<Tuple<string, Severity>>(traceLevels));
+            LogManager.SetTraceLevelOverrides(new List<Tuple<string, Severity>>(traceLevels));
 
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.StandardLoad();

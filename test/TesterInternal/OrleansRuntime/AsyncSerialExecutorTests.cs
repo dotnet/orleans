@@ -11,14 +11,14 @@ namespace UnitTests.OrleansRuntime
 {
     public class AsyncSerialExecutorTests
     {
-        public TraceLogger logger;
+        public Logger logger;
         private SafeRandom random;
         public int operationsInProgress;
 
         public AsyncSerialExecutorTests()
         {
-            TraceLogger.Initialize(new NodeConfiguration());
-            logger = TraceLogger.GetLogger("AsyncSerialExecutorTests", TraceLogger.LoggerType.Application);
+            LogManager.Initialize(new NodeConfiguration());
+            logger = LogManager.GetLogger("AsyncSerialExecutorTests", LoggerType.Application);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Async")]

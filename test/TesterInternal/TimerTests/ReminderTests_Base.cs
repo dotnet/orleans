@@ -36,19 +36,19 @@ namespace UnitTests.TimerTests
         protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
         protected const long failCheckAfter = 6; // safe value: 9
 
-        protected TraceLogger log;
+        protected Logger log;
 
         public ReminderTests_Base(BaseClusterFixture fixture)
         {
             HostedCluster = fixture.HostedCluster;
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            TraceLogger.Initialize(cfg);
+            LogManager.Initialize(cfg);
 #if DEBUG
-            TraceLogger.AddTraceLevelOverride("Storage", Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("Reminder", Severity.Verbose3);
+            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
+            LogManager.AddTraceLevelOverride("Reminder", Severity.Verbose3);
 #endif
-            log = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Application);
+            log = LogManager.GetLogger(this.GetType().Name, LoggerType.Application);
         }
 
         public void Dispose()

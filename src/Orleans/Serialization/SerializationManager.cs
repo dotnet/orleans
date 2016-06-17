@@ -104,7 +104,7 @@ namespace Orleans.Serialization
         private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private static IExternalSerializer fallbackSerializer;
-        private static TraceLogger logger;
+        private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
         private static readonly object registerBuiltInSerializerLockObj = new object();
         internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
@@ -240,7 +240,7 @@ namespace Orleans.Serialization
             serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
-            logger = TraceLogger.GetLogger("SerializationManager", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("SerializationManager", LoggerType.Runtime);
             UseStandardSerializer = false; // Default
 
             // Built-in handlers: Tuples

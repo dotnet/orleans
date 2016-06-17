@@ -10,7 +10,7 @@ namespace Orleans.Runtime
 {
     internal class RuntimeStatisticsGroup
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("RuntimeStatisticsGroup", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("RuntimeStatisticsGroup", LoggerType.Runtime);
         private const float KB = 1024f;
 
         private PerformanceCounter cpuCounterPF;

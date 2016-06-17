@@ -55,7 +55,7 @@ namespace Orleans
     internal class Interner<K, T> where T : class
     {
         private static readonly string internCacheName = "Interner-" + typeof(T).Name;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly TimeSpan cacheCleanupInterval;
         private readonly SafeTimer cacheCleanupTimer;
 
@@ -75,7 +75,7 @@ namespace Orleans
             if (initialSize <= 0) initialSize = InternerConstants.SIZE_MEDIUM;
             int concurrencyLevel = Environment.ProcessorCount * 4; // Default from ConcurrentDictionary class in .NET 4.0
 
-            logger = TraceLogger.GetLogger(internCacheName, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(internCacheName, LoggerType.Runtime);
 
             this.internCache = new ConcurrentDictionary<K, WeakReference>(concurrencyLevel, initialSize);
 

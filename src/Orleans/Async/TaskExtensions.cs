@@ -171,7 +171,7 @@ namespace Orleans
             catch (Exception exc)
             {
                 var ignored = task.Exception; // Observe exception
-                logger.Error((int)errorCode, message, exc);
+                logger.Error(errorCode, message, exc);
                 throw;
             }
         }

@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainTimer", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
         private readonly ActivationData activationData;
 

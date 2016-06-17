@@ -16,7 +16,7 @@ namespace Tests.GeoClusterTests
 {
     public class AzureGossipTableTests : AzureStorageBasicTestFixture 
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         private Guid globalServiceId; //this should be the same for all clusters. Use this as partition key.
         //this should be unique per cluster. Can we use deployment id? 
@@ -29,7 +29,7 @@ namespace Tests.GeoClusterTests
 
         public AzureGossipTableTests()
         {
-            logger = TraceLogger.GetLogger("AzureGossipTableTests", TraceLogger.LoggerType.Application);
+            logger = LogManager.GetLogger("AzureGossipTableTests", LoggerType.Application);
         
             globalServiceId = Guid.NewGuid();
             deploymentId = "test-" + globalServiceId;

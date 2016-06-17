@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="xmlElement"></param>
         /// <param name="logger"></param>
-        public void Load(XmlElement xmlElement, TraceLogger logger)
+        public void Load(XmlElement xmlElement, Logger logger)
         {
             bool found = false;
             foreach (XmlNode node in xmlElement.ChildNodes)
@@ -205,7 +205,7 @@ namespace Orleans.Runtime.Configuration
             if (timeSpan < TimeSpan.Zero) throw new ArgumentOutOfRangeException(paramName);
         }
 
-        internal void ValidateConfiguration(TraceLogger logger)
+        internal void ValidateConfiguration(Logger logger)
         {
             foreach (GrainTypeConfiguration config in classSpecific.Values)
             {
@@ -304,7 +304,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="xmlElement"></param>
         /// <param name="logger"></param>
-        public static GrainTypeConfiguration Load(XmlElement xmlElement, TraceLogger logger)
+        public static GrainTypeConfiguration Load(XmlElement xmlElement, Logger logger)
         {
             string fullTypeName = null;
             bool areDefaults = xmlElement.LocalName == "Defaults";
@@ -344,7 +344,7 @@ namespace Orleans.Runtime.Configuration
             throw new InvalidOperationException(string.Format("empty GrainTypeConfiguration for {0}", fullTypeName == null ? "defaults" : fullTypeName));
         }
 
-        internal void ValidateConfiguration(TraceLogger logger)
+        internal void ValidateConfiguration(Logger logger)
         {
             if (AreDefaults) return;
 

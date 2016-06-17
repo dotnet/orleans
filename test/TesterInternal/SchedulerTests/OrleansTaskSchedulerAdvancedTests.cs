@@ -35,7 +35,7 @@ namespace UnitTests.SchedulerTests
             {
                 orleansTaskScheduler.Stop();
             }
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

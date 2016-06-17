@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly TraceLogger Logger;
+        private static readonly Logger Logger;
         
         /// <summary>
         /// The initialization lock.
@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         /// </summary>
         static AssemblyProcessor()
         {
-            Logger = TraceLogger.GetLogger("AssemblyProcessor");
+            Logger = LogManager.GetLogger("AssemblyProcessor");
         }
 
         /// <summary>

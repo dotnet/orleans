@@ -16,7 +16,7 @@ namespace Orleans.Serialization
         /// Initializes the external serializer. Called once when the serialization manager creates 
         /// an instance of this type
         /// </summary>
-        void Initialize(TraceLogger logger);
+        void Initialize(Logger logger);
 
         /// <summary>
         /// Informs the serialization manager whether this serializer supports the type for serialization.

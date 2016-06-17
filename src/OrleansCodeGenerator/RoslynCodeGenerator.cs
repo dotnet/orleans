@@ -31,7 +31,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly Logger Logger = TraceLogger.GetLogger("CodeGenerator");
+        private static readonly Logger Logger = LogManager.GetLogger("CodeGenerator");
 
         /// <summary>
         /// The serializer generation manager.
@@ -124,7 +124,7 @@ namespace Orleans.CodeGenerator
                 if (Logger.IsVerbose2)
                 {
                     Logger.Verbose2(
-                        (int)ErrorCode.CodeGenCompilationSucceeded,
+                        ErrorCode.CodeGenCompilationSucceeded,
                         "Generated code for {0} assemblies in {1}ms",
                         generatedSyntax.SourceAssemblies.Count,
                         timer.ElapsedMilliseconds);
@@ -132,11 +132,9 @@ namespace Orleans.CodeGenerator
             }
             catch (Exception exception)
             {
-                var message = string.Format(
-                    "Exception generating code for input assemblies:\n{0}\nException: {1}",
-                    string.Join("\n", grainAssemblies.Select(_ => _.GetName().FullName)),
-                    TraceLogger.PrintException(exception));
-                Logger.Warn((int)ErrorCode.CodeGenCompilationFailed, message, exception);
+                var message =
+                    $"Exception generating code for input assemblies:\n{string.Join("\n", grainAssemblies.Select(_ => _.GetName().FullName))}\nException: {LogFormatter.PrintException(exception)}";
+                Logger.Warn(ErrorCode.CodeGenCompilationFailed, message, exception);
                 throw;
             }
         }
@@ -180,18 +178,16 @@ namespace Orleans.CodeGenerator
                 if (Logger.IsVerbose2)
                 {
                     Logger.Verbose2(
-                        (int)ErrorCode.CodeGenCompilationSucceeded,
+                        ErrorCode.CodeGenCompilationSucceeded,
                         "Generated code for 1 assembly in {0}ms",
                         timer.ElapsedMilliseconds);
                 }
             }
             catch (Exception exception)
             {
-                var message = string.Format(
-                    "Exception generating code for input assembly {0}\nException: {1}",
-                    input.GetName().FullName,
-                    TraceLogger.PrintException(exception));
-                Logger.Warn((int)ErrorCode.CodeGenCompilationFailed, message, exception);
+                var message =
+                    $"Exception generating code for input assembly {input.GetName().FullName}\nException: {LogFormatter.PrintException(exception)}";
+                Logger.Warn(ErrorCode.CodeGenCompilationFailed, message, exception);
                 throw;
             }
         }

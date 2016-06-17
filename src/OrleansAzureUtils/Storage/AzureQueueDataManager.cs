@@ -50,7 +50,7 @@ namespace Orleans.AzureUtils
 
         private string connectionString { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly CloudQueueClient queueOperationsClient;
         private CloudQueue queue;
 
@@ -63,7 +63,7 @@ namespace Orleans.AzureUtils
         {
             AzureStorageUtils.ValidateQueueName(queueName);
 
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = queueName;
             connectionString = storageConnectionString;
 
@@ -84,7 +84,7 @@ namespace Orleans.AzureUtils
         {
             AzureStorageUtils.ValidateQueueName(queueName);
 
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = deploymentId + "-" + queueName;
             AzureStorageUtils.ValidateQueueName(QueueName);
             connectionString = storageConnectionString;

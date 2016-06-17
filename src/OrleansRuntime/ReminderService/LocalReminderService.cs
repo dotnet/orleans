@@ -38,7 +38,7 @@ namespace Orleans.Runtime.ReminderService
 
         private readonly AverageTimeSpanStatistic tardinessStat;
         private readonly CounterStatistic ticksDeliveredStat;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly GlobalConfiguration config;
         private readonly TimeSpan initTimeout;
 
@@ -52,7 +52,7 @@ namespace Orleans.Runtime.ReminderService
             TimeSpan initTimeout)
             : base(id, addr)
         {
-            logger = TraceLogger.GetLogger("ReminderService", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ReminderService", LoggerType.Runtime);
 
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.ring = ring;
@@ -568,7 +568,7 @@ namespace Orleans.Runtime.ReminderService
                 LocalSequenceNumber = -1;
             }
 
-            public void StartTimer(Func<object, Task> asyncCallback, TraceLogger logger)
+            public void StartTimer(Func<object, Task> asyncCallback, Logger logger)
             {
                 StopReminder(logger); // just to make sure.
                 var dueTimeSpan = CalculateDueTime();
@@ -577,7 +577,7 @@ namespace Orleans.Runtime.ReminderService
                 Timer.Start();
             }
 
-            public void StopReminder(TraceLogger logger)
+            public void StopReminder(Logger logger)
             {
                 if (Timer != null)
                     Timer.Dispose();
@@ -610,7 +610,7 @@ namespace Orleans.Runtime.ReminderService
                 return dueTimeSpan;
             }
 
-            public async Task OnTimerTick(AverageTimeSpanStatistic tardinessStat, TraceLogger logger)
+            public async Task OnTimerTick(AverageTimeSpanStatistic tardinessStat, Logger logger)
             {
                 var before = DateTime.UtcNow;
                 var status = TickStatus.NewStruct(firstTickTime, period, before);
@@ -657,7 +657,7 @@ namespace Orleans.Runtime.ReminderService
                                         ReminderName,
                                         GrainRef.ToDetailedString(),
                                         period,
-                                        TraceLogger.PrintDate(firstTickTime),
+                                        LogFormatter.PrintDate(firstTickTime),
                                         ETag,
                                         LocalSequenceNumber,
                                         Timer == null ? "Not_ticking" : "Ticking");

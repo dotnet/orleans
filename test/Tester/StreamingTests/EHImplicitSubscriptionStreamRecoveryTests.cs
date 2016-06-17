@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Providers.Streams.Generator;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;

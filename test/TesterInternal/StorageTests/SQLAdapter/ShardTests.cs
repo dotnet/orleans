@@ -27,7 +27,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
         private const string ShardMap8 = "ShardMap8";
 
         private const string ShardMapDefault = ShardMap1;
-        private Logger logger = TraceLogger.GetLogger("SqlDataManager");
+        private Logger logger = LogManager.GetLogger("SqlDataManager");
 
         public ShardTests(ITestOutputHelper output)
         {

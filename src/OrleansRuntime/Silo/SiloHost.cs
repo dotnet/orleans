@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Host
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private TraceLogger logger;
+        private Logger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
@@ -136,7 +136,7 @@ namespace Orleans.Runtime.Host
         public void UnInitializeOrleansSilo()
         {
             Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
-            Utils.SafeExecute(TraceLogger.UnInitialize);
+            Utils.SafeExecute(LogManager.UnInitialize);
         }
 
         /// <summary>
@@ -395,7 +395,7 @@ namespace Orleans.Runtime.Host
             if (string.IsNullOrWhiteSpace(Name))
                 Name = "Silo";
 
-            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + TraceLogger.PrintException(exc);
+            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + LogFormatter.PrintException(exc);
             if (logger != null) logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
 
             // Dump Startup error to a log file
@@ -413,7 +413,7 @@ namespace Orleans.Runtime.Host
                 if (logger != null) logger.Error(ErrorCode.Runtime_Error_100106, "Error writing log file " + startupLog, exc2);
             }
 
-            TraceLogger.Flush();
+            LogManager.Flush();
         }
 
         /// <summary>
@@ -474,8 +474,8 @@ namespace Orleans.Runtime.Host
 
         private void InitializeLogger(NodeConfiguration nodeCfg)
         {
-            TraceLogger.Initialize(nodeCfg);
-            logger = TraceLogger.GetLogger("OrleansSiloHost", TraceLogger.LoggerType.Runtime);
+            LogManager.Initialize(nodeCfg);
+            logger = LogManager.GetLogger("OrleansSiloHost", LoggerType.Runtime);
         }
 
         /// <summary>

@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     internal class SiloControl : SystemTarget, ISiloControl
     {
         private readonly Silo silo;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("SiloControl", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("SiloControl", LoggerType.Runtime);
 
         public SiloControl(Silo silo)
             : base(Constants.SiloControlId, silo.SiloAddress)
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetSystemLogLevel={0}", newTraceLevel);
-            TraceLogger.SetRuntimeLogLevel(newTraceLevel);
+            LogManager.SetRuntimeLogLevel(newTraceLevel);
             silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
             return TaskDone.Done;
         }
@@ -39,7 +39,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetAppLogLevel={0}", newTraceLevel);
-            TraceLogger.SetAppLogLevel(newTraceLevel);
+            LogManager.SetAppLogLevel(newTraceLevel);
             return TaskDone.Done;
         }
 
@@ -47,7 +47,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
-            TraceLogger log = TraceLogger.FindLogger(logName);
+            LoggerImpl log = LogManager.FindLogger(logName);
             
             if (log == null) throw new ArgumentException(string.Format("Logger {0} not found", logName));
             

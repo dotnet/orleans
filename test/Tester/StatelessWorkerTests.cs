@@ -57,7 +57,7 @@ namespace UnitTests.General
                 logger.Info(" {0}: Activation {1}", activations.Count, response.Item1);
                 int count = 1;
                 foreach (Tuple<DateTime, DateTime> call in response.Item2)
-                    logger.Info("\t{0}: {1} - {2}", count++, TraceLogger.PrintDate(call.Item1), TraceLogger.PrintDate(call.Item2));
+                    logger.Info("\t{0}: {1} - {2}", count++, LogFormatter.PrintDate(call.Item1), LogFormatter.PrintDate(call.Item2));
             }
 
             Assert.IsTrue(activations.Count <= ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);

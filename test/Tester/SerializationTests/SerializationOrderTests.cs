@@ -87,7 +87,7 @@ namespace UnitTests.Serialization
                 IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
             }
 
-            public void Initialize(TraceLogger logger)
+            public void Initialize(Logger logger)
             {
             }
 
@@ -132,7 +132,7 @@ namespace UnitTests.Serialization
                 IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
             }
 
-            public void Initialize(TraceLogger logger)
+            public void Initialize(Logger logger)
             {
             }
 

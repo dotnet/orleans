@@ -123,7 +123,7 @@ namespace Orleans.Runtime
         private readonly ActivationDirectory activations;
         private IStorageProviderManager storageProviderManager;
         private Dispatcher dispatcher;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
         private IDisposable gcTimer;
@@ -163,7 +163,7 @@ namespace Orleans.Runtime
             // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
             grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
 
-            logger = TraceLogger.GetLogger("Catalog", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
             setDispatcher = d => dispatcher = d;
             ActivationCollector = new ActivationCollector(config);
@@ -1230,10 +1230,7 @@ namespace Orleans.Runtime
         #endregion
         #region IPlacementContext
 
-        public TraceLogger Logger
-        {
-            get { return logger; }
-        }
+        public Logger Logger => logger;
 
         public bool FastLookup(GrainId grain, out AddressesAndTag addresses)
         {

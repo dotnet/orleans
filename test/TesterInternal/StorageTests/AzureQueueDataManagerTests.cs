@@ -14,7 +14,7 @@ namespace UnitTests.StorageTests
 {
     public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTestFixture>, IDisposable
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         public static string DeploymentId = "aqdatamanagertests".ToLower();
         private string queueName;
 
@@ -22,8 +22,8 @@ namespace UnitTests.StorageTests
         {
             ClientConfiguration config = new ClientConfiguration();
             config.TraceFilePattern = null;
-            TraceLogger.Initialize(config);
-            logger = TraceLogger.GetLogger("AzureQueueDataManagerTests", TraceLogger.LoggerType.Application);
+            LogManager.Initialize(config);
+            logger = LogManager.GetLogger("AzureQueueDataManagerTests", LoggerType.Application);
         }
 
         public void Dispose()

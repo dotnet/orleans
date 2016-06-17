@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         private bool                timerStarted;
         private DateTime            previousTickTime;
         private int                 totalNumTicks;
-        private TraceLogger         logger;
+        private Logger      logger;
 
         internal SafeTimerBase(Func<object, Task> asynTaskCallback, object state)
         {
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
 
-            logger = TraceLogger.GetLogger(GetFullName(), TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(GetFullName(), LoggerType.Runtime);
 
             if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
@@ -136,7 +136,7 @@ namespace Orleans.Runtime
         }
 
         public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
-                        TimeSpan dueTime, TimeSpan timerFrequency, TraceLogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
+                        TimeSpan dueTime, TimeSpan timerFrequency, Logger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
             TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;
             TimeSpan exceptedTimeToNexTick = totalNumTicks == 0 ? dueTime : timerFrequency;
@@ -155,7 +155,7 @@ namespace Orleans.Runtime
             var errMsg = String.Format("{0}{1} did not fire on time. Last fired at {2}, {3} since previous fire, should have fired after {4}.",
                 freezeCheck ? "Watchdog Freeze Alert: " : "-", // 0
                 getName == null ? "" : getName(),   // 1
-                TraceLogger.PrintDate(previousTickTime), // 2
+                LogFormatter.PrintDate(previousTickTime), // 2
                 timeSinceLastTick,                  // 3
                 exceptedTimeToNexTick);             // 4
 

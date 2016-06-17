@@ -24,14 +24,14 @@ namespace UnitTests.SqlStatisticsPublisherTests
 
         private const string testDatabaseName = "OrleansStatisticsTest";
         
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         private readonly SqlStatisticsPublisher StatisticsPublisher;
         
         protected SqlStatisticsPublisherTestsBase(ConnectionStringFixture fixture)
         {
-            TraceLogger.Initialize(new NodeConfiguration());
-            logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
+            LogManager.Initialize(new NodeConfiguration());
+            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
 
             lock (fixture.SyncRoot)
             {

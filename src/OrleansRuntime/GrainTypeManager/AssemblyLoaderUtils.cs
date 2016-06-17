@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     {
         private static bool TraceLoadRequests { get; set; }
         private static readonly List<AssemblyLoadLogEntry> assemblyLoadLogEntries = new List<AssemblyLoadLogEntry>();
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoadTracer");
+        private static readonly Logger logger = LogManager.GetLogger("AssemblyLoadTracer");
 
         public static void EnableAssemblyLoadTracing()
         {

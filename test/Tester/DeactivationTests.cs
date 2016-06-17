@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;

@@ -13,7 +13,7 @@ namespace UnitTests.Streaming
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
-        private TraceLogger logger;
+        private Logger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
@@ -21,7 +21,7 @@ namespace UnitTests.Streaming
         public MultipleStreamsTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.streamProviderName = streamProvider;
-            this.logger = TraceLogger.GetLogger("MultipleStreamsTestRunner", TraceLogger.LoggerType.Application);
+            this.logger = LogManager.GetLogger("MultipleStreamsTestRunner", LoggerType.Application);
             this.testNumber = testNum;
             this.runFullTest = fullTest;
         }

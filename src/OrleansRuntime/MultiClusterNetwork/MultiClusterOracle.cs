@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private readonly List<IGossipChannel> gossipChannels;
         private readonly MultiClusterOracleData localData;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly SafeRandom random;
         private readonly string clusterId;
         private readonly IReadOnlyList<string> defaultMultiCluster;
@@ -35,7 +35,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             if (sources == null) throw new ArgumentNullException("sources");
             if (silo == null) throw new ArgumentNullException("silo");
 
-            logger = TraceLogger.GetLogger("MultiClusterOracle");
+            logger = LogManager.GetLogger("MultiClusterOracle");
             gossipChannels = sources;
             localData = new MultiClusterOracleData(logger);
             clusterId = config.ClusterId;
@@ -617,8 +617,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 }
                 catch (Exception e)
                 {
-                    oracle.logger.Warn((int)ErrorCode.MultiClusterNetwork_GossipCommunicationFailure,
-                        string.Format("-{0} Publish to silo {1} ({2}) failed", id, Silo, Cluster ?? "local"), e);
+                    oracle.logger.Warn(ErrorCode.MultiClusterNetwork_GossipCommunicationFailure,
+                        $"-{id} Publish to silo {Silo} ({Cluster ?? "local"}) failed", e);
                     if (TargetsRemoteCluster)
                         Silo = null; // pick a different gateway next time
                     LastException = e;

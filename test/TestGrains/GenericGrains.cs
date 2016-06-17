@@ -10,6 +10,7 @@ using System.Threading;
 using System.Reflection;
 using Orleans.Async;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace UnitTests.Grains
 {

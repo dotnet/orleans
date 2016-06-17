@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
     internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("Scheduler.ActivationTaskScheduler", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("Scheduler.ActivationTaskScheduler", LoggerType.Runtime);
 
         private static long idCounter;
         private readonly long myId;

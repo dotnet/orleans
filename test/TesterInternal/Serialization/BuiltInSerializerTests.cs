@@ -64,7 +64,7 @@ namespace UnitTests.Serialization
         public BuiltInSerializerTests(ITestOutputHelper output)
         {
             this.output = output;
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

@@ -512,12 +512,12 @@ namespace Orleans.Runtime
             return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
         }
 
-        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc, TraceLogger logger)
+        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc, Logger logger)
         {
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, TraceLogger logger)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger)
         {
             try
             {
@@ -539,7 +539,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc, TraceLogger logger)
+        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc, Logger logger)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
@@ -552,7 +552,7 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc, TraceLogger logger)
+        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc, Logger logger)
         {
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();

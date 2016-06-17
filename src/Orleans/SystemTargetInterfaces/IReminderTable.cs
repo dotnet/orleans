@@ -15,7 +15,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config, TraceLogger traceLogger);
+        Task Init(GlobalConfiguration config, Logger logger);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 

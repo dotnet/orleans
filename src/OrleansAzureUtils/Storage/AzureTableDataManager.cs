@@ -25,8 +25,8 @@ namespace Orleans.AzureUtils
         /// <summary> Name of the table this instance is managing. </summary>
         public string TableName { get; private set; }
 
-        /// <summary> TraceLogger for this table manager instance. </summary>
-        protected internal TraceLogger Logger { get; private set; }
+        /// <summary> Logger for this table manager instance. </summary>
+        protected internal Logger Logger { get; private set; }
 
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
@@ -41,10 +41,10 @@ namespace Orleans.AzureUtils
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="logger">Logger to use.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, TraceLogger logger = null)
+        public AzureTableDataManager(string tableName, string storageConnectionString, Logger logger = null)
         {
             var loggerName = "AzureTableDataManager-" + typeof(T).Name;
-            Logger = logger ?? TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Runtime);
+            Logger = logger ?? LogManager.GetLogger(loggerName, LoggerType.Runtime);
             TableName = tableName;
             ConnectionString = storageConnectionString;
 
@@ -76,7 +76,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_02, String.Format("Could not initialize connection to storage table {0}", TableName), exc);
+                Logger.Error(ErrorCode.AzureTable_02, $"Could not initialize connection to storage table {TableName}", exc);
                 throw;
             }
             finally
@@ -215,8 +215,8 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_06, String.Format("Intermediate error upserting entry {0} to the table {1}",
-                        (data == null ? "null" : data.ToString()), TableName), exc);
+                    Logger.Warn(ErrorCode.AzureTable_06,
+                        $"Intermediate error upserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
                     throw;
                 }
             }
@@ -260,8 +260,8 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_07, String.Format("Intermediate error merging entry {0} to the table {1}",
-                        (data == null ? "null" : data.ToString()), TableName), exc);
+                    Logger.Warn(ErrorCode.AzureTable_07,
+                        $"Intermediate error merging entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
                     throw;
                 }
             }
@@ -340,8 +340,7 @@ namespace Orleans.AzureUtils
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_08,
-                        String.Format("Intermediate error deleting entry {0} from the table {1}.",
-                            data, TableName), exc);
+                        $"Intermediate error deleting entry {data} from the table {TableName}.", exc);
                     throw;
                 }
             }
@@ -467,8 +466,7 @@ namespace Orleans.AzureUtils
                 catch (Exception exc)
                 {
                     Logger.Warn(ErrorCode.AzureTable_08,
-                        String.Format("Intermediate error deleting entries {0} from the table {1}.",
-                            Utils.EnumerableToString(collection), TableName), exc);
+                        $"Intermediate error deleting entries {Utils.EnumerableToString(collection)} from the table {TableName}.", exc);
                     throw;
                 }
             }
@@ -521,7 +519,7 @@ namespace Orleans.AzureUtils
                 catch (Exception exc)
                 {
                     // Out of retries...
-                    var errorMsg = string.Format("Failed to read Azure storage table {0}: {1}", TableName, exc.Message);
+                    var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
                     if (!AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
                         Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
@@ -586,8 +584,8 @@ namespace Orleans.AzureUtils
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn(ErrorCode.AzureTable_37, String.Format("Intermediate error bulk inserting {0} entries in the table {1}",
-                        collection.Count, TableName), exc);
+                    Logger.Warn(ErrorCode.AzureTable_37,
+                        $"Intermediate error bulk inserting {collection.Count} entries in the table {TableName}", exc);
                 }
             }
             finally
@@ -718,7 +716,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_17, String.Format("Error creating CloudTableOperationsClient."), exc);
+                Logger.Error(ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
                 throw;
             }
         }
@@ -737,7 +735,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.AzureTable_18, String.Format("Error creating CloudTableCreationClient."), exc);
+                Logger.Error(ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
                 throw;
             }
         }
@@ -750,14 +748,13 @@ namespace Orleans.AzureUtils
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
                 if(Logger.IsVerbose) Logger.Verbose(ErrorCode.AzureTable_13,
-                   String.Format("Intermediate Azure table write error {0} to table {1} data1 {2} data2 {3}",
-                   operation, TableName, (data1 ?? "null"), (data2 ?? "null")), exc);
+                    $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
 
             }
             else
             {
                 Logger.Error(ErrorCode.AzureTable_14,
-                    string.Format("Azure table access write error {0} to table {1} entry {2}", operation, TableName, data1), exc);
+                    $"Azure table access write error {operation} to table {TableName} entry {data1}", exc);
             }
         }
 

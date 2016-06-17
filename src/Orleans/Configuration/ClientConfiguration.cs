@@ -413,7 +413,7 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendLine("Client Configuration:");
             sb.Append("   Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
-            sb.Append("   Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("   Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("   Gateway Provider: ").Append(GatewayProvider);
             if (GatewayProvider == GatewayProviderType.None)
             {

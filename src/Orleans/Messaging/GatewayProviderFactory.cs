@@ -10,7 +10,7 @@ namespace Orleans.Messaging
 {
     internal class GatewayProviderFactory
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger(typeof(GatewayProviderFactory).Name, TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger(typeof(GatewayProviderFactory).Name, LoggerType.Runtime);
 
         internal static async Task<IGatewayListProvider> CreateGatewayListProvider(ClientConfiguration cfg)
         {
@@ -43,7 +43,7 @@ namespace Orleans.Messaging
                     throw new NotImplementedException(gatewayProviderToUse.ToString());
             }
 
-            await listProvider.InitializeGatewayListProvider(cfg, TraceLogger.GetLogger(listProvider.GetType().Name));
+            await listProvider.InitializeGatewayListProvider(cfg, LogManager.GetLogger(listProvider.GetType().Name));
             return listProvider;
         }
     }
@@ -56,7 +56,7 @@ namespace Orleans.Messaging
 
         #region Implementation of IGatewayListProvider
 
-        public Task InitializeGatewayListProvider(ClientConfiguration cfg, TraceLogger traceLogger)
+        public Task InitializeGatewayListProvider(ClientConfiguration cfg, Logger logger)
         {
             config = cfg;
             knownGateways = cfg.Gateways.Select(ep => ep.ToGatewayUri()).ToList();

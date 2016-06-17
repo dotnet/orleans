@@ -24,7 +24,7 @@ namespace Orleans.Messaging
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private readonly SafeRandom rand;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly object lockable;
 
         private readonly ClientConfiguration config;
@@ -35,7 +35,7 @@ namespace Orleans.Messaging
             config = cfg;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
-            logger = TraceLogger.GetLogger("Messaging.GatewayManager", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Messaging.GatewayManager", LoggerType.Runtime);
             lockable = new object();
             gatewayRefreshCallInitiated = false;
 

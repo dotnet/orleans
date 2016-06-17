@@ -15,7 +15,7 @@ namespace Orleans.Runtime.MembershipService
         private List<SiloAddress> localMultiClusterGatewaysCopy;               // a cached copy of the silos that are designated gateways
 
         private readonly List<ISiloStatusListener> statusListeners;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         
         private IntValueStatistic clusterSizeStatistic;
         private StringValueStatistic clusterStatistic;
@@ -31,7 +31,7 @@ namespace Orleans.Runtime.MembershipService
 
         private UpdateFaultCombo myFaultAndUpdateZones;
 
-        internal MembershipOracleData(Silo silo, TraceLogger log)
+        internal MembershipOracleData(Silo silo, Logger log)
         {
             logger = log;
             localTable = new Dictionary<SiloAddress, MembershipEntry>();  

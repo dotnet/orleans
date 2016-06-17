@@ -163,15 +163,15 @@ namespace UnitTests.StreamingTests
     internal class ConsumerProxy
     {
         private readonly IStreaming_ConsumerGrain[] _targets;
-        private readonly TraceLogger _logger;
+        private readonly Logger _logger;
 
-        private ConsumerProxy(IStreaming_ConsumerGrain[] targets, TraceLogger logger)
+        private ConsumerProxy(IStreaming_ConsumerGrain[] targets, Logger logger)
         {
             _targets = targets;
             _logger = logger;
         }
 
-        private static async Task<ConsumerProxy> NewConsumerProxy(Guid streamId, string streamProvider, IStreaming_ConsumerGrain[] targets, TraceLogger logger)
+        private static async Task<ConsumerProxy> NewConsumerProxy(Guid streamId, string streamProvider, IStreaming_ConsumerGrain[] targets, Logger logger)
         {
             if (targets == null)
                 throw new ArgumentNullException("targets");
@@ -187,7 +187,7 @@ namespace UnitTests.StreamingTests
             return newObj;
         }
 
-        public static Task<ConsumerProxy> NewConsumerGrainsAsync(Guid streamId, string streamProvider, TraceLogger logger, Guid[] grainIds = null, int grainCount = 1)
+        public static Task<ConsumerProxy> NewConsumerGrainsAsync(Guid streamId, string streamProvider, Logger logger, Guid[] grainIds = null, int grainCount = 1)
         {
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
@@ -218,7 +218,7 @@ namespace UnitTests.StreamingTests
             return NewConsumerProxy(streamId, streamProvider, grains, logger);
         }
 
-        public static Task<ConsumerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, TraceLogger logger, int[] grainIds, bool useReentrantGrain)
+        public static Task<ConsumerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, Logger logger, int[] grainIds, bool useReentrantGrain)
         {
             int grainCount = grainIds.Length;
             if (grainCount < 1)
@@ -248,7 +248,7 @@ namespace UnitTests.StreamingTests
             return NewConsumerProxy(streamId, streamProvider, grains, logger);
         }
 
-        public static Task<ConsumerProxy> NewConsumerClientObjectsAsync(Guid streamId, string streamProvider, TraceLogger logger, int consumerCount = 1)
+        public static Task<ConsumerProxy> NewConsumerClientObjectsAsync(Guid streamId, string streamProvider, Logger logger, int consumerCount = 1)
         {
             if (consumerCount < 1)
                 throw new ArgumentOutOfRangeException("consumerCount", "argument must be 1 or greater");
@@ -259,7 +259,7 @@ namespace UnitTests.StreamingTests
             return NewConsumerProxy(streamId, streamProvider, objs, logger);
         }
 
-        public static ConsumerProxy NewConsumerGrainAsync_WithoutBecomeConsumer(Guid consumerGrainId, TraceLogger logger, string grainClassName = "")
+        public static ConsumerProxy NewConsumerGrainAsync_WithoutBecomeConsumer(Guid consumerGrainId, Logger logger, string grainClassName = "")
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
@@ -343,7 +343,7 @@ namespace UnitTests.StreamingTests
     internal class ProducerProxy
     {
         private readonly IStreaming_ProducerGrain[] _targets;
-        private readonly TraceLogger _logger;
+        private readonly Logger _logger;
         private readonly Guid _streamId;
         private readonly string _providerName;
         private readonly InterlockedFlag _cleanedUpFlag;
@@ -356,7 +356,7 @@ namespace UnitTests.StreamingTests
         public string ProviderName { get { return _providerName; } }
         public Guid StreamId { get { return _streamId; } }
 
-        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, TraceLogger logger)
+        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, Logger logger)
         {
             _targets = targets;
             _logger = logger;
@@ -365,7 +365,7 @@ namespace UnitTests.StreamingTests
             _cleanedUpFlag = new InterlockedFlag();
         }
 
-        private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, TraceLogger logger)
+        private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, Logger logger)
         {
             if (targets == null)
                 throw new ArgumentNullException("targets");
@@ -379,7 +379,7 @@ namespace UnitTests.StreamingTests
             return newObj;
         }
 
-        public static Task<ProducerProxy> NewProducerGrainsAsync(Guid streamId, string streamProvider, string streamNamespace, TraceLogger logger, Guid[] grainIds = null, int grainCount = 1)
+        public static Task<ProducerProxy> NewProducerGrainsAsync(Guid streamId, string streamProvider, string streamNamespace, Logger logger, Guid[] grainIds = null, int grainCount = 1)
         {
             grainCount = grainIds != null ? grainIds.Length : grainCount;
             if (grainCount < 1)
@@ -410,7 +410,7 @@ namespace UnitTests.StreamingTests
             return NewProducerProxy(grains, streamId, streamProvider, streamNamespace, logger);
         }
 
-        public static Task<ProducerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, TraceLogger logger, int[] grainIds, bool useReentrantGrain)
+        public static Task<ProducerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, Logger logger, int[] grainIds, bool useReentrantGrain)
         {
             int grainCount = grainIds.Length;
             if (grainCount < 1)
@@ -440,7 +440,7 @@ namespace UnitTests.StreamingTests
             return NewProducerProxy(grains, streamId, streamProvider, null, logger);
         }
 
-        public static Task<ProducerProxy> NewProducerClientObjectsAsync(Guid streamId, string streamProvider,  string streamNamespace, TraceLogger logger, int producersCount = 1)
+        public static Task<ProducerProxy> NewProducerClientObjectsAsync(Guid streamId, string streamProvider,  string streamNamespace, Logger logger, int producersCount = 1)
         {            
             if (producersCount < 1)
                 throw new ArgumentOutOfRangeException("producersCount", "The producer count must be at least one");
