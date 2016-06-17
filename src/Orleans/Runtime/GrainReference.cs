@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Async;
 using Orleans.Serialization;
 using Orleans.CodeGeneration;
 
@@ -301,6 +302,7 @@ namespace Orleans.Runtime
             if (arguments != null)
             {
                 CheckForGrainArguments(arguments);
+                SetGrainCancellationTokensTarget(arguments, this);
                 argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
             }
             
@@ -505,6 +507,20 @@ namespace Orleans.Runtime
             foreach (var argument in arguments)
                 if (argument is Grain)
                     throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", argument.GetType().FullName));
+        }
+
+        /// <summary>
+        /// Sets target grain to the found instances of type GrainCancellationToken
+        /// </summary>
+        /// <param name="arguments"> Grain method arguments list</param>
+        /// <param name="target"> Target grain reference</param>
+        private static void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
+        {
+            if (arguments == null) return;
+            foreach (var argument in arguments)
+            {
+                (argument as GrainCancellationToken)?.AddGrainReference(target);
+            }
         }
 
         /// <summary> Serializer function for grain reference.</summary>
