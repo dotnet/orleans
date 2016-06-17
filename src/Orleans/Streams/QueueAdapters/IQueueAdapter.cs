@@ -26,7 +26,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Creates a quere receiver for the specificed queueId
         /// </summary>
-        /// <param name="requesterId">Id of requester, for monitoring/logging purposes</param>
         /// <param name="queueId"></param>
         /// <returns></returns>
         IQueueAdapterReceiver CreateReceiver(QueueId queueId);

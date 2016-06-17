@@ -71,10 +71,10 @@ namespace UnitTests.OrleansRuntime.Streams
                     : 0 - realToken.EventIndex;
             }
 
-            public int Compare(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
                 int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                return results != 0 ? results : String.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+                return results == 0 && string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal)==0;
             }
         }
 

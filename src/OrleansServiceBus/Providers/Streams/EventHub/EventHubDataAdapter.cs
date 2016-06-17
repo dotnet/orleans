@@ -69,14 +69,14 @@ namespace Orleans.ServiceBus.Providers
                 : 0 - realToken.EventIndex;
         }
 
-        public int Compare(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
+        public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
         {
             int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return result;
+            if (result != 0) return false;
 
             int readOffset = 0;
             string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
         }
     }
 
