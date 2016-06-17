@@ -2,11 +2,9 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Async;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using Xunit;
 using UnitTests.Tester;
 
@@ -22,7 +20,7 @@ namespace UnitTests.CancellationTests
             }
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -36,7 +34,7 @@ namespace UnitTests.CancellationTests
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -52,7 +50,7 @@ namespace UnitTests.CancellationTests
             await Task.WhenAll(grainTasks);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         public async Task TokenPassingWithoutCancellation_NoExceptionShouldBeThrown()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -67,7 +65,7 @@ namespace UnitTests.CancellationTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         public async Task PreCancelledTokenPassing()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -77,7 +75,7 @@ namespace UnitTests.CancellationTests
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksExecutionContext()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -89,7 +87,7 @@ namespace UnitTests.CancellationTests
             Assert.Equal(true, result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksTaskSchedulerContext()
         {
             var grains = await GetGrains<bool>(false);
@@ -101,7 +99,7 @@ namespace UnitTests.CancellationTests
             Assert.Equal(true, result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksThrow_ExceptionShouldBePropagated()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -121,7 +119,7 @@ namespace UnitTests.CancellationTests
             Assert.True(false, "No exception was thrown");
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -130,7 +128,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(false, delay);
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -139,7 +137,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(true, delay);
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -148,7 +146,7 @@ namespace UnitTests.CancellationTests
             await ClientGrainGrainTokenPassing(delay, true);
         }
 
-        [Theory, TestCategory("Functional"), TestCategory("BVT")]
+        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]

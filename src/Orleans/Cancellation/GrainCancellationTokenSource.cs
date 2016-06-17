@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
-namespace Orleans.Async
+namespace Orleans
 {
     /// <summary>
     /// Distributed version of the CancellationTokenSource
@@ -14,15 +13,11 @@ namespace Orleans.Async
         private readonly GrainCancellationToken _grainCancellationToken;
 
         /// <summary>
-        /// Initializes the <see cref="T:Orleans.Async.GrainCancellationTokenSource"/>.
+        /// Initializes the <see cref="T:Orleans.GrainCancellationTokenSource"/>.
         /// </summary>
-        public GrainCancellationTokenSource() : this(Guid.NewGuid(), false)
+        public GrainCancellationTokenSource()
         {
-        }
-
-        internal GrainCancellationTokenSource(Guid id, bool canceled)
-        {
-            _grainCancellationToken = new GrainCancellationToken(id, canceled);
+            _grainCancellationToken = new GrainCancellationToken(Guid.NewGuid());
         }
 
         /// <summary>

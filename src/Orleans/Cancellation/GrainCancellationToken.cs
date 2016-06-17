@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +7,7 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.Async
+namespace Orleans
 {
     /// <summary>
     /// Grain cancellation token
@@ -26,20 +25,26 @@ namespace Orleans.Async
         private readonly ConcurrentDictionary<GrainId, GrainReference> _targetGrainReferences;
 
         /// <summary>
-        /// Initializes the <see cref="T:Orleans.Async.GrainCancellationToken"/>.
+        /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
         /// </summary>
-        internal GrainCancellationToken(
-            Guid id,
-            bool canceled)
+        internal GrainCancellationToken(Guid id)
         {
             _cancellationTokenSource = new CancellationTokenSource();
-            if (canceled)
-            {
-                _cancellationTokenSource.Cancel();
-            }
-
             Id = id;
             _targetGrainReferences = new ConcurrentDictionary<GrainId, GrainReference>();
+        }
+
+
+        /// <summary>
+        /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
+        /// </summary>
+        internal GrainCancellationToken(Guid id, bool canceled) : this(id)
+        {
+            if (canceled)
+            {
+                // we Cancel _cancellationTokenSource just "to store" the cancelled state.
+                _cancellationTokenSource.Cancel();
+            }
         }
 
         /// <summary>
@@ -56,16 +61,19 @@ namespace Orleans.Async
 
         internal Task Cancel()
         {
-            _cancellationTokenSource.Cancel();
+            // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
+            // but also cancel _targetGrainReferences. 
+            Task task = OrleansTaskExtentions.WrapInTask(_cancellationTokenSource.Cancel);
+            
             if (_targetGrainReferences.IsEmpty)
             {
-                return TaskDone.Done;
+                return task;
             }
-
             var cancellationTasks = _targetGrainReferences
                 .Select(pair => pair.Value.AsReference<ICancellationSourcesExtension>()
-                .CancelTokenSource(this))
+                .CancelRemoteToken(this))
                 .ToList();
+            cancellationTasks.Add(task);
 
             return Task.WhenAll(cancellationTasks);
         }
