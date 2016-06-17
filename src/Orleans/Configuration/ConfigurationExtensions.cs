@@ -57,5 +57,22 @@ namespace Orleans.Runtime.Configuration
 
             return properties;
         }
+
+
+        /// <summary>
+        /// Configures all cluster nodes to use the specified startup class for dependency injection.
+        /// </summary>
+        /// <typeparam name="TStartup">Startup type</typeparam>
+        public static void UseStartupType<TStartup>(this ClusterConfiguration config) 
+        {
+            var startupName = typeof(TStartup).AssemblyQualifiedName;
+
+            foreach(var nodeConfig in config.Overrides.Values) {
+                nodeConfig.StartupTypeName = startupName;
+            }
+
+            config.Defaults.StartupTypeName = startupName;
+        }
+
     }
 }
