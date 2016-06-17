@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         internal ISiloMessageCenter Transport { get; private set; }
 
         private readonly Catalog catalog;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly ClusterConfiguration config;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
@@ -35,7 +35,7 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
-            logger = TraceLogger.GetLogger("Dispatcher", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
             errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;

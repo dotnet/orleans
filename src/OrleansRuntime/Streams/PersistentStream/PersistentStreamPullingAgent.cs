@@ -58,7 +58,7 @@ namespace Orleans.Streams
             numMessages = 0;
 
             logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
-            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_01, 
+            logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
@@ -87,7 +87,7 @@ namespace Orleans.Streams
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
             if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
 
-            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
+            logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
                 GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
             
             // Remove cast once we cleanup
@@ -101,7 +101,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
                 return;
             }
 
@@ -114,7 +114,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
                 return;
             }
 
@@ -140,7 +140,7 @@ namespace Orleans.Streams
         public async Task Shutdown()
         {
             // Stop pulling from queues that are not in my range anymore.
-            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
+            logger.Info(ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
             if (timer != null)
             {
                 var tmp = timer;
@@ -167,7 +167,7 @@ namespace Orleans.Streams
             {
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
-                logger.Info((int)ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
+                logger.Info(ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
                 unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
             }
 
@@ -177,7 +177,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_08,
+                logger.Warn(ErrorCode.PersistentStreamPullingAgent_08,
                     "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.", exc);
             }
             pubSubCache.Clear();
@@ -191,7 +191,7 @@ namespace Orleans.Streams
             IStreamConsumerExtension streamConsumer,
             IStreamFilterPredicateWrapper filter)
         {
-            if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
+            if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
             AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
@@ -298,7 +298,7 @@ namespace Orleans.Streams
 
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
-            if (removed && logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
+            if (removed && logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
             
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);
@@ -336,8 +336,8 @@ namespace Orleans.Streams
                             }
                             catch (Exception exc)
                             {
-                                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_27, 
-                                    String.Format("Exception calling MessagesDeliveredAsync on queue {0}. Ignoring.", myQueueId), exc);
+                                logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
+                                    $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
                             }
                         }
                     }
@@ -360,7 +360,7 @@ namespace Orleans.Streams
                     }
                     numMessages += multiBatch.Count;
                     numReadMessagesCounter.IncrementBy(multiBatch.Count);
-                    if (logger.IsVerbose2) logger.Verbose2((int)ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
+                    if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
                         multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
                     
                     foreach (var group in 
@@ -384,7 +384,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_12, "Exception while PersistentStreamPullingAgentGrain.AsyncTimerCallback", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_12, "Exception while PersistentStreamPullingAgentGrain.AsyncTimerCallback", exc);
             }
         }
 
@@ -512,8 +512,9 @@ namespace Orleans.Streams
                         {
                             consumerData.Cursor.RecordDeliveryFailure();
                         }
-                        var message = string.Format("Exception while trying to deliver msgs to stream {0} in PersistentStreamPullingAgentGrain.RunConsumerCursor", consumerData.StreamId);
-                        logger.Error((int)ErrorCode.PersistentStreamPullingAgent_14, message, exc);
+                        var message =
+                            $"Exception while trying to deliver msgs to stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
+                        logger.Error(ErrorCode.PersistentStreamPullingAgent_14, message, exc);
                         exceptionOccured = exc is ClientNotAvailableException
                             ? exc
                             : new StreamEventDeliveryFailureException(consumerData.StreamId);
@@ -530,7 +531,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_15, "Ignored RunConsumerCursor Error", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_15, "Ignored RunConsumerCursor Error", exc);
                 consumerData.State = StreamConsumerDataState.Inactive;
                 throw;
             }
@@ -582,7 +583,7 @@ namespace Orleans.Streams
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
             {
-                logger.Warn((int)ErrorCode.Stream_ConsumerIsDead,
+                logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                     "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
                 pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName).Ignore();
                 return true;
@@ -635,7 +636,7 @@ namespace Orleans.Streams
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
-                if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
+                if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)
@@ -647,7 +648,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 // RegisterAsStreamProducer is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
-                logger.Error((int)ErrorCode.PersistentStreamPullingAgent_17, "Ignored RegisterAsStreamProducer Error", exc);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, "Ignored RegisterAsStreamProducer Error", exc);
                 throw;
             }
         }

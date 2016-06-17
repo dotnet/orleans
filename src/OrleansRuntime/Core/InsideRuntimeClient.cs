@@ -27,9 +27,9 @@ namespace Orleans.Runtime
     /// </summary>
     internal class InsideRuntimeClient : IRuntimeClient
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("InsideRuntimeClient", TraceLogger.LoggerType.Runtime);
-        private static readonly TraceLogger invokeExceptionLogger = TraceLogger.GetLogger("Grain.InvokeException", TraceLogger.LoggerType.Application);
-        private static readonly TraceLogger appLogger = TraceLogger.GetLogger("Application", TraceLogger.LoggerType.Application);
+        private static readonly Logger logger = LogManager.GetLogger("InsideRuntimeClient", LoggerType.Runtime);
+        private static readonly Logger invokeExceptionLogger = LogManager.GetLogger("Grain.InvokeException", LoggerType.Application);
+        private static readonly Logger appLogger = LogManager.GetLogger("Application", LoggerType.Application);
 
         private readonly Dispatcher dispatcher;
         private readonly ILocalGrainDirectory directory;

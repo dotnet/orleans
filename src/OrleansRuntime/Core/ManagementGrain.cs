@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Management
 
         public override Task OnActivateAsync()
         {
-            logger = TraceLogger.GetLogger("ManagementGrain", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ManagementGrain", LoggerType.Runtime);
             return TaskDone.Done;
         }
 
@@ -268,7 +268,7 @@ namespace Orleans.Runtime.Management
                 membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
 
                 await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
-                    TraceLogger.GetLogger(membershipTable.GetType().Name));
+                    LogManager.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }

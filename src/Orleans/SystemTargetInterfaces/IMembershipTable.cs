@@ -19,8 +19,8 @@ namespace Orleans
         /// </summary>
         /// <param name="globalConfiguration">the give global configuration</param>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
-        /// <param name="traceLogger">the logger used by the membership table</param>
-        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, TraceLogger traceLogger);
+        /// <param name="logger">the logger used by the membership table</param>
+        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, Logger logger);
 
         /// <summary>
         /// Deletes all table entries of the given deploymentId
@@ -359,14 +359,14 @@ namespace Orleans
                 RoleName,
                 UpdateZone,
                 FaultZone,
-                TraceLogger.PrintDate(StartTime),
-                TraceLogger.PrintDate(IAmAliveTime),
+                LogFormatter.PrintDate(StartTime),
+                LogFormatter.PrintDate(IAmAliveTime),
                 suspecters == null
                     ? ""
                     : "Suspecters = " + Utils.EnumerableToString(suspecters, sa => sa.ToLongString()),
                 timestamps == null
                     ? ""
-                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, TraceLogger.PrintDate)
+                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, LogFormatter.PrintDate)
                 );
         }
     }

@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("OrleansTaskScheduler RunQueue={RunQueue.Length}")]
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
-        private readonly TraceLogger logger = TraceLogger.GetLogger("Scheduler.OrleansTaskScheduler", TraceLogger.LoggerType.Runtime);
+        private readonly LoggerImpl logger = LogManager.GetLogger("Scheduler.OrleansTaskScheduler", LoggerType.Runtime);
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         

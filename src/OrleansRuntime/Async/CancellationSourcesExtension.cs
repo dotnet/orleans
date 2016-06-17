@@ -12,8 +12,8 @@ namespace Orleans.Async
     /// </summary>
     internal class CancellationSourcesExtension : ICancellationSourcesExtension
     {
-        private readonly static Lazy<TraceLogger> _logger = new Lazy<TraceLogger>(() =>
-            TraceLogger.GetLogger("CancellationSourcesExtension", TraceLogger.LoggerType.Runtime));
+        private static readonly Lazy<Logger> _logger = new Lazy<Logger>(() =>
+            LogManager.GetLogger("CancellationSourcesExtension", LoggerType.Runtime));
         private readonly Interner<Guid, GrainCancellationToken> _cancellationTokens;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
         private static readonly int _defaultInternerCollectionSize = 31;
@@ -61,7 +61,7 @@ namespace Orleans.Async
         /// <param name="request"></param>
         /// <param name="i">Index of the GrainCancellationToken in the request.Arguments array</param>
         /// <param name="logger"></param>
-        internal static void RegisterCancellationTokens(IAddressable target, InvokeMethodRequest request, TraceLogger logger)
+        internal static void RegisterCancellationTokens(IAddressable target, InvokeMethodRequest request, Logger logger)
         {
             for (var i = 0; i < request.Arguments.Length; i++)
             {
@@ -77,7 +77,7 @@ namespace Orleans.Async
                     {
                         logger.Error(
                             ErrorCode.CancellationExtensionCreationFailed,
-                            string.Format("Could not add cancellation token extension, target: {0}", target));
+                            $"Could not add cancellation token extension, target: {target}");
                         return;
                     }
                 }

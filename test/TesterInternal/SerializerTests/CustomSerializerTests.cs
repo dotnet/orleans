@@ -71,7 +71,7 @@ namespace UnitTests.SerializerTests
     {
         public CustomSerializerTests()
         {
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
 
             SerializationManager.InitializeForTesting();
         }

@@ -18,7 +18,7 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                if (!TraceLogger.IsInitialized) TraceLogger.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+                if (!LogManager.IsInitialized) LogManager.Initialize(ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             }
         }

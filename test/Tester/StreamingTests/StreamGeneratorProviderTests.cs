@@ -8,6 +8,7 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;

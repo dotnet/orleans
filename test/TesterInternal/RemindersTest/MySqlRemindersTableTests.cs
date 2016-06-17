@@ -15,7 +15,7 @@ namespace UnitTests.RemindersTest
     {
         public MySqlRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride(nameof(MySqlRemindersTableTests), Severity.Verbose3);
+            LogManager.AddTraceLevelOverride(nameof(MySqlRemindersTableTests), Severity.Verbose3);
         }
 
         protected override IReminderTable CreateRemindersTable()

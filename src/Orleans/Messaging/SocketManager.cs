@@ -131,7 +131,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                TraceLogger.GetLogger("SocketManager", TraceLogger.LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
+                LogManager.GetLogger("SocketManager", LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
             }
             finally
             {

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;

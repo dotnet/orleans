@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         private readonly SiloAddress myAddress;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private GrainTimer clientRefreshTimer;
         private Gateway gateway;
        
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             myAddress = myAddr;
             this.scheduler = scheduler;
             orleansConfig = config;
-            logger = TraceLogger.GetLogger(typeof(ClientObserverRegistrar).Name);
+            logger = LogManager.GetLogger(typeof(ClientObserverRegistrar).Name);
         }
 
         internal void SetGateway(Gateway gateway)

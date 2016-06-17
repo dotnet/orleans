@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Streams;
+using Orleans.Runtime;
 
 namespace Orleans.Runtime.Host
 {
@@ -85,7 +86,7 @@ namespace Orleans.Runtime.Host
     /// </summary>
     internal class ServiceRuntimeWrapper : IServiceRuntimeWrapper, IDeploymentConfiguration
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private Assembly assembly;
         private Type roleEnvironmentType;
         private EventInfo stoppingEvent;
@@ -99,7 +100,7 @@ namespace Orleans.Runtime.Host
 
         public ServiceRuntimeWrapper()
         {
-            logger = TraceLogger.GetLogger("ServiceRuntimeWrapper");
+            logger = LogManager.GetLogger("ServiceRuntimeWrapper");
             Initialize();
         }
 
@@ -144,7 +145,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception exc)
             {
-                var errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
+                string errorMsg = string.Format("Unable to obtain endpoint info for role {0} from role config parameter {1} -- Endpoints defined = [{2}]",
                     RoleName, endpointName, string.Join(", ", instanceEndpoints));
 
                 logger.Error(ErrorCode.SiloEndpointConfigError, errorMsg, exc);

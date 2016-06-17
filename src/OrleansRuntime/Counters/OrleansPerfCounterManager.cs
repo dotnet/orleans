@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Counters
         internal const string CATEGORY_NAME = "OrleansRuntime";
         internal const string CATEGORY_DESCRIPTION = "Orleans Runtime Counters";
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("OrleansPerfCounterManager", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("OrleansPerfCounterManager", LoggerType.Runtime);
         private static readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
         
 

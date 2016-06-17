@@ -383,7 +383,7 @@ namespace Orleans.CodeGeneration
             catch (Exception ex)
             {
                 File.WriteAllText("error.txt", ex.Message + Environment.NewLine + ex.StackTrace);
-                Console.WriteLine("-- Code-gen FAILED -- \n{0}", TraceLogger.PrintException(ex));
+                Console.WriteLine("-- Code-gen FAILED -- \n{0}", LogFormatter.PrintException(ex));
                 return 3;
             }
         }

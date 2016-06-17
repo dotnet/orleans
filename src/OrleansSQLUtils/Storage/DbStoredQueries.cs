@@ -178,7 +178,7 @@ namespace OrleansSQLUtils.Storage
                         {
                             var split = s.Split(',');
                             return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]),
-                                TraceLogger.ParseDate(split[1]));
+                                LogFormatter.ParseDate(split[1]));
                         }));
                     }
                 }
@@ -439,7 +439,7 @@ namespace OrleansSQLUtils.Storage
                     Add(nameof(SuspectTimes), value == null
                         ? null
                         : string.Join("|", value.Select(
-                            s => $"{s.Item1.ToParsableString()},{TraceLogger.PrintDate(s.Item2)}")));
+                            s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
             }
         }

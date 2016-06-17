@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Host
         //Consul does not support the extended Membership Protocol and will always return the same table version information
         private readonly TableVersion _tableVersion = new TableVersion(0, "0");
 
-        private TraceLogger _logger;
+        private Logger _logger;
         private ConsulClient _consulClient = null;
         private String _deploymentId;
         private String _connectionString;
@@ -33,11 +33,11 @@ namespace Orleans.Runtime.Host
             get { return true; }
         }
 
-        public Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
+        public Task InitializeGatewayListProvider(ClientConfiguration config, Logger logger)
         {
             _maxStaleness = config.GatewayListRefreshPeriod;
 
-            Init(config.DeploymentId, config.DataConnectionString, traceLogger);
+            Init(config.DeploymentId, config.DataConnectionString, logger);
 
             return TaskDone.Done;
         }
@@ -47,22 +47,22 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitTableVersion">Will be ignored: Consul does not support the extended Membership Protocol TableVersion</param>
-        /// <param name="traceLogger">The logger to be used by this instance</param>
+        /// <param name="logger">The logger to be used by this instance</param>
         /// <returns></returns>
         /// <remarks>
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialise
         /// </remarks>
-        public Task InitializeMembershipTable(GlobalConfiguration config, Boolean tryInitTableVersion, TraceLogger traceLogger)
+        public Task InitializeMembershipTable(GlobalConfiguration config, Boolean tryInitTableVersion, Logger logger)
         {
-            Init(config.DeploymentId, config.DataConnectionString, traceLogger);
+            Init(config.DeploymentId, config.DataConnectionString, logger);
 
             return TaskDone.Done;
         }
 
-        private void Init(String deploymentId, String dataConnectionString, TraceLogger traceLogger)
+        private void Init(String deploymentId, String dataConnectionString, Logger logger)
         {
-            _logger = traceLogger;
+            _logger = logger;
             _deploymentId = deploymentId;
             _connectionString = dataConnectionString;
 

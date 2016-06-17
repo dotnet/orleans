@@ -27,14 +27,14 @@ namespace UnitTests
         public ConfigTests(ITestOutputHelper output)
         {
             this.output = output;
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
 
         public void Dispose()
         {
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
         }
@@ -150,7 +150,7 @@ namespace UnitTests
 
             Assert.AreEqual(baseLogFileName, fname);
 
-            TraceLogger.Initialize(n);
+            LogManager.Initialize(n);
 
             Assert.IsTrue(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
             Assert.IsTrue(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
@@ -178,7 +178,7 @@ namespace UnitTests
 
             Assert.AreEqual(baseLogFileName, fname);
 
-            TraceLogger.Initialize(n);
+            LogManager.Initialize(n);
 
             Assert.IsTrue(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
             Assert.IsTrue(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
@@ -206,14 +206,14 @@ namespace UnitTests
 
             Assert.AreEqual(logFileName, fname);
 
-            TraceLogger.Initialize(n);
+            LogManager.Initialize(n);
 
             Assert.IsTrue(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
 
-            TraceLogger myLogger = TraceLogger.GetLogger("MyLogger", TraceLogger.LoggerType.Application);
+            Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
 
             myLogger.Info("Write something");
-            TraceLogger.Flush();
+            LogManager.Flush();
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 
@@ -246,14 +246,14 @@ namespace UnitTests
 
             Assert.AreEqual(logFileName, fname);
 
-            TraceLogger.Initialize(n);
+            LogManager.Initialize(n);
 
             Assert.IsTrue(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
 
-            TraceLogger myLogger = TraceLogger.GetLogger("MyLogger", TraceLogger.LoggerType.Application);
+            Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
 
             myLogger.Info("Write something");
-            TraceLogger.Flush();
+            LogManager.Flush();
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 
@@ -349,28 +349,28 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ClientConfig_LogConsumers()
         {
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
 
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
 
             var cfg = ClientConfiguration.LoadFromFile(filename);
             Assert.AreEqual(filename, cfg.SourceFile);
 
-            TraceLogger.Initialize(cfg);
-            Assert.AreEqual(1, TraceLogger.LogConsumers.Count,
-                "Number of log consumers: " + string.Join(",", TraceLogger.LogConsumers));
-            Assert.AreEqual(typeof(DummyLogConsumer).FullName, TraceLogger.LogConsumers.Last().GetType().FullName, "Log consumer type #1");
+            LogManager.Initialize(cfg);
+            Assert.AreEqual(1, LogManager.LogConsumers.Count,
+                "Number of log consumers: " + string.Join(",", LogManager.LogConsumers));
+            Assert.AreEqual(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName, "Log consumer type #1");
 
-            Assert.AreEqual(1, TraceLogger.TelemetryConsumers.Count,
-                "Number of telemetry consumers: " + string.Join(",", TraceLogger.TelemetryConsumers));
-            Assert.AreEqual(typeof(TraceTelemetryConsumer).FullName, TraceLogger.TelemetryConsumers.First().GetType().FullName, "TelemetryConsumers consumer type #1");
+            Assert.AreEqual(1, LogManager.TelemetryConsumers.Count,
+                "Number of telemetry consumers: " + string.Join(",", LogManager.TelemetryConsumers));
+            Assert.AreEqual(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName, "TelemetryConsumers consumer type #1");
 
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
         public void ServerConfig_LogConsumers()
         {
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
 
             string filename = "Config_LogConsumers-OrleansConfiguration.xml";
 
@@ -378,13 +378,13 @@ namespace UnitTests
             cfg.LoadFromFile(filename);
             Assert.AreEqual(filename, cfg.SourceFile);
 
-            TraceLogger.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
+            LogManager.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
 
-            var actualLogConsumers = TraceLogger.LogConsumers.Select(x => x.GetType()).ToList();
+            var actualLogConsumers = LogManager.LogConsumers.Select(x => x.GetType()).ToList();
             Xunit.Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
             Assert.AreEqual(1, actualLogConsumers.Count);
 
-            var actualTelemetryConsumers = TraceLogger.TelemetryConsumers.Select(x => x.GetType()).ToList();
+            var actualTelemetryConsumers = LogManager.TelemetryConsumers.Select(x => x.GetType()).ToList();
             Xunit.Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
             Xunit.Assert.Contains(typeof(ConsoleTelemetryConsumer), actualTelemetryConsumers);
             Assert.AreEqual(2, actualTelemetryConsumers.Count);
@@ -889,7 +889,7 @@ namespace UnitTests
             const string filename = "DevTestServerConfiguration.xml";
             Guid myGuid = Guid.Empty;
 
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
 
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
@@ -1021,7 +1021,7 @@ namespace UnitTests
         {
             const string filename = "Config_NewAzure.xml";
 
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
 
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
@@ -1043,7 +1043,7 @@ namespace UnitTests
         {
             const string filename = "Config_OldAzure.xml";
 
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
 
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
@@ -1086,7 +1086,7 @@ namespace UnitTests
 
     public class DummyLogConsumer : ILogConsumer
     {
-        public void Log(Severity severity, TraceLogger.LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
+        public void Log(Severity severity, LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
         {
             throw new NotImplementedException();
         }

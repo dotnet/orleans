@@ -23,9 +23,9 @@ namespace Orleans.Runtime
         private int decodeOffset;
 
         private readonly bool supportForwarding;
-        private TraceLogger Log;
+        private Logger Log;
 
-        public IncomingMessageBuffer(TraceLogger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = logger;
             this.supportForwarding = supportForwarding;

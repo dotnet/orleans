@@ -20,7 +20,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private readonly TraceLogger Log;
+        private readonly Logger Log;
 
         /// <summary>
         /// The types to process.
@@ -63,7 +63,7 @@ namespace Orleans.CodeGenerator
                 typeof(Streams.StreamSubscriptionHandle<>)
             };
 
-            Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
+            Log = LogManager.GetLogger(typeof(SerializerGenerationManager).Name);
         }
         
         internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)

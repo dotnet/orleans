@@ -23,7 +23,7 @@ namespace Orleans.Serialization
         private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer> SerializerDictionary;
         private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer> DeserializerDictionary;
 
-        private TraceLogger logger;
+        private Logger logger;
 
         /// <summary>
         /// Determines whether this serializer has the ability to serialize a particular type.
@@ -108,7 +108,7 @@ namespace Orleans.Serialization
         /// Initializes the external serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             ClonerInfoDictionary = new ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo>();
             SerializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer>();

@@ -33,7 +33,7 @@ namespace UnitTests.SchedulerTests
         public void Dispose()
         {
             masterScheduler.Stop();
-            TraceLogger.UnInitialize();
+            LogManager.UnInitialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]

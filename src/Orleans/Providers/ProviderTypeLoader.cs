@@ -15,7 +15,7 @@ namespace Orleans.Providers
 
         private static readonly List<ProviderTypeLoader> managers;
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ProviderTypeLoader", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
 
         static ProviderTypeLoader()
         {

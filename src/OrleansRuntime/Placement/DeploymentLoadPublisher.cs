@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
-        private readonly TraceLogger logger = TraceLogger.GetLogger("DeploymentLoadPublisher", TraceLogger.LoggerType.Runtime);
+        private readonly Logger logger = LogManager.GetLogger("DeploymentLoadPublisher", LoggerType.Runtime);
 
         public static DeploymentLoadPublisher Instance { get; private set; }
 

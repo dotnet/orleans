@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static string FormatLogMessage(
             Severity severity,
-            TraceLogger.LoggerType loggerType,
+            LoggerType loggerType,
             string caller,
             string message,
             IPEndPoint myIPEndPoint,
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
         public static string FormatLogMessage(
             DateTime timestamp,
             Severity severity,
-            TraceLogger.LoggerType loggerType,
+            LoggerType loggerType,
             string caller,
             string message,
             IPEndPoint myIPEndPoint,
@@ -96,7 +96,7 @@ namespace Orleans.Runtime
         private static string FormatLogMessage_Impl(
             DateTime timestamp,
             Severity severity,
-            TraceLogger.LoggerType loggerType,
+            LoggerType loggerType,
             string caller,
             string message,
             IPEndPoint myIPEndPoint,
@@ -108,17 +108,17 @@ namespace Orleans.Runtime
                 message = "!!!!!!!!!! " + message;
 
             string ip = myIPEndPoint == null ? String.Empty : myIPEndPoint.ToString();
-            if (loggerType.Equals(TraceLogger.LoggerType.Grain))
+            if (loggerType.Equals(LoggerType.Grain))
             {
                 // Grain identifies itself, so I don't want an additional long string in the prefix.
                 // This is just a temporal solution to ease the dev. process, can remove later.
                 ip = String.Empty;
             }
-            string exc = includeStackTrace ? TraceLogger.PrintException(exception) : TraceLogger.PrintExceptionWithoutStackTrace(exception);
+            string exc = includeStackTrace ? LogFormatter.PrintException(exception) : LogFormatter.PrintExceptionWithoutStackTrace(exception);
             string msg = String.Format("[{0} {1,5}\t{2}\t{3}\t{4}\t{5}]\t{6}\t{7}",
-                TraceLogger.ShowDate ? TraceLogger.PrintDate(timestamp) : TraceLogger.PrintTime(timestamp),            //0
+                LogManager.ShowDate ? LogFormatter.PrintDate(timestamp) : LogFormatter.PrintTime(timestamp),            //0
                 Thread.CurrentThread.ManagedThreadId,   //1
-                TraceLogger.SeverityTable[(int)severity],    //2
+                LogManager.SeverityTable[(int)severity],    //2
                 errorCode,                              //3
                 caller,                                 //4
                 ip,                                     //5

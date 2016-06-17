@@ -80,6 +80,10 @@
     <Compile Include="Async\TaskUtility.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
+    <Compile Include="Logging\LoggerExtensions.cs" />
+    <Compile Include="Logging\LoggerImpl.cs" />
+    <Compile Include="Logging\LogFormatter.cs" />
+    <Compile Include="Logging\LogManager.cs" />
     <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />

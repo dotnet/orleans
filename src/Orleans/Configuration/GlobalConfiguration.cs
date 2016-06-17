@@ -616,7 +616,7 @@ namespace Orleans.Runtime.Configuration
 
         internal override void Load(XmlElement root)
         {
-            var logger = TraceLogger.GetLogger("OrleansConfiguration", TraceLogger.LoggerType.Runtime);
+            var logger = LogManager.GetLogger("OrleansConfiguration", LoggerType.Runtime);
             SeedNodes = new List<IPEndPoint>();
 
             XmlElement child;

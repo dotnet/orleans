@@ -30,7 +30,7 @@ namespace UnitTests.StorageTests
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
 
             ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            TraceLogger.Initialize(cfg);
+            LogManager.Initialize(cfg);
         }
 
         public void Dispose()

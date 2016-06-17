@@ -16,15 +16,15 @@ namespace UnitTests.MembershipTests
     {
         public SqlServerMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride(typeof (SqlServerMembershipTableTests).Name, Severity.Verbose3);
+            LogManager.AddTraceLevelOverride(typeof (SqlServerMembershipTableTests).Name, Severity.Verbose3);
         }
 
-        protected override IMembershipTable CreateMembershipTable(TraceLogger logger)
+        protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             return new SqlMembershipTable();
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(TraceLogger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
             return new SqlMembershipTable();
         }

@@ -13,18 +13,18 @@ namespace Orleans.Runtime.ReminderService
     internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private InMemoryRemindersTable remTable;
-        private TraceLogger logger;
+        private Logger logger;
 
         public override Task OnActivateAsync()
         {
-            logger = TraceLogger.GetLogger(String.Format("GrainBasedReminderTable_{0}", Data.Address.ToString()), TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(String.Format("GrainBasedReminderTable_{0}", Data.Address.ToString()), LoggerType.Runtime);
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
             remTable = new InMemoryRemindersTable();
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
             return TaskDone.Done;
         }
 
-        public Task Init(GlobalConfiguration config, TraceLogger logger)
+        public Task Init(GlobalConfiguration config, Logger logger)
         {
             return TaskDone.Done;
         }

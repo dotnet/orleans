@@ -14,7 +14,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
-        private readonly TraceLogger logger;
+        private readonly LoggerImpl logger;
         private readonly ClusterConfiguration orleansConfig;
         private readonly NodeConfiguration nodeConfig;
         private SiloAddress MyAddress { get { return membershipOracleData.MyAddress; } }
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.MembershipService
         internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {
-            logger = TraceLogger.GetLogger("MembershipOracle");
+            logger = LogManager.GetLogger("MembershipOracle");
             membershipTableProvider = membershipTable;
             membershipOracleData = new MembershipOracleData(silo, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + TraceLogger.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
+                logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
 
                 // randomly delay the startup, so not all silos write to the table at once.
                 // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
@@ -538,7 +538,7 @@ namespace Orleans.Runtime.MembershipService
 
         private bool HasMissedIAmAlives(MembershipEntry entry, bool writeWarning)
         {
-            var now = TraceLogger.ParseDate(TraceLogger.PrintDate(DateTime.UtcNow));
+            var now = LogFormatter.ParseDate(LogFormatter.PrintDate(DateTime.UtcNow));
             var allowedIAmAliveMissPeriod = orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit);
             var lastIAmAlive = entry.IAmAliveTime;
 
@@ -1067,7 +1067,7 @@ namespace Orleans.Runtime.MembershipService
         private static string PrintSuspectList(IEnumerable<Tuple<SiloAddress, DateTime>> list)
         {
             return Utils.EnumerableToString(list, t => String.Format("<{0}, {1}>", 
-                t.Item1.ToLongString(), TraceLogger.PrintDate(t.Item2)));
+                t.Item1.ToLongString(), LogFormatter.PrintDate(t.Item2)));
         }
 
         private void DisposeTimers()

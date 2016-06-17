@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     {
         private IDictionary<string, GrainTypeData> grainTypes;
         private readonly IGrainFactory grainFactory;
-        private readonly TraceLogger logger = TraceLogger.GetLogger("GrainTypeManager");
+        private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;

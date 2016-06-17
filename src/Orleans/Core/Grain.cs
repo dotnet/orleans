@@ -226,7 +226,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
-            return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
+            return Runtime.GetLogger(loggerName);
         }
 
         /// <summary>

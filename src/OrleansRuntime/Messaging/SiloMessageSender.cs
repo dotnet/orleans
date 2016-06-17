@@ -66,7 +66,7 @@ namespace Orleans.Runtime.Messaging
                 if (since < CONNECTION_RETRY_DELAY)
                 {
                     FailMessage(msg, String.Format("Recent ({0} ago, at {1}) connection failure trying to reach target silo {2}. Going to drop {3} msg {4} without sending. CONNECTION_RETRY_DELAY = {5}.",
-                        since, TraceLogger.PrintDate(failure), msg.TargetSilo.ToLongString(), msg.Direction, msg.Id, CONNECTION_RETRY_DELAY));
+                        since, LogFormatter.PrintDate(failure), msg.TargetSilo.ToLongString(), msg.Direction, msg.Id, CONNECTION_RETRY_DELAY));
                     return false;
                 }
             }

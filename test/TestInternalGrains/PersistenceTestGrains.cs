@@ -813,7 +813,7 @@ namespace UnitTests.Grains
                     _id, CaptureRuntimeEnvironment(), callStack);
                 logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 OrleansTaskScheduler.Instance.DumpSchedulerStatus();
-                TraceLogger.Flush();
+                LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
             }

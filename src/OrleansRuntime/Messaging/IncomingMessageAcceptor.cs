@@ -213,7 +213,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (ima == null)
                 {
-                    var logger = TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                    var logger = LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                     
                     if (result.AsyncState == null)
                         logger.Warn(ErrorCode.Messaging_IMA_AcceptCallbackNullState, "AcceptCallback invoked with a null unexpected async state");
@@ -298,7 +298,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception ex)
             {
-                var logger = ima != null ? ima.Log : TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                var logger = ima != null ? ima.Log : LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
             }
         }

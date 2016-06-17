@@ -8,7 +8,7 @@ namespace Orleans
     internal class UnobservedExceptionsHandlerClass
     {
         private static readonly Object lockObject = new Object();
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("UnobservedExceptionHandler");
+        private static readonly Logger logger = LogManager.GetLogger("UnobservedExceptionHandler");
         private static UnobservedExceptionDelegate unobservedExceptionHandler;
         private static readonly bool alreadySubscribedToTplEvent = false;
 
@@ -66,12 +66,12 @@ namespace Orleans
                 if (e.Observed)
                 {
                     logger.Info(ErrorCode.Runtime_Error_100311, "UnobservedExceptionsHandlerClass caught an UnobservedTaskException which was successfully observed and recovered from. BaseException = {0}. Exception = {1}",
-                            baseException.Message, TraceLogger.PrintException(aggrException));
+                            baseException.Message, LogFormatter.PrintException(aggrException));
                 }
                 else
                 {
                     var errorStr = String.Format("UnobservedExceptionsHandlerClass Caught an UnobservedTaskException event sent by {0}. Exception = {1}",
-                            OrleansTaskExtentions.ToString((Task)sender), TraceLogger.PrintException(aggrException));
+                            OrleansTaskExtentions.ToString((Task)sender), LogFormatter.PrintException(aggrException));
                     logger.Error(ErrorCode.Runtime_Error_100005, errorStr);
                     logger.Error(ErrorCode.Runtime_Error_100006, "Exception remained UnObserved!!! The subsequent behavior depends on the ThrowUnobservedTaskExceptions setting in app config and .NET version.");
                 }

@@ -49,7 +49,7 @@ namespace UnitTests.Grains
                     DateTime stop = DateTime.UtcNow;
                     calls.Add(new Tuple<DateTime, DateTime>(start, stop));
                     logger.Info(((stop - start).TotalMilliseconds).ToString());
-                    logger.Info("Start {0}, stop {1}, duration {2}. #act {3}", TraceLogger.PrintDate(start), TraceLogger.PrintDate(stop), (stop - start), count);
+                    logger.Info("Start {0}, stop {1}, duration {2}. #act {3}", LogFormatter.PrintDate(start), LogFormatter.PrintDate(stop), (stop - start), count);
                 });
         }
 

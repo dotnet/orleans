@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Orleans.Core;
-using Orleans.GrainDirectory;
 using Orleans.Storage;
 
 namespace Orleans.Runtime
@@ -67,7 +62,7 @@ namespace Orleans.Runtime
             var storage = new GrainStateStorageBridge(grainType.FullName, statefulGrain, storageProvider);
 
             //Inject state and storage data into the grain
-            statefulGrain.GrainState.State = Activator.CreateInstance(stateType); ;
+            statefulGrain.GrainState.State = Activator.CreateInstance(stateType);
             statefulGrain.SetStorage(storage);
 
             return grain;

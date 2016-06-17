@@ -69,7 +69,7 @@ namespace UnitTests
             // First initialize will have been done by orleans unit test base class, so uninitialize back to null state
             GrainClient.Uninitialize();
             Assert.IsFalse(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-            Assert.IsFalse(TraceLogger.IsInitialized, "Logger.IsInitialized");
+            Assert.IsFalse(LogManager.IsInitialized, "Logger.IsInitialized");
 
             try
             {
@@ -78,13 +78,13 @@ namespace UnitTests
                     GrainClient.Initialize(cfg));
 
                 Assert.IsFalse(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-                Assert.IsFalse(TraceLogger.IsInitialized, "Logger.IsInitialized");
+                Assert.IsFalse(LogManager.IsInitialized, "Logger.IsInitialized");
 
                 OutsideRuntimeClient.TestOnlyThrowExceptionDuringInit = false;
 
                 GrainClient.Initialize(cfg);
                 Assert.IsTrue(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-                Assert.IsTrue(TraceLogger.IsInitialized, "Logger.IsInitialized");
+                Assert.IsTrue(LogManager.IsInitialized, "Logger.IsInitialized");
             }
             finally
             {

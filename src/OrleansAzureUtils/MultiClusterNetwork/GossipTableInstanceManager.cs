@@ -114,13 +114,13 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private const string INSTANCE_TABLE_NAME = "OrleansGossipTable";
 
         private readonly AzureTableDataManager<GossipTableEntry> storage;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public string GlobalServiceId { get; private set; }
 
-        private GossipTableInstanceManager(Guid globalServiceId, string storageConnectionString, TraceLogger logger)
+        private GossipTableInstanceManager(Guid globalServiceId, string storageConnectionString, Logger logger)
         {
             GlobalServiceId = globalServiceId.ToString();
             this.logger = logger;
@@ -128,7 +128,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                 INSTANCE_TABLE_NAME, storageConnectionString, logger);
         }
 
-        public static async Task<GossipTableInstanceManager> GetManager(Guid globalServiceId, string storageConnectionString, TraceLogger logger)
+        public static async Task<GossipTableInstanceManager> GetManager(Guid globalServiceId, string storageConnectionString, Logger logger)
         {
             if (logger == null) throw new ArgumentNullException("logger");
             

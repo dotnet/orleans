@@ -83,7 +83,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                var log = TraceLogger.GetLogger("Thread Cycle Counter", TraceLogger.LoggerType.Runtime);
+                var log = LogManager.GetLogger("Thread Cycle Counter", LoggerType.Runtime);
                 if (log.IsVerbose2)
                     log.Verbose2(0,
                         String.Format("Invalid cycle counts startCycles = {0}, stopCycles = {1}", startCycles,

@@ -34,11 +34,11 @@ namespace Orleans.Providers
     {
         private readonly Dictionary<string, TProvider> providers;
         private IDictionary<string, IProviderConfiguration> providerConfigs;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public ProviderLoader()
         {
-            logger = TraceLogger.GetLogger("ProviderLoader/" + typeof(TProvider).Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ProviderLoader/" + typeof(TProvider).Name, LoggerType.Runtime);
             providers = new Dictionary<string, TProvider>();
         }
 

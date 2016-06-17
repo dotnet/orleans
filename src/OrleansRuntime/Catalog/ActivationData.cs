@@ -133,7 +133,7 @@ namespace Orleans.Runtime
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
         private HashSet<GrainTimer> timers;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
@@ -148,7 +148,7 @@ namespace Orleans.Runtime
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
             if (null == collector) throw new ArgumentNullException("collector");
 
-            logger = TraceLogger.GetLogger("ActivationData", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -492,14 +492,14 @@ namespace Orleans.Runtime
                 return true;
             }
         }
- 
+
         /// <summary>
         /// Check whether this activation is overloaded. 
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
-        /// <param name="log">TraceLogger to use for reporting any overflow condition</param>
+        /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(TraceLogger log)
+        public LimitExceededException CheckOverloaded(Logger log)
         {
             LimitValue limitValue = GetMaxEnqueuedRequestLimit();
 
