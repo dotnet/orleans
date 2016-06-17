@@ -59,9 +59,9 @@ namespace UnitTests.OrleansRuntime.Streams
                 return myToken.CompareTo(token);
             }
 
-            public int Compare(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
-                return cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+                return cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid)==0;
             }
         }
 

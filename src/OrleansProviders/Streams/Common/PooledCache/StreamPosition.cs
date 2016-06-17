@@ -10,6 +10,11 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class StreamPosition
     {
+        /// <summary>
+        /// Stream position consists of the stream identity and the sequence token
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="sequenceToken"></param>
         public StreamPosition(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
         {
             if (streamIdentity == null)
@@ -23,7 +28,14 @@ namespace Orleans.Providers.Streams.Common
             StreamIdentity = streamIdentity;
             SequenceToken = sequenceToken;
         }
+        /// <summary>
+        /// Identity of the stream
+        /// </summary>
         public IStreamIdentity StreamIdentity { get; }
+
+        /// <summary>
+        /// Position in the stream
+        /// </summary>
         public StreamSequenceToken SequenceToken { get; }
 
     }

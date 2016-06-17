@@ -34,6 +34,9 @@ namespace Orleans.Providers.Streams.Common
         internal CacheBucket CacheBucket;
     }
 
+    /// <summary>
+    /// A queue cache that keeps items in memory
+    /// </summary>
     public class SimpleQueueCache : IQueueCache
     {
         private readonly LinkedList<SimpleQueueCacheItem> cachedMessages;
@@ -44,16 +47,24 @@ namespace Orleans.Providers.Streams.Common
         private const int NUM_CACHE_HISTOGRAM_BUCKETS = 10;
         private readonly int CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
-        public int Size 
-        {
-            get { return cachedMessages.Count; }
-        }
+        /// <summary>
+        /// Number of items in the cache
+        /// </summary>
+        public int Size => cachedMessages.Count;
 
+        /// <summary>
+        /// The limit of the maximum number of items that can be added
+        /// </summary>
         public int GetMaxAddCount()
         {
             return CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
         }
 
+        /// <summary>
+        /// SimpleQueueCache Constructor
+        /// </summary>
+        /// <param name="cacheSize"></param>
+        /// <param name="logger"></param>
         public SimpleQueueCache(int cacheSize, Logger logger)
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
@@ -64,6 +75,9 @@ namespace Orleans.Providers.Streams.Common
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
         }
 
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
         public virtual bool IsUnderPressure()
         {
             if (cachedMessages.Count == 0) return false; // empty cache
@@ -75,6 +89,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
 
+        /// <summary>
+        /// Ask the cache if it has items that can be purged from the cache 
+        /// (so that they can be subsequently released them the underlying queue).
+        /// </summary>
+        /// <param name="purgedItems"></param>
         public virtual bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
@@ -150,7 +169,7 @@ namespace Orleans.Providers.Streams.Common
            
             if (cachedMessages.Count == 0) // nothing in cache
             {
-                StreamSequenceToken tokenToReset = sequenceToken ?? (lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null);
+                StreamSequenceToken tokenToReset = sequenceToken ?? ((EventSequenceToken) lastSequenceTokenAddedToCache)?.NextSequenceNumber();
                 ResetCursor(cursor, tokenToReset);
                 return;
             }
@@ -158,7 +177,7 @@ namespace Orleans.Providers.Streams.Common
             // if offset is not set, iterate from newest (first) message in cache, but not including the irst message itself
             if (sequenceToken == null)
             {
-                StreamSequenceToken tokenToReset = lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null;
+                StreamSequenceToken tokenToReset = ((EventSequenceToken) lastSequenceTokenAddedToCache)?.NextSequenceNumber();
                 ResetCursor(cursor, tokenToReset);
                 return;
             }
@@ -279,7 +298,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (batch == null) throw new ArgumentNullException("batch");
 
-            CacheBucket cacheBucket = null;
+            CacheBucket cacheBucket;
             if (cacheCursorHistogram.Count == 0)
             {
                 cacheBucket = new CacheBucket();

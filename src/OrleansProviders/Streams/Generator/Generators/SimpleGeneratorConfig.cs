@@ -13,10 +13,16 @@ namespace Orleans.Providers.Streams.Generator
     public class SimpleGeneratorConfig : IStreamGeneratorConfig
     {
         private const string StreamNamespaceName = "StreamNamespace";
+        /// <summary>
+        /// Stream namespace
+        /// </summary>
         public string StreamNamespace { get; set; }
 
-        public Type StreamGeneratorType { get { return typeof (SimpleGenerator); } }
-        
+        /// <summary>
+        /// Stream generator type
+        /// </summary>
+        public Type StreamGeneratorType => typeof (SimpleGenerator);
+
         /// <summary>
         /// Nuber of events to generate on this stream
         /// </summary>
@@ -24,6 +30,9 @@ namespace Orleans.Providers.Streams.Generator
         private const string EventsInStreamName = "EventsInStream";
         private const int EventsInStreamDefault = 100;
 
+        /// <summary>
+        /// Configuration for simple stream generator
+        /// </summary>
         public SimpleGeneratorConfig()
         {
             EventsInStream = EventsInStreamDefault;
