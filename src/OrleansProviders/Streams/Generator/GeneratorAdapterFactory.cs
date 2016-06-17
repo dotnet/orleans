@@ -9,8 +9,14 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
 {
+    /// <summary>
+    /// Stream generator commands
+    /// </summary>
     public enum StreamGeneratorCommand
     {
+        /// <summary>
+        /// Command to configure the generator
+        /// </summary>
         Configure = PersistentStreamProviderCommand.AdapterFactoryCommandStartRange
     }
 
@@ -21,6 +27,9 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IControllable
     {
+        /// <summary>
+        /// Configuration property name for generator configuration type
+        /// </summary>
         public const string GeneratorConfigTypeName = "StreamGeneratorConfigType";
         private IServiceProvider serviceProvider;
         private GeneratorAdapterConfig adapterConfig;
@@ -31,9 +40,25 @@ namespace Orleans.Providers.Streams.Generator
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private Logger logger;
 
-        public bool IsRewindable { get { return true; } }
-        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
+        /// <summary>
+        /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
+        /// </summary>
+        /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
+        public bool IsRewindable => true;
 
+        /// <summary>
+        /// Direction of this queue adapter: Read, Write or ReadWrite.
+        /// </summary>
+        /// <returns>The direction in which this adapter provides data.</returns>
+        public StreamProviderDirection Direction => StreamProviderDirection.ReadOnly;
+
+        /// <summary>
+        /// Initialize the factory
+        /// </summary>
+        /// <param name="providerConfig"></param>
+        /// <param name="providerName"></param>
+        /// <param name="log"></param>
+        /// <param name="svcProvider"></param>
         public void Init(IProviderConfiguration providerConfig, string providerName, Logger log, IServiceProvider svcProvider)
         {
             logger = log;
@@ -54,34 +79,69 @@ namespace Orleans.Providers.Streams.Generator
             bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(10, pool => new FixedSizeBuffer(1<<20, pool));
         }
 
+        /// <summary>
+        /// Create an adapter
+        /// </summary>
+        /// <returns></returns>
         public Task<IQueueAdapter> CreateAdapter()
         {
             return Task.FromResult<IQueueAdapter>(this);
         }
 
+        /// <summary>
+        /// Get the cache adapter
+        /// </summary>
+        /// <returns></returns>
         public IQueueAdapterCache GetQueueAdapterCache()
         {
             return this;
         }
 
+        /// <summary>
+        /// Get the stream queue mapper
+        /// </summary>
+        /// <returns></returns>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName));
         }
 
+        /// <summary>
+        /// Get the delivery failure handler
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
 
-        public string Name { get { return adapterConfig.StreamProviderName; } }
+        /// <summary>
+        /// Name of the adapter. Primarily for logging purposes
+        /// </summary>
+        public string Name => adapterConfig.StreamProviderName;
 
+        /// <summary>
+        /// Stores a batch of messages
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
+        /// <param name="events"></param>
+        /// <param name="token"></param>
+        /// <param name="requestContext"></param>
+        /// <returns></returns>
         public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             return TaskDone.Done;
         }
 
+        /// <summary>
+        /// Creates a quere receiver for the specificed queueId
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver());
@@ -89,6 +149,11 @@ namespace Orleans.Providers.Streams.Generator
             return receiver;
         }
 
+        /// <summary>
+        /// A function to execute a control command.
+        /// </summary>
+        /// <param name="command">A serial number of the command.</param>
+        /// <param name="arg">An opaque command argument</param>
         public Task<object> ExecuteCommand(int command, object arg)
         {
             if (arg == null)
@@ -155,12 +220,16 @@ namespace Orleans.Providers.Streams.Generator
             var generator = serviceProvider.GetService(generatorConfig.StreamGeneratorType) as IStreamGenerator;
             if (generator == null)
             {
-                throw new OrleansException(string.Format("StreamGenerator type not supported: {0}", generatorConfig.StreamGeneratorType));
+                throw new OrleansException($"StreamGenerator type not supported: {generatorConfig.StreamGeneratorType}");
             }
             generator.Configure(serviceProvider, generatorConfig);
             receiver.QueueGenerator = generator;
         }
 
+        /// <summary>
+        /// Create a cache for a given queue id
+        /// </summary>
+        /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
             return new GeneratorPooledCache(bufferPool);

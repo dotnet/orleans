@@ -11,7 +11,19 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     public interface IStreamGenerator
     {
+        /// <summary>
+        /// Tries to get an evente, if the generator is configured to generate any at this time
+        /// </summary>
+        /// <param name="utcNow"></param>
+        /// <param name="events"></param>
+        /// <returns></returns>
         bool TryReadEvents(DateTime utcNow, out List<IBatchContainer> events);
+
+        /// <summary>
+        /// Configures the generator
+        /// </summary>
+        /// <param name="serviceProvider"></param>
+        /// <param name="generatorConfig"></param>
         void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig);
     }
 
@@ -22,7 +34,15 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     public interface IStreamGeneratorConfig
     {
+        /// <summary>
+        /// Stream generator type
+        /// </summary>
         Type StreamGeneratorType { get; }
+
+        /// <summary>
+        /// Populates generator configuration from provider configuration
+        /// </summary>
+        /// <param name="providerConfiguration"></param>
         void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration);
     }
 }

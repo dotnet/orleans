@@ -11,15 +11,33 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     public class GeneratorAdapterConfig
     {
+        /// <summary>
+        /// Configuration property name for generator configuration type
+        /// </summary>
         public const string GeneratorConfigTypeName = "GeneratorConfigType";
+
+        /// <summary>
+        /// Generator configuration type
+        /// </summary>
         public Type GeneratorConfigType { get; set; }
 
-        public string StreamProviderName { get; private set; }
+        /// <summary>
+        /// Stream provider name
+        /// </summary>
+        public string StreamProviderName { get; }
 
         private const string TotalQueueCountName = "TotalQueueCount";
         private const int TotalQueueCountDefault = 4;
+
+        /// <summary>
+        /// Total number of queues
+        /// </summary>
         public int TotalQueueCount { get; set; }
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="streamProviderName"></param>
         public GeneratorAdapterConfig(string streamProviderName)
         {
             StreamProviderName = streamProviderName;
