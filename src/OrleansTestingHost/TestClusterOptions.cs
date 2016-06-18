@@ -32,7 +32,7 @@ namespace Orleans.TestingHost
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
         }
 
-        public static short DefaultInitialSilosCount { get; set; } = 1;
+        public static short DefaultInitialSilosCount { get; set; } = 2;
         public static bool DefaultTraceToConsole { get; set; } = true;
         public static string DefaultLogsFolder { get; set; } = "logs";
 
