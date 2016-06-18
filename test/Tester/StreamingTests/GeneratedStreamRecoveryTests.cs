@@ -61,7 +61,7 @@ namespace UnitTests.StreamingTests
                 Fixture.StreamProviderName);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
@@ -71,7 +71,7 @@ namespace UnitTests.StreamingTests
                 100);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
