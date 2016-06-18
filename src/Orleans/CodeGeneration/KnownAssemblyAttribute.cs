@@ -6,7 +6,7 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// The attribute which informs the code generator that code should be generated an assembly.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Assembly)]
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public class KnownAssemblyAttribute : Attribute
     {
         public KnownAssemblyAttribute(Type type)
