@@ -267,7 +267,10 @@ namespace Orleans.Runtime.Scheduler
         {
             if (context == null)
             {
-                throw new InvalidSchedulingContextException("CheckSchedulingContextValidity was called on a null SchedulingContext.");
+                throw new InvalidSchedulingContextException(
+                    "CheckSchedulingContextValidity was called on a null SchedulingContext."
+                     + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
+                     + "which will be the case if you create it inside Task.Run.");
             }
             GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
         }
