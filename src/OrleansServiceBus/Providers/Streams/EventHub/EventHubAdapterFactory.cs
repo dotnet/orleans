@@ -19,10 +19,11 @@ namespace Orleans.ServiceBus.Providers
     {
         protected Logger logger;
         protected IServiceProvider serviceProvider;
+        protected IProviderConfiguration providerConfig;
         protected EventHubStreamProviderConfig adapterConfig;
         protected IEventHubSettings hubSettings;
         protected ICheckpointerSettings checkpointerSettings;
-        private EventHubQueueMapper streamQueueMapper;
+        private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
@@ -34,6 +35,7 @@ namespace Orleans.ServiceBus.Providers
         protected Func<string, IStreamQueueCheckpointer<string>, IEventHubQueueCache> CacheFactory { get; set; }
         protected Func<string, Task<IStreamQueueCheckpointer<string>>> CheckpointerFactory { get; set; }
         protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
+        protected Func<string[], Task<IEventHubQueueMapper>> QueueMapperFactory { get; set; }
         
         /// <summary>
         /// Factory initialization.
@@ -51,6 +53,7 @@ namespace Orleans.ServiceBus.Providers
             if (log == null) throw new ArgumentNullException("log");
             if (svcProvider == null) throw new ArgumentNullException("svcProvider");
 
+            this.providerConfig = providerConfig;
             logger = log;
             serviceProvider = svcProvider;
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
@@ -77,6 +80,11 @@ namespace Orleans.ServiceBus.Providers
                 //TODO: Add a queue specific default failure handler with reasonable error reporting.
                 StreamFailureHandlerFactory = partition => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
             }
+
+            if (QueueMapperFactory == null)
+            {
+                QueueMapperFactory = partitions => Task.FromResult<IEventHubQueueMapper>(new EventHubQueueMapper(partitionIds, adapterConfig.StreamProviderName));
+            }
         }
 
         public async Task<IQueueAdapter> CreateAdapter()
@@ -84,7 +92,7 @@ namespace Orleans.ServiceBus.Providers
             if (streamQueueMapper == null)
             {
                 partitionIds = await GetPartitionIdsAsync();
-                streamQueueMapper = new EventHubQueueMapper(partitionIds, adapterConfig.StreamProviderName);
+                streamQueueMapper = await QueueMapperFactory(partitionIds);
             }
             return this;
         }
