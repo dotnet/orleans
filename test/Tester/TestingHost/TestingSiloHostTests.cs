@@ -7,7 +7,7 @@ namespace Tester.TestingHost
 {
     public class TestingSiloHostTests
     {
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Testing")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Testing")]
         public async Task AllowClusterReuseBetweenInvocations()
         {
             try

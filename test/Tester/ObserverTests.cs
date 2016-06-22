@@ -1,11 +1,9 @@
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.TestingHost.Utils;
-using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -106,7 +104,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
             TestInitialize();
@@ -154,7 +152,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
             TestInitialize();
@@ -246,8 +244,7 @@ namespace UnitTests.General
                 result.Done = true;
         }
 
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
         public async Task ObserverTest_DeleteObject()
         {
             TestInitialize();
@@ -310,10 +307,7 @@ namespace UnitTests.General
             public void StateChanged(int a, int b)
             {
                 GrainClient.Logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
-                if (action != null)
-                {
-                    action(a, b, result);
-                }
+                action?.Invoke(a, b, result);
             }
 
             #endregion
