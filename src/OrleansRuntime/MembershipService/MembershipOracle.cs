@@ -35,6 +35,7 @@ namespace Orleans.Runtime.MembershipService
 
         public string SiloName { get { return membershipOracleData.SiloName; } }
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
+        private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
         internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
@@ -373,7 +374,8 @@ namespace Orleans.Runtime.MembershipService
                 }
                 else
                 {
-                    errorString = String.Format("-Silo {0} failed to update its status to {1} in the table due to precondition failures after {2} attempts.", MyAddress.ToLongString(), status, numCalls);
+                    errorString = String.Format("-Silo {0} failed to update its status to {1} in the Membership table due to write contention on the table after {2} attempts.",
+                        MyAddress.ToLongString(), status, numCalls);
                     logger.Error(ErrorCode.MembershipFailedToWriteConditional, errorString);
                     throw new OrleansException(errorString);
                 }
@@ -384,8 +386,9 @@ namespace Orleans.Runtime.MembershipService
                 {
                     errorString = String.Format("-Silo {0} failed to update its status to {1} in the table due to failures (socket failures or table read/write failures) after {2} attempts: {3}", MyAddress.ToLongString(), status, numCalls, exc.Message);
                     logger.Error(ErrorCode.MembershipFailedToWrite, errorString);
+                    throw new OrleansException(errorString, exc);
                 }
-                throw new OrleansException(errorString, exc);
+                throw;
             }
         }
 
@@ -438,7 +441,7 @@ namespace Orleans.Runtime.MembershipService
             myEntry.Status = newStatus;
             myEntry.IAmAliveTime = now;
 
-            if (newStatus.Equals(SiloStatus.Active))
+            if (newStatus.Equals(SiloStatus.Active) && orleansConfig.Globals.ValidateInitialConnectivity)
                 await GetJoiningPreconditionPromise(table);
             
             TableVersion next = table.Version.Next();
@@ -448,7 +451,7 @@ namespace Orleans.Runtime.MembershipService
             return await membershipTableProvider.InsertRow(myEntry, next);
         }
 
-        private Task GetJoiningPreconditionPromise(MembershipTableData table)
+        private async Task GetJoiningPreconditionPromise(MembershipTableData table)
         {
             // send pings to all Active nodes, that are known to be alive
             List<MembershipEntry> members = table.Members.Select(tuple => tuple.Item1).Where(
@@ -478,7 +481,18 @@ namespace Orleans.Runtime.MembershipService
                         return true;
                     }));
             }
-            return Task.WhenAll(pingPromises);
+            try
+            {
+                await Task.WhenAll(pingPromises);
+            } catch (Exception)
+            {
+                logger.Error(ErrorCode.MembershipJoiningPreconditionFailure, 
+                    String.Format("-Failed to get ping responses from all {0} silos that are currently listed as Active in the Membership table. " + 
+                                    "Newly joining silos validate connectivity with all pre-existing silos that are listed as Active in the table " +
+                                    "and have written I Am Alive in the table in the last {1} period, before they are allowed to join the cluster. Active silos are: {2}",
+                        members.Count, AllowedIAmAliveMissPeriod, Utils.EnumerableToString(members, entry => entry.ToFullString(true))));
+                throw;
+            }
         }
 
         #endregion
@@ -539,13 +553,12 @@ namespace Orleans.Runtime.MembershipService
         private bool HasMissedIAmAlives(MembershipEntry entry, bool writeWarning)
         {
             var now = LogFormatter.ParseDate(LogFormatter.PrintDate(DateTime.UtcNow));
-            var allowedIAmAliveMissPeriod = orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit);
             var lastIAmAlive = entry.IAmAliveTime;
 
             if (entry.IAmAliveTime.Equals(default(DateTime)))
                 lastIAmAlive = entry.StartTime; // he has not written first IAmAlive yet, use its start time instead.
 
-            if (now - lastIAmAlive <= allowedIAmAliveMissPeriod) return false;
+            if (now - lastIAmAlive <= AllowedIAmAliveMissPeriod) return false;
 
             if (writeWarning)
             {
@@ -555,7 +568,7 @@ namespace Orleans.Runtime.MembershipService
                         lastIAmAlive,
                         now,
                         now - lastIAmAlive,
-                        allowedIAmAliveMissPeriod));
+                        AllowedIAmAliveMissPeriod));
             }
             return true;
         }
