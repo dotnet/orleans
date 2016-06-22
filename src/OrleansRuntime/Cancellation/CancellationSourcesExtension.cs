@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 
-namespace Orleans.Async
+namespace Orleans.Runtime
 {
     /// <summary>
     /// Contains list of cancellation token source corresponding to the tokens
@@ -12,20 +11,22 @@ namespace Orleans.Async
     /// </summary>
     internal class CancellationSourcesExtension : ICancellationSourcesExtension
     {
-        private static readonly Lazy<Logger> _logger = new Lazy<Logger>(() =>
-            LogManager.GetLogger("CancellationSourcesExtension", LoggerType.Runtime));
+        private readonly static Lazy<Logger> _logger = new Lazy<Logger>(() =>
+            LogManager.GetLogger(nameof(CancellationSourcesExtension), LoggerType.Runtime));
+
         private readonly Interner<Guid, GrainCancellationToken> _cancellationTokens;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
         private static readonly int _defaultInternerCollectionSize = 31;
 
+
         public CancellationSourcesExtension()
         {
             _cancellationTokens = new Interner<Guid, GrainCancellationToken>(
-                _defaultInternerCollectionSize,
-                _cleanupFrequency);
+                 _defaultInternerCollectionSize,
+                 _cleanupFrequency);
         }
 
-        public Task CancelTokenSource(GrainCancellationToken token)
+        public Task CancelRemoteToken(GrainCancellationToken token)
         {
             GrainCancellationToken gct;
             if (!_cancellationTokens.TryFind(token.Id, out gct))
@@ -37,29 +38,12 @@ namespace Orleans.Async
             return gct.Cancel();
         }
 
-        internal GrainCancellationToken GetOrCreateCancellationToken(GrainCancellationToken token)
-        {
-            GrainCancellationToken localToken;
-            if (_cancellationTokens.TryFind(token.Id, out localToken))
-            {
-                if (token.IsCancellationRequested && !localToken.IsCancellationRequested)
-                {
-                    localToken.Cancel();
-                }
-
-                return localToken;
-            }
-
-            return _cancellationTokens.Intern(token.Id, new GrainCancellationToken(token.Id, token.IsCancellationRequested));
-        }
-
         /// <summary>
         /// Adds CancellationToken to the grain extension
         /// so that it can be cancelled through remote call to the CancellationSourcesExtension.
         /// </summary>
         /// <param name="target"></param>
         /// <param name="request"></param>
-        /// <param name="i">Index of the GrainCancellationToken in the request.Arguments array</param>
         /// <param name="logger"></param>
         internal static void RegisterCancellationTokens(IAddressable target, InvokeMethodRequest request, Logger logger)
         {
@@ -77,14 +61,24 @@ namespace Orleans.Async
                     {
                         logger.Error(
                             ErrorCode.CancellationExtensionCreationFailed,
-                            $"Could not add cancellation token extension, target: {target}");
+                            $"Could not add cancellation token extension to: {target}");
                         return;
                     }
                 }
 
-                // Replacing the GrainCancellationToken that came from the wire with locally created one.
-                request.Arguments[i] = cancellationExtension.GetOrCreateCancellationToken(grainToken);
+                // Replacing the half baked GrainCancellationToken that came from the wire with locally fully created one.
+                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested);
             }
+        }
+
+        private GrainCancellationToken RecordCancellationToken(Guid tokenId, bool isCancellationRequested)
+        {
+            GrainCancellationToken localToken;
+            if (_cancellationTokens.TryFind(tokenId, out localToken))
+            {
+                return localToken;
+            }
+            return _cancellationTokens.Intern(tokenId, new GrainCancellationToken(tokenId, isCancellationRequested));
         }
     }
 }
