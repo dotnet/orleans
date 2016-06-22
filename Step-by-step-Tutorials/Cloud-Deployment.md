@@ -66,20 +66,19 @@ public class WorkerRole : RoleEntryPoint
     public override void OnStop()
     {
         silo.Stop();
-        base.Stop();
+        base.OnStop();
     }
 
     public override void Run()
     {
-        var config = new ClusterConfiguration();
-        config.StandardLoad();
+        var config = AzureSilo.DefaultConfiguration();
+        config.AddMemoryStorageProvider();
+        config.AddAzureTableStorageProvider("AzureStore", RoleEnvironment.GetConfigurationSettingValue("DataConnectionString"));
 
         // Configure storage providers
 
         silo = new AzureSilo();
-        bool ok = silo.Start(RoleEnvironment.DeploymentId,
-                             RoleEnvironment.CurrentRoleInstance,
-                             config);
+        bool ok = silo.Start(config);
 
         silo.Run(); // Call will block until silo is shutdown
     }
@@ -161,8 +160,8 @@ Note: You MUST ensure that all the referenced binaries are copied into the `Orle
 ## Running Orleans Client as Azure Web Role
 The user interface / presentation layer for your application will usually run as a Web Role in Azure.
 
-The `Orleans.Host.Azure.Client.OrleansAzureClient` utility class is the main mechanism for bootstrapping connection to the Orleans silo worker roles from an Azure Web Role.
-A few additional configuration steps are needed to make the `OrleansAzureClient` utility class work – see below for details.
+The `Orleans.Runtime.Host.AzureClient` utility class is the main mechanism for bootstrapping connection to the Orleans silo worker roles from an Azure Web Role.
+A few additional configuration steps are needed to make the `AzureClient` utility class work – see below for details.
 
 ### Create Azure Web Role for Orleans Client
 

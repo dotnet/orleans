@@ -185,8 +185,8 @@ public async Task AddDirectReport(IEmployee employee)
     }
     State.Reports.Add(employee);
     await employee.SetManager(this);
-    var data = await employee.Greeting(
-        new GreetingData { From = _me, Message = "Welcome to my team!" });
+    var data = new GreetingData { From = this.GetPrimaryKey(), Message = "Welcome to my team!" };
+    await employee.Greeting(data);
     Console.WriteLine("{0} said: {1}",
                         data.From.ToString(),
                         data.Message);
