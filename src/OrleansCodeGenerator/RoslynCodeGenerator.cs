@@ -311,9 +311,9 @@ namespace Orleans.CodeGenerator
             for (var i = 0; i < assemblies.Count; i++)
             {
                 var assembly = assemblies[i];
-                foreach (var attribute in assembly.GetCustomAttributes<KnownTypeAttribute>())
+                foreach (var attribute in assembly.GetCustomAttributes<ConsiderForCodeGenerationAttribute>())
                 {
-                    ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes);
+                    ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes, attribute.GenerateSerializer);
                 }
 
                 foreach (var type in assembly.DefinedTypes)
@@ -419,14 +419,15 @@ namespace Orleans.CodeGenerator
             Type type,
             bool runtime,
             Assembly targetAssembly,
-            ISet<Type> includedTypes)
+            ISet<Type> includedTypes,
+            bool treatAsSerializeable = false)
         {
             // The module containing the serializer.
             var module = runtime || type.Assembly != targetAssembly ? null : type.Module;
             var typeInfo = type.GetTypeInfo();
 
             // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
-            if (typeInfo.IsSerializable)
+            if (treatAsSerializeable || typeInfo.IsSerializable)
                 RecordType(type, module, targetAssembly, includedTypes);
             
             ConsiderGenericBaseTypeArguments(typeInfo, module, targetAssembly, includedTypes);
