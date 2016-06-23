@@ -35,7 +35,7 @@ namespace Orleans.ServiceBus.Providers
         protected Func<string, IStreamQueueCheckpointer<string>, IEventHubQueueCache> CacheFactory { get; set; }
         protected Func<string, Task<IStreamQueueCheckpointer<string>>> CheckpointerFactory { get; set; }
         protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
-        protected Func<string[], Task<IEventHubQueueMapper>> QueueMapperFactory { get; set; }
+        protected Func<string[], IEventHubQueueMapper> QueueMapperFactory { get; set; }
         
         /// <summary>
         /// Factory initialization.
@@ -83,7 +83,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (QueueMapperFactory == null)
             {
-                QueueMapperFactory = partitions => Task.FromResult<IEventHubQueueMapper>(new EventHubQueueMapper(partitionIds, adapterConfig.StreamProviderName));
+                QueueMapperFactory = partitions => new EventHubQueueMapper(partitionIds, adapterConfig.StreamProviderName);
             }
         }
 
@@ -92,7 +92,7 @@ namespace Orleans.ServiceBus.Providers
             if (streamQueueMapper == null)
             {
                 partitionIds = await GetPartitionIdsAsync();
-                streamQueueMapper = await QueueMapperFactory(partitionIds);
+                streamQueueMapper = QueueMapperFactory(partitionIds);
             }
             return this;
         }
