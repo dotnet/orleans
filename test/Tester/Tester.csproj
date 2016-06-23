@@ -152,6 +152,7 @@
     <Compile Include="BaseClusterFixture.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
+    <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="StreamingTests\AQClientStreamTests.cs" />
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
     <Compile Include="StreamingTests\EHClientStreamTests.cs" />

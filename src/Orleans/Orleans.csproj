@@ -94,7 +94,7 @@
     <Compile Include="CodeGeneration\KnownAssemblyAttribute.cs" />
     <Compile Include="CodeGeneration\Language.cs" />
     <Compile Include="CodeGeneration\OrleansCodeGenerationTargetAttribute.cs" />
-    <Compile Include="CodeGeneration\KnownTypeAttribute.cs" />
+    <Compile Include="CodeGeneration\ConsiderForCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
