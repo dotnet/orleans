@@ -5,9 +5,10 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq.Expressions;
+using System.Threading;
 using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
@@ -429,11 +430,34 @@ namespace Orleans.Runtime
             }
         }
 
+        private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy = 
+            new Lazy<Func<Exception, Exception>>(() =>
+            {
+                ParameterExpression exceptionParameter = Expression.Parameter(typeof(Exception));
+                MethodCallExpression prepForRemotingCall = Expression.Call(exceptionParameter, "PrepForRemoting", Type.EmptyTypes);
+                Expression<Func<Exception, Exception>> lambda = Expression.Lambda<Func<Exception, Exception>>(prepForRemotingCall, exceptionParameter);
+                Func<Exception, Exception> func = lambda.Compile();
+                return func;
+            });
+
+        private static Exception PrepareForRemoting(Exception exception)
+        {
+            // Call the Exception.PrepForRemoting internal method, which preserves the original stack when the exception
+            // is rethrown at the remote site (and appends the call site stacktrace). If this is not done, then when the
+            // exception is rethrown the original stacktrace is entire replaced.
+            // Note: another commonly used approach since .NET 4.5 is to use ExceptionDispatchInfo.Capture(ex).Throw()
+            // but that involves rethrowing the exception in-place, which is not what we want here, but could in theory
+            // be done at the receiving end with some rework (could be tackled when we reopen #875 Avoid unnecessary use of TCS).
+            prepForRemotingLazy.Value.Invoke(exception);
+            return exception;
+        }
+
         private void SafeSendExceptionResponse(Message message, Exception ex)
         {
             try
             {
-                SendResponse(message, Response.ExceptionResponse((Exception)SerializationManager.DeepCopy(ex)));
+                var copiedException = PrepareForRemoting((Exception)SerializationManager.DeepCopy(ex));
+                SendResponse(message, Response.ExceptionResponse(copiedException));
             }
             catch (Exception exc1)
             {
