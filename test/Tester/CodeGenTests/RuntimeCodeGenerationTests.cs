@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Orleans.Serialization;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Tester.CodeGenTests
 {
@@ -32,11 +31,12 @@ namespace Tester.CodeGenTests
             };
 
             var actual = await grain.SetState(expected);
-            Assert.IsNotNull(actual, "Result of SetState should be a non-null value.");
-            Assert.IsTrue(expected.Equals(actual));
+            Assert.NotNull(actual);
+
+            Assert.True(expected.Equals(actual));
 
             var newActual = await grain.@static();
-            Assert.IsTrue(expected.Equals(newActual), "Result of @static() should be equal to expected value.");
+            Assert.True(expected.Equals(newActual), "Result of @static() should be equal to expected value.");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
@@ -47,14 +47,14 @@ namespace Tester.CodeGenTests
             
             var nestedGeneric = new NestedGeneric<int> { Payload = new NestedGeneric<int>.Nested { Value = Expected } };
             var actual = await grain.Do(nestedGeneric);
-            Assert.AreEqual(Expected, actual, "NestedGeneric<int>.Nested value should round-trip correctly.");
-            
+            Assert.Equal(Expected, actual); // NestedGeneric<int>.Nested value should round-trip correctly.
+
             var nestedConstructedGeneric = new NestedConstructedGeneric
             {
                 Payload = new NestedConstructedGeneric.Nested<int> { Value = Expected }
             };
             actual = await grain.Do(nestedConstructedGeneric);
-            Assert.AreEqual(Expected, actual, "NestedConstructedGeneric.Nested<int> value should round-trip correctly.");
+            Assert.Equal(Expected, actual); // NestedConstructedGeneric.Nested<int> value should round-trip correctly.
         }
     }
 }

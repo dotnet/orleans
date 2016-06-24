@@ -1,4 +1,3 @@
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Serialization;
 using Orleans.UnitTest.GrainInterfaces;
 using Xunit;
@@ -22,8 +21,8 @@ namespace UnitTests.Serialization
         {
             var v = new MyTypeWithAnInternalTypeField();
 
-            Assert.IsNotNull(SerializationManager.GetSerializer(typeof (MyTypeWithAnInternalTypeField)));
-            Assert.IsNotNull(SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
+            Assert.NotNull(SerializationManager.GetSerializer(typeof (MyTypeWithAnInternalTypeField)));
+            Assert.NotNull(SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
         }
     }
 }

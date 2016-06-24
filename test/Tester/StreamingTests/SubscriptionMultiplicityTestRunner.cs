@@ -1,16 +1,13 @@
-using System.ComponentModel.Design;
-using System.IO;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
@@ -158,7 +155,7 @@ namespace UnitTests.StreamingTests
             // Resume
             StreamSubscriptionHandle<int> resumeHandle = await consumer.Resume(firstSubscriptionHandle);
 
-            Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
+            Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
             await producer.StartPeriodicProducing();
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
@@ -199,7 +196,7 @@ namespace UnitTests.StreamingTests
             // Resume
             StreamSubscriptionHandle<int> resumeHandle = await consumer.Resume(firstSubscriptionHandle);
 
-            Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
+            Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
             await producer.StartPeriodicProducing();
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
@@ -228,11 +225,11 @@ namespace UnitTests.StreamingTests
             IList<StreamSubscriptionHandle<int>> actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.AreEqual(subscriptionCount, actualSubscriptions.Count, "Subscription Count");
-            Assert.AreEqual(subscriptionCount, expectedSubscriptions.Count, "Reported subscription Count");
+            Assert.Equal(subscriptionCount, actualSubscriptions.Count);
+            Assert.Equal(subscriptionCount, expectedSubscriptions.Count);
             foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
             {
-                Assert.IsTrue(expectedSubscriptions.Contains(subscription), "Subscription Match");
+                Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");
             }
 
             // unsubscribe from one of the subscriptions
@@ -244,11 +241,11 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.AreEqual(subscriptionCount-1, actualSubscriptions.Count, "Subscription Count");
-            Assert.AreEqual(subscriptionCount-1, expectedSubscriptions.Count, "Reported subscription Count");
+            Assert.Equal(subscriptionCount-1, actualSubscriptions.Count);
+            Assert.Equal(subscriptionCount-1, expectedSubscriptions.Count);
             foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
             {
-                Assert.IsTrue(expectedSubscriptions.Contains(subscription), "Subscription Match");
+                Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");
             }
 
             // unsubscribe from the rest of the subscriptions
@@ -258,7 +255,7 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.AreEqual(0, actualSubscriptions.Count, "Subscription Count");
+            Assert.Equal(0, actualSubscriptions.Count);
         }
 
         public async Task TwoIntermitentStreamTest(Guid streamGuid)
@@ -339,12 +336,12 @@ namespace UnitTests.StreamingTests
             var numConsumed = await consumer.GetNumberConsumed();
             if (assertIsTrue)
             {
-                Assert.IsTrue(numConsumed.Values.All(v => v.Item2 == 0), "Errors");
-                Assert.IsTrue(numProduced > 0, "Events were not produced");
-                Assert.AreEqual(consumerCount, numConsumed.Count, "Incorrect number of consumers");
+                Assert.True(numConsumed.Values.All(v => v.Item2 == 0), "Errors");
+                Assert.True(numProduced > 0, "Events were not produced");
+                Assert.Equal(consumerCount, numConsumed.Count);
                 foreach (int consumed in numConsumed.Values.Select(v => v.Item1))
                 {
-                    Assert.AreEqual(numProduced, consumed, "Produced and consumed counts do not match");
+                    Assert.Equal(numProduced, consumed);
                 }
             }
             else if (numProduced <= 0 || // no events produced?
@@ -383,8 +380,8 @@ namespace UnitTests.StreamingTests
             var numConsumed = eventCount();
             if (assertIsTrue)
             {
-                Assert.IsTrue(numProduced > 0, "Events were not produced");
-                Assert.AreEqual(numProduced, numConsumed, "Produced and consumed counts do not match");
+                Assert.True(numProduced > 0, "Events were not produced");
+                Assert.Equal(numProduced, numConsumed);
             }
             else if (numProduced <= 0 || // no events produced?
                      numProduced != numConsumed)

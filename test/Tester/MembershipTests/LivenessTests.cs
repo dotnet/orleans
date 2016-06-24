@@ -12,7 +12,6 @@ using UnitTests.Tester;
 using Orleans.SqlUtils;
 using Tester;
 using UnitTests.General;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -41,9 +40,9 @@ namespace UnitTests.MembershipTests
             foreach (var pair in statuses)
             {
                 output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                Assert.AreEqual(SiloStatus.Active, pair.Value);
+                Assert.Equal(SiloStatus.Active, pair.Value);
             }
-            Assert.AreEqual(3, statuses.Count);
+            Assert.Equal(3, statuses.Count);
 
             IPEndPoint address = silo3.Endpoint;
             output.WriteLine("About to stop {0}", address);
@@ -60,15 +59,14 @@ namespace UnitTests.MembershipTests
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
-                    Assert.IsTrue(pair.Value.Equals(SiloStatus.ShuttingDown)
+                    Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
                         || pair.Value.Equals(SiloStatus.Stopping)
                         || pair.Value.Equals(SiloStatus.Dead),
-                        "SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}",
-                        silo, pair.Value);
+                        string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else
                 {
-                    Assert.AreEqual(SiloStatus.Active, pair.Value, "SiloStatus for {0}", silo);
+                    Assert.Equal(SiloStatus.Active, pair.Value);
                 }
             }
         }
@@ -159,8 +157,8 @@ namespace UnitTests.MembershipTests
             try
             {
                 ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
-                Assert.AreEqual(key, grain.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
+                Assert.Equal(key, grain.GetPrimaryKeyLong());
+                Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);
                 if (startTimers)
                 {

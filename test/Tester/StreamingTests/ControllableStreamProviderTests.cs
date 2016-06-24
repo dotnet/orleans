@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Orleans;
 using Orleans.Runtime;
@@ -64,12 +63,12 @@ namespace UnitTests.StreamingTests
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
-            Assert.AreEqual(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)
             {
-                Assert.AreEqual(command, echo.Item1, "command");
-                Assert.AreEqual(echoArg, echo.Item2, "echo");
+                Assert.Equal(command, echo.Item1);
+                Assert.Equal(echoArg, echo.Item2);
             }
         }
     }
