@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         
-        private readonly InvocationMethodInfoMap invocationMethodInfoMap = new InvocationMethodInfoMap();
+        private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private GrainInterfaceMap grainInterfaceMap;
@@ -360,35 +360,7 @@ namespace Orleans.Runtime
                         throw exc;
                     }
 
-                    // If the target has a grain-level interceptor or there is a silo-level interceptor, intercept the call.
-                    var shouldCallSiloWideInterceptor = SiloProviderRuntime.Instance.GetInvokeInterceptor() != null && target is IGrain;
-                    var intercepted = target as IGrainInvokeInterceptor;
-                    if (intercepted != null || shouldCallSiloWideInterceptor)
-                    {
-                        // Fetch the method info for the intercepted call.
-                        var implementationInvoker =
-                            invocationMethodInfoMap.GetInterceptedMethodInvoker(target.GetType(), request.InterfaceId,
-                                invoker);
-                        var methodInfo = implementationInvoker.GetMethodInfo(request.MethodId);
-                        if (shouldCallSiloWideInterceptor)
-                        {
-                            // There is a silo-level interceptor and possibly a grain-level interceptor.
-                            var runtime = SiloProviderRuntime.Instance;
-                            resultObject =
-                                await runtime.CallInvokeInterceptor(methodInfo, request, target, implementationInvoker);
-                        }
-                        else
-                        {
-                            // The grain has an interceptor, but there is no silo-wide interceptor.
-                            resultObject = await intercepted.Invoke(methodInfo, request, invoker);
-                        }
-                    }
-                    else
-                    {
-						// The call is not intercepted.
-                        // TODO: this await here is just grabbing the first exception of the AggregateException. As a framework we shouldn't do that.
-                        resultObject = await invoker.Invoke(target, request);
-                    }
+                    resultObject = await InvokeWithInterceptors(target, request, invoker);
                 }
                 catch (Exception exc1)
                 {
@@ -414,6 +386,48 @@ namespace Orleans.Runtime
                 if (message.Direction != Message.Directions.OneWay)
                     SafeSendExceptionResponse(message, exc2);             
             }
+        }
+
+        private Task<object> InvokeWithInterceptors(IAddressable target, InvokeMethodRequest request, IGrainMethodInvoker invoker)
+        {
+            // If the target has a grain-level interceptor or there is a silo-level interceptor, intercept the
+            // call.
+            var siloWideInterceptor = SiloProviderRuntime.Instance.GetInvokeInterceptor();
+            var grainWithInterceptor = target as IGrainInvokeInterceptor;
+            
+            // Silo-wide interceptors do not operate on system targets.
+            var hasSiloWideInterceptor = siloWideInterceptor != null && target is IGrain;
+            var hasGrainLevelInterceptor = grainWithInterceptor != null;
+            
+            if (!hasGrainLevelInterceptor && !hasSiloWideInterceptor)
+            {
+                // The call is not intercepted at either the silo or the grain level, so call the invoker
+                // directly.
+                return invoker.Invoke(target, request);
+            }
+
+            // Get an invoker which delegates to the grain's IGrainInvocationInterceptor implementation.
+            // If the grain does not implement IGrainInvocationInterceptor, then the invoker simply delegates
+            // calls to the provided invoker.
+            var interceptedMethodInvoker = interceptedMethodInvokerCache.GetOrCreate(
+                target.GetType(),
+                request.InterfaceId,
+                invoker);
+            var methodInfo = interceptedMethodInvoker.GetMethodInfo(request.MethodId);
+            if (hasSiloWideInterceptor)
+            {
+                // There is a silo-level interceptor and possibly a grain-level interceptor.
+                // As a minor optimization, only pass the intercepted invoker if there is a grain-level
+                // interceptor.
+                return siloWideInterceptor(
+                    methodInfo,
+                    request,
+                    (IGrain)target,
+                    hasGrainLevelInterceptor ? interceptedMethodInvoker : invoker);
+            }
+
+            // The grain has an invoke method, but there is no silo-wide interceptor.
+            return grainWithInterceptor.Invoke(methodInfo, request, invoker);
         }
 
         private void SafeSendResponse(Message message, object resultObject)
