@@ -349,7 +349,7 @@ namespace Orleans.Runtime
 
                 logger.useCustomSeverityLevel = false;
                 logger.defaultCopiedCounter = 0;
-                logger.severity = GetDefaultSeverityForLog(logger.logName, logger.loggerType);
+                logger.severity = GetDefaultSeverityForLog(logger.Name, logger.loggerType);
             }
         }
 

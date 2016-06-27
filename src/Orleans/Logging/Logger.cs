@@ -14,6 +14,11 @@ namespace Orleans.Runtime
         public abstract Severity SeverityLevel { get; }
 
         /// <summary>
+        /// Name of logger instance
+        /// </summary>
+        public abstract string Name { get; }
+
+        /// <summary>
         /// Find existing or create new Logger with the specified name
         /// </summary>
         /// <param name="loggerName">Name of the Logger to find or create</param>

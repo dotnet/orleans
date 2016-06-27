@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using static System.String;
@@ -20,10 +21,11 @@ namespace Orleans.Providers.Streams.Generator
         /// Pooled cache for generator stream provider
         /// </summary>
         /// <param name="bufferPool"></param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool)
+        /// <param name="logger"></param>
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool);
-            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance);
+            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
             dataAdapter.PurgeAction = cache.Purge;
         }
 

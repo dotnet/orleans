@@ -7,6 +7,17 @@ namespace Orleans.Runtime
     public static class LoggerExtensions
     {
         /// <summary>
+        /// Finds or creates a logger named after the existing logger with the appended name added.
+        /// </summary>
+        /// <param name="logger"></param>
+        /// <param name="loggerName"></param>
+        /// <returns></returns>
+        public static Logger GetSubLogger(this Logger logger, string appendedName)
+        {
+            return logger.GetLogger(logger.Name + appendedName);
+        }
+
+        /// <summary>
         /// Writes a log entry at the Verbose severity level.
         /// Verbose is suitable for debugging information that should usually not be logged in production.
         /// Verbose is lower than Info.
