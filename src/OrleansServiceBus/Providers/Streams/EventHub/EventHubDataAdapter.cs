@@ -169,7 +169,7 @@ namespace Orleans.ServiceBus.Providers
         // Placed object message payload into a segment.
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
-            byte[] propertiesBytes = queueMessage.Properties.SerializeProperties();
+            byte[] propertiesBytes = queueMessage.SerializeProperties();
             byte[] payload = queueMessage.GetBytes();
             // get size of namespace, offset, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +

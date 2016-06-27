@@ -6,7 +6,7 @@ using System.Linq;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using UnitTests.StreamingTests;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -189,7 +189,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             RunGoldenPath(cache, 111);
         }
@@ -203,7 +203,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             int startSequenceNuber = 222;
             startSequenceNuber = RunGoldenPath(cache, startSequenceNuber);
@@ -304,7 +304,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             int sequenceNumber = 10;
             IBatchContainer batch;

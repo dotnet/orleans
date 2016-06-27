@@ -232,7 +232,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new GeneratorPooledCache(bufferPool);
+            return new GeneratorPooledCache(bufferPool, logger);
         }
     }
 }

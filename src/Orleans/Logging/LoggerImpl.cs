@@ -16,7 +16,6 @@ namespace Orleans.Runtime
         internal bool useCustomSeverityLevel;
 
         internal readonly LoggerType loggerType;
-        internal readonly string logName;
 
         private Dictionary<int, int> recentLogMessageCounts = new Dictionary<int, int>();
         private DateTime lastBulkLogMessageFlush = DateTime.MinValue;
@@ -37,11 +36,16 @@ namespace Orleans.Runtime
             {
                 if (useCustomSeverityLevel || (defaultCopiedCounter >= LogManager.defaultModificationCounter)) return severity;
 
-                severity = LogManager.GetDefaultSeverityForLog(logName, loggerType);
+                severity = LogManager.GetDefaultSeverityForLog(Name, loggerType);
                 defaultCopiedCounter = LogManager.defaultModificationCounter;
                 return severity;
             }
         }
+
+        /// <summary>
+        /// Name of logger instance
+        /// </summary>
+        public override string Name { get; }
 
         public override Logger GetLogger(string loggerName)
         {
@@ -68,15 +72,15 @@ namespace Orleans.Runtime
         internal LoggerImpl(string source, LoggerType logType)
         {
             defaultCopiedCounter = -1;
-            logName = source;
+            Name = source;
             loggerType = logType;
             useCustomSeverityLevel = CheckForSeverityOverride();
         }
 
         internal bool MatchesPrefix(string prefix)
         {
-            return logName.StartsWith(prefix, StringComparison.Ordinal)
-                || (loggerType + "." + logName).StartsWith(prefix, StringComparison.Ordinal);
+            return Name.StartsWith(prefix, StringComparison.Ordinal)
+                || (loggerType + "." + Name).StartsWith(prefix, StringComparison.Ordinal);
         }
 
         internal bool CheckForSeverityOverride()
@@ -235,11 +239,11 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    consumer.Log(sev, loggerType, logName, message, LogManager.MyIPEndPoint, exception, errorCode);
+                    consumer.Log(sev, loggerType, Name, message, LogManager.MyIPEndPoint, exception, errorCode);
 
                     if (logMessageTruncated)
                     {
-                        consumer.Log(Severity.Warning, loggerType, logName,
+                        consumer.Log(Severity.Warning, loggerType, Name,
                             "Previous log message was truncated - Max size = " + LogManager.MAX_LOG_MESSAGE_SIZE,
                             LogManager.MyIPEndPoint, exception,
                             (int)ErrorCode.Logger_LogMessageTruncated);
@@ -248,11 +252,11 @@ namespace Orleans.Runtime
                 catch (Exception exc)
                 {
                     Console.WriteLine("Exception while passing a log message to log consumer. Logger type:{0}, name:{1}, severity:{2}, message:{3}, error code:{4}, message exception:{5}, log consumer exception:{6}",
-                        consumer.GetType().FullName, logName, sev, message, errorCode, exception, exc);
+                        consumer.GetType().FullName, Name, sev, message, errorCode, exception, exc);
                 }
             }
 
-            var formatedTraceMessage = TraceParserUtils.FormatLogMessage(sev, loggerType, logName, message, LogManager.MyIPEndPoint, exception, errorCode);
+            var formatedTraceMessage = TraceParserUtils.FormatLogMessage(sev, loggerType, Name, message, LogManager.MyIPEndPoint, exception, errorCode);
 
             if (exception != null)
                 TrackException(exception);
@@ -261,7 +265,7 @@ namespace Orleans.Runtime
 
             if (logMessageTruncated)
             {
-                formatedTraceMessage = TraceParserUtils.FormatLogMessage(Severity.Warning, loggerType, logName,
+                formatedTraceMessage = TraceParserUtils.FormatLogMessage(Severity.Warning, loggerType, Name,
                     "Previous log message was truncated - Max size = " + LogManager.MAX_LOG_MESSAGE_SIZE,
                     LogManager.MyIPEndPoint, exception,
                     (int)ErrorCode.Logger_LogMessageTruncated);
