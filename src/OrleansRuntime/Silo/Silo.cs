@@ -93,8 +93,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
-        private readonly IServiceProvider services;
-        
+
         internal readonly string Name;
         internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
@@ -117,7 +116,7 @@ namespace Orleans.Runtime
             get { return allSiloProviders.AsReadOnly();  }
         }
 
-        internal IServiceProvider Services { get { return services; } }
+        internal IServiceProvider Services { get; }
 
         /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
@@ -221,24 +220,8 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = new DefaultServiceProvider();
-            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
-            if (startupBuilder != null)
-            {
-                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
-                try
-                {
-                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
-                }
-                catch (FileNotFoundException exc)
-                {
-                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
-                }
-            }
-            else
-            {
-                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
-            }
+            // Configure DI using Startup type
+            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName) ?? new DefaultServiceProvider();
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();

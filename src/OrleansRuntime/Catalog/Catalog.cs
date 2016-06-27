@@ -160,7 +160,6 @@ namespace Orleans.Runtime
             collectionNumber = 0;
             destroyActivationsNumber = 0;
 
-            // TODO: Change back to GetRequiredService after stable Microsoft.Framework.DependencyInjection is released and can be referenced here
             grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
