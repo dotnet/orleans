@@ -52,10 +52,10 @@ We can add a `Get` method to the controller, which we'll use to return the level
 ``` csharp
 public class EmployeeController : ApiController
 {
-    public Task<int> Get(long id)
+    public Task<int> Get(Guid id)
     {
         var employee = GrainClient.GrainFactory.GetGrain<IEmployee>(id);
-        return employee.Level;
+        return employee.GetLevel();
     }
 }
 ```
@@ -72,7 +72,7 @@ Set the ASP.NET application as the startup project, and run the project.
 
 If you navigate to the API URL (the number may be different on your project)...
 
-    http://localhost:6858/api/employee/3
+    http://localhost:6858/api/employee/42783519-d64e-44c9-9c29-399e3afaa625
 
 
  ...you should see the result returned from the grain:

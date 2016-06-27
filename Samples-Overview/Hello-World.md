@@ -11,7 +11,7 @@ There are three projects involved -- one for declaring the communication interfa
 There's only one communication interface, in IHello.cs:
 
 ``` csharp
-public interface IHello : Orleans.IGrain
+public interface IHello : Orleans.IGrainWithIntegerKey
 {
    Task<string> SayHello(string greeting);
 }
@@ -35,7 +35,7 @@ The class inherits from an Orleans-defined base class, and implements the commun
 
 ``` csharp
 Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
-var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
+var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
 Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 ```
 

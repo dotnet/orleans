@@ -6,7 +6,7 @@ title: Interaction with Libraries and Services
 
 Code running in a grain is not prohibited from calling external systems or services, but the rule for always using asynchronous code must be maintained.
 
-In this sample we'll see how a grain can all out to an external service.
+In this sample we'll see how a grain can call out to an external service.
 
 ## Creating a Stock Grain
 
@@ -153,7 +153,7 @@ Whenever a stock grain is queried Orleans will provide the latest price it has, 
 
 ## Parallelization
 
-Running code in a single threaded execution model, does not prohibit you from await several tasks at once (or in parallel).
+Running code in a single threaded execution model, does not prohibit you from awaiting several tasks at once (or in parallel).
 
 Let's add a new function to retrieve the graph data for a stock:
 
@@ -220,7 +220,7 @@ Note: When a large number of asynchronous actions need to happen simultaneously 
 
 It's tempting to use the [Task Parallel Library](https://msdn.microsoft.com/en-us/library/dd460717) _"TPL"_ for executing parallel tasks in Orleans, but TPL uses the .NET thread pool to dispatch tasks. This is prohibited within grain code.
 
-Orleans has it's own task scheduler which provides the single threaded execution model used within grains. 
+Orleans has its own task scheduler which provides the single threaded execution model used within grains. 
 It's important that when running tasks the Orleans scheduler is used, and not the .NET thread pool.
 
 Should your grain code require a sub-task to be created, you should use `Task.Factory.StartNew`:

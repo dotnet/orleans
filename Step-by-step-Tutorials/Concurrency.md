@@ -14,7 +14,7 @@ First create a class in the interface project which we'll use to send the greeti
 ``` csharp
 public class GreetingData
 {
-    public long From { get; set; }
+    public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }
@@ -43,7 +43,7 @@ public async Task Greeting(GreetingData data)
     // send a message back to the sender
     var fromGrain = GrainFactory.GetGrain<IEmployee>(data.From);
     await fromGrain.Greeting(new GreetingData {
-        From = this.GetPrimaryKeyLong(),
+        From = this.GetPrimaryKey(),
         Message = "Thanks!",
         Count = data.Count + 1 });
 }
@@ -57,7 +57,7 @@ public async Task AddDirectReport(IEmployee employee)
     _reports.Add(employee);
     await employee.SetManager(this);
     await employee.Greeting(new GreetingData {
-        From = this.GetPrimaryKeyLong(),
+        From = this.GetPrimaryKey(),
         Message = "Welcome to my team!" });
 }
 ```
@@ -68,9 +68,9 @@ Let's add some simple client code to add a direct report to a manager:
 
 
 ``` csharp
-var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(0);
-var m1 = GrainClient.GrainFactory.GetGrain<IManager>(1);
-m1.AddDirectReport(e0);
+var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
+m1.AddDirectReport(e0).Wait();
 ```
 
 When we run this code, the first "Thanks!" greeting is received.
@@ -137,7 +137,7 @@ Immutability is indicated with a the `[Immutable]` attribute on the class:
 [Immutable]
 public class GreetingData
 {
-    public long From { get; set; }
+    public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }
