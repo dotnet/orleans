@@ -45,12 +45,16 @@ namespace Orleans.Runtime.GrainDirectory
                     // examine the multicluster configuration
                     var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
 
+                    // copy all entries before further processing
+                    // TODO I think this is too wasteful, should implement iteration without full copy
+                    var allEntries = router.DirectoryPartition.GetItems();
+
                     if (config == null || !config.Clusters.Contains(myClusterId))
                     {
                         // we are not joined to the cluster yet/anymore. 
                         // go through all owned entries and make them doubtful
 
-                        var ownedEntries = router.DirectoryPartition.GetItems().Where(kp =>
+                        var ownedEntries = allEntries.Where(kp =>
                         {
                             if (!kp.Value.SingleInstance) return false;
                             var act = kp.Value.Instances.FirstOrDefault();
@@ -71,7 +75,7 @@ namespace Orleans.Runtime.GrainDirectory
                         // we are joined to the multicluster.
                         // go through all doubtful entries and broadcast ownership requests for each
 
-                        var doubtfulEntries = router.DirectoryPartition.GetItems().Where(kp =>
+                        var doubtfulEntries = allEntries.Where(kp =>
                         {
                             if (!kp.Value.SingleInstance) return false;
                             var act = kp.Value.Instances.FirstOrDefault();

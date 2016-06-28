@@ -56,6 +56,17 @@ namespace UnitTests.Grains
             }
              * */
         }
+
+        public Task<string> GetRuntimeId()
+        {
+            return Task.FromResult(this.RuntimeIdentity);
+        }
+
+        public Task Deactivate()
+        {
+            this.DeactivateOnIdle();
+            return TaskDone.Done;
+        }
     }
 
     /// <summary>
@@ -73,6 +84,12 @@ namespace UnitTests.Grains
             string id = this.GetPrimaryKeyLong().ToString();
             logger = GetLogger(String.Format("{0}-{1}", GetType().Name, id));
             logger.Info("Activate.");
+            return TaskDone.Done;
+        }
+
+        public override Task OnDeactivateAsync()
+        {
+            logger.Info("Deactivate.");
             return TaskDone.Done;
         }
 
@@ -94,5 +111,6 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(A * B);
         }
-    }
+
+     }
 }

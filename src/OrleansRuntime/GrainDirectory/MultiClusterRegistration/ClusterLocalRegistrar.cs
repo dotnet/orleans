@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -48,7 +49,7 @@ namespace Orleans.Runtime.GrainDirectory
             throw new InvalidOperationException();
         }
 
-        public Task UnregisterAsync(ActivationAddress address, bool force)
+        public Task UnregisterAsync(List<ActivationAddress> addresses, bool force)
         {
             throw new InvalidOperationException();
         }

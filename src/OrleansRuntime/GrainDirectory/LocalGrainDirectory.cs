@@ -24,7 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         // Consider: move these constants into an apropriate place
         internal const int HOP_LIMIT = 3; // forward a remote request no more than two times
-        private static readonly TimeSpan RETRY_DELAY = TimeSpan.FromSeconds(5); // Pause 5 seconds between forwards to let the membership directory settle down
+        public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromSeconds(5); // Pause 5 seconds between forwards to let the membership directory settle down
 
         protected SiloAddress Seed { get { return seed; } }
 
@@ -627,7 +627,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (registrar.IsSynchronous)
                     registrar.Unregister(address, force);
                 else
-                    await registrar.UnregisterAsync(address, force);
+                    await registrar.UnregisterAsync(new List<ActivationAddress>() { address }, force);
             }
             else
             {
@@ -652,6 +652,8 @@ namespace Orleans.Runtime.GrainDirectory
         private void UnregisterOrPutInForwardList(IEnumerable<ActivationAddress> addresses, int hopCount,
             ref Dictionary<SiloAddress, List<ActivationAddress>> forward, List<Task> tasks, string context)
         {
+            Dictionary<IGrainRegistrar, List<ActivationAddress>> unregister_batches = null;
+
             foreach (var address in addresses)
             {
                 // see if the owner is somewhere else (returns null if we are owner)
@@ -670,9 +672,20 @@ namespace Orleans.Runtime.GrainDirectory
                         registrar.Unregister(address, true);
                     else
                     {
-                        tasks.Add(registrar.UnregisterAsync(address, true));
+                        if (unregister_batches == null)
+                            unregister_batches = new Dictionary<IGrainRegistrar, List<ActivationAddress>>();
+                        List<ActivationAddress> list;
+                        if (!unregister_batches.TryGetValue(registrar, out list))
+                            unregister_batches.Add(registrar, list = new List<ActivationAddress>());
+                        list.Add(address);
                     }
                 }
+            }
+
+            // batch-unregister for each asynchronous registrar
+            foreach(var kvp in unregister_batches)
+            {
+                tasks.Add(kvp.Key.UnregisterAsync(kvp.Value, true));
             }
         }
 

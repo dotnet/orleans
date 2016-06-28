@@ -10,6 +10,7 @@ using Orleans.Runtime.Configuration;
 using System.Net;
 using Orleans;
 using Assert = Xunit.Assert;
+using Xunit.Abstractions;
 using Tester;
 
 namespace Tests.GeoClusterTests
@@ -20,15 +21,17 @@ namespace Tests.GeoClusterTests
     /// </summary>
     public class TestingClusterHost   
     {
+        ITestOutputHelper output;
+
         protected readonly Dictionary<string, ClusterInfo> Clusters;
         private TestingSiloHost siloHost;
 
         private TimeSpan gossipStabilizationTime;
 
-        public TestingClusterHost() : base()
+        public TestingClusterHost(ITestOutputHelper output) 
         {
             Clusters = new Dictionary<string, ClusterInfo>();
-
+            this.output = output;
             TestUtils.CheckForAzureStorage();
         }
 
@@ -38,9 +41,22 @@ namespace Tests.GeoClusterTests
             public int SequenceNumber; // we number created clusters in order of creation
         }
 
-        public static void WriteLog(string format, params object[] args)
+        public void WriteLog(string format, params object[] args)
         {
-            Console.WriteLine(format, args);
+            output.WriteLine(format, args);
+        }
+
+        public async Task RunWithTimeout(string name, int msec, Func<Task> test)
+        {
+            WriteLog("Starting {0}", name);
+            var stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+            var testtask = test();
+            await Task.WhenAny(testtask, Task.Delay(System.Diagnostics.Debugger.IsAttached ? 3600000 : msec));
+            Assert.True(testtask.IsCompleted, string.Format("{0} took too long, timed out", name));
+            await testtask;
+            stopwatch.Stop();
+            WriteLog("{0} Done (elapsed = {1})", name, stopwatch.Elapsed);
         }
 
         /// <summary>

@@ -40,6 +40,8 @@ namespace Orleans.Runtime.GrainDirectory
     {
         public Dictionary<ActivationId, IActivationInfo> Instances { get; private set; }
         public int VersionTag { get; private set; }
+
+        // TODO the following field creates memory overhead for ALL grains in directory, perhaps it could be done differently
         public bool SingleInstance { get; private set; }
 
         private static readonly SafeRandom rand;
@@ -122,6 +124,22 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
             return Instances.Count == 0;
+        }
+
+        public IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force)
+        {
+            IActivationInfo info = null;
+            if (Instances.TryGetValue(address.Activation, out info))
+            {
+                if (force
+                    || (Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay > TimeSpan.Zero
+                        && info.TimeCreated <= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay))
+                {
+                    Instances.Remove(address.Activation);
+                    VersionTag = rand.Next();
+                }
+            }
+            return info;
         }
 
         public bool Merge(GrainId grain, IGrainInfo other)
@@ -364,6 +382,16 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        public IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force)
+        {
+            lock (lockable)
+            {
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(address.Grain, out graininfo))
+                    return graininfo.LookupAndRemoveActivation(address, force);
+            }
+            return null;
+        }
         /// <summary>
         /// Merges one partition into another, asuuming partitions are disjoint.
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.

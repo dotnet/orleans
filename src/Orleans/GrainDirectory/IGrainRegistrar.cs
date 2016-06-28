@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using System.Collections.Generic;
 
 namespace Orleans.GrainDirectory
 {
@@ -19,7 +20,7 @@ namespace Orleans.GrainDirectory
         bool IsSynchronous { get; }
 
         /// <summary>
-        /// Registers a new activation with the directory service.
+        /// Registers a new activation with the directory service, synchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the activation to register.</param>
@@ -28,7 +29,7 @@ namespace Orleans.GrainDirectory
         AddressAndTag Register(ActivationAddress address, bool singleActivation);
 
         /// <summary>
-        /// Registers a new activation with the directory service.
+        /// Registers a new activation with the directory service, asynchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the activation to register.</param>
@@ -37,33 +38,31 @@ namespace Orleans.GrainDirectory
         Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation);
 
         /// <summary>
-        /// Removes the given activation for the grain.
+        /// Removes the given activation registration, synchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="address"></param>
-        /// <param name="force"></param>
-        /// <returns></returns>
+        /// <param name="address">the activations to unregister</param>
+        /// <param name="force">if false, remove only registrations older than the lazy deregistration delay</param>
         void Unregister(ActivationAddress address, bool force);
 
         /// <summary>
-        /// Removes the given activation for the grain.
+        /// Removes the given activation registrations, asynchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="address"></param>
-        /// <param name="force"></param>
-        /// <returns></returns>
-        Task UnregisterAsync(ActivationAddress address, bool force);
+        /// <param name="addresses">the activations to unregister</param>
+        /// <param name="force">if false, remove only registrations older than the lazy deregistration delay</param>
+        Task UnregisterAsync(List<ActivationAddress> addresses, bool force);
 
         /// <summary>
-        /// Deletes the grain activation.
+        /// Deletes all registrations for a grain, synchronously
         /// </summary>
-        /// <returns></returns>
+        /// <param name="gid">The id of the grain</param>
         void Delete(GrainId gid);
 
         /// <summary>
-        /// Deletes the grain activation.
+        /// Deletes all registrations for a grain, asynchronously
         /// </summary>
-        /// <returns></returns>
+        /// <param name="gid">The id of the grain</param>
         Task DeleteAsync(GrainId gid);
     }
 }

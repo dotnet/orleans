@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
+using System.Collections.Generic;
 
 namespace Orleans.SystemTargetInterfaces
 {
@@ -59,15 +60,40 @@ namespace Orleans.SystemTargetInterfaces
 
     interface IClusterGrainDirectory : ISystemTarget
     {
+        /// <summary>
+        /// Called on remote clusters to process a global-single-instance round
+        /// </summary>
+        /// <param name="grain">the grain to process</param>
+        /// <param name="requestClusterId">the id of the origin cluster</param>
+        /// <returns></returns>
         Task<RemoteClusterActivationResponse> ProcessActivationRequest(
             GrainId grain,
             string requestClusterId,
-            bool withForward = true);
+            int hopCount = 0);
 
+        /// <summary>
+        /// Called on remote clusters to process a global-single-instance round
+        /// </summary>
+        /// <param name="grains">the grains to process</param>
+        /// <param name="sendingClusterId">the id of the origin cluster</param>
+        /// <returns></returns>
         Task<RemoteClusterActivationResponse[]> ProcessActivationRequestBatch(
             GrainId[] grains,
             string sendingClusterId);
 
-       // Task DeactivateLosers(ActivationId[] activations);
+        /// <summary>
+        /// Called on remote clusters after deactivating a owned or doubtful grain activation,
+        /// to give them the opportunity to remove the cached registration
+        /// </summary>
+        /// <param name="addresses">the list of activations</param>
+        /// <returns></returns>
+        Task ProcessDeactivations(List<ActivationAddress> addresses);
+
+        /// <summary>
+        /// Called on remote clusters when deletion of all grain registrations is asked for.
+        /// </summary>
+        /// <param name="gid"></param>
+        /// <returns></returns>
+        Task ProcessDeletion(GrainId gid);
     }
 }

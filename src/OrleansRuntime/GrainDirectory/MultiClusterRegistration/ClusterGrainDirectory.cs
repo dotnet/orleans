@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -31,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public Task<RemoteClusterActivationResponse> ProcessActivationRequest(GrainId grain, string requestClusterId, bool withRetry = true)
+        public async Task<RemoteClusterActivationResponse> ProcessActivationRequest(GrainId grain, string requestClusterId, int hopCount = 0)
         {
             // check if the requesting cluster id is in the current configuration view of this cluster
             // if not, reject the message.
@@ -41,17 +42,24 @@ namespace Orleans.Runtime.GrainDirectory
                 if (logger.IsVerbose)
                     logger.Verbose("GSIP:D {0} From={1} Result={2}", grain.ToString(), requestClusterId, "FAILED not in config");
 
-                return Task.FromResult(new RemoteClusterActivationResponse(ActivationResponseStatus.Failed));
+                return new RemoteClusterActivationResponse(ActivationResponseStatus.Failed);
             }
 
             var forwardAddress = router.CheckIfShouldForward(grain, 0, "ProcessActivationRequest");
+
+            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
+            if (hopCount > 0 && forwardAddress != null)
+            {
+                await Task.Delay(LocalGrainDirectory.RETRY_DELAY);
+                forwardAddress = router.CheckIfShouldForward(grain, hopCount, "ProcessActivationRequest(recheck)");
+            }
 
             if (forwardAddress == null)
             {
                 var response = ProcessRequestLocal(grain, requestClusterId);
                 return response == RemoteClusterActivationResponse.Pass 
-                    ? cachedPassTask
-                    : Task.FromResult(ProcessRequestLocal(grain, requestClusterId));
+                    ? await cachedPassTask
+                    : ProcessRequestLocal(grain, requestClusterId);
             }
             else
             {
@@ -59,7 +67,7 @@ namespace Orleans.Runtime.GrainDirectory
                     logger.Verbose("GSIP:D {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
 
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, forwardAddress);
-                return clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, false);
+                return await clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, hopCount + 1);
             }
         }
 
@@ -187,6 +195,21 @@ namespace Orleans.Runtime.GrainDirectory
                 .ToArray();
 
             return responses;
+        }
+
+
+        public Task ProcessDeactivations(List<ActivationAddress> addresses)
+        {
+            // standard grain directory mechanisms for this cluster can take care of this request
+            // (forwards to owning silo in this cluster as needed)
+            return router.UnregisterManyAsync(addresses, 0);
+        }
+
+        public Task ProcessDeletion(GrainId gid)
+        {
+            // standard grain directory mechanisms for this cluster can take care of this request
+            // (forwards to owning silo in this cluster as needed)
+            return router.DeleteGrainAsync(gid, 0);
         }
     }
 }

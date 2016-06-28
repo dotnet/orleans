@@ -4,11 +4,16 @@ using Orleans;
 using Orleans.Runtime;
 using Xunit;
 using Assert = Xunit.Assert;
+using Xunit.Abstractions;
 
 namespace Tests.GeoClusterTests
 {
     public class BasicMultiClusterTest : TestingClusterHost, IDisposable
     {
+
+        public BasicMultiClusterTest(ITestOutputHelper output) : base(output)
+        { }
+
         // Kill all clients and silos.
         public void Dispose()
         {

@@ -11,6 +11,7 @@ using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Xunit.Abstractions;
 
 // ReSharper disable InconsistentNaming
 
@@ -21,17 +22,32 @@ namespace Tests.GeoClusterTests
 
     public class GlobalSingleInstanceClusterTests : TestingClusterHost, IDisposable
     {
+
+        public GlobalSingleInstanceClusterTests(ITestOutputHelper output) : base(output)
+        { }
+
+
         // Kill all clients and silos.
         public void Dispose()
         {
+            WriteLog("Disposing...");
+            var stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
             try
             {
-                StopAllClientsAndClusters();
+                var disposetask = Task.Run(() => StopAllClientsAndClusters());
+
+                disposetask.WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 2));
             }
             catch (Exception e)
             {
                 WriteLog("Exception caught in test cleanup function: {0}", e);
+                throw e;
             }
+
+            stopwatch.Stop();
+            WriteLog("Dispose completed (elapsed = {0}).", stopwatch.Elapsed);
         }
 
         #region client wrappers
@@ -61,13 +77,7 @@ namespace Tests.GeoClusterTests
 
         #endregion
 
-        public async Task RunWithTimeout(int msec, Func<Task> test)
-        {
-            var testtask = test();
-            await Task.WhenAny(testtask, Task.Delay(msec));
-            Assert.IsTrue(testtask.IsCompleted, "test took too long, timed out");
-        }
-
+        ParallelOptions paralleloptions = new ParallelOptions() { MaxDegreeOfParallelism = 4 };
 
         #region Creation of clusters and non-conflicting grains
 
@@ -76,7 +86,7 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestClusterCreation_1_1()
         {
-            await RunWithTimeout(120000, async () =>
+            await RunWithTimeout("TestClusterCreation_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
@@ -101,10 +111,13 @@ namespace Tests.GeoClusterTests
                 int baseCount1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
                 int baseCount = baseCount0 + baseCount1;
 
+
                 const int numGrains = 2000;
 
+                WriteLog("Starting parallel creation of {0} grains", numGrains);
+
                 // Create grains on both clusters. Alternating between the two.
-                Parallel.For(0, numGrains, i =>
+                Parallel.For(0, numGrains, paralleloptions, i =>
                  {
                      int val;
                      if (i % 2 == 0)
@@ -148,17 +161,17 @@ namespace Tests.GeoClusterTests
         // This function is used to test the activation creation algorithm when two clusters create non-conflicting activations.
         // Takes around 1:45 min
         [Fact, TestCategory("GeoCluster")]
-        public async Task TestClusterCreation_5_5()
+        public async Task TestClusterCreation_3_4()
         {
-            await RunWithTimeout(180000, async () =>
+            await RunWithTimeout("TestClusterCreation_3_4", 240000, async () =>
             {    // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
 
                 // Create two clusters, each with 5 silos.
                 var cluster0 = "cluster0";
                 var cluster1 = "cluster1";
-                NewGeoCluster(globalserviceid, cluster0, 5);
-                NewGeoCluster(globalserviceid, cluster1, 5);
+                NewGeoCluster(globalserviceid, cluster0, 3);
+                NewGeoCluster(globalserviceid, cluster1, 4);
 
                 await WaitForLivenessToStabilizeAsync();
 
@@ -182,12 +195,14 @@ namespace Tests.GeoClusterTests
 
                 const int numGrains = 2000;
 
+                WriteLog("Starting parallel creation of {0} grains", numGrains);
+
                 // Ensure that we're running this test with an even number of grains :).
                 Assert.AreEqual(0, numGrains % 2);
 
                 Stopwatch sw = Stopwatch.StartNew();
 
-                Parallel.For(0, numGrains, i =>
+                Parallel.For(0, numGrains, paralleloptions, i =>
                 {
                     int first, second;
                     string pat; // Call pattern
@@ -258,7 +273,7 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestClusterRace_1_1()
         {
-            await RunWithTimeout(120000, async () =>
+            await RunWithTimeout("TestClusterRace_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
@@ -299,23 +314,23 @@ namespace Tests.GeoClusterTests
             });
         }
 
-        // This test is exactly the same as TestSingleSingleClusterRace. 
+        // This test is exactly the same as TestClusterRace_1_1. 
         // The only difference is that we run each cluster with more than one silo, 
         // and also use multiple clients connected to silos in the same cluster. 
         // The structure of the experiment itself is identical to that of TestSingleSingleClusterRace.
         [Fact, TestCategory("GeoCluster")]
-        public async Task TestClusterRace_5_5()
+        public async Task TestClusterRace_3_4()
         {
-            await RunWithTimeout(180000, async () =>
+            await RunWithTimeout("TestClusterRace_3_4", 180000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
 
-                // Create two clusters, each with 5 silos.
+                // Create two clusters, one with two and one with four silos.
                 var cluster0 = "cluster0";
                 var cluster1 = "cluster1";
-                NewGeoCluster(globalserviceid, cluster0, 5);
-                NewGeoCluster(globalserviceid, cluster1, 5);
+                NewGeoCluster(globalserviceid, cluster0, 3);
+                NewGeoCluster(globalserviceid, cluster1, 4);
 
                 await WaitForLivenessToStabilizeAsync();
 
@@ -338,6 +353,7 @@ namespace Tests.GeoClusterTests
                 // We perform a run of concurrent experiments. 
                 // we expect that all calls from concurrent clients will reference 
                 // the same activation of a grain.
+
                 var results = DoConcurrentExperiment(clients, numGrains);
 
                 ValidateClusterRaceResults(numGrains, results);
@@ -346,6 +362,8 @@ namespace Tests.GeoClusterTests
 
         private void ValidateClusterRaceResults(int numGrains, List<Tuple<int, int>>[] results)
         {
+            WriteLog("Validating cluster race results");
+
             var grains = GetGrainActivations();
 
             // there should be the right number of grains
@@ -413,7 +431,7 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestConflictResolution_1_1()
         {
-            await RunWithTimeout(120000, async () =>
+            await RunWithTimeout("TestConflictResolution_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
@@ -451,8 +469,10 @@ namespace Tests.GeoClusterTests
 
                 const int numGrains = 10;
 
+                WriteLog("Starting creation of {0} grains on isolated clusters", numGrains);
+
                 // This should create two activations of each grain - one in each cluster.
-                Parallel.For(0, numGrains, i =>
+                Parallel.For(0, numGrains, paralleloptions, i =>
                 {
                     var res0 = client0.CallGrain(i);
                     var res1 = client1.CallGrain(i);
@@ -466,6 +486,8 @@ namespace Tests.GeoClusterTests
                 Assert.IsTrue(GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count == numGrains, "c1 - Expecting All are Doubtful");
 
 
+                WriteLog("Restoring inter-cluster communication");
+
                 // un-block intercluster messaging.
                 UnblockAllClusterCommunication(cluster0);
                 UnblockAllClusterCommunication(cluster1);
@@ -473,6 +495,8 @@ namespace Tests.GeoClusterTests
                 // Wait for anti-entropy to kick in. 
                 // One of the DOUBTFUL activations must be killed, and the other must be converted to OWNED.
                 await Task.Delay(TimeSpan.FromSeconds(7));
+
+                WriteLog("Validation of conflict resolution");
 
                 // Validate that all the duplicates have been resolved.
                 var owned0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
@@ -488,7 +512,7 @@ namespace Tests.GeoClusterTests
 
                 // We need to ensure that the grain whose DOUBTFUL activation was killed,
                 // and now refers to the 'real' remote OWNED activation.
-                Parallel.For(0, numGrains, i =>
+                Parallel.For(0, numGrains, paralleloptions, i =>
                 {
                     var res0 = client0.CallGrain(i);
                     var res1 = client1.CallGrain(i);
@@ -500,9 +524,9 @@ namespace Tests.GeoClusterTests
 
         // This test is exactly the same as TestConflictResolution. The only difference is that we use more silos per cluster.
         [Fact, TestCategory("GeoCluster")]
-        public async Task TestConflictResolution_3_3()
+        public async Task TestConflictResolution_3_4()
         {
-            await RunWithTimeout(330000, async () =>
+            await RunWithTimeout("TestConflictResolution_3_4", 330000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
@@ -512,11 +536,11 @@ namespace Tests.GeoClusterTests
                     c.Globals.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5);
                 };
 
-                // create two clusters with 3 silos each
+                // create two clusters 
                 var cluster0 = "cluster0";
                 var cluster1 = "cluster1";
                 NewGeoCluster(globalserviceid, cluster0, 3, configurationcustomizer);
-                NewGeoCluster(globalserviceid, cluster1, 3, configurationcustomizer);
+                NewGeoCluster(globalserviceid, cluster1, 4, configurationcustomizer);
 
                 await WaitForLivenessToStabilizeAsync();
 
@@ -544,7 +568,9 @@ namespace Tests.GeoClusterTests
 
                 const int numGrains = 40;
 
-                Parallel.For(0, numGrains, i =>
+                WriteLog("Starting creation of {0} grains on isolated clusters", numGrains);
+
+                Parallel.For(0, numGrains, paralleloptions, i =>
                 {
                     int res0, res1, res2, res3;
                     if (i % 2 == 1)
@@ -572,6 +598,8 @@ namespace Tests.GeoClusterTests
                 Assert.IsTrue(GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count == numGrains, "c0 - Expecting All are Doubtful");
                 Assert.IsTrue(GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count == numGrains, "c1 - Expecting All are Doubtful");
 
+                WriteLog("Restoring inter-cluster communication");
+
                 // Turn on intercluster messaging and wait for the resolution to kick in.
                 UnblockAllClusterCommunication(cluster0);
                 UnblockAllClusterCommunication(cluster1);
@@ -580,6 +608,7 @@ namespace Tests.GeoClusterTests
                 // One of the DOUBTFUL activations must be killed, and the other must be converted to OWNED.
                 await Task.Delay(TimeSpan.FromSeconds(7));
 
+                WriteLog("Validation of conflict resolution");
 
                 // Validate that all the duplicates have been resolved.
                 var owned0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
@@ -841,6 +870,8 @@ namespace Tests.GeoClusterTests
         // wakes up the clients, after which they invoke "g+1", and so on.
         private List<Tuple<int, int>>[] DoConcurrentExperiment(List<ClientIdentity> configList, int numGrains)
         {
+            WriteLog("Starting concurrent experiment");
+
             // We use two objects to coordinate client threads and the main thread. coordWakeup is an object that is used to signal the coordinator
             // thread. toWait is used to signal client threads.
             var coordWakeup = new object();

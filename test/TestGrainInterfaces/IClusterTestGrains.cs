@@ -29,6 +29,8 @@ namespace TestGrainInterfaces
     public interface IClusterTestGrain : IGrainWithIntegerKey
     {
         Task<int> SayHelloAsync();
+        Task Deactivate();
+        Task<string> GetRuntimeId();
     }
 
     public interface ISimpleGlobalSingleInstanceGrain : IGrainWithIntegerKey

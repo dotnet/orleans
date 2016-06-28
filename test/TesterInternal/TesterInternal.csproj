@@ -116,6 +116,7 @@
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
+    <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />

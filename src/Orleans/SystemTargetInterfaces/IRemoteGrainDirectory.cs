@@ -22,6 +22,7 @@ namespace Orleans.Runtime
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned);
         bool RemoveActivation(ActivationAddress addr);
         bool RemoveActivation(ActivationId act, bool force);
+        IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force);
         bool Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
         bool UpdateClusterRegistrationStatus(ActivationId activationId, MultiClusterStatus registrationStatus, MultiClusterStatus? compareWith = null);

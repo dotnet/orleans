@@ -10,11 +10,14 @@ using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
 using Orleans.Runtime.MultiClusterNetwork;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tests.GeoClusterTests
 {
     public class MultiClusterNetworkTests : TestingClusterHost, IDisposable
     {
+        public MultiClusterNetworkTests(ITestOutputHelper output) : base(output)
+        { }
 
         // Kill all clients and silos.
         public void Dispose()
