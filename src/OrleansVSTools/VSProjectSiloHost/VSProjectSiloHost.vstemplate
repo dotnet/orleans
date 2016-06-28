@@ -57,8 +57,8 @@
       <Asset Type="Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Analyzers.1.0.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.Common.1.0.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.CodeAnalysis.CSharp.1.0.0.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:Source="File" Path="Packages\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final.nupkg" d:VsixSubPath="Packages" />
-      <Asset Type="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:Source="File" Path="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final" d:VsixSubPath="Packages" />
+      <Asset Type="Microsoft.Extensions.DependencyInjection.1.0.0.nupkg" d:Source="File" Path="Packages\Microsoft.Extensions.DependencyInjection.1.0.0.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0" d:Source="File" Path="Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.Core.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.2.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.CounterControl.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.CounterControl.1.2.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0.nupkg" d:VsixSubPath="Packages" />

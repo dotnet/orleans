@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Startup
     /// <summary>
     /// Configure dependency injection at startup
     /// </summary>
-    public class ConfigureStartupBuilder : IStartupBuilder
+    internal class StartupBuilder
     {
         internal static IServiceProvider ConfigureStartup(string startupTypeName)
         {
@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Startup
 
             if (startupType == null)
             {
-                throw new InvalidOperationException(string.Format("Can not locate the type specified in the configuration file: '{0}'.", startupTypeName));
+                throw new InvalidOperationException($"Can not locate the type specified in the configuration file: '{startupTypeName}'.");
             }
 
             var servicesMethod = FindConfigureServicesDelegate(startupType);
@@ -36,10 +36,18 @@ namespace Orleans.Runtime.Startup
             {
                 var instance = Activator.CreateInstance(startupType);
 
-                IServiceCollection serviceCollection = RegisterSystemTypes();
+                var serviceCollection = RegisterSystemTypes();
+
                 return servicesMethod.Build(instance, serviceCollection);
             }
-            return new DefaultServiceProvider();
+
+            //
+            // If a Startup Type is configured and does not have the required method, return null, it is
+            // the caller's responsibility to handle it as required. In our case it will create the default
+            // provider. At this point we should not do that.
+            //
+
+            return null;
         }
 
         private static IServiceCollection RegisterSystemTypes()
@@ -61,19 +69,20 @@ namespace Orleans.Runtime.Startup
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
         {
-            var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), required: false);
+            var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), false);
 
             return servicesMethod == null ? null : new ConfigureServicesBuilder(servicesMethod);
         }
 
-        private static MethodInfo FindMethod(Type startupType, string methodName, Type returnType = null, bool required = true)
+        private static MethodInfo FindMethod(Type startupType, string methodName, Type returnType = null,
+            bool required = true)
         {
             var methods = startupType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
             var selectedMethods = methods.Where(method => method.Name.Equals(methodName)).ToList();
 
             if (selectedMethods.Count > 1)
             {
-                throw new InvalidOperationException(string.Format("Having multiple overloads of method '{0}' is not supported.", methodName));
+                throw new InvalidOperationException($"Having multiple overloads of method '{methodName}' is not supported.");
             }
 
             var methodInfo = selectedMethods.FirstOrDefault();
@@ -82,9 +91,7 @@ namespace Orleans.Runtime.Startup
             {
                 if (required)
                 {
-                    throw new InvalidOperationException(string.Format("A method named '{0}' in the type '{1}' could not be found.",
-                        methodName,
-                        startupType.FullName));
+                    throw new InvalidOperationException($"A method named '{methodName}' in the type '{startupType.FullName}' could not be found.");
                 }
 
                 return null;
@@ -94,21 +101,13 @@ namespace Orleans.Runtime.Startup
             {
                 if (required)
                 {
-                    throw new InvalidOperationException(string.Format("The '{0}' method in the type '{1}' must have a return type of '{2}'.",
-                        methodInfo.Name,
-                        startupType.FullName,
-                        returnType.Name));
+                    throw new InvalidOperationException($"The '{methodInfo.Name}' method in the type '{startupType.FullName}' must have a return type of '{returnType.Name}'.");
                 }
 
                 return null;
             }
 
             return methodInfo;
-        }
-
-        IServiceProvider IStartupBuilder.ConfigureStartup(string startupTypeName)
-        {
-            return ConfigureStartupBuilder.ConfigureStartup(startupTypeName);
         }
     }
 }

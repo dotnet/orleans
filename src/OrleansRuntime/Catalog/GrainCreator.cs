@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Storage;
 
@@ -32,7 +33,7 @@ namespace Orleans.Runtime
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
         {
             var grain = _services != null
-                ? (Grain) _services.GetService(grainType)
+                ? (Grain) _services.GetRequiredService(grainType)
                 : (Grain) Activator.CreateInstance(grainType);
 
             // Inject runtime hooks into grain instance
