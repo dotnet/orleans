@@ -478,6 +478,13 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="ValidateInitialConnectivity" type="xs:boolean" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos before being allowed to join the cluster.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="IAmAliveTablePublishTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>

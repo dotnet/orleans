@@ -193,6 +193,10 @@ namespace Orleans.Runtime.Configuration
         /// Whether to use the gossip optimization to speed up spreading liveness information.
         /// </summary>
         public bool UseLivenessGossip { get; set; }
+        /// <summary>
+        /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
+        /// </summary>
+        public bool ValidateInitialConnectivity { get; set; }
 
         /// <summary>
         /// Service Id.
@@ -454,6 +458,7 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
         private const int DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT = 2;
         private const bool DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP = true;
+        private const bool DEFAULT_VALIDATE_INITIAL_CONNECTIVITY = true;
         private const int DEFAULT_MAX_MULTICLUSTER_GATEWAYS = 10;
         private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
@@ -495,6 +500,7 @@ namespace Orleans.Runtime.Configuration
             NumVotesForDeathDeclaration = DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION;
             NumMissedTableIAmAliveLimit = DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
             UseLivenessGossip = DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
+            ValidateInitialConnectivity = DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
             MaxJoinAttemptTime = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
             MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
             BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
@@ -560,6 +566,7 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("      NumProbedSilos: {0}", NumProbedSilos).AppendLine();
             sb.AppendFormat("      NumVotesForDeathDeclaration: {0}", NumVotesForDeathDeclaration).AppendLine();
             sb.AppendFormat("      UseLivenessGossip: {0}", UseLivenessGossip).AppendLine();
+            sb.AppendFormat("      ValidateInitialConnectivity: {0}", ValidateInitialConnectivity).AppendLine();
             sb.AppendFormat("      IAmAliveTablePublishTimeout: {0}", IAmAliveTablePublishTimeout).AppendLine();
             sb.AppendFormat("      NumMissedTableIAmAliveLimit: {0}", NumMissedTableIAmAliveLimit).AppendLine();
             sb.AppendFormat("      MaxJoinAttemptTime: {0}", MaxJoinAttemptTime).AppendLine();
@@ -677,6 +684,11 @@ namespace Orleans.Runtime.Configuration
                         {
                             UseLivenessGossip = ConfigUtilities.ParseBool(child.GetAttribute("UseLivenessGossip"),
                                 "Invalid boolean value for the UseLivenessGossip attribute on the Liveness element");
+                        }
+                        if (child.HasAttribute("ValidateInitialConnectivity"))
+                        {
+                            ValidateInitialConnectivity = ConfigUtilities.ParseBool(child.GetAttribute("ValidateInitialConnectivity"),
+                                "Invalid boolean value for the ValidateInitialConnectivity attribute on the Liveness element");
                         }
                         if (child.HasAttribute("IAmAliveTablePublishTimeout"))
                         {
