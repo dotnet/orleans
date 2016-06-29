@@ -28,6 +28,7 @@ namespace WebApplication1
     {
         protected void Application_Start()
         {
+        ...
             var config = ClientConfiguration.LocalhostSilo();
 
             // Try to connect 10 times. This will give the silo enough time to start up. Adjust if necessary.
