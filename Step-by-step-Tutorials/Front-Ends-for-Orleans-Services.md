@@ -30,7 +30,7 @@ namespace WebApplication1
         {
             var config = ClientConfiguration.LocalhostSilo();
 
-            // Try to connect 10 times. This will give the silo enough time to start up. Adjust if necessary
+            // Try to connect 10 times. This will give the silo enough time to start up. Adjust if necessary.
             for (int i = 0; i < 10; i++)
             {
                 try
