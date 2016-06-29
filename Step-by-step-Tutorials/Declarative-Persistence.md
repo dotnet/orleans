@@ -25,8 +25,6 @@ The modified `Main` program looks like this:
 static void Main(string[] args)
 {
      ...
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
-
     var ids = new string[] {
         "42783519-d64e-44c9-9c29-399e3afaa625",
         "d694a4e0-1bc3-4c3f-a1ad-ba95103622bc",
@@ -52,31 +50,24 @@ static void Main(string[] args)
 ```
 
 Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
-The silo host project includes a configuration file _DevTestServerConfiguration.xml_ which is where we find the following section:
+The silo host project includes a file _OrleansHostWrapper.cs_ which is where we find the following section:
 
-```xml
-<OrleansConfiguration xmlns="urn:orleans">
-    <Globals>
-        <StorageProviders>
-        <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
-        <!-- To use Azure storage, uncomment one of the following elements: -->
-        <!--
-        <Provider Type="Orleans.Storage.AzureTableStorage"
-                        Name="AzureStore"
-                        DataConnectionString="UseDevelopmentStorage=true" />
-        -->
-        <!--
-        <Provider Type="Orleans.Storage.AzureBlobStorage"
-                        Name="AzureStore"
-                        DataConnectionString="[removed for brevity]" />
-        -->
-    </StorageProviders>
+```csharp
+var config = ClusterConfiguration.LocalhostPrimarySilo();
+config.AddMemoryStorageProvider();
+
+// Add this line to use the Azure storage emulator
+// config.AddAzureTableStorageProvider("AzureStore", "UseDevelopmentStorage=true");
+// Add this line to use an Azure storage account
+// config.AddAzureTableStorageProvider("AzureStore", "[insert data connection string]");
+
+siloHost = new SiloHost(siloName, config);
 ```
 
 The `MemoryStorage` provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store.
 In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.
 
-Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should uncomment one of the other two declarations, but not both.
+Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should add one of the other two lines, but not both. You can use either the `AddAzureTableStorageProvider()` function or the `AddAzureBlobStorageProvider()` function depending on how you want to store information.
 
 In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK.
 In the case of the latter, you will have to create a Azure storage account and enter the name and keys in the configuration file.
@@ -95,7 +86,7 @@ Identifying that a grain should use persistent state takes three steps:
 2. changing the grain base class, and
 3. identifying the storage provider.
 
-The first step, declaring a state class, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring a state class in the interfaces project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
 For employees, we want to persist all the state:
 
@@ -116,7 +107,7 @@ public class ManagerState
 }
 ```
 
-Then, we change the grain class declaration to identify the state interface (e.g., from `Orleans.Grain` to `Orleans.Grain<EmployeeState>`) and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class.
+Then, we change the grain class declaration to identify the state interface (e.g., from `Orleans.Grain` to `Orleans.Grain<EmployeeState>`) and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class. In addition, we must update the other functions to reflect these removals.
 
  We also add an attribute to identify the storage provider:
 
