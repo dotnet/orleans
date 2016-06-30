@@ -23,5 +23,12 @@ namespace Orleans.CodeGeneration
         /// Gets or sets the assembly to include in code generation.
         /// </summary>
         public Assembly Assembly { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether or not to assume that all types in the specified assembly are
+        /// serializable.
+        /// </summary>
+        /// <remarks>This is equivalent to specifying <see cref="KnownTypeAttribute"/> for all types.</remarks>
+        public bool TreatTypesAsSerializable { get; set; }
     }
 }
