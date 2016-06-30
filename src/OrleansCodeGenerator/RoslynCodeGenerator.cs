@@ -39,22 +39,6 @@ namespace Orleans.CodeGenerator
         private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
 
         /// <summary>
-        /// The static instance.
-        /// </summary>
-        private static readonly RoslynCodeGenerator StaticInstance = new RoslynCodeGenerator();
-
-        /// <summary>
-        /// Gets the static instance.
-        /// </summary>
-        public static RoslynCodeGenerator Instance
-        {
-            get
-            {
-                return StaticInstance;
-            }
-        }
-
-        /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
         /// <param name="targetAssemblyName">
