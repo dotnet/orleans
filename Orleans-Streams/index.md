@@ -36,7 +36,7 @@ In a typical example below a device generates some data, which is sent as an HTT
 public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
      // Post data directly into device's stream.
-     var streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
+     IStreamProvider streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
      IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId);
      await chatStream.OnNextAsync(deviceEvent.Data);
 }
@@ -49,7 +49,8 @@ public class ChatUser: Grain
 {
     public async Task JoinChat(string chatGroupName)
     {
-       IAsyncStream<string> chatStream = GetStream<string>(chatGroupName);
+       IStreamProvider streamProvider = base.GetStreamProvider("myStreamProvider");
+       IAsyncStream<string> chatStream = streamProvider.GetStream<string>(chatGroupName);
        await chatStream.SubscribeAsync((string chatEvent) => Console.Out.Write(chatEvent));
     }
 }
