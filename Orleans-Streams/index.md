@@ -36,7 +36,8 @@ In a typical example below a device generates some data, which is sent as an HTT
 public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
      // Post data directly into device's stream.
-     IAsyncStream<DeviceEventData> deviceStream = GetStream<DeviceEventData>(deviceEvent.DeviceId);
+     var streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
+     IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId);
      await chatStream.OnNextAsync(deviceEvent.Data);
 }
 ```
