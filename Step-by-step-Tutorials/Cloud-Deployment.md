@@ -98,6 +98,7 @@ Then, in the `ServiceDefinition.csdef` file for this role, add some required con
     <WorkerRole name="OrleansAzureSilos" ...>
         ...
         <ConfigurationSettings>
+            ...
             <Setting name="DataConnectionString" />
         </ConfigurationSettings>
         <Endpoints>
@@ -125,6 +126,7 @@ For example, to use local Developer Storage emulator (for local testing only)
 
 ```xml
 <ConfigurationSettings>
+    ...
     <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
 </ConfigurationSettings>
 ```
@@ -133,6 +135,7 @@ Or using an Azure cloud storage account:
 
 ```xml
 <ConfigurationSettings>
+    ...
     <Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
 </ConfigurationSettings>
 ```
@@ -142,16 +145,8 @@ The "DataConnectionString" setting in `ServiceDefinition.csdef` is the default n
 
 If you wish to use a different setting name for this value, then in the silo role initialization code set the property `OrleansAzureSilo.DataConnectionConfigurationSettingName` before the call to `OrleansAzureSilo.Start(...)`
 
-Add your Orleans silo config file to Azure Worker Role for Orleans Silos.
-Add an _OrleansConfiguration.xml_ file into your `OrleansAzureSilo` worker role project, along with any supporting libraries those grains need.
-The networking configuration information in _OrleansConfiguration.xml_ will be overridden by values from the Azure role environment / configuration.
-
-
-Note: You MUST ensure this config file get copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools.
-![](../Images/AzureTutorial4.PNG)
-
 ## Add your grain binaries to Azure Worker Role for Orleans Silos
-Add the grain interfaces DLL and implementation classes DLL for the grains to he hosted in the Azure silo into the `OrleansAzureSilo` project, along with any supporting libraries those grains need.
+Add the grain interfaces DLL and implementation classes DLL for the grains to be hosted in the Azure silo into the `OrleansAzureSilo` project, along with any supporting libraries those grains need.
 
 
 Note: You MUST ensure that all the referenced binaries are copied into the `OrleansAzureSilo` project output directory, to ensure they get picked up by the Azure packaging tools.
@@ -195,8 +190,8 @@ This is the Azure storage location where Orleans Azure hosting library will plac
 <ServiceDefinition ...>
 <WebRole name="MyWebRole" ...>
     ...
-    <ConfigurationSettings:
-    <Setting name="DataConnectionString" /:
+    <ConfigurationSettings>
+    <Setting name="DataConnectionString" />
     </ConfigurationSettings>
     <Sites>
     <Site name="Web">
