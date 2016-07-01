@@ -280,6 +280,8 @@ namespace WebApplication1
                     continue;
                 }
             }
+            
+            AzureClient.Initialize(config);
        	   ...
 ```
 
