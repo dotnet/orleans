@@ -98,7 +98,7 @@ Then, in the `ServiceDefinition.csdef` file for this role, add some required con
     <WorkerRole name="OrleansAzureSilos" ...>
         ...
         <ConfigurationSettings>
-            ...
+            <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" />
             <Setting name="DataConnectionString" />
         </ConfigurationSettings>
         <Endpoints>
@@ -118,7 +118,7 @@ Add a `ConfigurationSettings` definition for 'DataConnectionString'
 
 This will be a normal Azure storage connection – either for the development storage emulator (only valid if running locally), or a full Azure storage account connection string for cloud-storage.
 
-In general, this connection string is likely to use the same configuration values as the `Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString` diagnostics connection string setting, but is not required to.
+In general, this connection string is likely to use the same configuration values as the `Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString` diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.
 
 See the [Configure Azure Storage Connection Strings](http://azure.microsoft.com/en-us/documentation/articles/storage-configure-connection-string/) for more information.
 
@@ -126,7 +126,7 @@ For example, to use local Developer Storage emulator (for local testing only)
 
 ```xml
 <ConfigurationSettings>
-    ...
+    <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" />
     <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
 </ConfigurationSettings>
 ```
@@ -135,7 +135,7 @@ Or using an Azure cloud storage account:
 
 ```xml
 <ConfigurationSettings>
-    ...
+    <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
     <Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
 </ConfigurationSettings>
 ```
@@ -186,18 +186,19 @@ This is the Azure storage location where Orleans Azure hosting library will plac
 <ServiceDefinition ...>
 <WebRole name="MyWebRole" ...>
     ...
-    <ConfigurationSettings>
-    <Setting name="DataConnectionString" />
-    </ConfigurationSettings>
     <Sites>
-    <Site name="Web">
+      <Site name="Web">
         <Bindings>
-        <Binding name="Endpoint1" endpointName="Endpoint1" />
+            <Binding name="Endpoint1" endpointName="Endpoint1" />
         </Bindings>
-    </Site>
+      </Site>
     </Sites>
+    <ConfigurationSettings>
+        <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" />
+        <Setting name="DataConnectionString" />
+    </ConfigurationSettings>
     <Endpoints>
-    <InputEndpoint name="Endpoint1" protocol="http" port="80" />
+        <InputEndpoint name="Endpoint1" protocol="http" port="80" />
     </Endpoints>
     ...
 </WebRole>
@@ -219,7 +220,8 @@ For example, to use local Developer Storage emulator (for local testing only)
 <Role name="OrleansWebClient" ...>
     ...
     <ConfigurationSettings>
-    <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
+        <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" />
+        <Setting name="DataConnectionString" value="UseDevelopmentStorage=true" />
     </ConfigurationSettings>
     ...
 </Role>
@@ -234,7 +236,8 @@ Or using an Azure cloud storage account:
 <Role name="OrleansWebClient" ...>
     ...
     <ConfigurationSettings>
-    <Setting name="DataConnectionString>    value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
+        <Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
+        <Setting name="DataConnectionString"    value="DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey" />
     </ConfigurationSettings>
     ...
 </Role>
