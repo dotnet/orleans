@@ -160,13 +160,9 @@ A few additional configuration steps are needed to make the `AzureClient` utilit
 
 ### Create Azure Web Role for Orleans Client
 
-Using the Azure Tools for Visual Studio, create a normal Azure web role project.
-
 Any type of web role can be used as an Orleans client, and there are no specific naming requirements or conventions for this project.
 
-Add a web role to the solution:
-
-![](../Images/AzureTutorial5.PNG)
+Add a web role to the solution using the existing web application project that we created in the Front Ends for Orleans Services tutorial.
 
 Add project references for Orleans Client binaries.
 Add references to the web role project for the required Orleans client library files.
@@ -246,11 +242,33 @@ Or using an Azure cloud storage account:
 </ServiceConfiguration>
 ```
 
-Add your Orleans client config file to Azure Web Role for Orleans Client.
-Add a _ClientConfiguration.xml_ file into this project.
-The networking configuration information in _ClientConfiguration.xml_ will be overridden by values from the Azure role environment / configuration.
+Edit the configuration of the client in the _Global.asax.cs_ file to use `AzureClient`.
 
-Note: You MUST ensure this config file get copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.
+``` csharp
+namespace WebApplication1
+{
+    public class WebApiApplication : System.Web.HttpApplication
+    {
+        protected void Application_Start()
+        {
+            ...
+            var config = AzureClient.DefaultConfiguration();
+
+            // Try to connect 10 times. This will give the silo enough time to start up. Adjust if necessary.
+            for (int i = 0; i < 10; i++)
+            {
+                try
+                {
+                    AzureClient.Initialize(config);
+                    break;
+                }
+                catch (SiloUnavailableException e)
+                {
+                    continue;
+                }
+            }
+       	   ...
+```
 
 
 ### Add your grain interface binaries to Azure Web Role for Orleans Client
