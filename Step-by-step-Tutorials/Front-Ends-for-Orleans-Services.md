@@ -44,6 +44,8 @@ namespace WebApplication1
                     continue;
                 }
             }
+            
+            GrainClient.Initialize(config);
        	   ...
 ```
 
