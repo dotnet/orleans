@@ -7,7 +7,7 @@ This tutorial provides step by step instructions for creating a basic functionin
 
 
 - It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.
-- Tested in both Visual Studio 2013 and 2015 using Orleans 1.0.9.
+- Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.
 - Has no reliance on SQL or Azure
 
 Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.
