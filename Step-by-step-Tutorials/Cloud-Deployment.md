@@ -253,7 +253,7 @@ Note: You MUST ensure that all the referenced binaries for grain interfaces and 
 The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.
 
 ## Initialize Client Connection to Orleans Silos
-It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use in _Global.asax_ initialization methods.
+It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use in the _Global.asax_ initialization methods.
 
 Edit the configuration of the client in the _Global.asax.cs_ file to use `AzureClient`.
 
@@ -285,7 +285,7 @@ namespace WebApplication1
 
 Repeated calls to `AzureClient.Initialize()`  will return and do nothing if the Orleans client connection is already set up.
 
-An additional variant of `OrleansAzureClient.Initialize(System.IO.FileInfo)` allows a base client config file location to be specified explicitly.
+An additional variant of `AzureClient.Initialize(System.IO.FileInfo)` allows a base client config file location to be specified explicitly.
 The internal endpoint addresses of the Orleans silo nodes will still be determined dynamically from the Orleans Silo instance table each silo node registers with.
 
 <!--TODO: Create link to Orleans API when the link is created/found-->
