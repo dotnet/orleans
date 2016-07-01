@@ -242,6 +242,19 @@ Or using an Azure cloud storage account:
 </ServiceConfiguration>
 ```
 
+
+### Add your grain interface binaries to Azure Web Role for Orleans Client
+Add the grain interfaces DLL for the application grains into this web role project.
+
+Access to the DLL containing the grain implementation classes should not be required by the client web role.
+
+Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.
+
+The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.
+
+## Initialize Client Connection to Orleans Silos
+It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use in _Global.asax_ initialization methods.
+
 Edit the configuration of the client in the _Global.asax.cs_ file to use `AzureClient`.
 
 ``` csharp
@@ -270,33 +283,7 @@ namespace WebApplication1
        	   ...
 ```
 
-
-### Add your grain interface binaries to Azure Web Role for Orleans Client
-Add the grain interfaces DLL for the application grains into this web role project.
-
-Access to the DLL containing the grain implementation classes should not be required by the client web role.
-
-Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.
-
-The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.
-
-## Initialize Client Connection to Orleans Silos
-It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use – either in the `Page_Load` method for each _.aspx_ page, or in _Global.asax_ initialization methods.
-
-``` csharp
-protected void Page_Load(object sender, EventArgs e)
-{
-    if (Page.IsPostBack)
-    {
-        if (!OrleansAzureClient.IsInitialized)
-        {
-            OrleansAzureClient.Initialize();
-        }
-    }
-}
-```
-
-Repeated calls to `OrleansAzureClient.Initialize()`  will return and do nothing if the Orleans client connection is already set up.
+Repeated calls to `AzureClient.Initialize()`  will return and do nothing if the Orleans client connection is already set up.
 
 An additional variant of `OrleansAzureClient.Initialize(System.IO.FileInfo)` allows a base client config file location to be specified explicitly.
 The internal endpoint addresses of the Orleans silo nodes will still be determined dynamically from the Orleans Silo instance table each silo node registers with.
