@@ -23,8 +23,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
-        //This test currently fails, because the name of the interface is too long
+        [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
             var grain = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());

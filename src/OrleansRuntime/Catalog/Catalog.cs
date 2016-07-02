@@ -441,7 +441,7 @@ namespace Orleans.Runtime
 
                 if (typeCode != 0)
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy);
+                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
                 }
                 else
                 {
@@ -485,11 +485,8 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private void SetupActivationInstance(ActivationData result, string grainType, string genericInterface)
+        private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)
         {
-            var genericArguments = String.IsNullOrEmpty(genericInterface) ? null
-                : TypeUtils.GenericTypeArgsString(genericInterface);
-
             lock (result)
             {
                 if (result.GrainInstance == null)
@@ -499,7 +496,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task InitActivation(ActivationData activation, string grainType, string genericInterface, Dictionary<string, object> requestContextData)
+        private async Task InitActivation(ActivationData activation, string grainType, string genericArguments, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation
@@ -514,7 +511,7 @@ namespace Orleans.Runtime
                 await RegisterActivationInGrainDirectoryAndValidate(activation);
 
                 initStage = 2;
-                await SetupActivationState(activation, grainType);                
+                await SetupActivationState(activation, String.IsNullOrEmpty(genericArguments) ? grainType : $"{grainType}[{genericArguments}]");
 
                 initStage = 3;
                 await InvokeActivate(activation, requestContextData);

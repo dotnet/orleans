@@ -282,24 +282,6 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
-        public void Generic_SimpleGrainControlFlow_Blocking()
-        {
-            var a = random.Next(100);
-            var b = a + 1;
-            var expected = a + "x" + b;
-
-            var grain = GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
-
-            // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
-            grain.SetA(a).Wait();
-
-            grain.SetB(b).Wait();
-
-            Task<string> stringPromise = grain.GetAxB();
-            Assert.AreEqual(expected, stringPromise.Result);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainDataFlow()
         {
             var a = random.Next(100);
@@ -732,7 +714,7 @@ namespace UnitTests.General
             Assert.Equal(result, "Hello!");
         }
         
-        [Fact(Skip= "https://github.com/dotnet/orleans/issues/1656 Casting from generic to non-generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
+        [Fact, TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation() {
             var grain = GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
 

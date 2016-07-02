@@ -149,7 +149,7 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialValue, readValue, "Read previously stored value");
         }
 
-        [Fact(Skip = "Currently failing"), TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
         public async Task Persistence_Grain_Activate_StoredValue_Generic() 
         {
             const string providerName = "test1";

@@ -357,7 +357,7 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceMap.GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
-        
+
         private readonly PlacementStrategy placementStrategy;
         private readonly MultiClusterRegistrationStrategy registrationStrategy;
         private readonly bool isGeneric;

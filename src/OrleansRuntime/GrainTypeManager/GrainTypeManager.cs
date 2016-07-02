@@ -97,7 +97,7 @@ namespace Orleans.Runtime
                             {
                                 // Instantiate the specific type from generic template
                                 var genericGrainTypeData = (GenericGrainTypeData)grainTypes[templateName];
-                                Type[] typeArgs = TypeUtils.GenericTypeArgs(className);
+                                Type[] typeArgs = TypeUtils.GenericTypeArgsFromClassName(className);
                                 var concreteTypeData = genericGrainTypeData.MakeGenericType(typeArgs);
 
                                 // Add to lookup tables for next time
@@ -255,24 +255,30 @@ namespace Orleans.Runtime
 
             public IGrainMethodInvoker GetInvoker(string genericGrainType = null)
             {
-                if (String.IsNullOrEmpty(genericGrainType))
+                // if the grain class is non-generic
+                if (cachedGenericInvokersLockObj == null)
+                {
                     return invoker ?? (invoker = (IGrainMethodInvoker)Activator.CreateInstance(baseInvokerType));
-                lock (cachedGenericInvokersLockObj)
-                {
-                    if (cachedGenericInvokers.ContainsKey(genericGrainType))
-                        return cachedGenericInvokers[genericGrainType];
                 }
-
-                var typeArgs = TypeUtils.GenericTypeArgs(genericGrainType);
-                var concreteType = baseInvokerType.MakeGenericType(typeArgs);
-                var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
-                lock (cachedGenericInvokersLockObj)
+                else
                 {
-                    if (!cachedGenericInvokers.ContainsKey(genericGrainType))
-                        cachedGenericInvokers[genericGrainType] = inv;
-                }
+                    lock (cachedGenericInvokersLockObj)
+                    {
+                        if (cachedGenericInvokers.ContainsKey(genericGrainType))
+                            return cachedGenericInvokers[genericGrainType];
+                    }
+                    var typeArgs = TypeUtils.GenericTypeArgsFromArgsString(genericGrainType);
+                    var concreteType = baseInvokerType.MakeGenericType(typeArgs);
+                    var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
 
-                return inv;
+                    lock (cachedGenericInvokersLockObj)
+                    {
+                        if (!cachedGenericInvokers.ContainsKey(genericGrainType))
+                            cachedGenericInvokers[genericGrainType] = inv;
+                    }
+
+                    return inv;
+                }
             }
         }
     }
