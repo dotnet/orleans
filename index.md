@@ -71,6 +71,6 @@ There are a number of [step-by-step tutorials](Step-by-step-Tutorials).
 
 Discuss your Orleans questions on the [gitter chat room](https://gitter.im/dotnet/orleans).
 
-Fork the code on the [GitHub Respository](https://github.com/dotnet/orleans).
+Fork the code on the [GitHub Repository](https://github.com/dotnet/orleans).
 
 
