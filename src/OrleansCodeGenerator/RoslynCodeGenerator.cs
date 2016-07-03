@@ -311,7 +311,7 @@ namespace Orleans.CodeGenerator
                 foreach (var type in group)
                 {
                     // The module containing the serializer.
-                    var module = runtime ? null : type.Module;
+                    var module = runtime ? null : type.GetTypeInfo().Module;
 
                     // Every type which is encountered must be considered for serialization.
                     Action<Type> onEncounteredType = encounteredType =>

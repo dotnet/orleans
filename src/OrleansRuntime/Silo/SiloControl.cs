@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Providers;
 
@@ -128,7 +129,7 @@ namespace Orleans.Runtime
                 string allProvidersList = Utils.EnumerableToString(
                     allProviders.Select(p => string.Format(
                         "[Name = {0} Type = {1} Location = {2}]",
-                        p.Name, p.GetType().FullName, p.GetType().Assembly.Location)));
+                        p.Name, p.GetType().FullName, p.GetType().GetTypeInfo().Assembly.Location)));
                 string error = string.Format(
                     "Could not find provider for type {0} and name {1} \n"
                     + " Providers currently loaded in silo are: {2}", 

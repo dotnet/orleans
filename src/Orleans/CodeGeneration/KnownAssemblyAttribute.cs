@@ -11,12 +11,12 @@ namespace Orleans.CodeGeneration
     {
         public KnownAssemblyAttribute(Type type)
         {
-            this.Assembly = type.Assembly;
+            this.Assembly = type.GetTypeInfo().Assembly;
         }
 
         public KnownAssemblyAttribute(string assemblyName)
         {
-            this.Assembly = Assembly.Load(assemblyName);
+            this.Assembly = Assembly.Load(new AssemblyName(assemblyName));
         }
 
         /// <summary>

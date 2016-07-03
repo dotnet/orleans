@@ -94,7 +94,7 @@ namespace Orleans.CodeGenerator
                     t.Name);
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (t.IsConstructedGenericType)
             {
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
@@ -106,7 +106,7 @@ namespace Orleans.CodeGenerator
             if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
                 || GrainInterfaceUtils.IsTaskType(t)) return false;
 
-            if (typeInfo.IsConstructedGenericType)
+            if (t.IsConstructedGenericType)
             {
                 return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
             }

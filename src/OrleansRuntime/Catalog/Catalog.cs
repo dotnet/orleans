@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -692,8 +693,7 @@ namespace Orleans.Runtime
             var grainTypeName = grainType.FullName;
 
             // Get the storage provider name, using the default if not specified.
-            var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
-            var attr = attrs.FirstOrDefault() as StorageProviderAttribute;
+            var attr = grainType.GetTypeInfo().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
             var storageProviderName = attr != null ? attr.ProviderName : Constants.DEFAULT_STORAGE_PROVIDER_NAME;
 
             IStorageProvider provider;
