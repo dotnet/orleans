@@ -1,36 +1,18 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Collections;
 using Orleans;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 
 namespace UnitTests.Grains
 {
-    /// <summary>
-    /// A simple grain that allows to set two arguments and then multiply them.
-    /// </summary>
     public class SimpleDIGrain : Grain, ISimpleDIGrain
     {
         private readonly IInjectedService injectedService;
 
-        protected Logger logger;
-
         public SimpleDIGrain(IInjectedService injectedService)
         {
             this.injectedService = injectedService;
-        }
-
-        public override Task OnActivateAsync()
-        {
-            logger = GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleDIGrain).Name, base.IdentityString, base.RuntimeIdentity));
-            logger.Info("Activate.");
-            return TaskDone.Done;
         }
 
         public Task<long> GetTicksFromService()
@@ -38,23 +20,52 @@ namespace UnitTests.Grains
             return injectedService.GetTicks();
         }
 
-        public override Task OnDeactivateAsync()
+        public Task<string> GetStringValue()
         {
-            logger.Info("OnDeactivateAsync.");
-            return TaskDone.Done;
+            return Task.FromResult(this.injectedService.GetInstanceValue());
+        }
+    }
+
+    public class ExplicitlyRegisteredSimpleDIGrain : Grain, ISimpleDIGrain
+    {
+        private readonly IInjectedService injectedService;
+        private string someValueThatIsNotRegistered;
+
+        public ExplicitlyRegisteredSimpleDIGrain(IInjectedService injectedService, string someValueThatIsNotRegistered)
+        {
+            this.injectedService = injectedService;
+            this.someValueThatIsNotRegistered = someValueThatIsNotRegistered;
+        }
+
+        public Task<long> GetTicksFromService()
+        {
+            return injectedService.GetTicks();
+        }
+
+        public Task<string> GetStringValue()
+        {
+           return Task.FromResult(this.someValueThatIsNotRegistered);
         }
     }
 
     public interface IInjectedService
     {
         Task<long> GetTicks();
+        string GetInstanceValue();
     }
 
     public class InjectedService : IInjectedService
     {
+        private readonly string instanceValue = Guid.NewGuid().ToString();
+
         public Task<long> GetTicks()
         {
             return Task.FromResult(DateTime.UtcNow.Ticks);
+        }
+
+        public string GetInstanceValue()
+        {
+            return this.instanceValue;
         }
     }
 }

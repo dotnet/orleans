@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
         {
             var grain = _services != null
-                ? (Grain) _services.GetRequiredService(grainType)
+                ? (Grain) ActivatorUtilities.GetServiceOrCreateInstance(_services, grainType)
                 : (Grain) Activator.CreateInstance(grainType);
 
             // Inject runtime hooks into grain instance
@@ -48,6 +48,8 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainType"></param>
         /// <param name="identity">Identity for the new grain</param>
+        /// <param name="stateType">If the grain is a stateful grain, the type of the state it persists.</param>
+        /// <param name="storageProvider">If the grain is a stateful grain, the storage provider used to persist the state.</param>
         /// <returns></returns>
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType,
             IStorageProvider storageProvider)

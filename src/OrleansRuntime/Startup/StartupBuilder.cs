@@ -58,11 +58,8 @@ namespace Orleans.Runtime.Startup
 
             IServiceCollection serviceCollection = new ServiceCollection();
 
-            serviceCollection.AddTransient<ManagementGrain>();
             serviceCollection.AddTransient<GrainBasedMembershipTable>();
             serviceCollection.AddTransient<GrainBasedReminderTable>();
-            serviceCollection.AddTransient<PubSubRendezvousGrain>();
-            serviceCollection.AddTransient<MemoryStorageGrain>();
 
             return serviceCollection;
         }
