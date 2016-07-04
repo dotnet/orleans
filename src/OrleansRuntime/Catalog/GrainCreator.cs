@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Storage;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime
 {
@@ -12,6 +13,8 @@ namespace Orleans.Runtime
     {
         private readonly IGrainRuntime _grainRuntime;
         private readonly IServiceProvider _services;
+        private readonly Func<Type, ObjectFactory> _createFactory;
+        private ConcurrentDictionary<Type, ObjectFactory> _typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
         /// <summary>
         /// Instantiate a new instance of a <see cref="GrainCreator"/>
@@ -22,7 +25,16 @@ namespace Orleans.Runtime
         {
             _grainRuntime = grainRuntime;
             _services = services;
-        }
+            if (_services != null)
+            {
+                _createFactory = (type) => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+            }
+            else
+            {
+                // TODO: we could optimize instance creation for the non-DI path also
+                _createFactory = (type) => ((sp, args) => Activator.CreateInstance(type));
+            }
+    }
 
         /// <summary>
         /// Create a new instance of a grain
@@ -32,9 +44,8 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
         {
-            var grain = _services != null
-                ? (Grain) ActivatorUtilities.GetServiceOrCreateInstance(_services, grainType)
-                : (Grain) Activator.CreateInstance(grainType);
+            var activator = _typeActivatorCache.GetOrAdd(grainType, _createFactory);
+            var grain = (Grain)activator(_services, arguments: null);
 
             // Inject runtime hooks into grain instance
             grain.Runtime = _grainRuntime;

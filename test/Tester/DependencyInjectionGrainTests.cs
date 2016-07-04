@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -43,17 +44,17 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
-        public async Task CanGetExplictlyRegisteredGrain()
+        public async Task CannotGetExplictlyRegisteredGrain()
         {
             ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
-            long ignored = await grain.GetTicksFromService();
-            Assert.Equal(TestStartup.ExplicitlyRegistrationValue, await grain.GetStringValue());
+            var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetTicksFromService());
+            Assert.Contains("Error creating activation for", exception.Message);
+            Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
         }
     }
 
     public class TestStartup
     {
-        public const string ExplicitlyRegistrationValue = "explict registration value";
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<IInjectedService, InjectedService>();
@@ -61,7 +62,7 @@ namespace UnitTests.General
             services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
                 sp => new ExplicitlyRegisteredSimpleDIGrain(
                     sp.GetRequiredService<IInjectedService>(),
-                    ExplicitlyRegistrationValue));
+                    "some value"));
 
             return services.BuildServiceProvider();
         }
