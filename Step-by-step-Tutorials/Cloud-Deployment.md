@@ -49,12 +49,12 @@ Note: All of these references MUST have _Copy Local = 'True'_ settings to ensure
 ## Configure Azure Worker Role for Orleans Silos
 The Worker Role initialization class is a normal Azure worker role - it needs to inherit from the usual `Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint` base class.
 
-The worker role initialization class needs to create an instance of `Orleans.Host.Azure.OrleansAzureSilo` class, and call the appropriate `Start`/`Run`/`Stop` functions in the appropriate places:
+The worker role initialization class needs to create an instance of `Orleans.Runtime.Host.AzureSilo` class, and call the appropriate `Start`/`Run`/`Stop` functions in the appropriate places:
 
 ``` csharp
 public class WorkerRole : RoleEntryPoint
 {
-    Orleans.Runtime.Host.AzureSilo silo;
+    AzureSilo silo;
 
     public override bool OnStart()
     {
