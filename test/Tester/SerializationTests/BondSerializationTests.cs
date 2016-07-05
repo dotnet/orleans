@@ -3,10 +3,10 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using Orleans.Serialization;
     using System.Collections.Generic;
     using System.Reflection;
-    
+    using Orleans.Serialization;
+
     public class BondSerializationTests
     {
         public BondSerializationTests()

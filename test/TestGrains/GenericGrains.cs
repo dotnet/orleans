@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using UnitTests.GrainInterfaces;
-using System.Globalization;
-using System.Threading;
-using System.Reflection;
-using Orleans.Async;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {

@@ -1,11 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
-
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
-using UpdateFaultCombo = Orleans.Runtime.MembershipService.MembershipOracleData.UpdateFaultCombo;
 using Xunit;
-using System.Collections.Generic;
+using UpdateFaultCombo = Orleans.Runtime.MembershipService.MembershipOracleData.UpdateFaultCombo;
 
 namespace UnitTests.GeoClusterTests
 {

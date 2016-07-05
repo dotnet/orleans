@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;

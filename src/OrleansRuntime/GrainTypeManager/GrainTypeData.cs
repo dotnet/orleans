@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.Placement;
-using System.Linq;
 
 namespace Orleans.Runtime
 {

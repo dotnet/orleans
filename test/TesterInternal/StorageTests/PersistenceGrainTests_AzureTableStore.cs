@@ -1,16 +1,16 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 
+using System;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using System;
-using System.IO;
-using System.Threading.Tasks;
+using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Tester;
 using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment

@@ -1,6 +1,6 @@
-﻿using Orleans.MultiCluster;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
 {

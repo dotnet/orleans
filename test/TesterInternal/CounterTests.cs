@@ -1,6 +1,6 @@
 ﻿
-using Orleans.Runtime;
 using System;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests

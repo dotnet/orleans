@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Orleans.SqlUtils;
 using System.Linq;
+using Orleans.SqlUtils;
 
 namespace UnitTests.General
 {

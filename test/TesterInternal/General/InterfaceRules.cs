@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.Grains;
-using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 using Xunit;
 using Xunit.Abstractions;
+using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace UnitTests.General
 {

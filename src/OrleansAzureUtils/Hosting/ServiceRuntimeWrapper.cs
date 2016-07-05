@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Streams;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime.Host
 {

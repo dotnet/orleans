@@ -7,10 +7,9 @@ using System.Linq;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Text;
-
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {

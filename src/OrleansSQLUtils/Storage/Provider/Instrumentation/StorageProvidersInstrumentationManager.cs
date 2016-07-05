@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using Orleans.Runtime;
-using Orleans.SqlUtils.StorageProvider.Instrumentation;
+﻿using System.Diagnostics;
 
 namespace Orleans.SqlUtils.StorageProvider.Instrumentation
 {

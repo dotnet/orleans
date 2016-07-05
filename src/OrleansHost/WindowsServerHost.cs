@@ -1,7 +1,6 @@
 using System;
 using System.Net;
-﻿using System.Runtime.InteropServices.WindowsRuntime;
-﻿using System.Threading;
+using System.Threading;
 
 
 namespace Orleans.Runtime.Host

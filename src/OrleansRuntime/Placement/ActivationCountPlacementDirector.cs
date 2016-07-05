@@ -1,10 +1,9 @@
 using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement

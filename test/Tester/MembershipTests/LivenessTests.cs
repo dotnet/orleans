@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Orleans.SqlUtils;
+using Orleans.TestingHost;
 using Tester;
 using UnitTests.General;
+using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

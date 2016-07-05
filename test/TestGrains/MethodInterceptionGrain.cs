@@ -5,12 +5,8 @@ namespace UnitTests.Grains
     using System;
     using System.Linq;
     using System.Reflection;
-    using System.Runtime.InteropServices;
-
     using Orleans;
     using Orleans.CodeGeneration;
-    using Orleans.Runtime;
-
     using UnitTests.GrainInterfaces;
     public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain, IGrainInvokeInterceptor
     {

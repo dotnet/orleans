@@ -4,14 +4,10 @@ namespace UnitTests.Serialization
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
-
-    
-
+    using GrainInterfaces;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
-    using GrainInterfaces;
     using Xunit;
 
     /// <summary>
