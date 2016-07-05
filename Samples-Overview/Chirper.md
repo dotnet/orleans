@@ -2,7 +2,7 @@
 layout: page
 title: Chirper
 ---
-{% include JB/setup %}
+
 
 A simple social network pub/sub system, with short text messages being sent between users. Publishers send out short "Chirp" messages (not to be confused with "Tweets", for a variety of legal reasons! ;) to any other users that are following them.
 

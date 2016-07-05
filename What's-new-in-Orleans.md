@@ -2,7 +2,7 @@
 layout: page
 title: What's new in Orleans
 ---
-{% include JB/setup %}
+
 
 ## [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0) May 4th 2016
 

@@ -2,7 +2,7 @@
 layout: page
 title: Custom Storage Providers
 ---
-{% include JB/setup %}
+
 
 
 ## Writing a Custom Storage Provider

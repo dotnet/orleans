@@ -2,7 +2,7 @@
 layout: page
 title: Client Configuration
 ---
-{% include JB/setup %}
+
 
 The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.
 

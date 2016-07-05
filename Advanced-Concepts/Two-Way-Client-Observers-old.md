@@ -2,7 +2,7 @@
 layout: page
 title: Two Way Client Observers
 ---
-{% include JB/setup %}
+
 
 **THE BELOW IS WRONG!!!!!!**
 

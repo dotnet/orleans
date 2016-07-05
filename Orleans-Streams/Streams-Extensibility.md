@@ -2,7 +2,7 @@
 layout: page
 title: Orleans Streams Extensibility
 ---
-{% include JB/setup %}
+
 
 There are three ways developers can extend the currently implemented behavior of Orleans Streaming:
 

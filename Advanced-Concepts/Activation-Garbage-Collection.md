@@ -2,7 +2,7 @@
 layout: page
 title: Activation Garbage Collection
 ---
-{% include JB/setup %}
+
 
 The Orleans Team often uses the phrase “Activation Garbage Collection” but that is probably a somewhat misleading term as it might imply it works the same way that .NET garbage collection does, based solely on memory-pressure triggers.
 

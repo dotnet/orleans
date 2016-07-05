@@ -2,7 +2,7 @@
 layout: page
 title: Concurrency
 ---
-{% include JB/setup %}
+
 
 Please read about [Grains](/orleans/Getting-Started-With-Orleans/Grains) before following this tutorial.
 

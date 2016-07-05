@@ -2,7 +2,7 @@
 layout: page
 title: Advanced Concepts
 ---
-{% include JB/setup %}
+
 
 This section covers a number of topics that are intended for the advanced user of Orleans.
 

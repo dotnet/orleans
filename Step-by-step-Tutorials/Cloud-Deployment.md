@@ -2,7 +2,7 @@
 layout: page
 title: Cloud Deployment
 ---
-{% include JB/setup %}
+
 
 ## Deploying Orleans to Windows Azure
 This walkthrough shows the steps required to deploy the sample created in the  [Front Ends for Orleans Services](Front-Ends-for-Orleans-Services) to Windows Azure Cloud Services.

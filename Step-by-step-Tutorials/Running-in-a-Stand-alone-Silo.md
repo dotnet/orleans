@@ -2,7 +2,7 @@
 layout: page
 title: Running in a Stand-Alone Silo
 ---
-{% include JB/setup %}
+
 
 
 In the [first tutorial](My-First-Orleans-Application), we got a very simple "Hello World!" Orleans application running in the simplest possible environment, a dev/test host where everything is running in one process, which makes starting and stopping it really easy. 

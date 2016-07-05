@@ -2,7 +2,7 @@
 layout: page
 title: Twitter Sentiment
 ---
-{% include JB/setup %}
+
 
 The Twitter Sentiment application records Twitter sentiment by consuming the Twitter streaming API, calulates a sentiment score for each tweet (i.e. is it a positive/negative/neutral tone of lanuage), and then records that sentiment against each hashtag in the tweet using an Orleans grain to maintain a total score for each unique hashtag.
 

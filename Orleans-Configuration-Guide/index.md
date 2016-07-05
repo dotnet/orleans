@@ -2,7 +2,7 @@
 layout: page
 title: Orleans Configuration Guide
 ---
-{% include JB/setup %}
+
 
 This Configuration Guide explains the key configuration parameters and how they should be used for several most typical usage scenarios. 
 

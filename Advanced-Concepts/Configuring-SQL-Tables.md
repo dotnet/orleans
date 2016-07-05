@@ -2,7 +2,7 @@
 layout: page
 title: SQL Tables
 ---
-{% include JB/setup %}
+
 
 ### SQL System Storage
 

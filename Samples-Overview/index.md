@@ -2,7 +2,7 @@
 layout: page
 title: Samples Overview
 ---
-{% include JB/setup %}
+
 
 ### What do I need?
 To productively use the Orleans samples, please follow the [Prerequisites](/orleans/Prerequisites) section for the supported versions of the .NET framework, Visual Studio and Azure SDK.

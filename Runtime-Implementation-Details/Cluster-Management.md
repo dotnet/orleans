@@ -2,7 +2,7 @@
 layout: page
 title: Cluster Management in Orleans
 ---
-{% include JB/setup %}
+
 
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as **Silo Membership**. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 

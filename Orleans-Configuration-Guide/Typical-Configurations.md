@@ -2,7 +2,7 @@
 layout: page
 title: Typical Configurations
 ---
-{% include JB/setup %}
+
 
 Below are examples of typical configurations that can be used for development and production deployments.
 

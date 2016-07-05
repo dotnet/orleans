@@ -2,7 +2,7 @@
 layout: page
 title: Student Projects
 ---
-{% include JB/setup %}
+
 
 We suggest 2 types of projects for students:
 

@@ -2,7 +2,7 @@
 layout: page
 title: Silos
 ---
-{% include JB/setup %}
+
 
 An Orleans silo is a server that hosts and executes Orleans grains. It has one listening port for silo-to-silo messaging and another for client-to-silo messaging. Typically, one silo is run per machine.
 

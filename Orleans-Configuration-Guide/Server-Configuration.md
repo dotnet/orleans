@@ -2,7 +2,7 @@
 layout: page
 title: Server Configuration
 ---
-{% include JB/setup %}
+
 
 There are two key aspects of silo configuration: 
 

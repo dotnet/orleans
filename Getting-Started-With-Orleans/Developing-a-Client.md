@@ -2,7 +2,7 @@
 layout: page
 title: Developing a Client
 ---
-{% include JB/setup %}
+
 
 Once we have our grain type implemented, we can write a client application that uses the type.
 

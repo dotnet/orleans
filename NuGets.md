@@ -2,7 +2,7 @@
 layout: page
 title: Orleans NuGet Packages
 ---
-{% include JB/setup %}
+
 
 
 ## Orleans NuGet packages as of [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0)

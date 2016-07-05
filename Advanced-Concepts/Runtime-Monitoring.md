@@ -2,7 +2,7 @@
 layout: page
 title: Runtime Monitoring
 ---
-{% include JB/setup %}
+
 
 [[THIS IS IN NEED OF REVIEW]]
 

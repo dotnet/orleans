@@ -2,7 +2,7 @@
 layout: page
 title: Serialization and Writing Custom Serializers
 ---
-{% include JB/setup %}
+
 
 # Orleans Serialization
 

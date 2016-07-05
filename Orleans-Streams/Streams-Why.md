@@ -2,7 +2,7 @@
 layout: page
 title: Why Orleans Streams?
 ---
-{% include JB/setup %}
+
 
 
 There is already a wide range of technologies that allow to build stream processing systems.

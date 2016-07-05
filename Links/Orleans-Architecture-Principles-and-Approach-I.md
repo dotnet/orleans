@@ -2,7 +2,7 @@
 layout: page
 title: Orleans Architecture - Principles and Approach I
 ---
-{% include JB/setup %}
+
 
 
 Now that Orleans is (finally) available as open source, it's important to be clear about the goals and principles that has motivated the design decisions behind Orleans so that new changes either fit within that framework or explicitly and intentionally revise those goals and principles.

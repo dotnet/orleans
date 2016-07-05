@@ -2,7 +2,7 @@
 layout: page
 title: Deployment and Versioning of Dependencies
 ---
-{% include JB/setup %}
+
 
 
 ## Orleans Dependencies ##

@@ -2,7 +2,7 @@
 layout: page
 title: Interceptors
 ---
-{% include JB/setup %}
+
 
 Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path. We currectly support only client side pre-call inteceptors. 
 

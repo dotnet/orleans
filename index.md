@@ -3,10 +3,9 @@ layout: index
 title: Microsoft Orleans
 tagline: A straightforward approach to building distributed, high-scale applications in .NET
 ---
-{% include JB/setup %}
 
 Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
-It was created by Microsoft Research and designed for use in the cloud. 
+It was created by Microsoft Research and designed for use in the cloud.
 
 Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 and Halo 5 cloud services, as well as by a growing number of other companies.
 
@@ -15,21 +14,21 @@ Orleans has been used extensively in Microsoft Azure by several Microsoft produc
 <div class="row">
     <div class="col-md-4">
         <h3>Scalable by Default</h3>
-        
-        Orleans handles the complexity of building distributed systems, enabling your application 
+
+        Orleans handles the complexity of building distributed systems, enabling your application
         to scale to hundreds of servers.
     </div>
     <div class="col-md-4">
         <h3>Low Latency</h3>
-        
+
         Orleans allows you to keep the state you need in memory, so your application can rapidly respond
         to incoming requests.
     </div>
     <div class="col-md-4">
-        <h3>Simplified Concurrency</h3> 
-        
-        Orleans allows you to write simple, single threaded C# code, handling concurrency with asynchronous 
-        message passing between actors. 
+        <h3>Simplified Concurrency</h3>
+
+        Orleans allows you to write simple, single threaded C# code, handling concurrency with asynchronous
+        message passing between actors.
     </div>
 </div>
 
@@ -44,7 +43,7 @@ public interface IMyGrain : IGrainWithStringKey
 }
 ```
 
-The implementation is executed inside the Orleans framework: 
+The implementation is executed inside the Orleans framework:
 
 ``` csharp
 public class MyGrain : IMyGrain
@@ -72,5 +71,3 @@ There are a number of [step-by-step tutorials](Step-by-step-Tutorials).
 Discuss your Orleans questions on the [gitter chat room](https://gitter.im/dotnet/orleans).
 
 Fork the code on the [GitHub Respository](https://github.com/dotnet/orleans).
-
-

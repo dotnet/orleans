@@ -2,7 +2,7 @@
 layout: page
 title: Adventure
 ---
-{% include JB/setup %}
+
 
 A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.
 

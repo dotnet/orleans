@@ -2,7 +2,7 @@
 layout: page
 title: Documentation guidelines
 ---
-{% include JB/setup %}
+
 
 The Orleans documentation is built in [Markdown](https://help.github.com/articles/markdown-basics/).
 We use a few simple conventions to ensure a homogeneous style throughout the full set of documents.

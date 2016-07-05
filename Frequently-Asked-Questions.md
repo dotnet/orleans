@@ -2,7 +2,7 @@
 layout: page
 title: Frequently Asked Questions
 ---
-{% include JB/setup %}
+
 
 
 

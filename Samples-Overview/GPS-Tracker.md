@@ -2,7 +2,7 @@
 layout: page
 title: GPS Tracker
 ---
-{% include JB/setup %}
+
 
 A sample application to show how Orleans could be used in conjunction with [SignalR](https://orleans.codeplex.com/wikipage?title=https%3a%2f%2fgithub.com%2fSignalR%2fSignalR&referringTitle=GPS%20Tracker) to monitor the position of a number of GPS enabled devices, and report these to a web browser.
 

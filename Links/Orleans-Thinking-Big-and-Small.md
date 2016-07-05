@@ -2,7 +2,7 @@
 layout: page
 title: Orleans - Thinking Big and Small
 ---
-{% include JB/setup %}
+
 
 
 TL;DR: You don’t need hundreds of servers to benefit from Orleans. A handful is enough.

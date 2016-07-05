@@ -2,7 +2,7 @@
 layout: page
 title: Orleans Stream Providers
 ---
-{% include JB/setup %}
+
 
 ## Stream Providers
 

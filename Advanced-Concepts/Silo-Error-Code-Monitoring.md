@@ -2,7 +2,7 @@
 layout: page
 title: Silo Error Code Monitoring
 ---
-{% include JB/setup %}
+
 
 
 Group  | Log Type  | Log Code Values  | Threshold  | Description 

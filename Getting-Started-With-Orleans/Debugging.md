@@ -2,7 +2,7 @@
 layout: page
 title: Debugging and Symbols
 ---
-{% include JB/setup %}
+
 
 An Orleans-based application can be easily debugged during development but simply attaching debugger to the silo host process, such as a host crteated with the Orleans Dev/Test Host project template, OrleansHost.exe, Azure Compute Emulator or any other host process.
 In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.

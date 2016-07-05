@@ -2,7 +2,7 @@
 layout: page
 title: Developing a Grain
 ---
-{% include JB/setup %}
+
 
 Please read about [Grains](/orleans/Getting-Started-With-Orleans/Grains) before reading this article.
 

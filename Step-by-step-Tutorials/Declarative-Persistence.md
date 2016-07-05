@@ -2,7 +2,7 @@
 layout: page
 title: Declarative Persistence
 ---
-{% include JB/setup %}
+
 
 In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of 'cache with behavior,' an object-oriented cache, if you will.
 That is already very valuable and goes a long way toward achieving server-side scalability with a simple, familiar, programming model and the built-in single-threaded execution guarantees.

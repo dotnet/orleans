@@ -2,7 +2,7 @@
 layout: page
 title: Step by Step Tutorials
 ---
-{% include JB/setup %}
+
 
 The collection of technology walkthrough tutorials found here is intended to introduce you to the features of this exciting technology, spanning the programming model, its configuration, deployment, and customization. 
 They build on each other, so it is best to go through them in the order outlined below.

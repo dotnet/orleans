@@ -2,7 +2,7 @@
 layout: page
 title: A Service is a Collection of Communicating Actors
 ---
-{% include JB/setup %}
+
 
 The previous tutorials all relied on interacting with a single actor from the client.
 In most real-world situations this is not what would be expected as actors are intended to be more or less as light-weight as objects and treated as such.

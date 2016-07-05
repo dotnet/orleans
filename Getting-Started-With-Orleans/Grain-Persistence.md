@@ -2,7 +2,7 @@
 layout: page
 title: Grain Persistence
 ---
-{% include JB/setup %}
+
 
 ## Grain Persistence Goals
 

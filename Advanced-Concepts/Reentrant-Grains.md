@@ -2,7 +2,7 @@
 layout: page
 title: Reentrant Grains
 ---
-{% include JB/setup %}
+
 
 By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request. 
 An activation cannot receive a new request until all of the `Task`s created (directly or indirectly) in the processing of the current request have been resolved and all of their associated closures executed.

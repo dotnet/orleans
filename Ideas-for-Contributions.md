@@ -2,7 +2,7 @@
 layout: page
 title: Ideas for Contributions
 ---
-{% include JB/setup %}
+
 
 These are some of the ideas for contributing to Orleans. Just an initial list for consideration, meant to be a live document. If you are interested in any of these or one that is not listed, create an issue to discuss it.
 

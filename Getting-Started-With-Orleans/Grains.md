@@ -2,7 +2,7 @@
 layout: page
 title: Grains
 ---
-{% include JB/setup %}
+
 
 ## Grains (Actors): Units of Distribution
 

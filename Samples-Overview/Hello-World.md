@@ -2,7 +2,7 @@
 layout: page
 title: Hello World
 ---
-{% include JB/setup %}
+
 
 In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that's that. Simple enough in theory, but since there's distribution involved, there's a bit more to it.
 

@@ -2,7 +2,7 @@
 layout: page
 title: Actor Identity
 ---
-{% include JB/setup %}
+
 
 In object-oriented environments, the identity of an object is hard to distinguish from a reference to it. 
 Thus, when an object is created using new, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.

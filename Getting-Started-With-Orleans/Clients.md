@@ -2,7 +2,7 @@
 layout: page
 title: Clients
 ---
-{% include JB/setup %}
+
 
 ## Orleans and Client Code
 

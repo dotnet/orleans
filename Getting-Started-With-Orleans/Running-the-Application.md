@@ -2,7 +2,7 @@
 layout: page
 title: Running the Application
 ---
-{% include JB/setup %}
+
 
 ## Configuring Connections to Orleans
 

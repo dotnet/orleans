@@ -2,7 +2,7 @@
 layout: page
 title: Interaction with Libraries and Services
 ---
-{% include JB/setup %}
+
 
 Code running in a grain is not prohibited from calling external systems or services, but the rule for always using asynchronous code must be maintained.
 

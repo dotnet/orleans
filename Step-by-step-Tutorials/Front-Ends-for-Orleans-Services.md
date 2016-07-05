@@ -2,7 +2,7 @@
 layout: page
 title: Front Ends for Orleans Services
 ---
-{% include JB/setup %}
+
 
 Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended.
 Instead, Orleans is intended to be fronted by your own API.

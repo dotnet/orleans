@@ -2,7 +2,7 @@
 layout: page
 title: Links
 ---
-{% include JB/setup %}
+
 
 ## **By Orleans team**
 

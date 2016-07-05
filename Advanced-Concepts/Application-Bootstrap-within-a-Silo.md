@@ -2,7 +2,7 @@
 layout: page
 title: Application Bootstrapping within a Silo
 ---
-{% include JB/setup %}
+
 
 There are several scenarios where application want to run some "auto-exec" functions when a silo comes online. 
 

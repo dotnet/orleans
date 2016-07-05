@@ -2,7 +2,7 @@
 layout: page
 title: Orleans Presentations
 ---
-{% include JB/setup %}
+
 
 * [Orleans Best Practices](http://research.microsoft.com/apps/pubs/default.aspx?id=244727) A collection of tips and trick to help design, build, and run an Orleans-based application.
 
