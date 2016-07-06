@@ -92,7 +92,7 @@ Identifying that a grain should use persistent state takes three steps:
 2. changing the grain base class, and
 3. identifying the storage provider.
 
-The first step, declaring a state class in the interfaces project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring a state class in the grain implementations project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
 For employees, we want to persist all the state:
 
