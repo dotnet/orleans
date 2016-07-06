@@ -270,8 +270,12 @@ namespace WebApplication1
             ...
             var config = AzureClient.DefaultConfiguration();
 
-            // Try to connect 10 times. This will give the silo enough time to start up. Adjust if necessary.
-            for (int i = 0; i < 10; i++)
+            // Attempt to connect a few times to overcome transient failures and to give the silo enough 
+            // time to start up when starting at the same time as the client (useful when deploying or during development).
+            const int initializeAttemptsBeforeFailing = 5;
+
+            int attempt = 0;
+            while (true)
             {
                 try
                 {
@@ -280,11 +284,14 @@ namespace WebApplication1
                 }
                 catch (SiloUnavailableException e)
                 {
-                    continue;
+                    attempt++;
+                    if (attempt >= initializeAttemptsBeforeFailing)
+                    {
+                         throw;
+                    }
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
                 }
             }
-            
-            AzureClient.Initialize(config);
        	   ...
 ```
 
