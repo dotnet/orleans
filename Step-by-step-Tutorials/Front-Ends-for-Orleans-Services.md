@@ -18,8 +18,6 @@ First, you should add a new ASP.NET Web Application to your solution. Then, sele
 
 Next, add a reference to the _Orleans.dll_ file in the project references.
 
-Now add the _ClientConfiguration.xml_ file used in the Orleans Host application to the root of the ASP.NET project.
-
 As with the Orleans host we created earlier, we need to initialize Orleans.
 This is best done in the _Global.asax.cs_ file like this:
 
@@ -30,7 +28,32 @@ namespace WebApplication1
     {
         protected void Application_Start()
         {
-            Orleans.GrainClient.Initialize(Server.MapPath("~/ClientConfiguration.xml"));
+            ...
+            var config = ClientConfiguration.LocalhostSilo();
+
+           // Attempt to connect a few times to overcome transient failures and to give the silo enough 
+            // time to start up when starting at the same time as the client (useful when deploying or during development).
+            const int initializeAttemptsBeforeFailing = 5;
+
+            int attempt = 0;
+            while (true)
+            {
+                try
+                {
+                    GrainClient.Initialize(config);
+                    break;
+                }
+                catch (SiloUnavailableException e)
+                {
+                    attempt++;
+                    if (attempt >= initializeAttemptsBeforeFailing)
+                    {
+                         throw;
+                    }
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
+                }
+            }
+
        	   ...
 ```
 
@@ -66,9 +89,7 @@ Note that the controller is asynchronous, and we can just pass back the `Task` w
 
 Now let's test the application.
 
-Build the project, and start the local silo.
-
-Set the ASP.NET application as the startup project, and run the project.
+Build the project. Set the ASP.NET application and the silo host project as the startup projects, and run them.
 
 If you navigate to the API URL (the number may be different on your project)...
 
@@ -78,7 +99,7 @@ If you navigate to the API URL (the number may be different on your project)...
  ...you should see the result returned from the grain:
 
 
-    <int xmlns="http://schemas.microsoft.com/2003/10/Serialization/">42</int>
+    42
 
 
 That's the basics in place, the rest of the API can be completed by adding the rest of the HTTP verbs.
