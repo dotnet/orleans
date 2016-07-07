@@ -1,16 +1,17 @@
 # Microsoft Orleans Changelog
 All notable end-user facing changes are documented in this file.
 
-### [vNext]
-*Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
-The idea is to track end-user facing changes as they occur.*
-
-- Sample change. We should start adding items here when we submit PRs
-
-
+### [v1.2.3]
+- Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
+- Troubleshooting improvements:
+  - Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) #1879 #1808
+  - Better messaging when silo fails to join due to initial connectivity problems #1866
+  - Throw meaningful exception if grain timer is created outside grain context #1858
+- Bug fixes:
+  - Do not deactivate Stateless Workers upon grain directory partition shutdown #1838
+  - Other minor bug fixes #1823
 
 ### [v1.2.2]
-- Bugfix: Remote stacktrace is once again being included in the exception that bubbles up to the caller (bug introduced in 1.2.0). #1808
 - Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. #1804
 - Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). #1720
 - Added GrainCreator abstraction to enable some unit testing scenarios. #1802 #1792
