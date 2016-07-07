@@ -221,7 +221,8 @@ namespace Orleans.Runtime
             }
 
             // Configure DI using Startup type
-            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName) ?? new DefaultServiceProvider();
+            bool usingCustomServiceProvider;
+            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -282,8 +283,12 @@ namespace Orleans.Runtime
                 (IConsistentRingProvider) new VirtualBucketsRingProvider(SiloAddress, GlobalConfig.NumVirtualBucketsConsistentRing)
                 : new ConsistentRingProvider(SiloAddress);
 
+            // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
+            // service provider, meaning that he is explicitly opting into it.
+            var grainCreator = new GrainCreator(grainRuntime, usingCustomServiceProvider ? Services : null);
+
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 

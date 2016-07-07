@@ -5,7 +5,9 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
-- Sample change. We should start adding items here when we submit PRs
+- Removed OrleansDependencyInjection package and instead Orleans references Microsoft.Extensions.DepedencyInjection #1911 #1901 #1878
+  - Now using Microsoft.Extensions.DepedencyInjection.ServiceProvider as the default service provider if the user does not override it.
+  - Grains are still not being injected automatically unless the user opts in by specifying his own Startup configuration that returns a service provider.
 
 
 

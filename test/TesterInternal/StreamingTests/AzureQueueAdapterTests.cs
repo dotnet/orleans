@@ -56,7 +56,7 @@ namespace UnitTests.StorageTests
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), new DefaultServiceProvider());
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 

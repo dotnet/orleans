@@ -153,7 +153,7 @@ namespace Orleans
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
-                clientProviderRuntime = new ClientProviderRuntime(grainFactory, new DefaultServiceProvider());
+                clientProviderRuntime = new ClientProviderRuntime(grainFactory, null);
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);

@@ -135,7 +135,6 @@ namespace Orleans.Runtime
         private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
-        private readonly IGrainRuntime grainRuntime;
         private readonly GrainCreator grainCreator;
 
         internal Catalog(
@@ -147,7 +146,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler, 
             ActivationDirectory activationDirectory, 
             ClusterConfiguration config, 
-            IGrainRuntime grainRuntime,
+            GrainCreator grainCreator,
             out Action<Dispatcher> setDispatcher)
             : base(grainId, silo)
         {
@@ -157,11 +156,9 @@ namespace Orleans.Runtime
             activations = activationDirectory;
             this.scheduler = scheduler;
             GrainTypeManager = typeManager;
-            this.grainRuntime = grainRuntime;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
-
-            grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
+            this.grainCreator = grainCreator;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;

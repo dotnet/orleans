@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainRuntime">Runtime to use for all new grains</param>
         /// <param name="services">(Optional) Service provider used to create new grains</param>
-        public GrainCreator(IGrainRuntime grainRuntime, IServiceProvider services = null)
+        public GrainCreator(IGrainRuntime grainRuntime, IServiceProvider services)
         {
             _grainRuntime = grainRuntime;
             _services = services;

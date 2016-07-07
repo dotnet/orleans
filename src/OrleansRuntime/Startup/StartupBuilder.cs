@@ -2,12 +2,8 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers;
-using Orleans.Runtime.Management;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.ReminderService;
-using Orleans.Storage;
-using Orleans.Streams;
 
 namespace Orleans.Runtime.Startup
 {
@@ -16,52 +12,46 @@ namespace Orleans.Runtime.Startup
     /// </summary>
     internal class StartupBuilder
     {
-        internal static IServiceProvider ConfigureStartup(string startupTypeName)
+        internal static IServiceProvider ConfigureStartup(string startupTypeName, out bool usingCustomServiceProvider)
         {
-            if (String.IsNullOrWhiteSpace(startupTypeName))
+            usingCustomServiceProvider = false;
+            IServiceCollection serviceCollection = new ServiceCollection();
+            ConfigureServicesBuilder servicesMethod = null;
+            Type startupType = null;
+
+            if (!String.IsNullOrWhiteSpace(startupTypeName))
             {
-                return new DefaultServiceProvider();
+                startupType = Type.GetType(startupTypeName);
+                if (startupType == null)
+                {
+                    throw new InvalidOperationException($"Can not locate the type specified in the configuration file: '{startupTypeName}'.");
+                }
+
+                servicesMethod = FindConfigureServicesDelegate(startupType);
+                if (servicesMethod != null && !servicesMethod.MethodInfo.IsStatic)
+                {
+                    usingCustomServiceProvider = true;
+                }
             }
 
-            var startupType = Type.GetType(startupTypeName);
+            RegisterSystemTypes(serviceCollection);
 
-            if (startupType == null)
-            {
-                throw new InvalidOperationException($"Can not locate the type specified in the configuration file: '{startupTypeName}'.");
-            }
-
-            var servicesMethod = FindConfigureServicesDelegate(startupType);
-
-            if ((servicesMethod != null && !servicesMethod.MethodInfo.IsStatic))
+            if (usingCustomServiceProvider)
             {
                 var instance = Activator.CreateInstance(startupType);
-
-                var serviceCollection = RegisterSystemTypes();
-
                 return servicesMethod.Build(instance, serviceCollection);
             }
 
-            //
-            // If a Startup Type is configured and does not have the required method, return null, it is
-            // the caller's responsibility to handle it as required. In our case it will create the default
-            // provider. At this point we should not do that.
-            //
-
-            return null;
+            return serviceCollection.BuildServiceProvider();
         }
 
-        private static IServiceCollection RegisterSystemTypes()
+        private static void RegisterSystemTypes(IServiceCollection serviceCollection)
         {
-            //
             // Register the system classes and grains in this method.
-            //
-
-            IServiceCollection serviceCollection = new ServiceCollection();
+            // Note: this method will probably have to be moved out into the Silo class to include internal runtime types.
 
             serviceCollection.AddTransient<GrainBasedMembershipTable>();
             serviceCollection.AddTransient<GrainBasedReminderTable>();
-
-            return serviceCollection;
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
