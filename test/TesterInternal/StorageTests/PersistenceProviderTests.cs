@@ -38,8 +38,8 @@ namespace UnitTests.StorageTests
         public PersistenceProviderTests_Local(ITestOutputHelper output)
         {
             this.output = output;
-            storageProviderManager = new StorageProviderManager(new GrainFactory(), new DefaultServiceProvider());
-            storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), new DefaultServiceProvider())).WaitWithThrow(TestConstants.InitTimeout);
+            storageProviderManager = new StorageProviderManager(new GrainFactory(), null);
+            storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), null)).WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
             SerializationManager.InitializeForTesting();
             LocalDataStoreInstance.LocalDataStore = null;

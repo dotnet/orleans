@@ -51,5 +51,14 @@ namespace UnitTests.General
 
             Assert.Equal(12, x);
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
+        {
+            ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
+
+            var actual = await grain.GetA();
+            Assert.Equal(MultipleConstructorsSimpleGrain.ValueUsedByParameterlessConstructor, actual);
+        }
     }
 }

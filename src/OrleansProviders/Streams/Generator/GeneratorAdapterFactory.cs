@@ -68,10 +68,10 @@ namespace Orleans.Providers.Streams.Generator
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             if (adapterConfig.GeneratorConfigType != null)
             {
-                generatorConfig = serviceProvider.GetService(adapterConfig.GeneratorConfigType) as IStreamGeneratorConfig;
+                generatorConfig = (IStreamGeneratorConfig)(serviceProvider?.GetService(adapterConfig.GeneratorConfigType) ?? Activator.CreateInstance(adapterConfig.GeneratorConfigType));
                 if (generatorConfig == null)
                 {
-                    throw new ArgumentOutOfRangeException("providerConfig", "GeneratorConfigType not valid.");
+                    throw new ArgumentOutOfRangeException(nameof(providerConfig), "GeneratorConfigType not valid.");
                 }
                 generatorConfig.PopulateFromProviderConfig(providerConfig);
             }
@@ -217,7 +217,7 @@ namespace Orleans.Providers.Streams.Generator
                 return;
             }
 
-            var generator = serviceProvider.GetService(generatorConfig.StreamGeneratorType) as IStreamGenerator;
+            var generator = (IStreamGenerator)(serviceProvider?.GetService(generatorConfig.StreamGeneratorType) ?? Activator.CreateInstance(generatorConfig.StreamGeneratorType));
             if (generator == null)
             {
                 throw new OrleansException($"StreamGenerator type not supported: {generatorConfig.StreamGeneratorType}");
