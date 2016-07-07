@@ -29,6 +29,8 @@ Make sure that the proper endpoints are configured in the ServiceDefinition.csde
 It will give errors saying that it cannot get the endpoint information.
 
 ##Missing Logs
+Make sure that the connection strings are set up properly.
+
 It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly. 
 Incorrect versions in these files can cause issues with the deployment. Be careful when dealing with updates.
 
