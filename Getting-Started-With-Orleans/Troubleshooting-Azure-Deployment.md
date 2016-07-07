@@ -32,6 +32,10 @@ It will give errors saying that it cannot get the endpoint information.
 It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly. 
 Incorrect versions in these files can cause issues with the deployment. Be careful when dealing with updates.
 
+##Version Issues
+Make sure that the same version of Orleans is used in every project in the solution. Not doing this can lead to the worker
+role recycling so fast that no logs can be produced. Visual Studio provides some error messages in the deployment history.
+
 ##Role Keeps Recycling
 - Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.
 - Check the logs to see if there is an unhandled exception while initializing.
