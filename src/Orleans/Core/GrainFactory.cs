@@ -158,16 +158,16 @@ namespace Orleans
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
-            return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
+            return Task.FromResult(CreateObjectReferenceImpl<TGrainObserverInterface>(obj));
         }
 
-        internal Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
+        internal TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
                 where TGrainObserverInterface : IAddressable
         {
             return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
         }
 
-        private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
+        private TGrainObserverInterface CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
         {
             var interfaceType = typeof(TGrainObserverInterface);
             var interfaceTypeInfo = interfaceType.GetTypeInfo();
@@ -204,9 +204,7 @@ namespace Orleans
                         interfaceType));
             }
 
-            return
-                GrainReference.CreateObjectReference(obj, invoker)
-                    .ContinueWith(result => this.Cast<TGrainObserverInterface>(result.GetAwaiter().GetResult()));
+            return Cast<TGrainObserverInterface>(RuntimeClient.Current.CreateObjectReference(obj, invoker));
         }
 
         /// <summary>
@@ -220,7 +218,8 @@ namespace Orleans
         public Task DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            return GrainReference.DeleteObjectReference(obj);
+            RuntimeClient.Current.DeleteObjectReference(obj);
+            return TaskDone.Done;
         }
 
         private static IGrainMethodInvoker MakeInvoker(Type interfaceType)
