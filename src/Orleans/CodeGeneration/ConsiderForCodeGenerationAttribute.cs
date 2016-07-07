@@ -3,18 +3,25 @@ namespace Orleans.CodeGeneration
     using System;
     
     /// <summary>
-    /// Abstract base class for attributes that effect code generation of types.
+    /// The attribute which informs the code generator that code should be generated for this type.
     /// </summary>
-    public abstract class ConsiderForCodeGenerationAttribute : Attribute
+    public class ConsiderForCodeGenerationAttribute : Attribute
     {
-        protected ConsiderForCodeGenerationAttribute(Type type, bool generateSerializer)
+        protected ConsiderForCodeGenerationAttribute(Type type, bool throwOnFailure = false)
         {
             this.Type = type;
-            this.GenerateSerializer = generateSerializer;
+            this.ThrowOnFailure = throwOnFailure;
         }
 
+        /// <summary>
+        /// Gets the type which should be considered for code generation.
+        /// </summary>
         public Type Type { get; private set; }
-        public bool GenerateSerializer { get; private set; }
+
+        /// <summary>
+        /// Gets a value indicating whether or not to throw if code was not generated for the specified type.
+        /// </summary>
+        public bool ThrowOnFailure { get; private set; }
     }
 
     /// <summary>
@@ -23,12 +30,12 @@ namespace Orleans.CodeGeneration
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class KnownTypeAttribute : ConsiderForCodeGenerationAttribute
     {
-        public KnownTypeAttribute(Type type) : base(type, false){}
+        public KnownTypeAttribute(Type type) : base(type){}
     }
 
     /// <summary>
     /// The attribute which informs the code generator that code should be generated for this type.
-    /// Forces generation of type serializer.
+    /// Forces generation of type serializer, throwing if a serializer could not be generated.
     /// </summary>
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class GenerateSerializerAttribute : ConsiderForCodeGenerationAttribute
