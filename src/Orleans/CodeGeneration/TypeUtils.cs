@@ -244,9 +244,16 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
-        public static Type[] GenericTypeArgs(string className)
+        public static Type[] GenericTypeArgsFromClassName(string className)
         {
-            var genericTypeDef = GenericTypeArgsString(className).Replace("[]", "##"); // protect array arguments
+            return GenericTypeArgsFromArgsString(GenericTypeArgsString(className));
+        }
+
+        public static Type[] GenericTypeArgsFromArgsString(string genericArgs)
+        {
+            if (string.IsNullOrEmpty(genericArgs)) return new Type[] { };
+
+            var genericTypeDef = genericArgs.Replace("[]", "##"); // protect array arguments
 
             return InnerGenericTypeArgs(genericTypeDef);
         }
