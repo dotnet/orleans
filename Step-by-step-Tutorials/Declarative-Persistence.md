@@ -225,6 +225,13 @@ For example, a stack of elements may be externally represented as a `List<T>`, b
 
 In the case of our `Manager` class, the `_me` field is simply a cached value, something we don't even need to keep as a field in the first place, it can be created any time we need it, but since it's going to be a commonly used value, it's worth keeping it around in a transient field.
 
+## Automatic loading of state
+
+If a grain type has state, at activation time the state will be loaded from storage and then `OnActivateAsync` is called so you can be sure that the state is loaded when initializing your grain. This is the only case that Orleans calls `ReadStateAsync` automatically. If you want to write the state or read it in some other place, you should do it on your own. Normally you should not need to call `ReadStateAsync` yourself unless you are doing something specific regarding handling corrupted state or something else.
+
+## Handling failures using persistence
+
+Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent. There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed. In this case reading from storage can return your state to the last correct state. The "Let it crash" philosophy of Erlang works exactly like this so if a grain can not continue its job, you can tell it to deactivate itself so state is cleanedup and in the next grain activation, the state will be read from storage. Also you can simply fix the state yourself and not kill the activation.
 
 ## Next
 
