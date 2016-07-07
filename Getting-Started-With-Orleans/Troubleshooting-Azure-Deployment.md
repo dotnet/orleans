@@ -31,3 +31,9 @@ It will give errors saying that it cannot get the endpoint information.
 ##Missing Logs
 It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly. 
 Incorrect versions in these files can cause issues with the deployment. Be careful when dealing with updates.
+
+##Role Keeps Recycling
+- Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.
+- Check the logs to see if there is an unhandled exception while initializing.
+- Make sure that the connections strings are correct.
+- Check the Azure Cloud Services troubleshooting pages for more information.
