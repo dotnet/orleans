@@ -1,11 +1,9 @@
-using System;
 using System.Threading.Tasks;
 using HelloWorldInterfaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Orleans;
 using Orleans.TestingHost;
 
-namespace Tests
+namespace SiloTests
 {
     /// <summary>
     /// -----------------------------------------------------------------
@@ -44,7 +42,7 @@ namespace Tests
         }
 
         [TestMethod]
-        public async Task SayHelloTest()
+        public async Task SiloSayHelloTest()
         {
             // The Orleans silo / client test environment is already set up at this point.
 
