@@ -181,7 +181,7 @@ namespace Orleans.ServiceBus.Providers
             return closeTask;
         }
 
-        private static Task<EventHubReceiver> CreateReceiver(EventHubPartitionConfig partitionConfig, string offset, Logger logger)
+        private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionConfig partitionConfig, string offset, Logger logger)
         {
             EventHubClient client = EventHubClient.CreateFromConnectionString(partitionConfig.Hub.ConnectionString, partitionConfig.Hub.Path);
             EventHubConsumerGroup consumerGroup = client.GetConsumerGroup(partitionConfig.Hub.ConsumerGroup);
@@ -193,10 +193,16 @@ namespace Orleans.ServiceBus.Providers
             if (!partitionConfig.Hub.StartFromNow || offset != EventHubConsumerGroup.StartOfStream)
             {
                 logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionConfig.Hub.Path, partitionConfig.Partition, offset);
-                return consumerGroup.CreateReceiverAsync(partitionConfig.Partition, offset, true);
             }
-            logger.Info("Starting to read latest messages from EventHub partition {0}-{1}", partitionConfig.Hub.Path, partitionConfig.Partition);
-            return consumerGroup.CreateReceiverAsync(partitionConfig.Partition, DateTime.UtcNow);
+            else
+            {
+                // to start reading from most recent data, we get the latest offset from the partition.
+                PartitionRuntimeInformation patitionInfo =
+                    await client.GetPartitionRuntimeInformationAsync(partitionConfig.Partition);
+                offset = patitionInfo.LastEnqueuedOffset;
+                logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionConfig.Hub.Path, partitionConfig.Partition, offset);
+            }
+            return await consumerGroup.CreateReceiverAsync(partitionConfig.Partition, offset, true);
         }
 
         private class StreamActivityNotificationBatch : IBatchContainer
