@@ -17,6 +17,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Streams.AdHoc;
 
 
 namespace Orleans.Runtime
@@ -346,21 +347,31 @@ namespace Orleans.Runtime
                     if (invoker is IGrainExtensionMethodInvoker
                         && !(target is IGrainExtension))
                     {
-                        // We are trying the invoke a grain extension method on a grain 
-                        // -- most likely reason is that the dynamic extension is not installed for this grain
-                        // So throw a specific exception here rather than a general InvalidCastException
-                        var error = String.Format(
-                            "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}", 
-                            target.GetType().FullName, invoker.GetType().FullName, invokable.GetType().FullName);
-                        var exc = new GrainExtensionNotInstalledException(error);
-                        string extraDebugInfo = null;
+#warning try to find a cheaper way to do this.
+                        var methodInvokerAttribute = invoker.GetType().GetCustomAttribute<MethodInvokerAttribute>();
+                        if (methodInvokerAttribute != null &&
+                            methodInvokerAttribute.GrainType == typeof(IObservableGrainExtension))
+                        {
+                            target = ObservableGrainExtension.GetOrAddExtension(invokable, message.GenericGrainType, target);
+                        }
+                        else
+                        {
+                            // We are trying the invoke a grain extension method on a grain 
+                            // -- most likely reason is that the dynamic extension is not installed for this grain
+                            // So throw a specific exception here rather than a general InvalidCastException
+                            var error = string.Format(
+                                "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}",
+                                target.GetType().FullName, invoker.GetType().FullName, invokable.GetType().FullName);
+                            var exc = new GrainExtensionNotInstalledException(error);
+                            string extraDebugInfo = null;
 #if DEBUG
-                        extraDebugInfo = new StackTrace().ToString();
+                            extraDebugInfo = new StackTrace().ToString();
 #endif
-                        logger.Warn(ErrorCode.Stream_ExtensionNotInstalled, 
-                            string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
+                            logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
+                                string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
 
-                        throw exc;
+                            throw exc;
+                        }
                     }
 
                     resultObject = await InvokeWithInterceptors(target, request, invoker);

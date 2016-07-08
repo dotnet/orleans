@@ -9,10 +9,11 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
+    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime, IGrainExtensionManager
     { 
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();
@@ -148,16 +149,22 @@ namespace Orleans.Runtime.Providers
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
         }
 
+        internal bool TryAddExtension(IGrainExtension handler)
+        {
+            return TryAddExtension(handler, handler.GetType());
+        }
+
         /// <summary>
         /// Adds the specified extension handler to the currently running activation.
         /// This method must be called during an activation turn.
         /// </summary>
         /// <param name="handler"></param>
+        /// <param name="extensionType">The extension type to register, used for disambiguation.</param>
         /// <returns></returns>
-        internal bool TryAddExtension(IGrainExtension handler)
+        public bool TryAddExtension(IGrainExtension handler, Type extensionType)
         {
             var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(handler.GetType());
+            var invoker = TryGetExtensionInvoker(extensionType);
             if (invoker == null)
                 throw new SystemException("Extension method invoker was not generated for an extension interface");
             
@@ -180,13 +187,13 @@ namespace Orleans.Runtime.Providers
         /// This method must be called during an activation turn.
         /// </summary>
         /// <param name="handler"></param>
-        internal void RemoveExtension(IGrainExtension handler)
+        public void RemoveExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
             currentActivation.RemoveExtension(handler);
         }
 
-        internal bool TryGetExtensionHandler<TExtension>(out TExtension result)
+        public bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension
         {
             var currentActivation = GetCurrentActivationData();
             IGrainExtension untypedResult;

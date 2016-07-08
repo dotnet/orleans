@@ -84,7 +84,7 @@ namespace Orleans.CodeGenerator
             }
 
             if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
-                || GrainInterfaceUtils.IsTaskType(t)) return false;
+                || GrainInterfaceUtils.IsValidGrainInterfaceReturnType(t)) return false;
 
             if (t.IsConstructedGenericType)
             {

@@ -1,3 +1,5 @@
+using Orleans.Streams.AdHoc;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -183,15 +185,26 @@ namespace Orleans.CodeGenerator
 
                     body.Add(SF.ExpressionStatement(invocation));
                 }
+                else if (method.ReturnType.IsConstructedGenericType &&
+                          method.ReturnType.GetGenericTypeDefinition() == typeof(IGrainObservable<>))
+                {
+                    var invocation =
+                        SF.InvocationExpression(baseReference.Member("InvokeObservableMethod", method.ReturnType.GenericTypeArguments[0]))
+                            .AddArgumentListArguments(methodIdArgument)
+                            .AddArgumentListArguments(SF.Argument(args));
+
+                    body.Add(SF.ReturnStatement(invocation));
+                }
                 else
                 {
                     var returnType = method.ReturnType == typeof(Task)
                                          ? typeof(object)
                                          : method.ReturnType.GenericTypeArguments[0];
+                    
                     var invocation =
-                        SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", returnType))
-                            .AddArgumentListArguments(methodIdArgument)
-                            .AddArgumentListArguments(SF.Argument(args));
+                    SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", returnType))
+                        .AddArgumentListArguments(methodIdArgument)
+                        .AddArgumentListArguments(SF.Argument(args));
 
                     if (options != null)
                     {

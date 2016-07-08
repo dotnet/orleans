@@ -3,7 +3,9 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime.Startup
 {
@@ -52,6 +54,8 @@ namespace Orleans.Runtime.Startup
 
             serviceCollection.AddTransient<GrainBasedMembershipTable>();
             serviceCollection.AddTransient<GrainBasedReminderTable>();
+            serviceCollection.AddSingleton<IGrainExtensionManager>(_ => SiloProviderRuntime.Instance);
+            serviceCollection.AddTransient<IObserverGrainExtensionManager, ObserverGrainExtensionManager>();
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
