@@ -3,8 +3,8 @@
 #define USE_INPROC_SILO
 
 using System;
+using HelloWorld.Interfaces;
 using Orleans;
-using HelloWorldInterfaces;
 using Orleans.Runtime.Configuration;
 
 namespace HelloWorld

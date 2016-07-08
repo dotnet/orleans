@@ -9,8 +9,8 @@
     <ProjectGuid>{3BD01348-ACC3-4378-A49E-4D62FB0BD3D0}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>HelloWorldNugetInterfaces</RootNamespace>
-    <AssemblyName>HelloWorldNugetInterfaces</AssemblyName>
+    <RootNamespace>HelloWorld.Interfaces</RootNamespace>
+    <AssemblyName>HelloWorld.Interfaces</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IHello.cs" />
+    <Compile Include="IHelloArchive.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
   </ItemGroup>

@@ -1,36 +1,17 @@
 ﻿using System;
-using HelloWorldGrains;
-using HelloWorldInterfaces;
+using System.Linq;
+using HelloWorld.Grains;
+using HelloWorld.Interfaces;
 using Moq;
 using Orleans;
 using Orleans.Core;
 using Orleans.Runtime;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace NonSiloTests
 {
     public class HelloWorldNonSiloTests
     {
-        private GrainCreator _grainCreator;
-
-        public HelloWorldNonSiloTests()
-        {
-            var grainRuntime = Mock.Of<IGrainRuntime>();
-
-            _grainCreator = new GrainCreator(grainRuntime);
-        }
-
-        private T CreateGrain<T>(long id) where T : Grain, IGrainWithIntegerKey
-        {
-            var identity = new Mock<IGrainIdentity>();
-            identity.Setup(i => i.PrimaryKeyLong).Returns(id);
-
-            var grain = _grainCreator.CreateGrainInstance(typeof(T), identity.Object);
-
-            return grain as T;
-        }
-
         [Fact]
         public async void NonSiloSayHelloTest()
         {
@@ -41,14 +22,37 @@ namespace NonSiloTests
 
             //Create a new instance of the grain. Notice this is the concrete grain type
             //that is being tested, not just the grain interface as with the silo test
-            IHello grain = CreateGrain<HelloGrain>(id);
+            IHello grain = TestGrainFactory.CreateGrain<HelloGrain>(id);
 
-            // This will create and call a Hello grain with specified 'id' in one of the test silos.
+            // This will directly call the grain under test.
             string reply = await grain.SayHello(greeting);
 
-            Assert.IsNotNull(reply, "Grain replied with some message");
+            Assert.NotNull(reply);
             string expected = string.Format("You said: '{0}', I say: Hello!", greeting);
-            Assert.AreEqual(expected, reply, "Grain replied with expected message");
+            Assert.Equal(expected, reply);
+        }
+
+        [Fact(Skip = "WriteStateAsync currently throws an exception due to a null pointer within Grain.GrainReference. Hopefully fixed in 1.3.0")]
+        public async void NonSiloSayHelloArchiveTest()
+        {
+            // The mocked Orleans runtime is already set up at this point
+
+            const long id = 0;
+            const string greeting1 = "Bonjour";
+            const string greeting2 = "Hei";
+
+            //Create a new instance of the grain. Notice this is the concrete grain type
+            //that is being tested, not just the grain interface as with the silo test
+            IHelloArchive grain = TestGrainFactory.CreateGrain<HelloArchiveGrain>(id);
+
+            // This will directly call the grain under test.
+            await grain.SayHello(greeting1);
+            await grain.SayHello(greeting2);
+
+            var greetings = (await grain.GetGreetings()).ToList();
+
+            Assert.True(greetings.Contains(greeting1));
+            Assert.True(greetings.Contains(greeting2));
         }
     }
 }

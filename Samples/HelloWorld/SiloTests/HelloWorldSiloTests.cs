@@ -1,5 +1,6 @@
+using System.Linq;
 using System.Threading.Tasks;
-using HelloWorldInterfaces;
+using HelloWorld.Interfaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.TestingHost;
 
@@ -57,6 +58,27 @@ namespace SiloTests
             Assert.IsNotNull(reply, "Grain replied with some message");
             string expected = string.Format("You said: '{0}', I say: Hello!", greeting);
             Assert.AreEqual(expected, reply, "Grain replied with expected message");
+        }
+
+        [TestMethod]
+        public async void SiloSayHelloArchiveTest()
+        {
+            // The mocked Orleans runtime is already set up at this point
+
+            const long id = 0;
+            const string greeting1 = "Bonjour";
+            const string greeting2 = "Hei";
+
+            IHelloArchive grain = GrainFactory.GetGrain <IHelloArchive>(id);
+
+            // This will directly call the grain under test.
+            await grain.SayHello(greeting1);
+            await grain.SayHello(greeting2);
+
+            var greetings = (await grain.GetGreetings()).ToList();
+
+            Assert.IsTrue(greetings.Contains(greeting1));
+            Assert.IsTrue(greetings.Contains(greeting2));
         }
     }
 }
