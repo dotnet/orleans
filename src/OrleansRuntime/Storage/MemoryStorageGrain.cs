@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using System.Xml;
 using Orleans.Runtime;
 
 namespace Orleans.Storage
@@ -81,7 +82,7 @@ namespace Orleans.Storage
             {
                 IGrainState entry;
                 grainStateStorage.TryGetValue(grainId, out entry);
-                return entry;
+                return ReferenceEquals(entry, Deleted) ? null : entry;
             }
 
             public void UpdateGrainState(string grainId, IGrainState grainState)
@@ -102,14 +103,13 @@ namespace Orleans.Storage
             {
                 IGrainState entry;
                 string currentETag = null;
-                grainStateStorage.TryGetValue(grainId, out entry);
                 if (grainStateStorage.TryGetValue(grainId, out entry))
                 {
                     currentETag = entry.ETag;
                 }
 
                 ValidateEtag(currentETag, receivedEtag, grainId, "Delete");
-                grainStateStorage.Remove(grainId);
+                grainStateStorage[grainId] = Deleted;
             }
 
             private static string NewEtag()
@@ -119,25 +119,38 @@ namespace Orleans.Storage
 
             private void ValidateEtag(string currentETag, string receivedEtag, string grainStoreKey, string operation)
             {
-                if (receivedEtag == null) // first write
-                {
-                    if (currentETag != null)
-                    {
-                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = null", operation, grainStoreKey, currentETag);
-                        logger.Warn(0, error);
-                        throw new InconsistentStateException(error);
-                    }
-                }
-                else // non first write
-                {
-                    if (receivedEtag != currentETag)
-                    {
-                        string error = string.Format("Etag mismatch during {0} for grain {1}: Expected = {2} Received = {3}", operation, grainStoreKey, currentETag ?? "null", receivedEtag);
-                        logger.Warn(0, error);
-                        throw new InconsistentStateException(error);
-                    }
-                }
+                // if we have no current etag, we will accept the users data.
+                // This is a mitigation for when the memory storage grain is lost due to silo crash.
+                if (currentETag == null)
+                    return;
+
+                // if this is our first write, and we have an empty etag, we're good
+                if (string.IsNullOrEmpty(currentETag) && receivedEtag == null)
+                    return;
+
+                // if current state and new state have matching etags, we're good
+                if (receivedEtag == currentETag)
+                    return;
+
+                // else we have an etag mismatch
+                string error = $"Etag mismatch during {operation} for grain {grainStoreKey}: Expected = {currentETag ?? "null"} Received = {receivedEtag}";
+                logger.Warn(0, error);
+                throw new InconsistentStateException(error);
             }
+
+            /// <summary>
+            /// Marker to record deleted state so we can detect the difference between deleted state and state that never existed.
+            /// </summary>
+            private class DeletedState : IGrainState
+            {
+                public DeletedState()
+                {
+                    ETag = string.Empty;
+                }
+                public object State { get; set; }
+                public string ETag { get; set; }
+            }
+            private static readonly IGrainState Deleted = new DeletedState();
         }
     }
 }
