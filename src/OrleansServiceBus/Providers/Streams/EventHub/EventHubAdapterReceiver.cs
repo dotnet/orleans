@@ -45,6 +45,11 @@ namespace Orleans.ServiceBus.Providers
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
 
+        // Receiver life cycle
+        private int recieverState = ReceiverShutdown;
+        private const int ReceiverShutdown = 0;
+        private const int ReceiverRunning = 1;
+
         public int GetMaxAddCount() { return flowController.GetMaxAddCount(); }
 
         public EventHubAdapterReceiver(EventHubPartitionConfig partitionConfig,
@@ -68,10 +73,20 @@ namespace Orleans.ServiceBus.Providers
             partitionAgeOfMessagesBeingProcessed = $"Orleans.ServiceBus.EventHub.AgeOfMessagesBeingProcessed_{config.Hub.Path}-{config.Partition}";
         }
 
-        public async Task Initialize(TimeSpan timeout)
+        public Task Initialize(TimeSpan timeout)
         {
             logger.Info("Initializing EventHub partition {0}-{1}.", config.Hub.Path, config.Partition);
+            // if receiver was already running, do nothing
+            return ReceiverRunning == Interlocked.Exchange(ref recieverState, ReceiverRunning) ? TaskDone.Done : Initialize();
+        }
 
+        /// <summary>
+        /// Initialization of EventHub receiver is performed at adapter reciever initialization, but if it fails,
+        ///  it will be retried when messages are requested
+        /// </summary>
+        /// <returns></returns>
+        private async Task Initialize()
+        {
             checkpointer = await checkpointerFactory(config.Partition);
             cache = cacheFactory(config.Partition, checkpointer, baseLogger);
             flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache };
@@ -81,9 +96,21 @@ namespace Orleans.ServiceBus.Providers
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (receiver == null || maxCount <= 0)
+            if (recieverState==ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
+            }
+
+            // if receiver initialization failed, retry
+            if (receiver == null)
+            {
+                logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead, "Retrying initialization of EventHub partition {0}-{1}.", config.Hub.Path, config.Partition);
+                await Initialize();
+                if (receiver==null)
+                {
+                    // should not get here, should throw instead, but just incase.
+                    return new List<IBatchContainer>();
+                }
             }
 
             List<EventData> messages;
@@ -164,6 +191,12 @@ namespace Orleans.ServiceBus.Providers
 
         public Task Shutdown(TimeSpan timeout)
         {
+            // if receiver was already shutdown, do nothing
+            if (ReceiverShutdown == Interlocked.Exchange(ref recieverState, ReceiverShutdown))
+            {
+                return TaskDone.Done;
+            }
+
             logger.Info("Stopping reading from EventHub partition {0}-{1}", config.Hub.Path, config.Partition);
 
             // clear cache and receiver

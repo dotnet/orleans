@@ -15,6 +15,7 @@ namespace Orleans.ServiceBus
         ServiceBus = 1<<16,
 
         FailedPartitionRead = ServiceBus + 1,
+        RetryReceiverInit   = ServiceBus + 2,
     }
 
     internal static class LoggerExtensions
