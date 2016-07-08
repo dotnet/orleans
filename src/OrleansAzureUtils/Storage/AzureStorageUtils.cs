@@ -6,6 +6,7 @@ using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Orleans.Runtime;
+using System.Text;
 
 namespace Orleans.AzureUtils
 {
@@ -274,16 +275,24 @@ namespace Orleans.AzureUtils
         {
             // Remove any characters that can't be used in Azure PartitionKey or RowKey values
             // http://www.jamestharpe.com/web-development/azure-table-service-character-combinations-disallowed-in-partitionkey-rowkey/
-            key = key
-                .Replace('/', '_')        // Forward slash
-                .Replace('\\', '_')       // Backslash
-                .Replace('#', '_')        // Pound sign
-                .Replace('?', '_');       // Question mark
+            var sb = new StringBuilder();
+            foreach (var c in key)
+            {
+                if (c == '/'
+                        || c == '\\'
+                        || c == '#'
+                        || c == '/'
+                        || c == '?'
+                        || char.IsControl(c))
+                    sb.Append('_');
+                else
+                    sb.Append(c);
+            }
 
-            if (key.Length >= 1024)
+            if (sb.Length >= 1024)
                 throw new ArgumentException(string.Format("Key length {0} is too long to be an Azure table key. Key={1}", key.Length, key));
 
-            return key;
+            return sb.ToString();
         }
 
 

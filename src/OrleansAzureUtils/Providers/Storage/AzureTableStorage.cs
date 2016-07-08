@@ -139,11 +139,11 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetPartitionKey(grainReference);
             if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, tableName);
-            string partitionKey = pk;
-            string rowKey = grainType;
-            GrainStateRecord record = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
+
+            string rk = GetRowKey(grainType);
+            GrainStateRecord record = await tableDataManager.Read(pk, rk).ConfigureAwait(false);
             if (record != null)
             {
                 var entity = record.Entity;
@@ -164,11 +164,13 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetPartitionKey(grainReference);
             if (Log.IsVerbose3)
                 Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.ETag, tableName);
 
-            var entity = new DynamicTableEntity(pk, grainType);
+            string rk = GetRowKey(grainType);
+            var entity = new DynamicTableEntity(pk, rk);
+
             ConvertToStorageFormat(grainState.State, entity);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
@@ -195,9 +197,12 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainReference);
+            string pk = GetPartitionKey(grainReference);
             if (Log.IsVerbose3) Log.Verbose3((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.ETag, isDeleteStateOnClear, tableName);
-            var entity = new DynamicTableEntity(pk, grainType);
+
+            string rk = GetRowKey(grainType);
+            var entity = new DynamicTableEntity(pk, rk);
+
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             string operation = "Clearing";
             try
@@ -436,10 +441,25 @@ namespace Orleans.Storage
             return dataValue;
         }
 
-        private string GetKeyString(GrainReference grainReference)
+        private string GetPartitionKey(GrainReference grainReference)
         {
             var key = String.Format("{0}_{1}", serviceId, grainReference.ToKeyString());
             return AzureStorageUtils.SanitizeTableProperty(key);
+        }
+
+
+        private string GetRowKey(string grainType)
+        {
+            string rowKey;
+            int index = grainType.IndexOf("`");
+            if (index > 0)
+                // in case we have a generic grain, we use an empty rowkey as it seems Azure has a maximum length for the combined keys?
+                return String.Empty;
+            else
+                // for non-generic grains, we keep the existing behavior to not break existing storage, but we do sanitize
+                rowKey = AzureStorageUtils.SanitizeTableProperty(grainType);
+
+            return rowKey;
         }
 
         internal class GrainStateRecord
