@@ -35,19 +35,16 @@ namespace Tester.AzureUtils.General
             var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());
             await grain.EchoAsync(42);
 
-            //ClearState() also exhibits the error, even with the shorter named grain
             await grain.ClearState();
         }
 
         [SkippableFact, TestCategory("Functional")]
-        //This test is identical to the one above, with a shorter name, and passes
         public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
             await grain.EchoAsync(42);
 
-            //ClearState() also exhibits the error, even with the shorter named grain
-            //await grain.ClearState();
+            await grain.ClearState();
         }
     }
 }

@@ -233,7 +233,7 @@ namespace Orleans.Runtime
 
         public static Type[] GenericTypeArgsFromArgsString(string genericArgs)
         {
-            if (string.IsNullOrEmpty(genericArgs)) return new Type[] { };
+            if (string.IsNullOrEmpty(genericArgs)) return Type.EmptyTypes;
 
             var genericTypeDef = genericArgs.Replace("[]", "##"); // protect array arguments
 
