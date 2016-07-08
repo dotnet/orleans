@@ -677,7 +677,12 @@ namespace Orleans.Runtime
                 else
                 {
                     SetupStorageProvider(grainType, data);
-                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, data.StorageProvider);
+
+                    var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
+
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, storage);
+
+                    storage.SetGrain(grain);
                 }
                 grain.Data = data;
                 data.SetGrainInstance(grain);
