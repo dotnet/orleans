@@ -20,7 +20,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-	  <dependency id="ZooKeeperNetEx" version="3.4.8.1" />
+	  <dependency id="ZooKeeperNetEx" version="3.4.8.5" />
     </dependencies>
   </metadata>
   <files>
