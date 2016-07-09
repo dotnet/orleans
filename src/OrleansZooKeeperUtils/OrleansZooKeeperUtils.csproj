@@ -51,7 +51,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="ZooKeeperNetEx">
-      <HintPath>$(SolutionDir)packages\ZooKeeperNetEx.3.4.8.1\lib\net45\ZooKeeperNetEx.dll</HintPath>
+      <HintPath>$(SolutionDir)packages\ZooKeeperNetEx.3.4.8.5\lib\net45\ZooKeeperNetEx.dll</HintPath>
       <Private>True</Private>
     </Reference>
   </ItemGroup>
