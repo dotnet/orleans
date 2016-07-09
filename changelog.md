@@ -17,6 +17,8 @@ The idea is to track end-user facing changes as they occur.*
   - Do not deactivate Stateless Workers upon grain directory partition shutdown #1838
   - Other minor bug fixes #1823
 
+### [v1.2.3]
+- Bugfix: Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. #1885
 
 ### [v1.2.2]
 - Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. #1804
