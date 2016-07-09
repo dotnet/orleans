@@ -9,6 +9,7 @@ All notable end-user facing changes are documented in this file.
   - Throw meaningful exception if grain timer is created outside grain context #1858
 - Bug fixes:
   - Do not deactivate Stateless Workers upon grain directory partition shutdown #1838
+  - interception works with Streams and grain extensions #1874
   - Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. #1885
   - Other minor bug fixes #1823
 
