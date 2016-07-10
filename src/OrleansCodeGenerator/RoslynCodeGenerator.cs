@@ -39,6 +39,26 @@ namespace Orleans.CodeGenerator
         private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
 
         /// <summary>
+        /// The generic interface types whose type arguments needs serializators generation
+        /// </summary>
+        private static readonly HashSet<Type> KnownGenericIntefaceTypes = new HashSet<Type>
+            {
+                typeof(Streams.IAsyncObserver<>),
+                typeof(Streams.IAsyncStream<>),
+                typeof(Streams.IAsyncObservable<>)
+            };
+
+        /// <summary>
+        /// The generic base types whose type arguments needs serializators generation
+        /// </summary>
+        private static readonly HashSet<Type> KnownGenericBaseTypes = new HashSet<Type>
+            {
+                typeof(Grain<>),
+                typeof(Streams.StreamSubscriptionHandleImpl<>),
+                typeof(Streams.StreamSubscriptionHandle<>)
+            };
+
+        /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
         /// <param name="targetAssemblyName">
@@ -68,7 +88,7 @@ namespace Orleans.CodeGenerator
         {
             if (inputs == null)
             {
-                throw new ArgumentNullException("inputs");
+                throw new ArgumentNullException(nameof(inputs));
             }
 
             var timer = Stopwatch.StartNew();
@@ -116,8 +136,9 @@ namespace Orleans.CodeGenerator
             }
             catch (Exception exception)
             {
+                var assemblyNames = string.Join("\n", grainAssemblies.Select(_ => _.GetName().FullName));
                 var message =
-                    $"Exception generating code for input assemblies:\n{string.Join("\n", grainAssemblies.Select(_ => _.GetName().FullName))}\nException: {LogFormatter.PrintException(exception)}";
+                    $"Exception generating code for input assemblies:\n{assemblyNames}\nException: {LogFormatter.PrintException(exception)}";
                 Logger.Warn(ErrorCode.CodeGenCompilationFailed, message, exception);
                 throw;
             }
@@ -452,7 +473,7 @@ namespace Orleans.CodeGenerator
         {
             if (typeInfo.BaseType == null) return;
             if (!typeInfo.BaseType.IsConstructedGenericType) return;
-            if (!SerializerGenerationManager.KnownGenericBaseTypes.Contains(typeInfo.BaseType.GetGenericTypeDefinition())) return;
+            if (!KnownGenericBaseTypes.Contains(typeInfo.BaseType.GetGenericTypeDefinition())) return;
 
             foreach (var type in typeInfo.BaseType.GetGenericArguments())
             {
@@ -468,7 +489,7 @@ namespace Orleans.CodeGenerator
         {
             var interfaces = typeInfo.GetInterfaces().Where(x =>
                 x.IsConstructedGenericType
-                && SerializerGenerationManager.KnownGenericIntefaceTypes.Contains(x.GetGenericTypeDefinition()));
+                && KnownGenericIntefaceTypes.Contains(x.GetGenericTypeDefinition()));
             foreach (var type in interfaces.SelectMany(v => v.GetGenericArguments()))
             {
                 RecordType(type, module, targetAssembly, includedTypes);
