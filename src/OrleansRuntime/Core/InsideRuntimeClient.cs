@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
-        private GrainInterfaceMap grainInterfaceMap;
+        private IGrainTypeResolver grainInterfaceMap;
 
         internal readonly IConsistentRingProvider ConsistentRingProvider;
         
