@@ -8,6 +8,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans
 {
+    using Orleans.Streams;
+
     /// <summary>
     /// Utility functions for dealing with Tasks.
     /// </summary>
@@ -66,7 +68,7 @@ namespace Orleans
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="IGrainObservable{T}"/>.
         /// </summary>
         /// <param name="value">The observable.</param>
-        public static Task<object> Box<T>(this IGrainObservable<T> value)
+        public static Task<object> Box<T>(this IAsyncObservable<T> value)
         {
             return Task.FromResult((object)value);
         }

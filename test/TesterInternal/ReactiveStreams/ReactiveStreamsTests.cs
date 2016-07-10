@@ -16,8 +16,8 @@ namespace UnitTests.ReactiveStreams
             var expected = new[] {1, 2, 3, 4, 5, 6};
             var stream = grain.GetStream(expected);
             var observer = new BufferedObserver<int>();
-            var disposable = await stream.Subscribe(observer);
-            await disposable.Dispose();
+            var disposable = await stream.SubscribeAsync(observer);
+            await disposable.UnsubscribeAsync();
             Assert.Equal(expected, observer.Buffer);
         }
 
@@ -28,8 +28,8 @@ namespace UnitTests.ReactiveStreams
             var expected = new[] {"always", "leave", "a", "note"};
             var stream = grain.GetStream(expected);
             var observer = new BufferedObserver<string>();
-            var disposable = await stream.Subscribe(observer);
-            await disposable.Dispose();
+            var disposable = await stream.SubscribeAsync(observer);
+            await disposable.UnsubscribeAsync();
             Assert.Equal(expected, observer.Buffer);
         }
 
@@ -42,12 +42,12 @@ namespace UnitTests.ReactiveStreams
 
             // Join the room via a proxy grain.
             var messagesFromProxyGrain = new BufferedObserver<string>();
-            var proxySubscription = await reactiveGrain.JoinChatRoom("#orleans").Subscribe(messagesFromProxyGrain);
+            var proxySubscription = await reactiveGrain.JoinChatRoom("#orleans").SubscribeAsync(messagesFromProxyGrain);
 
             // Join the room directly.
             Assert.Equal(1, await roomGrain.GetCurrentUserCount());
             var messagesFromRoom = new BufferedObserver<string>();
-            var subscription = await roomGrain.JoinRoom().Subscribe(messagesFromRoom);
+            var subscription = await roomGrain.JoinRoom().SubscribeAsync(messagesFromRoom);
             Assert.Equal(2, await roomGrain.GetCurrentUserCount());
 
             // Send a couple of messages to the room.
@@ -56,7 +56,7 @@ namespace UnitTests.ReactiveStreams
             await roomGrain.SendMessage(messages[1]);
 
             // Leave the room by disposing one of the subscriptions.
-            await proxySubscription.Dispose();
+            await proxySubscription.UnsubscribeAsync();
             Assert.Equal(1, await roomGrain.GetCurrentUserCount());
 
             // Send another message.
@@ -64,7 +64,7 @@ namespace UnitTests.ReactiveStreams
 
             // Check that the observers received the right messages.
             Assert.Equal(messages, messagesFromProxyGrain.Buffer);
-            await subscription.Dispose();
+            await subscription.UnsubscribeAsync();
             Assert.Equal(
                 new[] {messages[0], messages[1], messages[1].ToUpperInvariant()},
                 messagesFromRoom.Buffer);
@@ -76,14 +76,29 @@ namespace UnitTests.ReactiveStreams
         public async Task GrainToGrainAdhocStreamingTest()
         {
             var jeff = GrainFactory.GetGrain<IChatUserGrain>("@JeffBezos");
-            var satya = GrainFactory.GetGrain<IChatUserGrain>("@SatyaNadella");
             var room = GrainFactory.GetGrain<IChatRoomGrain>("#orleans");
 
             await jeff.JoinRoom("#orleans");
 
             await room.SendMessage("Hi I'm Jeff!");
             var messages = await jeff.MessagesSince(0, "#orleans");
+            var originalLifetime = await jeff.GetLifetimeId();
             Assert.Equal(1, messages.Count);
+            await jeff.Deactivate();
+            await room.SendMessage("WAKE UP, JEFF!");
+            messages = await jeff.MessagesSince(0, "#orleans");
+            Assert.Equal(2, messages.Count);
+
+            // Ensure that the grain was actually reactivated;
+            Assert.NotEqual(originalLifetime, await jeff.GetLifetimeId());
         }
+
+        // TODO: Tests:
+        // Client calling ResumeAsync
+        // Grain call OnNext for deactivated grain which does *not* called ResumeAsync on reactivation.
+        // Client detects remote endpoint crash
+        // Grain detects remote client crash (note grain observer crashes should not result in an error or removal of the observer)
+        // Round-trip all serializable types
+        // Reentrancy tests
     }
 }

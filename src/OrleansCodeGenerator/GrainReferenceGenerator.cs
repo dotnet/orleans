@@ -14,6 +14,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
+    using Orleans.Streams;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -186,7 +187,7 @@ namespace Orleans.CodeGenerator
                     body.Add(SF.ExpressionStatement(invocation));
                 }
                 else if (method.ReturnType.IsConstructedGenericType &&
-                          method.ReturnType.GetGenericTypeDefinition() == typeof(IGrainObservable<>))
+                          method.ReturnType.GetGenericTypeDefinition() == typeof(IAsyncObservable<>))
                 {
                     var invocation =
                         SF.InvocationExpression(baseReference.Member("InvokeObservableMethod", method.ReturnType.GenericTypeArguments[0]))

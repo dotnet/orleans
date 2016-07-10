@@ -7,6 +7,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime
 {
+    using Orleans.Streams;
+
     internal class ObserverGrainExtensionManager : IObserverGrainExtensionManager
     {
         private readonly IGrainExtensionManager extensionManager;
@@ -19,10 +21,10 @@ namespace Orleans.Runtime
         public IObserverGrainExtension GetOrAddExtension()
         {
             IObserverGrainExtensionRemote handler;
-            if (!extensionManager.TryGetExtensionHandler(out handler))
+            if (!this.extensionManager.TryGetExtensionHandler(out handler))
             {
-                extensionManager.TryAddExtension(
-                    handler = new ObserverGrainExtension(),
+                this.extensionManager.TryAddExtension(
+                    handler = new ObserverGrainExtension(), 
                     typeof(IObserverGrainExtensionRemote));
             }
 
@@ -35,24 +37,25 @@ namespace Orleans.Runtime
         private readonly Dictionary<Guid, IUntypedGrainObserver> observers =
             new Dictionary<Guid, IUntypedGrainObserver>();
 
-        public Task OnNext(Guid streamId, object value) => observers[streamId].OnNext(value);
+        public Task OnNext(Guid streamId, object value, StreamSequenceToken token) => this.observers[streamId].OnNextAsync(streamId, value, token);
 
-        public Task OnError(Guid streamId, Exception exception) => GetAndRemove(streamId).OnError(exception);
-        public Task OnCompleted(Guid streamId) => GetAndRemove(streamId).OnCompleted();
+        public Task OnError(Guid streamId, Exception exception) => this.GetAndRemove(streamId).OnErrorAsync(streamId, exception);
+
+        public Task OnCompleted(Guid streamId) => this.GetAndRemove(streamId).OnCompletedAsync(streamId);
         
-        public void Register(Guid streamId, IUntypedGrainObserver observer) => observers.Add(streamId, observer);
+        public void Register(Guid streamId, IUntypedGrainObserver observer) => this.observers.Add(streamId, observer);
 
-        public void Remove(Guid streamId) => observers.Remove(streamId);
+        public void Remove(Guid streamId) => this.observers.Remove(streamId);
 
         private IUntypedGrainObserver GetAndRemove(Guid streamId)
         {
             IUntypedGrainObserver observer;
-            if (!observers.TryGetValue(streamId, out observer))
+            if (!this.observers.TryGetValue(streamId, out observer))
             {
                 throw new KeyNotFoundException($"Observable with id {streamId}.");
             }
 
-            observers.Remove(streamId);
+            this.observers.Remove(streamId);
             return observer;
         }
     }
@@ -71,7 +74,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The mapping between stream id and disposable for each observer.
         /// </summary>
-        private readonly Dictionary<Guid, IAsyncDisposable> observers = new Dictionary<Guid, IAsyncDisposable>();
+        private readonly Dictionary<Guid, object> observers = new Dictionary<Guid, object>();
 
         public ObservableGrainExtension(IInvokable invokable, string genericGrainType, IAddressable grain)
         {
@@ -93,32 +96,40 @@ namespace Orleans.Runtime
         }
 
 #warning automatically unsubscribe if remote endpoint fails.
-        public async Task SubscribeClient(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver receiver)
+        public async Task SubscribeClient(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver receiver, StreamSequenceToken token)
         {
-            var invoker = invokable.GetInvoker(request.InterfaceId, genericGrainType);
-            var result = await invoker.Invoke(grain, request);
+            // If an existing subscription exists, then this is a resume call and nothing needs to be done.
+            object subscription;
+            if (this.observers.TryGetValue(streamId, out subscription)) return;
+
+            var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
+            var result = await invoker.Invoke(this.grain, request);
             
             try
             {
-                var disposable = await ObservableSubscriberHelper.Subscribe(result, receiver);
-                observers.Add(streamId, disposable);
+                subscription = await StreamDelegateHelper.Subscribe(result, receiver, streamId, token);
+                this.observers.Add(streamId, subscription);
             }
             catch (Exception exception)
             {
-                await receiver.OnError(exception);
+                await receiver.OnErrorAsync(streamId, exception);
             }
         }
 
-        public async Task SubscribeGrain(Guid streamId, InvokeMethodRequest request, GrainReference remoteGrain)
+        public async Task SubscribeGrain(Guid streamId, InvokeMethodRequest request, GrainReference remoteGrain, StreamSequenceToken token)
         {
-            var invoker = invokable.GetInvoker(request.InterfaceId, genericGrainType);
-            var result = await invoker.Invoke(grain, request);
+            // If an existing subscription exists, then this is a resume call and nothing needs to be done.
+            object subscription;
+            if (this.observers.TryGetValue(streamId, out subscription)) return;
+
+            var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
+            var result = await invoker.Invoke(this.grain, request);
             var receiver = remoteGrain.AsReference<IObserverGrainExtensionRemote>();
 
             try
             {
-                var disposable = await ObservableSubscriberHelper.Subscribe(result, receiver, streamId);
-                observers.Add(streamId, disposable);
+                subscription = await StreamDelegateHelper.Subscribe(result, receiver, streamId, token);
+                this.observers.Add(streamId, subscription);
             }
             catch (Exception exception)
             {
@@ -128,13 +139,12 @@ namespace Orleans.Runtime
 
         public Task Unsubscribe(Guid streamId)
         {
-            IAsyncDisposable disposable;
-            if (observers.TryGetValue(streamId, out disposable))
-            {
-                observers.Remove(streamId);
-            }
+            // If no subscription exists, return success.
+            object subscription;
+            if (!this.observers.TryGetValue(streamId, out subscription)) return Task.FromResult(0);
 
-            return disposable?.Dispose() ?? Task.FromResult(0);
+            this.observers.Remove(streamId);
+            return StreamDelegateHelper.Unsubscribe(subscription);
         }
     }
 }

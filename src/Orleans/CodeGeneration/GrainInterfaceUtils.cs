@@ -10,6 +10,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans.CodeGeneration
 {
+    using Orleans.Streams;
+
     internal static class GrainInterfaceUtils
     {
         [Serializable]
@@ -69,7 +71,7 @@ namespace Orleans.CodeGeneration
                    ||
                    (typeInfo.IsGenericType &&
                     (typeInfo.GetGenericTypeDefinition() == typeof(Task<>) ||
-                     typeInfo.GetGenericTypeDefinition() == typeof(IGrainObservable<>)));
+                     typeInfo.GetGenericTypeDefinition() == typeof(IAsyncObservable<>)));
         }
 
         /// <summary>
@@ -232,7 +234,7 @@ namespace Orleans.CodeGeneration
                 else if (!IsValidGrainInterfaceReturnType(method.ReturnType))
                 {
                     success = false;
-                    violations.Add(String.Format("Method {0}.{1} must return Task, Task<T>, or IGrainObservable<T> because it is defined within a grain interface.",
+                    violations.Add(String.Format("Method {0}.{1} must return Task, Task<T>, or IAsyncObservable<T> because it is defined within a grain interface.",
                         type.FullName, method.Name));
                 }
 

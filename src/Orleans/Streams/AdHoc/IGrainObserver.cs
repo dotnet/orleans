@@ -5,30 +5,11 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace Orleans.Streams.AdHoc
 {
-    /// <summary>
-    /// Represents an asynchronous observer.
-    /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    public interface IGrainObserver<in T>
-    {
-        Task OnNext(T value);
-        Task OnError(Exception exception);
-        Task OnCompleted();
-    }
-
-    /// <summary>
-    /// Represents an asynchronous observable stream of values.
-    /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    public interface IGrainObservable<out T>
-    {
-        Task<IAsyncDisposable> Subscribe(IGrainObserver<T> observer);
-    }
-    
     /// <summary>
     /// Represents a resource which can be disposed of asynchronously.
     /// </summary>
@@ -42,11 +23,11 @@ namespace Orleans.Streams.AdHoc
     /// </summary>
     internal interface IUntypedGrainObserver : IAddressable
     {
-        Task OnNext(object value);
-        
-        Task OnError(Exception exception);
-        
-        Task OnCompleted();
+        Task OnNextAsync(Guid streamId, object value, StreamSequenceToken token);
+
+        Task OnErrorAsync(Guid streamId, Exception exception);
+
+        Task OnCompletedAsync(Guid streamId);
     }
 
     /// <summary>
@@ -55,7 +36,9 @@ namespace Orleans.Streams.AdHoc
     internal interface IGrainExtensionManager
     {
         bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension;
+
         bool TryAddExtension(IGrainExtension handler, Type extensionType);
+
         void RemoveExtension(IGrainExtension handler);
     }
 
@@ -72,8 +55,21 @@ namespace Orleans.Streams.AdHoc
     /// </summary>
     internal interface IObservableGrainExtension : IGrainExtension
     {
-        Task SubscribeClient(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver receiver);
-        Task SubscribeGrain(Guid streamId, InvokeMethodRequest request, GrainReference receiver);
+        [AlwaysInterleave]
+        Task SubscribeClient(
+            Guid streamId,
+            InvokeMethodRequest request,
+            IUntypedGrainObserver receiver,
+            StreamSequenceToken token);
+
+        [AlwaysInterleave]
+        Task SubscribeGrain(
+            Guid streamId,
+            InvokeMethodRequest request,
+            GrainReference receiver,
+            StreamSequenceToken token);
+
+        [AlwaysInterleave]
         Task Unsubscribe(Guid streamId);
     }
 
@@ -82,10 +78,13 @@ namespace Orleans.Streams.AdHoc
     /// </summary>
     internal interface IObserverGrainExtensionRemote : IGrainExtension
     {
-        Task OnNext(Guid streamId, object value);
+        [AlwaysInterleave]
+        Task OnNext(Guid streamId, object value, StreamSequenceToken token);
 
+        [AlwaysInterleave]
         Task OnError(Guid streamId, Exception exception);
 
+        [AlwaysInterleave]
         Task OnCompleted(Guid streamId);
     }
 
@@ -105,12 +104,27 @@ namespace Orleans.Streams.AdHoc
     }
 
     [Serializable]
-    internal class GrainObservableProxy<T> : IGrainObservable<T>
+    internal class GrainObservableProxy<T> : IAsyncObservable<T>
     {
         private readonly InvokeMethodRequest subscriptionRequest;
+
         private readonly GrainReference grain;
 
-        [NonSerialized] private IObservableGrainExtension grainExtension;
+        [NonSerialized]
+        private IObservableGrainExtension grainExtension;
+
+        public IObservableGrainExtension GrainExtension
+        {
+            get
+            {
+                if (this.grainExtension == null)
+                {
+                    this.grainExtension = this.grain.AsReference<IObservableGrainExtension>();
+                }
+
+                return this.grainExtension;
+            }
+        }
 
         public GrainObservableProxy(GrainReference grain, InvokeMethodRequest subscriptionRequest)
         {
@@ -118,16 +132,25 @@ namespace Orleans.Streams.AdHoc
             this.subscriptionRequest = subscriptionRequest;
         }
 
-#warning Call OnError if the silo goes down.
-        public async Task<IAsyncDisposable> Subscribe(IGrainObserver<T> observer)
+        internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            Guid streamId,
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token = null)
         {
-            if (grainExtension == null)
-            {
-                grainExtension = grain.AsReference<IObservableGrainExtension>();
-            }
+            return this.SubscribeInternal(streamId, observer, token);
+        }
 
-            var streamId = Guid.NewGuid();
+#warning Call OnError if the silo goes down.
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
+        {
+            return this.SubscribeInternal(Guid.NewGuid(), observer, token: null);
+        }
 
+        private async Task<StreamSubscriptionHandle<T>> SubscribeInternal(
+            Guid streamId,
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token)
+        {
             var activation = RuntimeClient.Current.CurrentActivationData;
             object observerReference;
             if (activation == null)
@@ -136,7 +159,12 @@ namespace Orleans.Streams.AdHoc
                 var adapter = new TypedToUntypedObserverAdapter<T>(observer);
                 var grainFactory = RuntimeClient.Current.InternalGrainFactory;
                 var clientObjectReference = await grainFactory.CreateObjectReference<IUntypedGrainObserver>(adapter);
-                await grainExtension.SubscribeClient(streamId, subscriptionRequest, clientObjectReference);
+                await
+                    this.GrainExtension.SubscribeClient(
+                        streamId,
+                        this.subscriptionRequest,
+                        clientObjectReference,
+                        token);
                 observerReference = adapter;
             }
             else
@@ -144,8 +172,8 @@ namespace Orleans.Streams.AdHoc
                 // The caller is a grain, so get or install the observer extension.
                 var caller = activation.GrainInstance;
                 var grainExtensionManager =
-                    caller?.Runtime?.ServiceProvider?.GetService(typeof(IObserverGrainExtensionManager))
-                        as IObserverGrainExtensionManager;
+                    caller?.Runtime?.ServiceProvider?.GetService(typeof(IObserverGrainExtensionManager)) as
+                    IObserverGrainExtensionManager;
                 if (caller == null || grainExtensionManager == null)
                 {
 #warning throw?
@@ -158,35 +186,49 @@ namespace Orleans.Streams.AdHoc
                 callerGrainExtension.Register(streamId, adapter);
 
                 // Subscribe the calling grain to the remote observable.
-                await grainExtension.SubscribeGrain(streamId, subscriptionRequest, activation.GrainReference);
+                await
+                    this.GrainExtension.SubscribeGrain(
+                        streamId,
+                        this.subscriptionRequest,
+                        activation.GrainReference,
+                        token);
                 observerReference = adapter;
             }
 
-            // Return a disposable which will forward Dispose calls to the remote observable endpoint.
-            return new AsyncDisposableProxy(streamId, grainExtension, observerReference);
+            return new TransientStreamSubscriptionHandle<T>(streamId, this, observerReference);
+        }
 
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token,
+            StreamFilterPredicate filterFunc = null,
+            object filterData = null)
+        {
+            return this.SubscribeInternal(Guid.NewGuid(), observer, token);
         }
     }
 
     internal class TypedToUntypedObserverAdapter<T> : IUntypedGrainObserver
     {
-        private readonly IGrainObserver<T> observer;
+        private readonly IAsyncObserver<T> observer;
 
-        public TypedToUntypedObserverAdapter(IGrainObserver<T> observer)
+        public TypedToUntypedObserverAdapter(IAsyncObserver<T> observer)
         {
             this.observer = observer;
         }
 
-        public Task OnNext(object value) => observer.OnNext((T)value);
+        public Task OnNextAsync(Guid streamId, object value, StreamSequenceToken token)
+            => this.observer.OnNextAsync((T)value, token);
 
-        public Task OnError(Exception exception) => observer.OnError(exception);
+        public Task OnErrorAsync(Guid streamId, Exception exception) => this.observer.OnErrorAsync(exception);
 
-        public Task OnCompleted() => observer.OnCompleted();
+        public Task OnCompletedAsync(Guid streamId) => this.observer.OnCompletedAsync();
     }
 
-    internal class GrainObserverExtensionToUntypedObserverAdapter<T> : IGrainObserver<T>
+    internal class GrainObserverExtensionToUntypedObserverAdapter<T> : IAsyncObserver<T>
     {
         private readonly IObserverGrainExtensionRemote observer;
+
         private readonly Guid streamId;
 
         public GrainObserverExtensionToUntypedObserverAdapter(IObserverGrainExtensionRemote observer, Guid streamId)
@@ -195,175 +237,301 @@ namespace Orleans.Streams.AdHoc
             this.streamId = streamId;
         }
 
-        public Task OnNext(T value) => observer.OnNext(streamId, value);
+        public Task OnNextAsync(T value, StreamSequenceToken token) => this.observer.OnNext(this.streamId, value, token);
 
-        public Task OnError(Exception exception) => observer.OnError(streamId, exception);
+        public Task OnErrorAsync(Exception exception) => this.observer.OnError(this.streamId, exception);
 
-        public Task OnCompleted() => observer.OnCompleted(streamId);
+        public Task OnCompletedAsync() => this.observer.OnCompleted(this.streamId);
     }
 
-    internal class UntypedToTypedObserverAdapter<T> : IGrainObserver<T>
+    internal class UntypedToTypedObserverAdapter<T> : IAsyncObserver<T>
     {
-        public UntypedToTypedObserverAdapter(IUntypedGrainObserver receiver)
+        private readonly Guid streamId;
+
+        public UntypedToTypedObserverAdapter(Guid streamId, IUntypedGrainObserver receiver)
         {
             this.Receiver = receiver;
+            this.streamId = streamId;
         }
 
         public IUntypedGrainObserver Receiver { get; }
 
-        public Task OnNext(T value) => Receiver.OnNext(value);
+        public Task OnNextAsync(T value, StreamSequenceToken token = null)
+            => this.Receiver.OnNextAsync(streamId, value, token);
 
-        public Task OnError(Exception exception) => Receiver.OnError(exception);
+        public Task OnErrorAsync(Exception exception) => this.Receiver.OnErrorAsync(streamId, exception);
 
-        public Task OnCompleted() => Receiver.OnCompleted();
+        public Task OnCompletedAsync() => this.Receiver.OnCompletedAsync(streamId);
+    }
+
+    internal class TransientStreamIdentity : IStreamIdentity
+    {
+        public TransientStreamIdentity(Guid id)
+        {
+            this.Guid = id;
+        }
+
+        public Guid Guid { get; }
+
+        public string Namespace => string.Empty;
     }
 
     [Serializable]
-    internal class AsyncDisposableProxy : IAsyncDisposable
+    internal class TransientStreamSubscriptionHandle<T> : StreamSubscriptionHandle<T>, IAsyncDisposable
     {
         private readonly Guid streamId;
-        private readonly IAddressable grain;
 
-        [SuppressMessage(
-            "ReSharper",
-            "NotAccessedField.Local",
+        private readonly GrainObservableProxy<T> observable;
+
+        [SuppressMessage("ReSharper", "NotAccessedField.Local",
             Justification = "This field prevents the reference from being garbage collected.")]
         [NonSerialized]
         private readonly object observerReference;
 
-        public AsyncDisposableProxy(Guid streamId, IAddressable grain, object observerReference)
+        public TransientStreamSubscriptionHandle(
+            Guid streamId,
+            GrainObservableProxy<T> observable,
+            object observerReference)
         {
             this.streamId = streamId;
-            this.grain = grain;
+            this.observable = observable;
             this.observerReference = observerReference;
         }
 
-        public Task Dispose() => grain.AsReference<IObservableGrainExtension>().Unsubscribe(streamId);
+        public Task Dispose() => this.UnsubscribeAsync();
+
+        public override IStreamIdentity StreamIdentity => new TransientStreamIdentity(this.streamId);
+
+        public override Guid HandleId => this.streamId;
+
+        public override Task UnsubscribeAsync()
+        {
+            return this.observable.GrainExtension.Unsubscribe(this.streamId);
+        }
+
+        public override Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            IAsyncObserver<T> observer,
+            StreamSequenceToken token = null)
+        {
+            return this.observable.ResumeAsync(this.streamId, observer, token);
+        }
+
+        public override bool Equals(StreamSubscriptionHandle<T> other)
+        {
+            return this.HandleId == other.HandleId;
+        }
     }
 
     /// <summary>
     /// Utility class for subscribing to observable streams.
     /// </summary>
-    internal static class ObservableSubscriberHelper
+    internal static class StreamDelegateHelper
     {
-        private delegate Task<IAsyncDisposable> TypedClientSubscribeDelegate(object observable, IUntypedGrainObserver receiver);
-        private delegate Task<IAsyncDisposable> TypedGrainSubscribeDelegate(object observable, IObserverGrainExtensionRemote receiver, Guid streamId);
+        private delegate Task<object> ClientSubscribeDelegate(
+            object observable,
+            IUntypedGrainObserver receiver,
+            Guid streamId,
+            StreamSequenceToken token);
 
-        private static readonly ConcurrentDictionary<Type, TypedClientSubscribeDelegate> ClientSubscribeDelegates =
-            new ConcurrentDictionary<Type, TypedClientSubscribeDelegate>();
-        private static readonly ConcurrentDictionary<Type, TypedGrainSubscribeDelegate> GrainSubscribeDelegates =
-            new ConcurrentDictionary<Type, TypedGrainSubscribeDelegate>();
+        private delegate Task<object> GrainSubscribeDelegate(
+            object observable,
+            IObserverGrainExtensionRemote receiver,
+            Guid streamId,
+            StreamSequenceToken token);
+
+        private delegate Task UnsubscribeDelegate(object handle);
+
+        private static readonly ConcurrentDictionary<Type, ClientSubscribeDelegate> ClientSubscribeDelegates =
+            new ConcurrentDictionary<Type, ClientSubscribeDelegate>();
+
+        private static readonly ConcurrentDictionary<Type, GrainSubscribeDelegate> GrainSubscribeDelegates =
+            new ConcurrentDictionary<Type, GrainSubscribeDelegate>();
+
+        private static readonly ConcurrentDictionary<Type, UnsubscribeDelegate> UnsubscribeDelegates =
+            new ConcurrentDictionary<Type, UnsubscribeDelegate>();
 
         private static readonly MethodInfo ClientSubscribeMethodInfo;
+
         private static readonly MethodInfo GrainSubscribeMethodInfo;
-        static ObservableSubscriberHelper()
+
+        private static readonly MethodInfo UnsubscribeMethodInfo;
+
+        static StreamDelegateHelper()
         {
-            ClientSubscribeMethodInfo = typeof(ObservableSubscriberHelper).GetMethod(nameof(ClientSubscribe),
+            ClientSubscribeMethodInfo = typeof(StreamDelegateHelper).GetMethod(
+                nameof(ClientSubscribe),
                 BindingFlags.Static | BindingFlags.NonPublic);
-            GrainSubscribeMethodInfo = typeof(ObservableSubscriberHelper).GetMethod(nameof(GrainSubscribe),
+            GrainSubscribeMethodInfo = typeof(StreamDelegateHelper).GetMethod(
+                nameof(GrainSubscribe),
+                BindingFlags.Static | BindingFlags.NonPublic);
+            UnsubscribeMethodInfo = typeof(StreamDelegateHelper).GetMethod(
+                nameof(UnsubscribeInternal),
                 BindingFlags.Static | BindingFlags.NonPublic);
         }
 
-        private static Task<IAsyncDisposable> ClientSubscribe<TElement, TObservable>(TObservable observable,
-            IUntypedGrainObserver receiver) where TObservable : IGrainObservable<TElement>
+        private static Task<StreamSubscriptionHandle<TElement>> ClientSubscribe<TElement, TObservable>(
+            TObservable observable,
+            IUntypedGrainObserver receiver,
+            Guid streamId,
+            StreamSequenceToken token) where TObservable : IAsyncObservable<TElement>
         {
-            return observable.Subscribe(new UntypedToTypedObserverAdapter<TElement>(receiver));
+            return observable.SubscribeAsync(new UntypedToTypedObserverAdapter<TElement>(streamId, receiver), token);
         }
 
-        private static Task<IAsyncDisposable> GrainSubscribe<TElement, TObservable>(
+        private static Task<StreamSubscriptionHandle<TElement>> GrainSubscribe<TElement, TObservable>(
             TObservable observable,
             IObserverGrainExtensionRemote receiver,
-            Guid streamId) where TObservable : IGrainObservable<TElement>
+            Guid streamId,
+            StreamSequenceToken token) where TObservable : IAsyncObservable<TElement>
         {
-            return observable.Subscribe(new GrainObserverExtensionToUntypedObserverAdapter<TElement>(receiver, streamId));
+            return
+                observable.SubscribeAsync(new GrainObserverExtensionToUntypedObserverAdapter<TElement>(receiver, streamId), token);
         }
 
-        public static Task<IAsyncDisposable> Subscribe(object observable, IUntypedGrainObserver receiver)
+        private static Task UnsubscribeInternal<TElement, THandle>(THandle observable) where THandle : StreamSubscriptionHandle<TElement>
+        {
+            return observable.UnsubscribeAsync();
+        }
+
+        public static Task<object> Subscribe(
+            object observable,
+            IUntypedGrainObserver receiver,
+            Guid streamId,
+            StreamSequenceToken token)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             var type = observable.GetType();
-            if (!type.IsConstructedGenericType || typeof(IGrainObservable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
+            if (!type.IsConstructedGenericType
+                || typeof(IAsyncObservable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
             {
-                throw new ArgumentException($"Type {type} must be of type {typeof(IGrainObservable<>)}");
+                throw new ArgumentException($"Type {type} must be of type {typeof(IAsyncObservable<>)}");
             }
 
-            TypedClientSubscribeDelegate subscribeDelegate;
+            ClientSubscribeDelegate subscribeDelegate;
             if (!ClientSubscribeDelegates.TryGetValue(type, out subscribeDelegate))
             {
-                subscribeDelegate = ClientSubscribeDelegates.GetOrAdd(type, CreateTypedClientSubscribeDelegate);
+                subscribeDelegate = ClientSubscribeDelegates.GetOrAdd(type, CreateClientSubscribeDelegate);
             }
-
-            return subscribeDelegate(observable, receiver);
+            
+            return subscribeDelegate(observable, receiver, streamId, token);
         }
 
-        public static Task<IAsyncDisposable> Subscribe(object observable, IObserverGrainExtensionRemote receiver, Guid streamId)
+        public static Task<object> Subscribe(
+            object observable,
+            IObserverGrainExtensionRemote receiver,
+            Guid streamId,
+            StreamSequenceToken token)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             var type = observable.GetType();
-            if (!type.IsConstructedGenericType || typeof(IGrainObservable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
+            if (!type.IsConstructedGenericType
+                || typeof(IAsyncObservable<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
             {
-                throw new ArgumentException($"Type {type} must be of type {typeof(IGrainObservable<>)}");
+                throw new ArgumentException($"Type {type} must be of type {typeof(IAsyncObservable<>)}");
             }
 
-            TypedGrainSubscribeDelegate subscribeDelegate;
+            GrainSubscribeDelegate subscribeDelegate;
             if (!GrainSubscribeDelegates.TryGetValue(type, out subscribeDelegate))
             {
-                subscribeDelegate = GrainSubscribeDelegates.GetOrAdd(type, CreateTypedGrainSubscribeDelegate);
+                subscribeDelegate = GrainSubscribeDelegates.GetOrAdd(type, CreateGrainSubscribeDelegate);
             }
 
-            return subscribeDelegate(observable, receiver, streamId);
+            return subscribeDelegate(observable, receiver, streamId, token);
         }
 
-        private static TypedClientSubscribeDelegate CreateTypedClientSubscribeDelegate(Type observableType)
+        public static Task Unsubscribe(object handle)
+        {
+            if (handle == null) throw new ArgumentNullException(nameof(handle));
+            var type = handle.GetType();
+            if (!type.IsConstructedGenericType
+                || typeof(StreamSubscriptionHandle<>).IsAssignableFrom(type.GetGenericTypeDefinition()))
+            {
+                throw new ArgumentException($"Type {type} must be of type {typeof(StreamSubscriptionHandle<>)}");
+            }
+
+            UnsubscribeDelegate unsubscribeDelegate;
+            if (!UnsubscribeDelegates.TryGetValue(type, out unsubscribeDelegate))
+            {
+                unsubscribeDelegate = UnsubscribeDelegates.GetOrAdd(type, CreateUnsubscribeDelegate);
+            }
+
+            return unsubscribeDelegate(handle);
+        }
+
+        private static ClientSubscribeDelegate CreateClientSubscribeDelegate(Type observableType)
+        {
+            return
+                (ClientSubscribeDelegate)
+                CreateSubscribeDelegate<ClientSubscribeDelegate>(
+                    observableType,
+                    typeof(IUntypedGrainObserver),
+                    ClientSubscribeMethodInfo);
+        }
+
+        private static GrainSubscribeDelegate CreateGrainSubscribeDelegate(Type observableType)
+        {
+            return
+                (GrainSubscribeDelegate)
+                CreateSubscribeDelegate<GrainSubscribeDelegate>(
+                    observableType,
+                    typeof(IObserverGrainExtensionRemote),
+                    GrainSubscribeMethodInfo);
+        }
+
+        private static Delegate CreateSubscribeDelegate<TDelegate>(
+            Type observableType,
+            Type observerType,
+            MethodInfo subscribeMethodInfo)
         {
             // Create a method to hold the generated IL.
             var method = new DynamicMethod(
-                observableType.Name + "ClientSubscriber",
-                typeof(Task<IAsyncDisposable>),
-                new[] { typeof(object), typeof(IUntypedGrainObserver) },
+                observableType.Name + observerType.Name,
+                typeof(Task<object>),
+                new[] { typeof(object), observerType, typeof(Guid), typeof(StreamSequenceToken) },
                 observableType.GetTypeInfo().Module,
                 true);
 
             // Construct the method which this IL will call.
-            var genericMethod = ClientSubscribeMethodInfo.MakeGenericMethod(
-                observableType.GetTypeInfo().GetGenericArguments()[0],
-                observableType);
-
-            // Emit IL which calls the constructed method.
-            var emitter = method.GetILGenerator();
-            emitter.Emit(OpCodes.Ldarg_0);
-            emitter.Emit(OpCodes.Ldarg_1);
-            emitter.Emit(OpCodes.Call, genericMethod);
-            emitter.Emit(OpCodes.Ret);
-
-            return (TypedClientSubscribeDelegate)method.CreateDelegate(typeof(TypedClientSubscribeDelegate));
-        }
-
-        private static TypedGrainSubscribeDelegate CreateTypedGrainSubscribeDelegate(Type observableType)
-        {
-            // Create a method to hold the generated IL.
-            var method = new DynamicMethod(
-                observableType.Name + "GrainSubscriber",
-                typeof(Task<IAsyncDisposable>),
-                new[] { typeof(object), typeof(IObserverGrainExtensionRemote), typeof(Guid)},
-                observableType.GetTypeInfo().Module,
-                true);
-
-            // Construct the method which this IL will call.
-            var genericMethod = GrainSubscribeMethodInfo.MakeGenericMethod(
-                observableType.GetTypeInfo().GetGenericArguments()[0],
-                observableType);
+            var genericMethod =
+                subscribeMethodInfo.MakeGenericMethod(
+                    observableType.GetTypeInfo().GetGenericArguments()[0],
+                    observableType);
 
             // Emit IL which calls the constructed method.
             var emitter = method.GetILGenerator();
             emitter.Emit(OpCodes.Ldarg_0);
             emitter.Emit(OpCodes.Ldarg_1);
             emitter.Emit(OpCodes.Ldarg_2);
+            emitter.Emit(OpCodes.Ldarg_3);
             emitter.Emit(OpCodes.Call, genericMethod);
             emitter.Emit(OpCodes.Ret);
 
-            return (TypedGrainSubscribeDelegate)method.CreateDelegate(typeof(TypedGrainSubscribeDelegate));
+            return method.CreateDelegate(typeof(TDelegate));
+        }
+
+        private static UnsubscribeDelegate CreateUnsubscribeDelegate(Type handleType)
+        {
+            // Create a method to hold the generated IL.
+            var method = new DynamicMethod(
+                handleType.Name + "Unsubscribe",
+                typeof(Task),
+                new[] { typeof(object)},
+                handleType.GetTypeInfo().Module,
+                true);
+
+            // Construct the method which this IL will call.
+            var genericMethod =
+                UnsubscribeMethodInfo.MakeGenericMethod(
+                    handleType.GetTypeInfo().GetGenericArguments()[0],
+                    handleType);
+
+            // Emit IL which calls the constructed method.
+            var emitter = method.GetILGenerator();
+            emitter.Emit(OpCodes.Ldarg_0);
+            emitter.Emit(OpCodes.Call, genericMethod);
+            emitter.Emit(OpCodes.Ret);
+
+            return (UnsubscribeDelegate)method.CreateDelegate(typeof(UnsubscribeDelegate));
         }
     }
-
 }

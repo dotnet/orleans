@@ -1,31 +1,34 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Streams.AdHoc;
 
 namespace UnitTests.GrainInterfaces
 {
+    using Orleans.Streams;
+
     public interface IReactiveGrain<T> : IGrainWithGuidKey
     {
-        IGrainObservable<T> GetStream(T[] values);
-        IGrainObservable<string> JoinChatRoom(string room);
+        IAsyncObservable<T> GetStream(T[] values);
+        IAsyncObservable<string> JoinChatRoom(string room);
     }
 
     public interface IChatRoomGrain : IGrainWithStringKey
     {
-        IGrainObservable<string> JoinRoom();
+        IAsyncObservable<string> JoinRoom();
         Task SendMessage(string message);
         Task<int> GetCurrentUserCount();
     }
-
+    
     public interface IChatUserGrain : IGrainWithStringKey
     {
         Task<List<string>> MessagesSince(int id, string roomName);
         Task JoinRoom(string room);
         Task LeaveRoom(string room);
+        Task Deactivate();
+        Task<Guid> GetLifetimeId();
     }
+
     [Serializable]
     public class ChatUserGrainState
     {
@@ -35,18 +38,15 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class ChatRoomMailbox
     {
-        public IAsyncDisposable Subscription { get; set; }
+        public StreamSubscriptionHandle<string> Subscription { get; set; }
         public List<string> Messages { get; } = new List<string>();
     }
 
-    public class BufferedObserver<T> : IGrainObserver<T>
+    public class BufferedObserver<T> : IAsyncObserver<T>
     {
-        private readonly TaskCompletionSource<T[]> values = new TaskCompletionSource<T[]>();
-        private ConcurrentBag<Task> waiters;
-
         public BufferedObserver()
         {
-            Buffer = new List<T>();
+            this.Buffer = new List<T>();
         }
 
         public BufferedObserver(List<T> buffer)
@@ -54,27 +54,25 @@ namespace UnitTests.GrainInterfaces
             this.Buffer = buffer;
         }
 
-        public Task OnNext(T value)
+        public Func<T, StreamSequenceToken, Task> OnNextDelegate { get; set; } = (_, __) => Task.FromResult(0);
+
+        public Task OnNextAsync(T value, StreamSequenceToken token = null)
         {
-            Buffer.Add(value);
+            this.Buffer.Add(value);
+            return OnNextDelegate(value, token);
+        }
+
+        public Task OnErrorAsync(Exception exception)
+        {
             return Task.FromResult(0);
         }
 
-        public Task OnError(Exception exception)
+        public Task OnCompletedAsync()
         {
-            values.TrySetException(exception);
             return Task.FromResult(0);
         }
 
-        public Task OnCompleted()
-        {
-            values.TrySetResult(Buffer.ToArray());
-            return Task.FromResult(0);
-        }
-
-        public Task<T[]> WhenNext() => values.Task;
-
-        public void Clear() => Buffer.Clear();
+        public void Clear() => this.Buffer.Clear();
         
         public List<T> Buffer { get; }
     }

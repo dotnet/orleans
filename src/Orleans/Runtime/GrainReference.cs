@@ -10,6 +10,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime
 {
+    using Orleans.Streams;
+
     /// <summary>
     /// This is the base class for all typed grain references.
     /// </summary>
@@ -280,7 +282,7 @@ namespace Orleans.Runtime
             }
         }
 
-        protected IGrainObservable<T> InvokeObservableMethod<T>(int methodId, object[] arguments)
+        protected IAsyncObservable<T> InvokeObservableMethod<T>(int methodId, object[] arguments)
         {
             return new GrainObservableProxy<T>(this, CreateInvokeMethodRequest(methodId, arguments));
         }
