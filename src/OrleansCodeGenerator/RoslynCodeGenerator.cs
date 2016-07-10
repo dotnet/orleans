@@ -296,7 +296,7 @@ namespace Orleans.CodeGenerator
                 var assembly = assemblies[i];
                 foreach (var attribute in assembly.GetCustomAttributes<ConsiderForCodeGenerationAttribute>())
                 {
-                    ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes, true);
+                    ConsiderType(attribute.Type, runtime, targetAssembly, includedTypes, considerForSerialization: true);
                     if (attribute.ThrowOnFailure && !SerializerGenerationManager.IsTypeRecorded(attribute.Type))
                     {
                         throw new CodeGenerationException(
@@ -306,11 +306,12 @@ namespace Orleans.CodeGenerator
                 }
 
                 KnownAssemblyAttribute knownAssemblyAttribute;
-                var treatAsSerializable = knownAssemblyAttributes.TryGetValue(assembly, out knownAssemblyAttribute)
+                var considerAllTypesForSerialization = knownAssemblyAttributes.TryGetValue(assembly, out knownAssemblyAttribute)
                                           && knownAssemblyAttribute.TreatTypesAsSerializable;
                 foreach (var type in assembly.DefinedTypes)
                 {
-                    ConsiderType(type, runtime, targetAssembly, includedTypes, treatAsSerializable);
+                    var considerForSerialization = considerAllTypesForSerialization || type.GetTypeInfo().IsSerializable;
+                    ConsiderType(type, runtime, targetAssembly, includedTypes, considerForSerialization);
                 }
             }
 
@@ -412,14 +413,14 @@ namespace Orleans.CodeGenerator
             bool runtime,
             Assembly targetAssembly,
             ISet<Type> includedTypes,
-            bool treatAsSerializeable = false)
+            bool considerForSerialization = false)
         {
             // The module containing the serializer.
             var module = runtime || type.Assembly != targetAssembly ? null : type.Module;
             var typeInfo = type.GetTypeInfo();
 
             // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
-            if (treatAsSerializeable || typeInfo.IsSerializable)
+            if (considerForSerialization)
             {
                 RecordType(type, module, targetAssembly, includedTypes);
             }
