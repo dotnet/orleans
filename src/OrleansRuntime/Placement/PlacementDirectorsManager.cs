@@ -5,42 +5,34 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.DependencyInjection.Extensions;
+
     internal class PlacementDirectorsManager
     {
-        private readonly Dictionary<Type, PlacementDirector> directors = new Dictionary<Type, PlacementDirector>();
-        private PlacementStrategy defaultPlacementStrategy;
-        private ClientObserversPlacementDirector clientObserversPlacementDirector;
-
-        public static PlacementDirectorsManager Instance { get; private set; }
-
-        private PlacementDirectorsManager()
-        { }
-
-        public static void CreatePlacementDirectorsManager(GlobalConfiguration globalConfig)
+        private readonly IServiceProvider serviceProvider;
+        private readonly PlacementStrategy defaultPlacementStrategy;
+        private readonly ClientObserversPlacementDirector clientObserversPlacementDirector;
+        
+        public PlacementDirectorsManager(IServiceProvider serviceProvider)
         {
-            Instance = new PlacementDirectorsManager();
-            Instance.Register<RandomPlacement, RandomPlacementDirector>();
-            Instance.Register<PreferLocalPlacement, PreferLocalPlacementDirector>();
-            Instance.Register<StatelessWorkerPlacement, StatelessWorkerDirector>();
-            Instance.Register<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
-
-            var acDirector = (ActivationCountPlacementDirector)Instance.directors[typeof(ActivationCountBasedPlacement)];
-            acDirector.Initialize(globalConfig);
-
-            Instance.defaultPlacementStrategy = PlacementStrategy.GetDefault();
-            Instance.clientObserversPlacementDirector = new ClientObserversPlacementDirector();
+            this.serviceProvider = serviceProvider;
+            defaultPlacementStrategy = PlacementStrategy.GetDefault();
+            clientObserversPlacementDirector = new ClientObserversPlacementDirector();
         }
 
-        private void Register<TStrategy, TDirector>()
-            where TDirector : PlacementDirector, new()
-            where TStrategy : PlacementStrategy
+        public static void ConfigurePlacementDirectors(IServiceCollection serviceCollection)
         {
-            directors.Add(typeof(TStrategy), new TDirector());
+            serviceCollection.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
+            serviceCollection.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
+            serviceCollection.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
+            serviceCollection.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
+            serviceCollection.TryAddSingleton<PlacementDirectorsManager>();
         }
-
-        private PlacementDirector ResolveDirector(PlacementStrategy strategy)
+        
+        private IPlacementDirector ResolveDirector(PlacementStrategy strategy)
         {
-            return directors[strategy.GetType()];
+            return this.serviceProvider.GetRequiredService(strategy.DirectorType) as IPlacementDirector;
         }
 
         public async Task<PlacementResult> SelectOrAddActivation(

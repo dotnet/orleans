@@ -9,6 +9,8 @@ using System.Xml;
 
 namespace Orleans.Runtime.Configuration
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>
     /// Individual node-specific silo configuration parameters.
     /// </summary>
@@ -170,7 +172,14 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Specifies the name of the Startup class in the configuration file.
         /// </summary>
+        /// <remarks>This property and <see cref="ServiceProviderBuilder"/> are mutually exclive: at most one can be specified.</remarks>
         public string StartupTypeName { get; set; }
+
+        /// <summary>
+        /// The delegate used to configure dependency injection.
+        /// </summary>
+        /// <remarks>This property and <see cref="StartupTypeName"/> are mutually exclive: at most one can be specified.</remarks>
+        public Func<IServiceCollection, IServiceProvider> ServiceProviderBuilder { get; set; }
 
         public string StatisticsProviderName { get; set; }
         /// <summary>
@@ -329,6 +338,7 @@ namespace Orleans.Runtime.Configuration
             UseNagleAlgorithm = other.UseNagleAlgorithm;
 
             StartupTypeName = other.StartupTypeName;
+            ServiceProviderBuilder = other.ServiceProviderBuilder;
             AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
         }
 

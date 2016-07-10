@@ -32,6 +32,9 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
+    using Microsoft.Extensions.DependencyInjection;
+
+    using Orleans.Runtime.ReminderService;
 
     /// <summary>
     /// Orleans silo.
@@ -176,6 +179,27 @@ namespace Orleans.Runtime
             globalConfig = config.Globals;
             config.OnConfigChange("Defaults", () => nodeConfig = config.GetOrCreateNodeConfigurationForSilo(name));
 
+            // Configure DI using Startup type
+            bool usingCustomServiceProvider;
+            Action<IServiceCollection> configureServices = serviceCollection =>
+            {
+                serviceCollection.AddSingleton(this);
+                serviceCollection.AddTransient<GrainBasedMembershipTable>();
+                serviceCollection.AddTransient<GrainBasedReminderTable>();
+
+                PlacementDirectorsManager.ConfigurePlacementDirectors(serviceCollection);
+                serviceCollection.AddSingleton(config);
+                serviceCollection.AddTransient(_ => this.globalConfig);
+                serviceCollection.AddTransient(_ => this.nodeConfig);
+
+                serviceCollection.AddSingleton(
+                                               svc =>
+                                               membershipFactory.CreateMembershipOracle(svc.GetRequiredService<Silo>(),
+                                                                                        svc.GetRequiredService<IMembershipTable>()));
+            };
+
+            Services = StartupBuilder.ConfigureStartup(nodeConfig, configureServices, out usingCustomServiceProvider);
+
             if (!LogManager.IsInitialized)
                 LogManager.Initialize(nodeConfig);
 
@@ -220,9 +244,6 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            // Configure DI using Startup type
-            bool usingCustomServiceProvider;
-            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -289,7 +310,7 @@ namespace Orleans.Runtime
 
             Action<Dispatcher> setDispatcher;
             catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
-            var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
+            var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config, Services.GetRequiredService<PlacementDirectorsManager>());
             setDispatcher(dispatcher);
 
             RuntimeClient.Current = new InsideRuntimeClient(
@@ -310,7 +331,6 @@ namespace Orleans.Runtime
             siloStatistics.MetricsTable.MessageCenter = messageCenter;
 
             DeploymentLoadPublisher.CreateDeploymentLoadPublisher(this, globalConfig);
-            PlacementDirectorsManager.CreatePlacementDirectorsManager(globalConfig);
 
             // Now the incoming message agents
             incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, dispatcher);
@@ -462,8 +482,9 @@ namespace Orleans.Runtime
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
 
-            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
-            membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
+            IMembershipTable membershipTable = Services.GetService<IMembershipTable>()
+                                               ?? membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
+            membershipOracle = Services.GetRequiredService<IMembershipOracle>();
             multiClusterOracle = multiClusterFactory.CreateGossipOracle(this).WaitForResultWithThrow(initTimeout);
 
             // This has to follow the above steps that start the runtime components

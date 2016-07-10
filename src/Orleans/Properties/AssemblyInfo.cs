@@ -34,3 +34,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("OrleansBenchmarks")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("Microsoft.Orleans.ServiceFabric")]

@@ -3,9 +3,28 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
+    internal interface IPlacementDirector<TPlacementStrategy> where TPlacementStrategy : PlacementStrategy
+    {
+    }
+
     [Serializable]
     internal abstract class PlacementStrategy
     {
+        private Type directorType;
+
+        internal Type DirectorType
+        {
+            get
+            {
+                if (this.directorType == null)
+                {
+                    this.directorType = typeof(IPlacementDirector<>).MakeGenericType(this.GetType());
+                }
+
+                return this.directorType;
+            }
+        }
+
         private static PlacementStrategy defaultStrategy;
 
         internal static void Initialize()
@@ -33,6 +52,7 @@ namespace Orleans.Runtime
             StatelessWorkerPlacement.InitializeClass(NodeConfiguration.DEFAULT_MAX_LOCAL_ACTIVATIONS);
             SystemPlacement.InitializeClass();
             ActivationCountBasedPlacement.InitializeClass();
+            ConsistentPartitionPlacement.InitializeClass();
         }
 
         private static PlacementStrategy GetDefaultStrategy(string str)
@@ -52,6 +72,10 @@ namespace Orleans.Runtime
             else if (str.Equals(typeof(ActivationCountBasedPlacement).Name))
             {
                 return ActivationCountBasedPlacement.Singleton;
+            }
+            else if (str.Equals(typeof(ConsistentPartitionPlacement).Name))
+            {
+                return ConsistentPartitionPlacement.Singleton;
             }
             return null;
         }

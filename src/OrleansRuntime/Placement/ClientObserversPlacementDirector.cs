@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        internal override Task<PlacementResult> 
+        public override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + grain);

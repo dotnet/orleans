@@ -24,11 +24,9 @@ namespace Orleans.Runtime
         private readonly double errorInjectionRate;
         private readonly SafeRandom random;
 
-        public Dispatcher(
-            OrleansTaskScheduler scheduler, 
-            ISiloMessageCenter transport, 
-            Catalog catalog, 
-            ClusterConfiguration config)
+        private readonly PlacementDirectorsManager placementDirectorsManager;
+
+        public Dispatcher(OrleansTaskScheduler scheduler, ISiloMessageCenter transport, Catalog catalog, ClusterConfiguration config, PlacementDirectorsManager placementDirectorsManager)
         {
             Scheduler = scheduler;
             this.catalog = catalog;
@@ -40,6 +38,7 @@ namespace Orleans.Runtime
             errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;
             errorInjectionRate = rejectionInjectionRate + messageLossInjectionRate;
             random = new SafeRandom();
+            this.placementDirectorsManager = placementDirectorsManager;
         }
 
         #region Receive path
@@ -542,7 +541,7 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-            var placementResult = await PlacementDirectorsManager.Instance.SelectOrAddActivation(
+            var placementResult = await placementDirectorsManager.SelectOrAddActivation(
                 message.SendingAddress, message.TargetGrain, InsideRuntimeClient.Current.Catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)

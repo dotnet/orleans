@@ -1,0 +1,13 @@
+﻿{
+  "dependencies": {
+    "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0",
+    "Microsoft.ServiceFabric.Services": "2.1.163",
+    "Newtonsoft.Json": "7.0.1"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-x64": {}
+  }
+}
