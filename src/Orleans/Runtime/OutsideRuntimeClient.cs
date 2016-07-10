@@ -40,7 +40,7 @@ namespace Orleans
 
         internal ClientStatisticsManager ClientStatistics;
         private readonly GrainId clientId;
-        private GrainInterfaceMap grainInterfaceMap;
+        private IGrainTypeResolver grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
