@@ -133,23 +133,6 @@ namespace Orleans.Runtime
             return new GrainReference(grainId, null, null, observerId);
         }
 
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        public static Task<GrainReference> CreateObjectReference(IAddressable o, IGrainMethodInvoker invoker)
-        {
-            return Task.FromResult(RuntimeClient.Current.CreateObjectReference(o, invoker));
-        }
-
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        public static Task DeleteObjectReference(IAddressable observer)
-        {
-            RuntimeClient.Current.DeleteObjectReference(observer);
-            return TaskDone.Done;
-        }
-
         #endregion
 
         /// <summary>
