@@ -59,7 +59,7 @@ namespace UnitTests.General
             const int TestValue = 43;
             await stream.OnNextAsync(TestValue);
             var actual = await grain.GetLastStreamValue();
-            Assert.Equal(TestValue * 2, actual);
+            Assert.AreEqual(TestValue * 2, actual);
         }
     }
 
