@@ -34,6 +34,9 @@ namespace Orleans.Providers.Streams.Common
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
 
+        /// <summary>
+        /// Cached message most recently added
+        /// </summary>
         public TCachedMessage? Newest
         {
             get
@@ -44,6 +47,9 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        /// <summary>
+        /// Oldest message in cache
+        /// </summary>
         public TCachedMessage? Oldest
         {
             get
@@ -61,6 +67,11 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public Action<TCachedMessage> OnPurged { get; set; }
 
+        /// <summary>
+        /// Pooled queue cache is a cache of message that obtains resource from a pool
+        /// </summary>
+        /// <param name="cacheDataAdapter"></param>
+        /// <param name="comparer"></param>
         public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer)
         {
             if (cacheDataAdapter == null)
@@ -78,13 +89,10 @@ namespace Orleans.Providers.Streams.Common
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
         }
 
-        public bool IsEmpty
-        {
-            get
-            {
-                return messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
-            }
-        }
+        /// <summary>
+        /// Indicates whether the cach is empty
+        /// </summary>
+        public bool IsEmpty => messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
 
 
         /// <summary>
@@ -260,6 +268,10 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
+        /// <summary>
+        /// Add a queue message to the cache
+        /// </summary>
+        /// <param name="message"></param>
         public void Add(TQueueMessage message)
         {
             if (message == null)
@@ -318,9 +330,9 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
-            if (lastMessagePurged.HasValue && OnPurged != null)
+            if (lastMessagePurged.HasValue)
             {
-                OnPurged(lastMessagePurged.Value);
+                OnPurged?.Invoke(lastMessagePurged.Value);
             }
 
             purgeRequest.Dispose();
@@ -353,8 +365,8 @@ namespace Orleans.Providers.Streams.Common
             public int Index;
 
             // utilities
-            public bool IsNewestInBlock { get { return Index == CurrentBlock.Value.NewestMessageIndex; } }
-            public TCachedMessage Message { get { return CurrentBlock.Value[Index]; } }
+            public bool IsNewestInBlock => Index == CurrentBlock.Value.NewestMessageIndex;
+            public TCachedMessage Message => CurrentBlock.Value[Index];
         }
     }
 }

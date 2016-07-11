@@ -24,7 +24,8 @@ namespace Orleans.Runtime
 
         private GrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.Current.ActivationContext;
+            var ctxt = RuntimeContext.CurrentActivationContext;
+            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
             activationData = (ActivationData) RuntimeClient.Current.CurrentActivationData;
 
             this.Name = name;

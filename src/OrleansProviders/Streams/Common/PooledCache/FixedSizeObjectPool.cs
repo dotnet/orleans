@@ -38,6 +38,10 @@ namespace Orleans.Providers.Streams.Common
             maxObjectCount = poolSize;
         }
 
+        /// <summary>
+        /// Allocates a resource from the pool.
+        /// </summary>
+        /// <returns></returns>
         public override T Allocate()
         {
             T obj;
@@ -58,6 +62,10 @@ namespace Orleans.Providers.Streams.Common
             return obj;
         }
 
+        /// <summary>
+        /// Returns a resource to the pool to be reused
+        /// </summary>
+        /// <param name="resource"></param>
         public override void Free(T resource)
         {
             lock (locker)

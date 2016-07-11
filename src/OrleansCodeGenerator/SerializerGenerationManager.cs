@@ -65,7 +65,11 @@ namespace Orleans.CodeGenerator
 
             Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
         }
-        
+        internal bool IsTypeRecorded(Type type)
+        {
+            return this.TypesToProcess.Contains(type) || this.ProcessedTypes.Contains(type);
+        }
+
         internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
         {
             if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))

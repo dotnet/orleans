@@ -543,13 +543,13 @@ namespace Orleans.Runtime
                                                 primary != null ? "Primary Directory partition for this grain is " + primary + ". " : String.Empty,
                                     address.ToFullString(),
                                     activation.WaitingCount);
-                                if (activation.IsStatelessWorker)
+                                if (activation.IsUsingGrainDirectory)
                                 {
-                                    if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                    logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
                                 }
                                 else
                                 {
-                                    logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
+                                    if (logger.IsVerbose) logger.Verbose(ErrorCode.Catalog_DuplicateActivation, logMsg);
                                 }
                                 RerouteAllQueuedMessages(activation, target, "Duplicate activation", ex);
                             }
@@ -559,7 +559,7 @@ namespace Orleans.Runtime
                                     String.Format("Failed to RegisterActivationInGrainDirectory for {0}.",
                                         activation), ex);
                                 // Need to undo the registration we just did earlier
-                                if (!activation.IsStatelessWorker)
+                                if (activation.IsUsingGrainDirectory)
                                 {
                                     scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
                                         SchedulingContext).Ignore();
@@ -574,7 +574,7 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_SetupActivationState,
                                 String.Format("Failed to SetupActivationState for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            if (!activation.IsStatelessWorker)
+                            if (activation.IsUsingGrainDirectory)
                             {
                                 scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
                                     SchedulingContext).Ignore();
@@ -588,7 +588,7 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate,
                                 String.Format("Failed to InvokeActivate for {0}.", activation), ex);
                             // Need to undo the registration we just did earlier
-                            if (!activation.IsStatelessWorker)
+                            if (activation.IsUsingGrainDirectory)
                             {
                                 scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
                                     SchedulingContext).Ignore();
@@ -995,7 +995,7 @@ namespace Orleans.Runtime
                 try
                 {            
                     List<ActivationAddress> activationsToDeactivate = list.
-                        Where((ActivationData d) => !d.IsStatelessWorker).
+                        Where((ActivationData d) => d.IsUsingGrainDirectory).
                         Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
 
                     if (activationsToDeactivate.Count > 0)
@@ -1155,10 +1155,11 @@ namespace Orleans.Runtime
         private async Task RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
             ActivationAddress address = activation.Address;
-            bool singleActivationMode = !activation.IsStatelessWorker;
-
-            if (singleActivationMode)
+            // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
+            // Among those that are registered in the directory, we currently do not have any multi activations.
+            if (activation.IsUsingGrainDirectory)
             {
+                
                 var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation:true), this.SchedulingContext);
                 if (address.Equals(result.Address)) return;
                
@@ -1303,6 +1304,7 @@ namespace Orleans.Runtime
                         try
                         {
                             var activationData = activation.Value;
+                            if (!activationData.IsUsingGrainDirectory) continue;
                             if (!directory.GetPrimaryForGrain(activationData.Grain).Equals(updatedSilo)) continue;
 
                             lock (activationData)

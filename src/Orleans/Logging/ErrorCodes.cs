@@ -495,8 +495,9 @@ namespace Orleans
         MembershipGossipSendFailure            = MembershipBase + 56,
         MembershipTimerProcessingFailure       = MembershipBase + 57,
         MembershipSendPingFailure              = MembershipBase + 58,
-        MembershipUpdateIAmAliveFailure          = MembershipBase + 59,
+        MembershipUpdateIAmAliveFailure        = MembershipBase + 59,
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
+        MembershipJoiningPreconditionFailure   = MembershipBase + 61,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,
