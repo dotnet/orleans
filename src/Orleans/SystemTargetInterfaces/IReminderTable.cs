@@ -15,7 +15,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config, TraceLogger traceLogger);
+        Task Init(GlobalConfiguration config, Logger logger);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 
@@ -82,11 +82,26 @@ namespace Orleans
     [Serializable]
     public class ReminderEntry
     {
-        // 1 & 2 combine to form a unique key, i.e., a reminder is uniquely identified using these two together
-        public GrainReference GrainRef { get; set; }        // 1
-        public string ReminderName { get; set; }    // 2
+        /// <summary>
+        /// The grain reference of the grain that created the reminder. Forms the reminder
+        /// primary key together with <see cref="ReminderName"/>.
+        /// </summary>
+        public GrainReference GrainRef { get; set; }
 
+        /// <summary>
+        /// The name of the reminder. Forms the reminder primary key together with 
+        /// <see cref="GrainRef"/>.
+        /// </summary>
+        public string ReminderName { get; set; }
+
+        /// <summary>
+        /// the time when the reminder was supposed to tick in the first time
+        /// </summary>
         public DateTime StartAt { get; set; }
+
+        /// <summary>
+        /// the time period for the reminder
+        /// </summary>
         public TimeSpan Period { get; set; }
 
         public string ETag { get; set; }

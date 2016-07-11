@@ -32,5 +32,10 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns></returns>
         void Refresh();
+
+        /// <summary>
+        /// Record that delivery of the current event has failed
+        /// </summary>
+        void RecordDeliveryFailure();
     }
 }

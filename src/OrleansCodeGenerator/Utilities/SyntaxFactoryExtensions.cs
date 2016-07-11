@@ -6,12 +6,12 @@ namespace Orleans.CodeGenerator.Utilities
     using System.Linq.Expressions;
     using System.Reflection;
 
-    using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
     using Orleans.Runtime;
-
+    using System.Globalization;
+	
     /// <summary>
     /// The syntax factory extensions.
     /// </summary>
@@ -128,42 +128,6 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
-        /// Returns <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
-        /// </summary>
-        /// <param name="separatedSyntaxList">
-        /// Args used in initialization.
-        /// </param>
-        /// <param name="arrayType">
-        /// The array type.
-        /// </param>
-        /// <returns>
-        /// <see cref="ArrayCreationExpressionSyntax"/> representing the array creation form of <paramref name="arrayType"/>.
-        /// </returns>
-        public static ArrayCreationExpressionSyntax GetArrayCreationWithInitializerSyntax(this SeparatedSyntaxList<ExpressionSyntax> separatedSyntaxList, TypeSyntax arrayType)
-        {
-            var arrayRankSizes =
-                new SeparatedSyntaxList<ExpressionSyntax>().Add(SyntaxFactory.OmittedArraySizeExpression(
-                    SyntaxFactory.Token(SyntaxKind.OmittedArraySizeExpressionToken)));
-
-            var arrayRankSpecifier = SyntaxFactory.ArrayRankSpecifier(
-                SyntaxFactory.Token(SyntaxKind.OpenBracketToken),
-                arrayRankSizes,
-                SyntaxFactory.Token(SyntaxKind.CloseBracketToken));
-
-            var arrayRankSpecifierSyntaxList = new SyntaxList<ArrayRankSpecifierSyntax>().Add(arrayRankSpecifier);
-
-            var arrayCreationExpressionSyntax = SyntaxFactory.ArrayCreationExpression(
-                SyntaxFactory.Token(SyntaxKind.NewKeyword),
-                SyntaxFactory.ArrayType(arrayType, arrayRankSpecifierSyntaxList),
-                SyntaxFactory.InitializerExpression(SyntaxKind.ArrayInitializerExpression,
-                    SyntaxFactory.Token(SyntaxKind.OpenBraceToken),
-                    separatedSyntaxList,
-                    SyntaxFactory.Token(SyntaxKind.CloseBraceToken)));
-
-            return arrayCreationExpressionSyntax;
-        }
-
-        /// <summary>
         /// Returns <see cref="ArrayTypeSyntax"/> representing the array form of <paramref name="type"/>.
         /// </summary>
         /// <param name="type">
@@ -249,6 +213,24 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
+        /// Returns the name of the provided parameter.
+        /// If the parameter has no name (possible in F#),
+        /// it returns a name computed by suffixing "arg" with the parameter's index
+        /// </summary>
+        /// <param name="parameter"> The parameter. </param>
+        /// <param name="parameterIndex"> The parameter index in the list of parameters. </param>
+        /// <returns> The parameter name. </returns>
+        public static string GetOrCreateName(this ParameterInfo parameter, int parameterIndex)
+        {
+            var argName = parameter.Name;
+            if (String.IsNullOrWhiteSpace(argName))
+            {
+                argName = String.Format(CultureInfo.InvariantCulture, "arg{0:G}", parameterIndex);
+            }
+            return argName;
+        }
+
+        /// <summary>
         /// Returns the parameter list syntax for the provided method.
         /// </summary>
         /// <param name="method">
@@ -262,8 +244,8 @@ namespace Orleans.CodeGenerator.Utilities
             return
                 method.GetParameters()
                     .Select(
-                        parameter =>
-                        SyntaxFactory.Parameter(parameter.Name.ToIdentifier())
+                        (parameter, parameterIndex) =>
+                        SyntaxFactory.Parameter(parameter.GetOrCreateName(parameterIndex).ToIdentifier())
                             .WithType(parameter.ParameterType.GetTypeSyntax()))
                     .ToArray();
         }

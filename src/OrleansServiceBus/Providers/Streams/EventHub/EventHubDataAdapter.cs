@@ -1,13 +1,13 @@
 ﻿
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
-using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
 
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
     /// This is a tightly packed cached structure containing an event hub message.  
@@ -17,103 +17,125 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
     {
         public Guid StreamGuid;
         public long SequenceNumber;
+        public DateTime EnqueueTimeUtc;
+        public DateTime DequeueTimeUtc;
         public ArraySegment<byte> Segment;
     }
 
-    class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
+    /// <summary>
+    /// Replication of EventHub EventData class, reconstructed from cached data CachedEventHubMessage
+    /// </summary>
+    [Serializable]
+    public class EventHubMessage
+    {
+        public EventHubMessage(CachedEventHubMessage cachedMessage)
+        {
+            int readOffset = 0;
+            StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset));
+            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+            SequenceNumber = cachedMessage.SequenceNumber;
+            EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
+            DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
+            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties();
+            object offsetObj;
+            PartitionKey = Properties.TryGetValue("PartitionKey", out offsetObj)
+                ? offsetObj as string
+                : default(string);
+            Payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).ToArray();
+        }
+
+        public IStreamIdentity StreamIdentity { get; }
+        public string PartitionKey { get; }
+        public string Offset { get; }
+        public long SequenceNumber { get; }
+        public DateTime EnqueueTimeUtc { get; }
+        public DateTime DequeueTimeUtc { get; }
+        public IDictionary<string, object> Properties { get; }
+        public byte[] Payload { get; }
+    }
+
+    /// <summary>
+    /// Default eventhub data comparer.  Implements comparisions against CachedEventHubMessage
+    /// </summary>
+    internal class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
+    {
+        public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
+
+        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken token)
+        {
+            var realToken = (EventSequenceToken)token;
+            return cachedMessage.SequenceNumber != realToken.SequenceNumber
+                ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
+                : 0 - realToken.EventIndex;
+        }
+
+        public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
+        {
+            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+            if (result != 0) return false;
+
+            int readOffset = 0;
+            string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
+        }
+    }
+
+    /// <summary>
+    /// Default event hub data adapter.  Users may subclass to override event data to stream mapping.
+    /// </summary>
+    public class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
     {
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-        private readonly Action<IDisposable> purgeAction;
         private FixedSizeBuffer currentBuffer;
 
-        public EventHubDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, Action<IDisposable> purgeAction)
+        public Action<IDisposable> PurgeAction { private get; set; }
+
+        public EventHubDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
         {
             if (bufferPool == null)
             {
                 throw new ArgumentNullException("bufferPool");
             }
-            if (purgeAction == null)
-            {
-                throw new ArgumentNullException("purgeAction");
-            }
             this.bufferPool = bufferPool;
-            this.purgeAction = purgeAction;
         }
 
-        public void QueueMessageToCachedMessage(ref CachedEventHubMessage cachedMessage, EventData queueMessage)
+        public StreamPosition QueueMessageToCachedMessage(ref CachedEventHubMessage cachedMessage, EventData queueMessage, DateTime dequeueTimeUtc)
         {
-            cachedMessage.StreamGuid = Guid.Parse(queueMessage.PartitionKey);
+            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
             cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
-            cachedMessage.Segment = SerializeMessageIntoPooledSegment(queueMessage);
-        }
-
-        // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
-        private ArraySegment<byte> SerializeMessageIntoPooledSegment(EventData queueMessage)
-        {
-            byte[] payloadBytes = queueMessage.GetBytes();
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            int size = CalculateAppendSize(streamNamespace) + CalculateAppendSize(queueMessage.Offset) + CalculateAppendSize(payloadBytes);
-
-            // get segment from current block
-            ArraySegment<byte> segment;
-            if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
-            {
-                // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
-                currentBuffer.SetPurgeAction(purgeAction);
-                // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
-                {
-                    string errmsg = String.Format(CultureInfo.InvariantCulture,
-                        "Message size is to big. MessageSize: {0}", size);
-                    throw new ArgumentOutOfRangeException("queueMessage", errmsg);
-                }
-            }
-            // encode namespace, offset, and payload into segment
-            int writeOffset = 0;
-            Append(segment, ref writeOffset, streamNamespace);
-            Append(segment, ref writeOffset, queueMessage.Offset);
-            Append(segment, ref writeOffset, payloadBytes);
-
-            return segment;
+            cachedMessage.EnqueueTimeUtc = queueMessage.EnqueuedTimeUtc;
+            cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
+            cachedMessage.Segment = EncodeMessageIntoSegment(streamPosition, queueMessage);
+            return streamPosition;
         }
 
         public IBatchContainer GetBatchContainer(ref CachedEventHubMessage cachedMessage)
         {
-            int readOffset = 0;
-            string streamNamespace = ReadNextString(cachedMessage.Segment, ref readOffset);
-            string offset = ReadNextString(cachedMessage.Segment, ref readOffset);
-            ArraySegment<byte> payload = ReadNextBytes(cachedMessage.Segment, ref readOffset);
-
-            return new EventHubBatchContainer(cachedMessage.StreamGuid, streamNamespace, offset, cachedMessage.SequenceNumber, payload.ToArray());
+            var evenHubMessage = new EventHubMessage(cachedMessage);
+            return GetBatchContainer(evenHubMessage);
         }
 
-        public StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
+        protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
+        {
+            return new EventHubBatchContainer(eventHubMessage);
+        }
+
+        public virtual StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
         {
             return new EventSequenceToken(cachedMessage.SequenceNumber, 0);
         }
 
-        public int CompareCachedMessageToSequenceToken(ref CachedEventHubMessage cachedMessage, StreamSequenceToken token)
+        public virtual StreamPosition GetStreamPosition(EventData queueMessage)
         {
-            var realToken = (EventSequenceToken) token;
-            return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                ? (int) (cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                : 0 - realToken.EventIndex;
+            Guid streamGuid = Guid.Parse(queueMessage.PartitionKey);
+            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
+            StreamSequenceToken token = new EventSequenceToken(queueMessage.SequenceNumber, 0);
+            return new StreamPosition(stremIdentity, token);
         }
 
-        public bool IsInStream(ref CachedEventHubMessage cachedMessage, Guid streamGuid, string streamNamespace)
-        {
-            // fail out early if guids does not match.  Don't incur cost of decoding namespace unless necessary.
-            if (cachedMessage.StreamGuid != streamGuid)
-            {
-                return false;
-            }
-            int readOffset = 0;
-            string decodedStreamNamespace = ReadNextString(cachedMessage.Segment, ref readOffset);
-            return decodedStreamNamespace == streamNamespace;
-        }
-
-        public bool ShouldPurge(CachedEventHubMessage cachedMessage, IDisposable purgeRequest)
+        public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, IDisposable purgeRequest)
         {
             var purgedResource = (FixedSizeBuffer) purgeRequest;
             // if we're purging our current buffer, don't use it any more
@@ -124,132 +146,48 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             return cachedMessage.Segment.Array == purgedResource.Id;
         }
 
-        /// <summary>
-        /// Calculates how much space will be needed to append the provided bytes into the segment.
-        /// </summary>
-        /// <param name="bytes"></param>
-        /// <returns></returns>
-        private static int CalculateAppendSize(byte[] bytes)
+        private ArraySegment<byte> GetSegment(int size)
         {
-            return (bytes == null || bytes.Length == 0)
-                ? sizeof(int)
-                : bytes.Length + sizeof(int);
+            // get segment from current block
+            ArraySegment<byte> segment;
+            if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
+            {
+                // no block or block full, get new block and try again
+                currentBuffer = bufferPool.Allocate();
+                currentBuffer.SetPurgeAction(PurgeAction);
+                // if this fails with clean block, then requested size is too big
+                if (!currentBuffer.TryGetSegment(size, out segment))
+                {
+                    string errmsg = String.Format(CultureInfo.InvariantCulture,
+                        "Message size is to big. MessageSize: {0}", size);
+                    throw new ArgumentOutOfRangeException("size", errmsg);
+                }
+            }
+            return segment;
         }
 
-        /// <summary>
-        /// Calculates how much space will be needed to append the provided string into the segment.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns></returns>
-        private static int CalculateAppendSize(string str)
+        // Placed object message payload into a segment.
+        private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
-            return (string.IsNullOrEmpty(str))
-                ? sizeof(int)
-                : str.Length * sizeof(char) + sizeof(int);
-        }
+            byte[] propertiesBytes = queueMessage.SerializeProperties();
+            byte[] payload = queueMessage.GetBytes();
+            // get size of namespace, offset, properties, and payload
+            int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
+            SegmentBuilder.CalculateAppendSize(propertiesBytes) +
+            SegmentBuilder.CalculateAppendSize(payload);
 
-        /// <summary>
-        /// Appends an array of bytes to the end of the segment
-        /// </summary>
-        /// <param name="writerOffset"></param>
-        /// <param name="bytes"></param>
-        /// <param name="segment"></param>
-        private static void Append(ArraySegment<byte> segment, ref int writerOffset, byte[] bytes)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException("segment");
-            }
-            if (bytes == null)
-            {
-                throw new ArgumentNullException("bytes");
-            }
+            // get segment
+            ArraySegment<byte> segment = GetSegment(size);
 
-            if (bytes.Length == 0)
-            {
-                Buffer.BlockCopy(BitConverter.GetBytes(0), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-                writerOffset += sizeof(int);
-            }
-            else
-            {
-                Buffer.BlockCopy(BitConverter.GetBytes(bytes.Length), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-                writerOffset += sizeof(int);
-                Buffer.BlockCopy(bytes, 0, segment.Array, segment.Offset + writerOffset, bytes.Length);
-                writerOffset += bytes.Length;
-            }
-        }
+            // encode namespace, offset, properties and payload into segment
+            int writeOffset = 0;
+            SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
+            SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
+            SegmentBuilder.Append(segment, ref writeOffset, payload);
 
-        /// <summary>
-        /// Appends a string to the end of the segment
-        /// </summary>
-        /// <param name="writerOffset"></param>
-        /// <param name="str"></param>
-        /// <param name="segment"></param>
-        private static void Append(ArraySegment<byte> segment, ref int writerOffset, string str)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException("segment");
-            }
-            if (str == null)
-            {
-                Buffer.BlockCopy(BitConverter.GetBytes(-1), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-                writerOffset += sizeof(int);
-            }
-            else if (string.IsNullOrEmpty(str))
-            {
-                Buffer.BlockCopy(BitConverter.GetBytes(0), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
-                writerOffset += sizeof(int);
-            }
-            else
-            {
-                var bytes = new byte[str.Length * sizeof(char)];
-                Buffer.BlockCopy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
-                Append(segment, ref writerOffset, bytes);
-            }
-        }
-
-        /// <summary>
-        /// Reads the next item in the segment as a byte array.  For performance, this is returned as a sub-segment of the original segment.
-        /// </summary>
-        /// <returns></returns>
-        private static ArraySegment<byte> ReadNextBytes(ArraySegment<byte> segment, ref int readerOffset)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException("segment");
-            }
-            int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
-            readerOffset += sizeof(int);
-            var seg = new ArraySegment<byte>(segment.Array, segment.Offset + readerOffset, size);
-            readerOffset += size;
-            return seg;
-        }
-
-        /// <summary>
-        /// Reads the next item in the segment as a string.
-        /// </summary>
-        /// <returns></returns>
-        private static string ReadNextString(ArraySegment<byte> segment, ref int readerOffset)
-        {
-            if (segment.Array == null)
-            {
-                throw new ArgumentNullException("segment");
-            }
-            int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
-            readerOffset += sizeof(int);
-            if (size < 0)
-            {
-                return null;
-            }
-            if (size == 0)
-            {
-                return string.Empty;
-            }
-            var chars = new char[size / sizeof(char)];
-            Buffer.BlockCopy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
-            readerOffset += size;
-            return new string(chars);
+            return segment;
         }
     }
 }

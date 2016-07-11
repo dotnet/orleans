@@ -5,13 +5,13 @@ using System.Globalization;
 using System.Linq;
 using Orleans.Streams;
 
-namespace Orleans.ServiceBus.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
-    internal class EventHubQueueMapper : HashRingBasedStreamQueueMapper
+    public class EventHubQueueMapper : HashRingBasedStreamQueueMapper, IEventHubQueueMapper
     {
         private readonly Dictionary<QueueId, string> partitionDictionary = new Dictionary<QueueId, string>();
 
-        internal EventHubQueueMapper(string[] partitionIds, string queueNamePrefix)
+        public EventHubQueueMapper(string[] partitionIds, string queueNamePrefix)
             : base(partitionIds.Length, queueNamePrefix)
         {
             QueueId[] queues = GetAllQueues().ToArray();

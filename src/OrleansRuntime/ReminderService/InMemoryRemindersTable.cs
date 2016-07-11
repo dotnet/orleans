@@ -19,7 +19,7 @@ namespace Orleans.Runtime.ReminderService
         //internal TableVersion TableVersion;
 
         [NonSerialized]
-        private readonly TraceLogger logger = TraceLogger.GetLogger("InMemoryReminderTable", TraceLogger.LoggerType.Runtime);
+        private readonly Logger logger = LogManager.GetLogger("InMemoryReminderTable", LoggerType.Runtime);
 
         public InMemoryRemindersTable()
         {

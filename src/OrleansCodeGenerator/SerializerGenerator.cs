@@ -78,7 +78,7 @@ namespace Orleans.CodeGenerator
                 onEncounteredType(fieldType);
             }
 
-            var members = new List<MemberDeclarationSyntax>(GetStaticFields(fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateStaticFields(fields))
             {
                 GenerateDeepCopierMethod(type, fields),
                 GenerateSerializerMethod(type, fields),
@@ -117,8 +117,12 @@ namespace Orleans.CodeGenerator
                                         .Select(_ => SF.OmittedTypeArgument())
                                         .Cast<TypeSyntax>()
                                         .ToArray()));
+                var registererClassName = className + "_" +
+                                          string.Join("_",
+                                              type.GetTypeInfo().GenericTypeParameters.Select(_ => _.Name)) + "_" +
+                                          RegistererClassSuffix;
                 classes.Add(
-                    SF.ClassDeclaration(className + RegistererClassSuffix)
+                    SF.ClassDeclaration(registererClassName)
                         .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                         .AddAttributeLists(
                             SF.AttributeList()
@@ -128,7 +132,7 @@ namespace Orleans.CodeGenerator
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
-                            GenerateConstructor(className + RegistererClassSuffix)));
+                            GenerateConstructor(registererClassName)));
             }
 
             return classes;
@@ -321,12 +325,13 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="fields">The fields.</param>
         /// <returns>Syntax for the static fields of the serializer class.</returns>
-        private static MemberDeclarationSyntax[] GetStaticFields(List<FieldInfoMember> fields)
+        private static MemberDeclarationSyntax[] GenerateStaticFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Expression<Action<Type>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
             Expression<Action> getGetter = () => SerializationManager.GetGetter(default(FieldInfo));
             Expression<Action> getReferenceSetter = () => SerializationManager.GetReferenceSetter(default(FieldInfo));
             Expression<Action> getValueSetter = () => SerializationManager.GetValueSetter(default(FieldInfo));
@@ -342,7 +347,7 @@ namespace Orleans.CodeGenerator
             foreach (var field in fields)
             {
                 var fieldInfo =
-                    getField.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax()))
+                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
                         .AddArgumentListArguments(
                             SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
                             SF.Argument(bindingFlags));
@@ -457,63 +462,17 @@ namespace Orleans.CodeGenerator
             else
             {
                 // Create an unformatted object.
+                Expression<Func<object>> getUninitializedObject =
 #if DNXCORE50
-                var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
-                    SyntaxKind.BitwiseOrExpression,
-                    BindingFlags.Instance,
-                    BindingFlags.NonPublic,
-                    BindingFlags.Public);
-                var nullLiteralExpressionArgument = SF.Argument(SF.LiteralExpression(SyntaxKind.NullLiteralExpression));
-                var typeArg = SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()));
-                var bindingFlagsArg = SF.Argument(bindingFlags);
-                var binderArg = nullLiteralExpressionArgument;
-                ArgumentSyntax ctorArgumentsArg;
-                var cons = typeInfo.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .OrderBy(p => p.GetParameters().Count()).FirstOrDefault();
-                var consParameters = cons != null ? cons.GetParameters().Select(p => p.ParameterType).ToArray() : null;
-                if (consParameters != null && consParameters.Length > 0)
-                {
-                    var separatedSyntaxList = new SeparatedSyntaxList<ExpressionSyntax>();
-                    separatedSyntaxList = consParameters
-                        .Aggregate(separatedSyntaxList, (current, t) => current.Add(SF.DefaultExpression(t.GetTypeInfo().GetTypeSyntax())));
-                    ctorArgumentsArg = SF.Argument(separatedSyntaxList.GetArrayCreationWithInitializerSyntax(
-                        SF.PredefinedType(SF.Token(SyntaxKind.ObjectKeyword))));
-                }
-                else
-                {
-                    ctorArgumentsArg = nullLiteralExpressionArgument;
-                }
-
-                var cultureInfoArg = SF.Argument(
-                    SF.IdentifierName("System").Member("Globalization").Member("CultureInfo").Member("InvariantCulture"));
-                var createInstanceArguments = new []
-                {
-                    typeArg,
-                    bindingFlagsArg,
-                    binderArg,
-                    ctorArgumentsArg,
-                    cultureInfoArg
-                };
-
-                Expression<Func<object>> getUninitializedObject = () => Activator.CreateInstance(
-                    default(Type), 
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                    null,
-                    null,
-                    System.Globalization.CultureInfo.InvariantCulture);
-                result = SF.CastExpression(
-                    type.GetTypeSyntax(),
-                    getUninitializedObject.Invoke()
-                        .AddArgumentListArguments(createInstanceArguments));
+                    () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
 #else
-                Expression<Func<object>> getUninitializedObject = 
                     () => FormatterServices.GetUninitializedObject(default(Type));
+#endif
                 result = SF.CastExpression(
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
                             SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()))));
-#endif
             }
 
             return result;

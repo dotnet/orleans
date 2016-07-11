@@ -1,6 +1,7 @@
 using System;
+using System.Reflection;
 using Orleans.GrainDirectory;
-
+using System.Linq;
 namespace Orleans
 {
     namespace Concurrency
@@ -268,7 +269,7 @@ namespace Orleans
 
         internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
         {
-            var attribs = type.GetCustomAttributes(typeof(FactoryAttribute), inherit: true);
+            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
 
             // if no attributes are specified, we default to FactoryTypes.Grain.
             if (0 == attribs.Length)

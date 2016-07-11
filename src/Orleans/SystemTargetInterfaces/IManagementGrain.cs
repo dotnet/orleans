@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
 {
@@ -19,6 +19,15 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
 
+
+        /// <summary>
+        /// Get the list of silo hosts and membership information currently known about in this cluster.
+        /// </summary>
+        /// <param name="onlyActive">Whether data on just current active silos should be returned, 
+        /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
+        /// <returns></returns>
+        Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
+
         /// <summary>
         /// Set the current log level for system runtime components.
         /// </summary>
@@ -34,10 +43,10 @@ namespace Orleans.Runtime
         /// <returns>Completion promise for this operation.</returns>
         Task SetAppLogLevel(SiloAddress[] hostsIds, int traceLevel);
         /// <summary>
-        /// Set the current log level for a particular TraceLogger, by name (with prefix matching).
+        /// Set the current log level for a particular Logger, by name (with prefix matching).
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <param name="logName">Name of the TraceLogger (with prefix matching) to change.</param>
+        /// <param name="logName">Name of the Logger (with prefix matching) to change.</param>
         /// <param name="traceLevel">New log level to use.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task SetLogLevel(SiloAddress[] hostsIds, string logName, int traceLevel);
@@ -68,27 +77,34 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
+
         /// <summary>
         /// Return the most recent grain statistics information, amalgomated across silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
+
         /// <summary>
         /// Return the most recent grain statistics information, amalgomated across all silos.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
+
         /// <summary>
-        /// Return the most recent activation count for a specific grain across all silos.
+        /// Returns the most recent detailed grain statistics information, amalgomated across silos for the specified types.
         /// </summary>
-        /// <param name="grainReference">Reference to the grain to be queried.</param>
-        /// <returns>Completion promise for this operation.</returns>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <param name="types">Array of grain types to filter the results with</param>
+        /// <returns></returns>
+        Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null,SiloAddress[] hostsIds=null);
+
         Task<int> GetGrainActivationCount(GrainReference grainReference);
         /// <summary>
         /// Return the total count of all current grain activations across all silos.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
+        /// 
         Task<int> GetTotalActivationCount();
 
         /// <summary>
@@ -134,5 +150,45 @@ namespace Orleans.Runtime
         /// <param name="configuration">XML elements and attributes to update</param>
         /// <returns></returns>
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
+
+        /// <summary>
+        /// Returns an array of all the active grain types in the system
+        /// </summary>
+        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <returns></returns>
+        Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
+
+
+#region MultiCluster Management
+
+        /// <summary>
+        /// Get the current list of multicluster gateways.
+        /// </summary>
+        /// <returns>A list of the currently known gateways</returns>
+        Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways();
+
+        /// <summary>
+        /// Get the current multicluster configuration.
+        /// </summary>
+        /// <returns>The current multicluster configuration, or null if there is none</returns>
+        Task<MultiClusterConfiguration> GetMultiClusterConfiguration();
+
+        /// <summary>
+        /// Contact all silos in all clusters and return silos that do not have the latest multi-cluster configuration. 
+        /// If some clusters and/or silos cannot be reached, an exception is thrown.
+        /// </summary>
+        /// <returns>A list of silo addresses of silos that do not have the latest configuration</returns>
+        Task<List<SiloAddress>> FindLaggingSilos();
+ 
+        /// <summary>
+        /// Configure the active multi-cluster, by injecting a multicluster configuration.
+        /// </summary>
+        /// <param name="clusters">the clusters that should be part of the active configuration</param>
+        /// <param name="comment">a comment to store alongside the configuration</param>
+        /// <param name="checkForLaggingSilosFirst">if true, checks that all clusters are reachable and up-to-date before injecting the new configuration</param>
+        /// <returns> The task completes once information has propagated to the gossip channels</returns>
+        Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true);
+
+#endregion
     }
 }

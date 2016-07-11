@@ -56,20 +56,28 @@ function RegisterSerializer(
     
     Try
     {
-    $projectItem.Save([string]::Empty)
+	    $projectItem.Save([string]::Empty)
     }
     Catch
     {
     }
-    
-    $documentEntry = $projectItem.Document
+
+	
+	Write-Host "Opening the document"
+	$window = $projectItem.Open()
+	$documentEntry = $projectItem.Document
     if ($documentEntry -eq $null) {
         Write-Error "The fileKey $fileKey had no associated document"
         return
     }
-    
-    $fullFilePath = $documentEntry.FullName
-    
+
+	$documentEntry.Activate() | Out-Null
+	$fullFilePath = $documentEntry.FullName
+	if ([String]::IsNullOrWhiteSpace($fullFilePath)) {
+        Write-Error "The fileKey $fileKey had no associated document"
+        return
+    }
+
     if (-not [System.IO.File]::Exists($fullFilePath)) {
         Write-Error "The file $fullFilePath was not found"
         return
@@ -110,6 +118,7 @@ function RegisterSerializer(
         $fileXml.Save($fullFilePath)
     }
 
+	$documentEntry.Close()
     Out-Null
 }
 

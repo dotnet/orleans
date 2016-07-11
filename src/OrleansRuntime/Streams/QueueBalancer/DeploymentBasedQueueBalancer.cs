@@ -182,7 +182,7 @@ namespace Orleans.Streams
         /// </summary>
         private BestFitBalancer<string, QueueId> GetBalancer()
         {
-            var allSiloNames = deploymentConfig.GetAllSiloInstanceNames();
+            var allSiloNames = deploymentConfig.GetAllSiloNames();
             // rebuild balancer with new list of instance names
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }

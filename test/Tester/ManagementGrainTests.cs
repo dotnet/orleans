@@ -2,13 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Xunit.Abstractions;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -16,19 +18,44 @@ namespace UnitTests.Management
 {
     public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
+        private readonly ITestOutputHelper output;
         private IManagementGrain mgmtGrain;
         
-        public ManagementGrainTests()
+        public ManagementGrainTests(DefaultClusterFixture fixture, ITestOutputHelper output)
+            : base(fixture)
         {
+            this.output = output;
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
-        public void GetHosts()
+        public async Task GetHosts()
         {
+            if (HostedCluster.SecondarySilos.Count == 0)
+            {
+                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+
+            var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
             Dictionary<SiloAddress, SiloStatus> siloStatuses = mgmtGrain.GetHosts(true).Result;
-            Assert.IsNotNull(siloStatuses, "Got some silo statuses");
-            Assert.AreEqual(2, siloStatuses.Count, "Number of silo statuses");
+            Assert.NotNull(siloStatuses);
+            Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        public async Task GetDetailedHosts()
+        {
+            if (HostedCluster.SecondarySilos.Count == 0)
+            {
+                HostedCluster.StartAdditionalSilo();
+                await HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+
+            var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
+            var siloStatuses = mgmtGrain.GetDetailedHosts(true).Result;
+            Assert.NotNull(siloStatuses);
+            Assert.Equal(numberOfActiveSilos, siloStatuses.Length);
         }
 
 
@@ -36,10 +63,10 @@ namespace UnitTests.Management
         public void GetSimpleGrainStatistics()
         {
             SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Initial");
-            Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
+            Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
             foreach (var s in stats)
             {
-                Assert.IsFalse(s.GrainType.EndsWith("Activation"), "Grain type name should not end with 'Activation' - " + s.GrainType);
+                Assert.False(s.GrainType.EndsWith("Activation"), "Grain type name should not end with 'Activation' - " + s.GrainType);
             }
         }
 
@@ -60,7 +87,7 @@ namespace UnitTests.Management
             where TGrain : TGrainInterface
         {
             SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Before Create");
-            Assert.IsTrue(stats.Length > 0, "Got some grain statistics: " + stats.Length);
+            Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
             string grainType = typeof(TGrain).FullName;
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
@@ -68,10 +95,10 @@ namespace UnitTests.Management
             var grain1 = GrainClient.GrainFactory.GetGrain<TGrainInterface>(random.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = GetSimpleGrainStatistics("After Invoke");
-            Assert.IsTrue(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
+            Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
             int expectedActivationsCount = initialActivationsCount + 1;
             int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            Assert.AreEqual(expectedActivationsCount, actualActivationsCount, "Activation count for grain after activation: " + grainType);
+            Assert.Equal(expectedActivationsCount, actualActivationsCount);
         }
 
         private SimpleGrainStatistic[] GetSimpleGrainStatistics(string when)
@@ -80,7 +107,7 @@ namespace UnitTests.Management
             StringBuilder sb = new StringBuilder();
             foreach (var s in stats) sb.AppendLine().Append(s);
             sb.AppendLine();
-            Console.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
+            output.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);
             return stats;
         }
     }

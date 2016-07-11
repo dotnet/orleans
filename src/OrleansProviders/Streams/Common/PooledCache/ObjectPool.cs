@@ -15,6 +15,11 @@ namespace Orleans.Providers.Streams.Common
         private readonly Stack<T> pool;
         private readonly Func<IObjectPool<T>, T> factoryFunc;
 
+        /// <summary>
+        /// Simple object pool
+        /// </summary>
+        /// <param name="factoryFunc"></param>
+        /// <param name="initialCapacity"></param>
         public ObjectPool(Func<IObjectPool<T>, T> factoryFunc, int initialCapacity = DefaultPoolCapacity)
         {
             if (factoryFunc == null)
@@ -29,6 +34,10 @@ namespace Orleans.Providers.Streams.Common
             pool = new Stack<T>(initialCapacity);
         }
 
+        /// <summary>
+        /// Allocates a pooled resource
+        /// </summary>
+        /// <returns></returns>
         public virtual T Allocate()
         {
             return pool.Count != 0
@@ -36,6 +45,10 @@ namespace Orleans.Providers.Streams.Common
                 : factoryFunc(this);
         }
 
+        /// <summary>
+        /// Returns a resource to the pool
+        /// </summary>
+        /// <param name="resource"></param>
         public virtual void Free(T resource)
         {
             pool.Push(resource);

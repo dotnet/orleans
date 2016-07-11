@@ -13,11 +13,10 @@ namespace Orleans.AzureUtils
     {
         private OrleansSiloInstanceManager siloInstanceManager;
         private ClientConfiguration config;
-        private readonly object lockable = new object();
 
         #region Implementation of IGatewayListProvider
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration conf, TraceLogger traceLogger)
+        public async Task InitializeGatewayListProvider(ClientConfiguration conf, Logger logger)
         {
             config = conf;
             siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);
@@ -25,11 +24,8 @@ namespace Orleans.AzureUtils
         // no caching
         public Task<IList<Uri>> GetGateways()
         {
-            lock (lockable)
-            {
-                // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
-                return siloInstanceManager.FindAllGatewayProxyEndpoints();
-            }
+            // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
+            return siloInstanceManager.FindAllGatewayProxyEndpoints();
         }
 
         public TimeSpan MaxStaleness 

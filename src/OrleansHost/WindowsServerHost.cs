@@ -100,7 +100,7 @@ namespace Orleans.Runtime.Host
 			catch (Exception exc)
 			{
 				SiloHost.ReportStartupError(exc);
-				TraceLogger.CreateMiniDump();
+				LogManager.CreateMiniDump();
 				ok = false;
 			}
 

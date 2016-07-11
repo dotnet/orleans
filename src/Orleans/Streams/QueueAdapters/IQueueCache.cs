@@ -3,13 +3,8 @@ using System.Collections.Generic;
 
 namespace Orleans.Streams
 {
-    public interface IQueueCache
+    public interface IQueueCache : IQueueFlowController
     {
-        /// <summary>
-        /// The limit of the maximum number of items that can be added to the cache in a single AddToCache operation.
-        /// </summary>
-        int MaxAddCount { get; }
-
         /// <summary>
         /// Add messages to the cache
         /// </summary>
@@ -27,11 +22,10 @@ namespace Orleans.Streams
         /// Acquire a stream message cursor.  This can be used to retreave messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamIdentity"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token);
+        IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token);
 
         /// <summary>
         /// Returns true if this cache is under pressure.

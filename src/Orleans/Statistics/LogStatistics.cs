@@ -15,13 +15,13 @@ namespace Orleans.Runtime
         private readonly TimeSpan reportFrequency;
         private AsyncTaskSafeTimer reportTimer;
 
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         public IStatisticsPublisher StatsTablePublisher;
 
         internal LogStatistics(TimeSpan writeInterval, bool isSilo)
         {
             reportFrequency = writeInterval;
-            logger = TraceLogger.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", LoggerType.Runtime);
         }
 
         internal void Start()
@@ -110,7 +110,7 @@ namespace Orleans.Runtime
             int newSize = logMsgBuilder.Length + Environment.NewLine.Length + counterData.Length;
             int newSizeWithPostfix = newSize + STATS_LOG_POSTFIX.Length + Environment.NewLine.Length;
 
-            if (newSizeWithPostfix >= TraceLogger.MAX_LOG_MESSAGE_SIZE)
+            if (newSizeWithPostfix >= LogManager.MAX_LOG_MESSAGE_SIZE)
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);

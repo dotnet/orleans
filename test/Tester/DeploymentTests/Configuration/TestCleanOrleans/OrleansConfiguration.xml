@@ -12,7 +12,7 @@
   <Defaults>
     <Networking Address="" Port="0" Subnet="127"/>
     <Scheduler MaxActiveThreads="10" />
-    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" WriteMessagingTraces="false"/>
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log"/>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="10010" />

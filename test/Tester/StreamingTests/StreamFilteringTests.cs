@@ -1,23 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 
 namespace Tester.StreamingTests
 {
-    [ExcludeFromCodeCoverage]
-    public abstract class StreamFilteringTestsBase : OrleansTestingBase, IDisposable
+    public abstract class StreamFilteringTestsBase : OrleansTestingBase
     {
         protected Guid StreamId;
         protected string StreamNamespace;
@@ -29,27 +29,6 @@ namespace Tester.StreamingTests
         {
             StreamId = Guid.NewGuid();
             StreamNamespace = Guid.NewGuid().ToString();
-        }
-
-        public virtual void Dispose()
-        {
-            if (StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME.Equals(streamProviderName))
-            {
-                try
-                {
-                    logger.Info("TestCleanup - DeleteAllUsedAzureQueues {0}", streamProviderName);
-                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
-                        streamProviderName,
-                        TestingSiloHost.Instance.DeploymentId,
-                        StorageTestConstants.DataConnectionString,
-                        logger).Wait();
-                }
-                catch (Exception exc)
-                {
-                    if (logger != null)
-                        logger.Warn(0, "Ignoring error in TestCleanup from DeleteAllUsedAzureQueues {0}", exc);
-                }
-            }
         }
 
         // Test support functions
@@ -250,165 +229,129 @@ namespace Tester.StreamingTests
         }
     }
 
-    public class StreamFilteringTestsSMSFixture : BaseClusterFixture
+    public class StreamFilteringTests_SMS : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_SMS.Fixture>
     {
-        public StreamFilteringTestsSMSFixture() 
-            : base(CreateCluster())
+        public class Fixture : BaseTestClusterFixture
         {
+            public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(2);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                return new TestCluster(options);
+            }
         }
 
-        private static TestingSiloHost CreateCluster()
+        public StreamFilteringTests_SMS()
         {
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingTesting_SMS.xml"),
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            var clientOptions = new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            };
-
-            return new TestingSiloHost(siloOptions, clientOptions);
-        }
-    }
-
-    public class StreamFilteringTestsAQFixture : BaseClusterFixture
-    {
-        public StreamFilteringTestsAQFixture() 
-            : base(CreateCluster())
-        {
+            streamProviderName = Fixture.StreamProvider;
         }
 
-        private static TestingSiloHost CreateCluster()
-        {
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            var clientOptions = new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-            };
-
-            return new TestingSiloHost(siloOptions, clientOptions);
-        }
-    }
-
-    [ExcludeFromCodeCoverage]
-    public class StreamFilteringTests_SMS : StreamFilteringTestsBase, IClassFixture<StreamFilteringTestsSMSFixture>
-    {
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_Basic()
         {
-            streamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
             await Test_Filter_EvenOdd(true);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_EvenOdd()
         {
-            streamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
             await Test_Filter_EvenOdd();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_BadFunc()
         {
-            streamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
-            await Xunit.Assert.ThrowsAsync(typeof(ArgumentException), async () =>
-            {
-                try
-                {
-                    await Test_Filter_BadFunc();
-                }
-                catch (ArgumentException ae)
-                {
-                    logger.Info("Got the expected exception type: {0}", ae);
-                    throw;
-                }
-            });
+            await Assert.ThrowsAsync(typeof(ArgumentException), () =>
+                 Test_Filter_BadFunc());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_TwoObsv_Different()
         {
-            streamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
             await Test_Filter_TwoObsv_Different();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_TwoObsv_Same()
         {
-            streamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
             await Test_Filter_TwoObsv_Same();
         }
     }
 
-    [ExcludeFromCodeCoverage]
-    public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTestsAQFixture>
+    public class StreamFilteringTests_AQ : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_AQ.Fixture>, IDisposable
     {
-        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
+        private readonly string deploymentId;
+
+        public class Fixture : BaseTestClusterFixture
+        {
+            public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(2);
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
+                return new TestCluster(options);
+            }
+
+            public override void Dispose()
+            {
+                var deploymentId = this.HostedCluster.DeploymentId;
+                base.Dispose();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString)
+                    .Wait();
+            }
+        }
+
+        public StreamFilteringTests_AQ(Fixture fixture)
+        {
+            this.deploymentId = fixture.HostedCluster.DeploymentId;
+            streamProviderName = Fixture.StreamProvider;
+        }
+
+        public virtual void Dispose()
+        {
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
+                    streamProviderName,
+                    this.deploymentId,
+                    StorageTestConstants.DataConnectionString).Wait();
+            }
+
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_Basic()
         {
-            streamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
             await Test_Filter_EvenOdd(true);
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_EvenOdd()
         {
-            streamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
             await Test_Filter_EvenOdd();
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_BadFunc()
         {
-            streamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
-            await Xunit.Assert.ThrowsAsync(typeof(ArgumentException), async () =>
-            {
-                try
-                {
-                    await Test_Filter_BadFunc();
-                }
-                catch (ArgumentException ae)
-                {
-                    logger.Info("Got the expected exception type: {0}", ae);
-                    throw;
-                }
-
-            });
+            await Assert.ThrowsAsync(typeof(ArgumentException), () =>
+                Test_Filter_BadFunc());
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_TwoObsv_Different()
         {
-            streamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
             await Test_Filter_TwoObsv_Different();
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_TwoObsv_Same()
         {
-            streamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
             await Test_Filter_TwoObsv_Same();
         }
     }

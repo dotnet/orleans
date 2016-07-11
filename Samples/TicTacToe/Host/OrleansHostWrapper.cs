@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace Host
@@ -80,7 +80,7 @@ namespace Host
         {
             string deploymentId = null;
 
-            string configFileName = "DevTestServerConfiguration.xml";
+            string configFileName = null;
             string siloName = Dns.GetHostName(); // Default to machine name
 
             int argPos = 1;
@@ -143,8 +143,18 @@ namespace Host
                 }
             }
 
-            siloHost = new SiloHost(siloName);
-            siloHost.ConfigFileName = configFileName;
+            ClusterConfiguration config;
+            if (!string.IsNullOrWhiteSpace(configFileName))
+            {
+                config = new ClusterConfiguration();
+                config.LoadFromFile(configFileName);
+            }
+            else
+            {
+                config = ClusterConfiguration.LocalhostPrimarySilo();
+            }
+
+            siloHost = new SiloHost(siloName, config);
             if (deploymentId != null)
                 siloHost.DeploymentId = deploymentId;
 

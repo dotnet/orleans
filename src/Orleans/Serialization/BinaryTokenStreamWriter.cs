@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 
 using Orleans.Runtime;
@@ -284,7 +285,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (t.IsGenericType)
+            if (t.GetTypeInfo().IsGenericType)
             {
                 if (typeTokens.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out token))
                 {

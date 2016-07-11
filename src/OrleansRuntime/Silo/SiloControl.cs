@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Providers;
 
@@ -10,7 +11,7 @@ namespace Orleans.Runtime
     internal class SiloControl : SystemTarget, ISiloControl
     {
         private readonly Silo silo;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("SiloControl", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("SiloControl", LoggerType.Runtime);
 
         public SiloControl(Silo silo)
             : base(Constants.SiloControlId, silo.SiloAddress)
@@ -30,7 +31,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetSystemLogLevel={0}", newTraceLevel);
-            TraceLogger.SetRuntimeLogLevel(newTraceLevel);
+            LogManager.SetRuntimeLogLevel(newTraceLevel);
             silo.LocalConfig.DefaultTraceLevel = newTraceLevel;
             return TaskDone.Done;
         }
@@ -39,7 +40,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetAppLogLevel={0}", newTraceLevel);
-            TraceLogger.SetAppLogLevel(newTraceLevel);
+            LogManager.SetAppLogLevel(newTraceLevel);
             return TaskDone.Done;
         }
 
@@ -47,7 +48,7 @@ namespace Orleans.Runtime
         {
             var newTraceLevel = (Severity)traceLevel;
             logger.Info("SetLogLevel[{0}]={1}", logName, newTraceLevel);
-            TraceLogger log = TraceLogger.FindLogger(logName);
+            LoggerImpl log = LogManager.FindLogger(logName);
             
             if (log == null) throw new ArgumentException(string.Format("Logger {0} not found", logName));
             
@@ -87,6 +88,12 @@ namespace Orleans.Runtime
             return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetGrainStatistics());
         }
 
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
+        {
+            if (logger.IsVerbose) logger.Verbose("GetDetailedGrainStatistics");
+            return Task.FromResult(InsideRuntimeClient.Current.Catalog.GetDetailedGrainStatistics(types));
+        }
+
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.Info("GetSimpleGrainStatistics");
@@ -115,18 +122,37 @@ namespace Orleans.Runtime
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
-            IProvider provider = silo.AllSiloProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
+            IReadOnlyCollection<IProvider> allProviders = silo.AllSiloProviders;
+            IProvider provider = allProviders.FirstOrDefault(pr => pr.GetType().FullName.Equals(providerTypeFullName) && pr.Name.Equals(providerName));
             if (provider == null)
             {
-                throw new ArgumentException("Could not find provider for type " + providerTypeFullName + " and name " + providerName);
+                string allProvidersList = Utils.EnumerableToString(
+                    allProviders.Select(p => string.Format(
+                        "[Name = {0} Type = {1} Location = {2}]",
+                        p.Name, p.GetType().FullName, p.GetType().GetTypeInfo().Assembly.Location)));
+                string error = string.Format(
+                    "Could not find provider for type {0} and name {1} \n"
+                    + " Providers currently loaded in silo are: {2}", 
+                    providerTypeFullName, providerName, allProvidersList);
+                logger.Error(ErrorCode.Provider_ProviderNotFound, error);
+                throw new ArgumentException(error);
             }
 
-            var controllable = provider as IControllable;
+            IControllable controllable = provider as IControllable;
             if (controllable == null)
             {
-                throw new ArgumentException("The found provider of type " + providerTypeFullName + " and name " + providerName + " is not controllable.");
+                string error = string.Format(
+                    "The found provider of type {0} and name {1} is not controllable.", 
+                    providerTypeFullName, providerName);
+                logger.Error(ErrorCode.Provider_ProviderNotControllable, error);
+                throw new ArgumentException(error);
             }
             return controllable.ExecuteCommand(command, arg);
+        }
+
+        public Task<string[]> GetGrainTypeList()
+        {
+            return Task.FromResult(GrainTypeManager.Instance.GetGrainTypeList());
         }
 
         #endregion

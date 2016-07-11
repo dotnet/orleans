@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
@@ -21,9 +23,21 @@ namespace Orleans.Runtime.Providers
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
 
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private InvokeInterceptor invokeInterceptor;
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
+
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            this.invokeInterceptor = interceptor;
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
+
         public Guid ServiceId { get; private set; }
         public string SiloIdentity { get; private set; }
 
@@ -74,7 +88,7 @@ namespace Orleans.Runtime.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public string ExecutingEntityIdentity()
@@ -112,7 +126,7 @@ namespace Orleans.Runtime.Providers
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
-            return new EquallyDevidedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
+            return new EquallyDividedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
         }
 
         public bool InSilo { get { return true; } }
@@ -189,11 +203,11 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceData.GetRemoteInterfaces(handlerType).Values;
+            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if(interfaces.Count != 1)
                 throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
 
-            var interfaceId = CodeGeneration.GrainInterfaceData.ComputeInterfaceId(interfaces.First());
+            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
             var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker) invoker;
@@ -222,6 +236,11 @@ namespace Orleans.Runtime.Providers
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
             return pullingAgentManager;
+        }
+
+        public Task<object> CallInvokeInterceptor(MethodInfo method, InvokeMethodRequest request, IAddressable target, IGrainMethodInvoker invoker)
+        {
+            return this.invokeInterceptor(method, request, (IGrain)target, invoker);
         }
     }
 }

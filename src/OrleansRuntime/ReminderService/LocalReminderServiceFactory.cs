@@ -9,11 +9,11 @@ namespace Orleans.Runtime
 {
     internal class LocalReminderServiceFactory
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal LocalReminderServiceFactory()
         {
-            logger = TraceLogger.GetLogger("ReminderFactory", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ReminderFactory", LoggerType.Runtime);
         }
 
         internal IReminderService CreateReminderService(Silo silo, IGrainFactory grainFactory, TimeSpan iniTimeSpan)

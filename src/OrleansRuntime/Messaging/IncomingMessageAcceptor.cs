@@ -213,7 +213,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (ima == null)
                 {
-                    var logger = TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                    var logger = LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                     
                     if (result.AsyncState == null)
                         logger.Warn(ErrorCode.Messaging_IMA_AcceptCallbackNullState, "AcceptCallback invoked with a null unexpected async state");
@@ -298,7 +298,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception ex)
             {
-                var logger = ima != null ? ima.Log : TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                var logger = ima != null ? ima.Log : LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
             }
         }
@@ -381,9 +381,6 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
-
             // See it's a Ping message, and if so, short-circuit it
             object pingObj;
             var requestContext = msg.RequestContextData;
@@ -453,7 +450,6 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 if (Log.IsVerbose2) Log.Verbose2("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
-                if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueForForwarding);
                 MessageCenter.OutboundQueue.SendMessage(msg);
                 return;
             }
@@ -515,7 +511,7 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    Sock.BeginReceive(_buffer.ReceiveBuffer, SocketFlags.None, callback, this);
+                    Sock.BeginReceive(_buffer.BuildReceiveBuffer(), SocketFlags.None, callback, this);
                 }
                 catch (Exception ex)
                 {

@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private SafeTimer timer;
         private ITimeInterval timeSinceIssued;
         private IMessagingConfiguration config;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("CallbackData");
+        private static readonly Logger logger = LogManager.GetLogger("CallbackData");
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
@@ -144,8 +144,6 @@ namespace Orleans.Runtime
                     unregister();
                 }     
             }
-            if (Message.WriteMessagingTraces) response.AddTimestamp(Message.LifecycleTag.InvokeIncoming);
-            if (logger.IsVerbose2) logger.Verbose2("Message {0} timestamps: {1}", response, response.GetTimestampString());
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
                 ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);

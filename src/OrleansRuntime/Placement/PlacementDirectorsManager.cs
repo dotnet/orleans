@@ -55,7 +55,7 @@ namespace Orleans.Runtime.Placement
                 var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain, context);
                 if (res == null)
                 {
-                    throw new KeyNotFoundException("No activation for client " + targetGrain);
+                    throw new ClientNotAvailableException(targetGrain);
                 }
                 return res;
             }

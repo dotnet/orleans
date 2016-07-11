@@ -13,13 +13,13 @@ namespace Orleans.Serialization
     {
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, object> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, object>();
 
-        private TraceLogger logger;
+        private Logger logger;
 
         /// <summary>
         /// Initializes the external serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
@@ -35,7 +35,13 @@ namespace Orleans.Serialization
             {
                 if (!Parsers.ContainsKey(itemType.TypeHandle))
                 {
-                    var parser = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                    var prop = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static);
+                    if (prop == null)
+                    {
+                        return false;
+                    }
+
+                    var parser = prop.GetValue(null, null);
                     Parsers.TryAdd(itemType.TypeHandle, parser);
                 }
                 return true;

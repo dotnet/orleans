@@ -10,7 +10,8 @@ namespace Orleans.Streams
     [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     internal interface IStreamConsumerExtension : IGrainExtension
     {
-        Task<StreamHandshakeToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
         Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item, StreamHandshakeToken handshakeToken);
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);

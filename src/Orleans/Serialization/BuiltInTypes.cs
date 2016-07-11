@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.CodeGeneration;

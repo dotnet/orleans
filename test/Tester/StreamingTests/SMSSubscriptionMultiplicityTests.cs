@@ -1,46 +1,39 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Xunit;
 using Orleans;
-using Orleans.Providers.Streams.SimpleMessageStream;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 using Tester;
 
 namespace UnitTests.StreamingTests
 {
-    public class SMSSubscriptionMultiplicityTestsFixture : BaseClusterFixture
+    public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTests.Fixture>
     {
-        public const string SMSStreamProviderName = "SMSProvider";
-
-        public SMSSubscriptionMultiplicityTestsFixture()
-            : base(new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-                }, new TestingClientOptions()
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<SimpleMessageStreamProvider>(SMSStreamProviderName, new Dictionary<string, string>());
-                    },
-                }))
+        public class Fixture : BaseTestClusterFixture
         {
-        }
-    }
+            public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-    public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTestsFixture>
-    {
-        
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(2);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
+                return new TestCluster(options);
+            }
+        }
+
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
         private SubscriptionMultiplicityTestRunner runner;
         
         public SMSSubscriptionMultiplicityTests()
         {
-            runner = new SubscriptionMultiplicityTestRunner(SMSSubscriptionMultiplicityTestsFixture.SMSStreamProviderName, GrainClient.Logger);
+            runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, GrainClient.Logger);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

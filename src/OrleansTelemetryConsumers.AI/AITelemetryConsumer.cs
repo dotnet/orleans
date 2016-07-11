@@ -125,5 +125,8 @@ namespace Orleans.TelemetryConsumers.AI
                 _client.TrackTrace(message, sev, properties);
             }
         }
+
+        public void Flush() { }
+        public void Close() { }
     }
 }

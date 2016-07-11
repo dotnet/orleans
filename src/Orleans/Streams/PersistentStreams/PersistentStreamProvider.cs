@@ -41,7 +41,8 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
         private PersistentStreamProviderConfig myConfig;
-        private const string STARTUP_STATE = "StartupState";
+        internal const string StartupStatePropertyName = "StartupState";
+        internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
         private PersistentStreamProviderState startupState;
 
         public string                   Name { get; private set; }
@@ -61,21 +62,21 @@ namespace Orleans.Providers.Streams.Common
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             string startup;
-            if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
+            if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {
                 if(!Enum.TryParse(startup, true, out startupState))
                     throw new ArgumentException(
-                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, STARTUP_STATE, config.Name));
+                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, StartupStatePropertyName, config.Name));
             }
             else
-                startupState = PersistentStreamProviderState.AgentsStarted;
+                startupState = StartupStateDefaultValue;
 
             logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, Adapter {2} and config {3}, {4} = {5}.",
                 typeof(TAdapterFactory).Name, 
                 Name, 
                 queueAdapter.Name,
                 myConfig,
-                STARTUP_STATE, startupState);
+                StartupStatePropertyName, startupState);
         }
 
         public async Task Start()

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
+using Orleans.Core;
 
 namespace Orleans.Runtime
 {
@@ -96,7 +98,7 @@ namespace Orleans.Runtime
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1032:ImplementStandardExceptionConstructors")]
     public class DeadlockException : OrleansException
     {
-        internal IEnumerable<Tuple<GrainId, int, int>> CallChain { get; private set; }
+        internal IEnumerable<Tuple<GrainId, string>> CallChain { get; private set; }
 
         public DeadlockException() : base("Deadlock between grain calls") {}
 
@@ -104,11 +106,11 @@ namespace Orleans.Runtime
 
         public DeadlockException(string message, Exception innerException) : base(message, innerException) { }
 
-        internal DeadlockException(IEnumerable<Tuple<GrainId, int, int>> callChain)
-            : base(String.Format("Deadlock Exception for grain call chain {0}.", Utils.EnumerableToString(callChain, 
-                            elem => String.Format("{0}.{1}.{2}", elem.Item1, elem.Item2, elem.Item3)))) 
+        internal DeadlockException(List<RequestInvocationHistory> callChain)
+            : base(String.Format("Deadlock Exception for grain call chain {0}.", Utils.EnumerableToString(callChain,
+                        elem => String.Format("{0}.{1}", elem.GrainId, elem.DebugContext))))
         {
-            CallChain = callChain;
+            CallChain = callChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList();
         }
 
         protected DeadlockException(SerializationInfo info, StreamingContext context)
@@ -116,7 +118,7 @@ namespace Orleans.Runtime
         {
             if (info != null)
             {
-                CallChain = (IEnumerable<Tuple<GrainId, int, int>>)info.GetValue("CallChain", typeof(IEnumerable<Tuple<GrainId, int, int>>));
+                CallChain = (IEnumerable<Tuple<GrainId, string>>)info.GetValue("CallChain", typeof(IEnumerable<Tuple<GrainId, string>>));
             }
         }
 
@@ -124,7 +126,7 @@ namespace Orleans.Runtime
         {
             if (info != null)
             {
-                info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<Tuple<GrainId, int, int>>));
+                info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<Tuple<GrainId, string>>));
             }
 
             base.GetObjectData(info, context);
@@ -172,6 +174,21 @@ namespace Orleans.Runtime
         public InvalidSchedulingContextException(string message, Exception innerException) : base(message, innerException) { }
 
         protected InvalidSchedulingContextException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+    }
+
+    /// <summary>
+    /// Indicates that a client is not longer reachable.
+    /// </summary>
+    [Serializable]
+    public class ClientNotAvailableException : OrleansException
+    {
+        internal ClientNotAvailableException(IGrainIdentity clientId) : base("No activation for client " + clientId) { }
+        internal ClientNotAvailableException(string msg) : base(msg) { }
+        internal ClientNotAvailableException(string message, Exception innerException) : base(message, innerException) { }
+
+        protected ClientNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
     }

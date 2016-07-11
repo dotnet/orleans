@@ -15,7 +15,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
 
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -131,12 +131,12 @@ namespace Orleans.CodeGenerator
         private static MemberDeclarationSyntax[] GenerateInvokeMethods(Type grainType, Action<Type> onEncounteredType)
         {
             var baseReference = SF.BaseExpression();
-            var methods = GrainInterfaceData.GetMethods(grainType);
+            var methods = GrainInterfaceUtils.GetMethods(grainType);
             var members = new List<MemberDeclarationSyntax>();
             foreach (var method in methods)
             {
                 onEncounteredType(method.ReturnType);
-                var methodId = GrainInterfaceData.ComputeMethodId(method);
+                var methodId = GrainInterfaceUtils.ComputeMethodId(method);
                 var methodIdArgument =
                     SF.Argument(SF.LiteralExpression(SyntaxKind.NumericLiteralExpression, SF.Literal(methodId)));
 
@@ -221,17 +221,17 @@ namespace Orleans.CodeGenerator
         private static ArgumentSyntax GetInvokeOptions(MethodInfo method)
         {
             var options = new List<ExpressionSyntax>();
-            if (GrainInterfaceData.IsReadOnly(method))
+            if (GrainInterfaceUtils.IsReadOnly(method))
             {
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.ReadOnly.ToString()));
             }
 
-            if (GrainInterfaceData.IsUnordered(method))
+            if (GrainInterfaceUtils.IsUnordered(method))
             {
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.Unordered.ToString()));
             }
 
-            if (GrainInterfaceData.IsAlwaysInterleave(method))
+            if (GrainInterfaceUtils.IsAlwaysInterleave(method))
             {
                 options.Add(typeof(InvokeMethodOptions).GetNameSyntax().Member(InvokeMethodOptions.AlwaysInterleave.ToString()));
             }
@@ -255,9 +255,9 @@ namespace Orleans.CodeGenerator
             return SF.Argument(SF.NameColon("options"), SF.Token(SyntaxKind.None), allOptions);
         }
 
-        private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg)
+         private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex)
         {
-            var argIdentifier = arg.Name.ToIdentifierName();
+            var argIdentifier = arg.GetOrCreateName(argIndex).ToIdentifierName();
 
             // Addressable arguments must be converted to references before passing.
             if (typeof(IAddressable).IsAssignableFrom(arg.ParameterType)
@@ -278,7 +278,7 @@ namespace Orleans.CodeGenerator
             var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceId);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
-                SF.Literal(GrainInterfaceData.GetGrainInterfaceId(grainType)));
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
             return
                 SF.PropertyDeclaration(typeof(int).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
@@ -295,8 +295,8 @@ namespace Orleans.CodeGenerator
 
             var interfaceIds =
                 new HashSet<int>(
-                    new[] { GrainInterfaceData.GetGrainInterfaceId(grainType) }.Concat(
-                        GrainInterfaceData.GetRemoteInterfaces(grainType).Keys));
+                    new[] { GrainInterfaceUtils.GetGrainInterfaceId(grainType) }.Concat(
+                        GrainInterfaceUtils.GetRemoteInterfaces(grainType).Keys));
 
             var returnValue = default(BinaryExpressionSyntax);
             foreach (var interfaceId in interfaceIds)

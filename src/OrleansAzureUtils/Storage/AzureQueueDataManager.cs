@@ -50,7 +50,7 @@ namespace Orleans.AzureUtils
 
         private string connectionString { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly CloudQueueClient queueOperationsClient;
         private CloudQueue queue;
 
@@ -63,7 +63,7 @@ namespace Orleans.AzureUtils
         {
             AzureStorageUtils.ValidateQueueName(queueName);
 
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = queueName;
             connectionString = storageConnectionString;
 
@@ -84,7 +84,7 @@ namespace Orleans.AzureUtils
         {
             AzureStorageUtils.ValidateQueueName(queueName);
 
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = deploymentId + "-" + queueName;
             AzureStorageUtils.ValidateQueueName(QueueName);
             connectionString = storageConnectionString;
@@ -162,7 +162,9 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Clearing a queue: {0}", QueueName);
             try
             {
-                await Task.Factory.FromAsync(queue.BeginClear, queue.EndClear, null);
+                // that way we don't have first to create the queue to be able later to delete it.
+                CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
+                await Task.Factory.FromAsync(queueRef.BeginClear, queueRef.EndClear, null);
                 logger.Info(ErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (Exception exc)

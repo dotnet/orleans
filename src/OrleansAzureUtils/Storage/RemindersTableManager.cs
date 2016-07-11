@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
@@ -94,13 +93,13 @@ namespace Orleans.Runtime.ReminderService
             }
             catch (TimeoutException te)
             {
-                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
+                string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
                 singleton.Logger.Error(ErrorCode.AzureTable_38, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
-                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
                 singleton.Logger.Error(ErrorCode.AzureTable_39, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }

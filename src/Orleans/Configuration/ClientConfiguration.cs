@@ -7,6 +7,7 @@ using System.Text;
 using System.Xml;
 using Orleans.Providers;
 using System.Reflection;
+using System.Threading;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -83,7 +84,6 @@ namespace Orleans.Runtime.Configuration
 
         public Severity DefaultTraceLevel { get; set; }
         public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
-        public bool WriteMessagingTraces { get; set; }
         public bool TraceToConsole { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
         public bool PropagateActivityId { get; set; }
@@ -184,7 +184,6 @@ namespace Orleans.Runtime.Configuration
             TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
-            WriteMessagingTraces = false;
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
@@ -353,10 +352,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerTypeInfo))
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
@@ -414,7 +413,7 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendLine("Client Configuration:");
             sb.Append("   Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
-            sb.Append("   Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("   Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("   Gateway Provider: ").Append(GatewayProvider);
             if (GatewayProvider == GatewayProviderType.None)
             {
@@ -461,6 +460,13 @@ namespace Orleans.Runtime.Configuration
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
+            sb.Append("   .NET: ").AppendLine();
+            int workerThreads;
+            int completionPortThreads;
+            ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
             sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
@@ -497,7 +503,26 @@ namespace Orleans.Runtime.Configuration
                     if (!UseAzureSystemStore && !HasStaticGateways)
                         throw new ArgumentException("Config does not specify GatewayProviderType, and also does not have the adequate defaults: no Azure and or Gateway element(s) are specified.","GatewayProvider");
                     break;
+                case GatewayProviderType.SqlServer:
+                    if (!UseSqlSystemStore)
+                        throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but DeploymentId or DataConnectionString are not specified or not complete.", "GatewayProvider");
+                    break;
+                case GatewayProviderType.ZooKeeper:
+                    break;
             }
+        }
+
+        /// <summary>
+        /// Retuurns a ClientConfiguration object for connecting to a local silo (for testing).
+        /// </summary>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClientConfiguration object that can be passed to GrainClient class for initialization</returns>
+        public static ClientConfiguration LocalhostSilo(int gatewayPort = 40000)
+        {
+            var config = new ClientConfiguration {GatewayProvider = GatewayProviderType.Config};
+            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayPort));
+
+            return config;
         }
     }
 }

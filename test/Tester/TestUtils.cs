@@ -1,23 +1,23 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
+using Xunit;
 
 namespace Tester
 {
     public class TestUtils
     {
-        protected static readonly Random random = new Random();
+        public static readonly Random Random = new Random();
 
         public static long GetRandomGrainId()
         {
-            return random.Next();
+            return Random.Next();
         }
 
         public static void CheckForAzureStorage()
@@ -26,8 +26,7 @@ namespace Tester
 
             if (!usingLocalWAS)
             {
-                string msg = "Tests are using Azure Cloud Storage, not local WAS emulator.";
-                Console.WriteLine(msg);
+                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 
@@ -36,28 +35,8 @@ namespace Tester
             {
                 string errorMsg = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMsg);
-                Assert.Inconclusive(errorMsg);
+                throw new SkipException(errorMsg);
             }
-        }
-
-        public static string DumpTestContext(TestContext context)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendFormat(@"TestName={0}", context.TestName).AppendLine();
-            sb.AppendFormat(@"FullyQualifiedTestClassName={0}", context.FullyQualifiedTestClassName).AppendLine();
-            sb.AppendFormat(@"CurrentTestOutcome={0}", context.CurrentTestOutcome).AppendLine();
-            sb.AppendFormat(@"DeploymentDirectory={0}", context.DeploymentDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunDirectory={0}", context.TestRunDirectory).AppendLine();
-            sb.AppendFormat(@"TestResultsDirectory={0}", context.TestResultsDirectory).AppendLine();
-            sb.AppendFormat(@"ResultsDirectory={0}", context.ResultsDirectory).AppendLine();
-            sb.AppendFormat(@"TestRunResultsDirectory={0}", context.TestRunResultsDirectory).AppendLine();
-            sb.AppendFormat(@"Properties=[ ");
-            foreach (var key in context.Properties.Keys)
-            {
-                sb.AppendFormat(@"{0}={1} ", key, context.Properties[key]);
-            }
-            sb.AppendFormat(@" ]").AppendLine();
-            return sb.ToString();
         }
 
         public static double CalibrateTimings()

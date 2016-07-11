@@ -19,7 +19,7 @@ namespace Orleans.TestingHost
                 return;
             }
 
-            if (!OrleansTestSecrets.TryLoad() && !OrleansTestStorageKey.TryLoad())
+            if (!OrleansTestSecrets.TryLoad())
             {
                 DataConnectionString = DEFAULT_STORAGE_DATA_CONNECTION_STRING;
             }

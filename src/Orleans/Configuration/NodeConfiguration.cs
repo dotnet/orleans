@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Configuration
         /// The host name or IP address of this silo.
         /// This is a configurable IP address or Hostname.
         /// </summary>
-        public string HostNameOrIPAddress { get; set; } 
+        public string HostNameOrIPAddress { get; set; }
         private IPAddress Address { get { return ClusterConfiguration.ResolveIPAddress(HostNameOrIPAddress, Subnet, AddressType).GetResult(); } }
 
         /// <summary>
@@ -142,9 +142,6 @@ namespace Orleans.Runtime.Configuration
         public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         /// <summary>
         /// </summary>
-        public bool WriteMessagingTraces { get; set; }
-        /// <summary>
-        /// </summary>
         public bool TraceToConsole { get; set; }
         /// <summary>
         /// </summary>
@@ -222,6 +219,8 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool UseNagleAlgorithm { get; set; }
 
+        public Dictionary<string, SearchOption> AdditionalAssemblyDirectories { get; set; }
+
         public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
@@ -248,7 +247,7 @@ namespace Orleans.Runtime.Configuration
             AddressType = AddressFamily.InterNetwork;
             ProxyGatewayEndpoint = null;
 
-            MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS; 
+            MaxActiveThreads = DEFAULT_MAX_ACTIVE_THREADS;
             DelayWarningThreshold = TimeSpan.FromMilliseconds(10000); // 10,000 milliseconds
             ActivationSchedulingQuantum = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
             TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
@@ -261,7 +260,6 @@ namespace Orleans.Runtime.Configuration
             TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
-            WriteMessagingTraces = false;
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
@@ -280,6 +278,8 @@ namespace Orleans.Runtime.Configuration
             Expect100Continue = false;
             DefaultConnectionLimit = DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
             UseNagleAlgorithm = false;
+
+            AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
         }
 
         public NodeConfiguration(NodeConfiguration other)
@@ -308,7 +308,6 @@ namespace Orleans.Runtime.Configuration
             TraceToConsole = other.TraceToConsole;
             TraceFilePattern = other.TraceFilePattern;
             TraceFileName = other.TraceFileName;
-            WriteMessagingTraces = other.WriteMessagingTraces;
             LargeMessageWarningThreshold = other.LargeMessageWarningThreshold;
             PropagateActivityId = other.PropagateActivityId;
             BulkMessageLimit = other.BulkMessageLimit;
@@ -330,6 +329,7 @@ namespace Orleans.Runtime.Configuration
             UseNagleAlgorithm = other.UseNagleAlgorithm;
 
             StartupTypeName = other.StartupTypeName;
+            AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
         }
 
         public override string ToString()
@@ -457,12 +457,12 @@ namespace Orleans.Runtime.Configuration
                     case "LoadShedding":
                         if (child.HasAttribute("Enabled"))
                         {
-                            LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"), 
+                            LoadSheddingEnabled = ConfigUtilities.ParseBool(child.GetAttribute("Enabled"),
                                 "Invalid boolean value for Enabled attribute on LoadShedding attribute for " + SiloName);
                         }
                         if (child.HasAttribute("LoadLimit"))
                         {
-                            LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"), 
+                            LoadSheddingLimit = ConfigUtilities.ParseInt(child.GetAttribute("LoadLimit"),
                                 "Invalid integer value for LoadLimit attribute on LoadShedding attribute for " + SiloName);
                             if (LoadSheddingLimit < 0)
                             {
@@ -492,6 +492,10 @@ namespace Orleans.Runtime.Configuration
                     case "Telemetry":
                         ConfigUtilities.ParseTelemetry(child);
                         break;
+                    case "AdditionalAssemblyDirectories":
+                        ConfigUtilities.ParseAdditionalAssemblyDirectories(AdditionalAssemblyDirectories, child);
+                        break;
+
                 }
             }
         }

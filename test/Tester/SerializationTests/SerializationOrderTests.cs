@@ -3,13 +3,10 @@ namespace UnitTests.Serialization
     using System;
     using System.Collections.Generic;
     using System.Reflection;
-
-    using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-    using Xunit;
-
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
+    using Xunit;
 
     public class SerializationOrderTests
     {
@@ -31,16 +28,16 @@ namespace UnitTests.Serialization
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
             SerializationManager.RoundTripSerializationForTesting(serializationItem);
 
-            Assert.IsTrue(
+            Assert.True(
                 FakeSerializer1.SerializeCalled,
                 "IExternalSerializer.Serialize should have been called on FakeSerializer1");
-            Assert.IsTrue(
+            Assert.True(
                 FakeSerializer1.DeserializeCalled,
                 "IExternalSerializer.Deserialize should have been called on FakeSerializer1");
-            Assert.IsFalse(
+            Assert.False(
                 FakeTypeToSerialize.SerializeWasCalled,
                 "Serialize on the type should NOT have been called");
-            Assert.IsFalse(
+            Assert.False(
                 FakeTypeToSerialize.DeserializeWasCalled,
                 "Deserialize on the type should NOT have been called");
         }
@@ -51,8 +48,8 @@ namespace UnitTests.Serialization
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = null;
             SerializationManager.RoundTripSerializationForTesting(serializationItem);
-            Assert.IsTrue(FakeTypeToSerialize.SerializeWasCalled, "FakeTypeToSerialize.Serialize should have been called");
-            Assert.IsTrue(FakeTypeToSerialize.DeserializeWasCalled, "FakeTypeToSerialize.Deserialize should have been called");
+            Assert.True(FakeTypeToSerialize.SerializeWasCalled, "FakeTypeToSerialize.Serialize should have been called");
+            Assert.True(FakeTypeToSerialize.DeserializeWasCalled, "FakeTypeToSerialize.Deserialize should have been called");
         }
 
 
@@ -62,12 +59,12 @@ namespace UnitTests.Serialization
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = new[] { typeof(FakeTypeToSerialize) };
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
             SerializationManager.RoundTripSerializationForTesting(serializationItem);
-            Assert.IsTrue(FakeSerializer1.SerializeCalled, "IExternalSerializer.Serialize should have been called on FakeSerializer1");
-            Assert.IsTrue(FakeSerializer1.DeserializeCalled, "IExternalSerializer.Deserialize should have been called on FakeSerializer1");
-            Assert.IsFalse(FakeSerializer2.SerializeCalled, "IExternalSerializer.Serialize should NOT have been called on FakeSerializer2");
-            Assert.IsFalse(FakeSerializer2.DeserializeCalled, "IExternalSerializer.Deserialize should NOT have been called on FakeSerializer2");
-            Assert.IsFalse(FakeTypeToSerialize.SerializeWasCalled, "Serialize on the type should NOT have been called");
-            Assert.IsFalse(FakeTypeToSerialize.DeserializeWasCalled, "Deserialize on the type should NOT have been called");
+            Assert.True(FakeSerializer1.SerializeCalled, "IExternalSerializer.Serialize should have been called on FakeSerializer1");
+            Assert.True(FakeSerializer1.DeserializeCalled, "IExternalSerializer.Deserialize should have been called on FakeSerializer1");
+            Assert.False(FakeSerializer2.SerializeCalled, "IExternalSerializer.Serialize should NOT have been called on FakeSerializer2");
+            Assert.False(FakeSerializer2.DeserializeCalled, "IExternalSerializer.Deserialize should NOT have been called on FakeSerializer2");
+            Assert.False(FakeTypeToSerialize.SerializeWasCalled, "Serialize on the type should NOT have been called");
+            Assert.False(FakeTypeToSerialize.DeserializeWasCalled, "Deserialize on the type should NOT have been called");
         }
 
         private class FakeSerializer1 : IExternalSerializer
@@ -87,7 +84,7 @@ namespace UnitTests.Serialization
                 IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
             }
 
-            public void Initialize(TraceLogger logger)
+            public void Initialize(Logger logger)
             {
             }
 
@@ -132,7 +129,7 @@ namespace UnitTests.Serialization
                 IsSupportedTypeCalled = DeepCopyCalled = SerializeCalled = DeserializeCalled = false;
             }
 
-            public void Initialize(TraceLogger logger)
+            public void Initialize(Logger logger)
             {
             }
 

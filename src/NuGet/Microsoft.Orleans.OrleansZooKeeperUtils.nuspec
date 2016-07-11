@@ -20,10 +20,11 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-	  <dependency id="ZooKeeperNetEx" version="3.4.6.1009" />
+	  <dependency id="ZooKeeperNetEx" version="3.4.8.5" />
     </dependencies>
   </metadata>
   <files>
+    <file src="OrleansZooKeeperUtils.XML" target="lib\net451" />
     <file src="OrleansZooKeeperUtils.dll" target="lib\net451" />
     <file src="OrleansZooKeeperUtils.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansZooKeeperUtils\**\*.cs" target="src" />

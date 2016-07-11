@@ -19,6 +19,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IStreamProducerExtension                myGrainReference;
         private bool                                    connectedToRendezvous;
         private readonly bool                           fireAndForgetDelivery;
+        private readonly bool                           optimizeForImmutableData;
         [NonSerialized]
         private bool                                    isDisposed;
         [NonSerialized]
@@ -29,7 +30,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal bool IsRewindable { get; private set; }
 
         internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
-            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, IStreamPubSub pubSub, bool isRewindable)
+            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData, IStreamPubSub pubSub, bool isRewindable)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
@@ -37,6 +38,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.pubSub = pubSub;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
+            this.optimizeForImmutableData = optimizeForImmutableData;
             IsRewindable = isRewindable;
             isDisposed = false;
             logger = providerRuntime.GetLogger(GetType().Name);
@@ -48,7 +50,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, fireAndForgetDelivery));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;

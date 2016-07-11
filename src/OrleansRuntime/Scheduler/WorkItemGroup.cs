@@ -20,8 +20,8 @@ namespace Orleans.Runtime.Scheduler
             Shutdown = 3
         }
 
-        private static readonly TraceLogger appLogger = TraceLogger.GetLogger("Scheduler.WorkItemGroup", TraceLogger.LoggerType.Runtime);
-        private readonly TraceLogger log;
+        private static readonly Logger appLogger = LogManager.GetLogger("Scheduler.WorkItemGroup", LoggerType.Runtime);
+        private readonly Logger log;
         private readonly OrleansTaskScheduler masterScheduler;
         private WorkGroupStatus state;
         private readonly Object lockable;
@@ -142,7 +142,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            log = IsSystemPriority ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
+            log = IsSystemPriority ? LogManager.GetLogger("Scheduler." + Name + ".WorkItemGroup", LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
             {
@@ -423,7 +423,7 @@ namespace Orleans.Runtime.Scheduler
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
          
-                if (AverageQueueLenght != 0)
+                if (AverageQueueLenght > 0)
                 {
                     sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
                     if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)

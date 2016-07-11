@@ -401,7 +401,7 @@ namespace Orleans.Runtime.Configuration
             var sb = new StringBuilder();
             sb.Append("Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
             sb.Append("Host: ").AppendLine(Dns.GetHostName());
-            sb.Append("Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());
@@ -561,6 +561,29 @@ namespace Orleans.Runtime.Configuration
             var xmlReader = XmlReader.Create(input);
             doc.Load(xmlReader);
             return doc.DocumentElement;
+        }
+
+        /// <summary>
+        /// Returns a prepopulated ClusterConfiguration object for a primary local silo (for testing)
+        /// </summary>
+        /// <param name="siloPort">TCP port for silo to silo communication</param>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClusterConfiguration object that can be passed to Silo or SiloHost classes for initialization</returns>
+        public static ClusterConfiguration LocalhostPrimarySilo(int siloPort = 22222, int gatewayPort = 40000)
+        {
+            var config = new ClusterConfiguration();
+            var siloAddress = new IPEndPoint(IPAddress.Loopback, siloPort);
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+            config.Globals.SeedNodes.Add(siloAddress);
+            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+            config.Defaults.HostNameOrIPAddress = "localhost";
+            config.Defaults.Port = siloPort;
+            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+            
+            config.PrimaryNode = siloAddress;
+
+            return config;
         }
     }
 }

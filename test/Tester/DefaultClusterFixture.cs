@@ -1,16 +1,16 @@
-﻿using Orleans.TestingHost;
-using Xunit;
+﻿using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
 
 namespace Tester
 {
-    public class DefaultClusterFixture : BaseClusterFixture
+    public class DefaultClusterFixture : BaseTestClusterFixture
     {
-        public DefaultClusterFixture()
-            : base(new TestingSiloHost(true))
+        protected override TestCluster CreateTestCluster()
         {
+            var options = new TestClusterOptions();
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            return new TestCluster(options);
         }
     }
-
-    [CollectionDefinition("DefaultCluster")]
-    public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
 }

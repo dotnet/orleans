@@ -1,22 +1,32 @@
 ﻿using System;
+using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 
 namespace Tester
 {
-    public abstract class BaseClusterFixture : IDisposable
+    public abstract class BaseTestClusterFixture : IDisposable
     {
-        static BaseClusterFixture()
+        static BaseTestClusterFixture()
         {
+            TestClusterOptions.DefaultTraceToConsole = false;
+        }
+
+        protected BaseTestClusterFixture()
+        {
+            GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
+            var testCluster = CreateTestCluster();
+            if (testCluster.Primary == null)
+            {
+                testCluster.Deploy();
+            }
+            this.HostedCluster = testCluster;
         }
 
-        protected BaseClusterFixture(TestingSiloHost hostedCluster)
-        {
-            this.HostedCluster = hostedCluster;
-        }
+        protected abstract TestCluster CreateTestCluster();
 
-        public TestingSiloHost HostedCluster { get; private set; }        
+        public TestCluster HostedCluster { get; private set; }
 
         public virtual void Dispose()
         {

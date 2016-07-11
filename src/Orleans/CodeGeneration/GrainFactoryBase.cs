@@ -18,7 +18,7 @@ namespace Orleans.CodeGeneration
             string grainClassNamePrefix = null)
         {
             CheckRuntimeEnvironmentSetup();
-            if (!GrainInterfaceData.IsGrainType(interfaceType))
+            if (!GrainInterfaceUtils.IsGrainType(interfaceType))
             {
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }
@@ -26,7 +26,7 @@ namespace Orleans.CodeGeneration
             GrainId grainId = getGrainId(implementation);
 
             var typeInfo = interfaceType.GetTypeInfo();
-            return GrainReference.FromGrainId(grainId, typeInfo.IsGenericType ? typeInfo.UnderlyingSystemType.FullName : null);
+            return GrainReference.FromGrainId(grainId, typeInfo.IsGenericType ? TypeUtils.GenericTypeArgsString(typeInfo.UnderlyingSystemType.FullName) : null);
         }
 
         /// <summary>

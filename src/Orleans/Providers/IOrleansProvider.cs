@@ -1,9 +1,8 @@
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-
 
 namespace Orleans.Providers
 {
@@ -139,6 +138,26 @@ namespace Orleans.Providers
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? Type.GetType(s) : settingDefault;
+        }
+
+        public static bool GetBoolProperty(this IProviderConfiguration config, string key, bool settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? bool.Parse(s) : settingDefault;
+        }
+
+        public static TimeSpan GetTimeSpanProperty(this IProviderConfiguration config, string key, TimeSpan settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
         }
     }
 }

@@ -26,19 +26,17 @@ namespace Orleans
 
         internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
-        internal IGrainRuntime Runtime
+        internal IGrainRuntime Runtime { get; set; }
+
+        protected IGrainFactory GrainFactory 
         {
-            get { return runtime; }
-            set
-            {
-                runtime = value;
-                GrainFactory = value.GrainFactory;
-            }
+            get { return Runtime.GrainFactory; }
         }
 
-        protected IGrainFactory GrainFactory { get; private set; }
-
-        protected IServiceProvider ServiceProvider { get; private set; }
+        protected IServiceProvider ServiceProvider 
+        {
+            get { return Runtime.ServiceProvider; }
+        }
 
         internal IGrainIdentity Identity;
 
@@ -61,8 +59,6 @@ namespace Orleans
         {
             Identity = identity;
             Runtime = runtime;
-            GrainFactory = runtime.GrainFactory;
-            ServiceProvider = runtime.ServiceProvider;
         }
 
         
@@ -230,7 +226,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
-            return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
+            return Runtime.GetLogger(loggerName);
         }
 
         /// <summary>

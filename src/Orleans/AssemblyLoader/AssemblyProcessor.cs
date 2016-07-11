@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly TraceLogger Logger;
+        private static readonly Logger Logger;
         
         /// <summary>
         /// The initialization lock.
@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         /// </summary>
         static AssemblyProcessor()
         {
-            Logger = TraceLogger.GetLogger("AssemblyProcessor");
+            Logger = LogManager.GetLogger("AssemblyProcessor");
         }
 
         /// <summary>
@@ -58,10 +58,13 @@ namespace Orleans.Runtime
                     return;
                 }
 
+                // load the code generator before intercepting assembly loading
+                CodeGeneratorManager.Initialize(); 
+
                 // initialize serialization for all assemblies to be loaded.
                 AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
 
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
                 // initialize serialization for already loaded assemblies.
                 CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
@@ -90,6 +93,11 @@ namespace Orleans.Runtime
         /// <param name="assembly">The assembly to process.</param>
         private static void ProcessAssembly(Assembly assembly)
         {
+            string assemblyName = assembly.GetName().Name;
+            if (Logger.IsVerbose3)
+            {
+                Logger.Verbose3("Processing assembly {0}", assemblyName);
+            }
             // If the assembly is loaded for reflection only avoid processing it.
             if (assembly.ReflectionOnly)
             {
@@ -114,35 +122,30 @@ namespace Orleans.Runtime
 
             // Process each type in the assembly.
             var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
-            TypeInfo[] assemblyTypes;
-            try
-            {
-                assemblyTypes = assembly.DefinedTypes.ToArray();
-            }
-            catch (Exception exception)
-            {
-                if (Logger.IsWarning)
-                {
-                    var message =
-                        string.Format(
-                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
-                            assembly.FullName,
-                            exception);
-                    Logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
-                }
-
-                return;
-            }
+            var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, Logger).ToArray();
 
             // Process each type in the assembly.
-            foreach (var type in assemblyTypes)
+            foreach (TypeInfo typeInfo in assemblyTypes)
             {
-                if (shouldProcessSerialization)
+                try
                 {
-                    SerializationManager.FindSerializationInfo(type);
+                    var type = typeInfo.AsType();
+                    string typeName = typeInfo.FullName;
+                    if (Logger.IsVerbose3)
+                    {
+                        Logger.Verbose3("Processing type {0}", typeName);
+                    }
+                    if (shouldProcessSerialization)
+                    {
+                        SerializationManager.FindSerializationInfo(type);
+                    }
+    
+                    GrainFactory.FindSupportClasses(type);
                 }
-
-                GrainFactory.FindSupportClasses(type);
+                catch (Exception exception)
+                {
+                    Logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failed to load type " + typeInfo.FullName + " in assembly " + assembly.FullName + ".", exception);
+                }
             }
         }
     }

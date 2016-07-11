@@ -383,9 +383,9 @@ namespace Orleans
         SiloShutdownEventCreated        = SiloBase + 42,
         SiloShutdownEventOpened         = SiloBase + 43,
         SiloShutdownEventReceived       = SiloBase + 44,
-        SiloLoadedDI                    = SiloBase + 45,
-        SiloFailedToLoadDI              = SiloBase + 46,
-        SiloFileNotFoundLoadingDI       = SiloBase + 47,
+        SiloLoadedDI                    = SiloBase + 45, // Not used anymore
+        SiloFailedToLoadDI              = SiloBase + 46, // Not used anymore
+        SiloFileNotFoundLoadingDI       = SiloBase + 47, // Not used anymore
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -495,8 +495,9 @@ namespace Orleans
         MembershipGossipSendFailure            = MembershipBase + 56,
         MembershipTimerProcessingFailure       = MembershipBase + 57,
         MembershipSendPingFailure              = MembershipBase + 58,
-        MembershipUpdateIAmAliveFailure          = MembershipBase + 59,
+        MembershipUpdateIAmAliveFailure        = MembershipBase + 59,
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
+        MembershipJoiningPreconditionFailure   = MembershipBase + 61,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,
@@ -938,6 +939,8 @@ namespace Orleans
         RS_RangeChanged                         = ReminderServiceBase + 34,
         RS_LocalStop                            = ReminderServiceBase + 35,
         RS_Started                              = ReminderServiceBase + 36,
+        RS_ServiceInitialLoadFailing            = ReminderServiceBase + 37,
+        RS_ServiceInitialLoadFailed             = ReminderServiceBase + 38,
 
         
         // Codes for the Consistent Ring Provider
@@ -963,6 +966,9 @@ namespace Orleans
         Provider_NotLoaded                      = ProviderManagerBase + 11,
         Provider_Manager_Already_Loaded         = ProviderManagerBase + 12,
         Provider_CatalogNoStorageProvider_3     = ProviderManagerBase + 13,
+        Provider_ProviderLoadedOk               = ProviderManagerBase + 14,
+        Provider_ProviderNotFound               = ProviderManagerBase + 15,
+        Provider_ProviderNotControllable        = ProviderManagerBase + 16,
 
         AzureQueueBase = Runtime + 3200,
         AzureQueue_01 = AzureQueueBase + 1,
@@ -1019,6 +1025,7 @@ namespace Orleans
         Stream_ProducerIsDead                       = StreamProviderManagerBase + 6,
         StreamProvider_NoStreamForBatch             = StreamProviderManagerBase + 7,
         StreamProvider_ConsumerFailedToUnregister   = StreamProviderManagerBase + 8,
+        Stream_ConsumerIsDead                       = StreamProviderManagerBase + 9,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,
@@ -1057,6 +1064,18 @@ namespace Orleans
         CodeGenIgnoringTypes                = CodeGenBase + 5,
         CodeGenDllMissing                   = CodeGenBase + 6,
         CodeGenSystemTypeRequiresSerializer = CodeGenBase + 7,
+
+        MultiClusterNetworkBase = Runtime + 3900,
+        MultiClusterNetwork_Starting = MultiClusterNetworkBase + 1,
+        MultiClusterNetwork_Started = MultiClusterNetworkBase + 2,
+        MultiClusterNetwork_FailedToStart = MultiClusterNetworkBase + 3,
+        MultiClusterNetwork_LocalSubscriberException = MultiClusterNetworkBase + 4,
+        MultiClusterNetwork_GossipCommunicationFailure = MultiClusterNetworkBase + 5,
+        MultiClusterNetwork_NoChannelsConfigured = MultiClusterNetworkBase + 6,
+
+        CancellationTokenManagerBase        = Runtime + 4000,
+        CancellationTokenCancelFailed       = CancellationTokenManagerBase + 1,
+        CancellationExtensionCreationFailed = CancellationTokenManagerBase + 2
     }
 }
 // ReSharper restore InconsistentNaming

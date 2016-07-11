@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The assembly name of the core Orleans assembly.
         /// </summary>
-        private static readonly string OrleansCoreAssembly = typeof(IGrain).Assembly.GetName().FullName;
+        private static readonly AssemblyName OrleansCoreAssembly = typeof(IGrain).GetTypeInfo().Assembly.GetName();
 
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 
@@ -30,13 +30,22 @@ namespace Orleans.Runtime
 
             return t.Name;
         }
-        
-        public static string GetSimpleTypeName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
+
+        private static string GetSimpleNameHandleArray(TypeInfo typeInfo, Language language)
         {
-            var typeInfo = t.GetTypeInfo();
+            return GetSimpleNameHandleArray(typeInfo.AsType(), language);
+        }
+
+        public static string GetSimpleTypeName(Type t, Predicate<Type> fullName = null, Language language = Language.CSharp)
+        {
+            return GetSimpleTypeName(t.GetTypeInfo(), fullName, language);
+        }
+
+        public static string GetSimpleTypeName(TypeInfo typeInfo, Predicate<Type> fullName = null, Language language = Language.CSharp)
+        {
             if (typeInfo.IsNestedPublic || typeInfo.IsNestedPrivate)
             {
-                if (typeInfo.DeclaringType.IsGenericType)
+                if (typeInfo.DeclaringType.GetTypeInfo().IsGenericType)
                 {
                     return GetTemplatedName(
                         GetUntemplatedTypeName(typeInfo.DeclaringType.Name),
@@ -49,9 +58,10 @@ namespace Orleans.Runtime
                 return GetTemplatedName(typeInfo.DeclaringType, language: language) + "." + GetUntemplatedTypeName(typeInfo.Name);
             }
 
-            if (typeInfo.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language));
-            
-            return fullName != null && fullName(t) ? GetFullName(t, language) : GetSimpleNameHandleArray(t, language: language);
+            var type = typeInfo.AsType();
+            if (typeInfo.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(type) ? GetFullName(type, language) : GetSimpleNameHandleArray(typeInfo, language));
+
+            return fullName != null && fullName(type) ? GetFullName(type, language) : GetSimpleNameHandleArray(typeInfo, language);
         }
 
         public static string GetUntemplatedTypeName(string typeName)
@@ -66,7 +76,7 @@ namespace Orleans.Runtime
             {
                 typeName = typeName.Substring(0, i);
             }
-            return typeName;            
+            return typeName;
         }
 
         public static string GetSimpleTypeName(string typeName)
@@ -91,16 +101,17 @@ namespace Orleans.Runtime
 
         public static bool IsConcreteTemplateType(Type t)
         {
-            if (t.IsGenericType) return true;
+            if (t.GetTypeInfo().IsGenericType) return true;
             return t.IsArray && IsConcreteTemplateType(t.GetElementType());
         }
 
-        public static string GetTemplatedName(Type t, Func<Type, bool> fullName=null, Language language = Language.CSharp)
+        public static string GetTemplatedName(Type t, Predicate<Type> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = _ => true; // default to full type names
 
-            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName, language), t, t.GetGenericArguments(), fullName, language);
+            var typeInfo = t.GetTypeInfo();
+            if (typeInfo.IsGenericType) return GetTemplatedName(GetSimpleTypeName(typeInfo, fullName, language), t, typeInfo.GetGenericArguments(), fullName, language);
 
             if (t.IsArray)
             {
@@ -111,14 +122,25 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + (isVB ? ")" : "]");
             }
-            
-            return GetSimpleTypeName(t, fullName, language);
+
+            return GetSimpleTypeName(typeInfo, fullName, language);
         }
 
-        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Func<Type, bool> fullName, Language language = Language.CSharp)
+        public static bool IsConstructedGenericType(this TypeInfo typeInfo)
+        {
+            // is there an API that returns this info without converting back to type already?
+            return typeInfo.AsType().IsConstructedGenericType;
+        }
+
+        internal static IEnumerable<TypeInfo> GetTypeInfos(this Type[] types)
+        {
+            return types.Select(t => t.GetTypeInfo());
+        }
+
+        public static string GetTemplatedName(string baseName, Type t, Type[] genericArguments, Predicate<Type> fullName, Language language = Language.CSharp)
         {
             var typeInfo = t.GetTypeInfo();
-            if (!typeInfo.IsGenericType || (typeInfo.DeclaringType != null && typeInfo.DeclaringType.IsGenericType)) return baseName;
+            if (!typeInfo.IsGenericType || (t.DeclaringType != null && t.DeclaringType.GetTypeInfo().IsGenericType)) return baseName;
             bool isVB = language == Language.VisualBasic;
             string s = baseName;
             s += isVB ? "(Of " : "<";
@@ -127,7 +149,7 @@ namespace Orleans.Runtime
             return s;
         }
 
-        public static string GetGenericTypeArgs(Type[] args, Func<Type, bool> fullName, Language language = Language.CSharp)
+        public static string GetGenericTypeArgs(IEnumerable<Type> args, Predicate<Type> fullName, Language language = Language.CSharp)
         {
             string s = string.Empty;
 
@@ -138,7 +160,7 @@ namespace Orleans.Runtime
                 {
                     s += ",";
                 }
-                if (!genericParameter.IsGenericType)
+                if (!genericParameter.GetTypeInfo().IsGenericType)
                 {
                     s += GetSimpleTypeName(genericParameter, fullName, language);
                 }
@@ -152,50 +174,51 @@ namespace Orleans.Runtime
             return s;
         }
 
-        public static string GetParameterizedTemplateName(Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
+        public static string GetParameterizedTemplateName(TypeInfo typeInfo, bool applyRecursively = false, Predicate<Type> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => true;
 
-            return GetParameterizedTemplateName(t, fullName, applyRecursively, language);
+            return GetParameterizedTemplateName(typeInfo, fullName, applyRecursively, language);
         }
 
-        public static string GetParameterizedTemplateName(Type t, Func<Type, bool> fullName, bool applyRecursively = false, Language language = Language.CSharp)
+        public static string GetParameterizedTemplateName(TypeInfo typeInfo, Predicate<Type> fullName, bool applyRecursively = false, Language language = Language.CSharp)
         {
-            if (t.IsGenericType)
+            if (typeInfo.IsGenericType)
             {
-                return GetParameterizedTemplateName(GetSimpleTypeName(t, fullName), t, applyRecursively, fullName, language);
+                return GetParameterizedTemplateName(GetSimpleTypeName(typeInfo, fullName), typeInfo, applyRecursively, fullName, language);
             }
-            else
+            
+            var t = typeInfo.AsType();
+            if (fullName != null && fullName(t) == true)
             {
-                if(fullName != null && fullName(t)==true)
-                {
-                    return t.FullName;
-                }
+                return t.FullName;
             }
+
             return t.Name;
         }
 
-        public static string GetParameterizedTemplateName(string baseName, Type t, bool applyRecursively = false, Func<Type, bool> fullName = null, Language language = Language.CSharp)
+        public static string GetParameterizedTemplateName(string baseName, TypeInfo typeInfo, bool applyRecursively = false, Predicate<Type> fullName = null, Language language = Language.CSharp)
         {
             if (fullName == null)
                 fullName = tt => false;
 
-            if (!t.IsGenericType) return baseName;
+            if (!typeInfo.IsGenericType) return baseName;
 
             bool isVB = language == Language.VisualBasic;
             string s = baseName;
             s += isVB ? "(Of " : "<";
             bool first = true;
-            foreach (var genericParameter in t.GetGenericArguments())
+            foreach (var genericParameter in typeInfo.GetGenericArguments())
             {
                 if (!first)
                 {
                     s += ",";
                 }
-                if (applyRecursively && genericParameter.IsGenericType)
+                var genericParameterTypeInfo = genericParameter.GetTypeInfo();
+                if (applyRecursively && genericParameterTypeInfo.IsGenericType)
                 {
-                    s += GetParameterizedTemplateName(genericParameter, applyRecursively, language: language);
+                    s += GetParameterizedTemplateName(genericParameterTypeInfo, applyRecursively, language: language);
                 }
                 else
                 {
@@ -221,20 +244,92 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
-        private static string[] typeSeparator = new string[] { "],[" };
-        public static Type[] GenericTypeArgs(string className)
+        public static Type[] GenericTypeArgsFromClassName(string className)
+        {
+            return GenericTypeArgsFromArgsString(GenericTypeArgsString(className));
+        }
+
+        public static Type[] GenericTypeArgsFromArgsString(string genericArgs)
+        {
+            if (string.IsNullOrEmpty(genericArgs)) return new Type[] { };
+
+            var genericTypeDef = genericArgs.Replace("[]", "##"); // protect array arguments
+
+            return InnerGenericTypeArgs(genericTypeDef);
+        }
+
+        private static Type[] InnerGenericTypeArgs(string className)
         {
             var typeArgs = new List<Type>();
-            var genericTypeDef = GenericTypeArgsString(className).Replace("[]", "##"); // protect array arguments
-            string[] genericArgs = genericTypeDef.Split(typeSeparator, StringSplitOptions.RemoveEmptyEntries);
+            var innerTypes = GetInnerTypes(className);
 
-            foreach (string genericArg in genericArgs)
+            foreach (var innerType in innerTypes)
             {
-                string typeArg = genericArg.Trim('[', ']');
-                if (typeArg.Length > 0 && typeArg != ",")
-                    typeArgs.Add(Type.GetType(typeArg.Replace("##", "[]"))); // restore array arguments
+                if (innerType.StartsWith("[[")) // Resolve and load generic types recursively
+                {
+                    InnerGenericTypeArgs(GenericTypeArgsString(innerType));
+                    string genericTypeArg = className.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(genericTypeArg.Replace("##", "[]")));
+                }
+
+                else
+                {
+                    string nonGenericTypeArg = innerType.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(nonGenericTypeArg.Replace("##", "[]")));
+                }
             }
+
             return typeArgs.ToArray();
+        }
+
+        private static string[] GetInnerTypes(string input)
+        {
+            // Iterate over strings of length 2 positionwise.
+            var charsWithPositions = input.Zip(Enumerable.Range(0, input.Length), (c, i) => new { Ch = c, Pos = i });
+            var candidatesWithPositions = charsWithPositions.Zip(charsWithPositions.Skip(1), (c1, c2) => new { Str = c1.Ch.ToString() + c2.Ch, Pos = c1.Pos });
+
+            var results = new List<string>();
+            int startPos = -1;
+            int endPos = -1;
+            int endTokensNeeded = 0;
+            string curStartToken = "";
+            string curEndToken = "";
+            var tokenPairs = new[] { new { Start = "[[", End = "]]" }, new { Start = "[", End = "]" } }; // Longer tokens need to come before shorter ones
+
+            foreach (var candidate in candidatesWithPositions)
+            {
+                if (startPos == -1)
+                {
+                    foreach (var token in tokenPairs)
+                    {
+                        if (candidate.Str.StartsWith(token.Start))
+                        {
+                            curStartToken = token.Start;
+                            curEndToken = token.End;
+                            startPos = candidate.Pos;
+                            break;
+                        }
+                    }
+                }
+
+                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken))
+                    endTokensNeeded++;
+
+                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken))
+                {
+                    endPos = candidate.Pos;
+                    endTokensNeeded--;
+                }
+
+                if (endTokensNeeded == 0 && startPos != -1)
+                {
+                    results.Add(input.Substring(startPos, endPos - startPos + 2));
+                    startPos = -1;
+                    curStartToken = "";
+                }
+            }
+
+            return results.ToArray();
         }
 
         public static string GenericTypeArgsString(string className)
@@ -247,6 +342,12 @@ namespace Orleans.Runtime
         public static bool IsGenericClass(string name)
         {
             return name.Contains("`") || name.Contains("[");
+        }
+
+        public static string GetFullName(TypeInfo typeInfo, Language language = Language.CSharp)
+        {
+            if (typeInfo == null) throw new ArgumentNullException(nameof(typeInfo));
+            return GetFullName(typeInfo.AsType());
         }
 
         public static string GetFullName(Type t, Language language = Language.CSharp)
@@ -264,7 +365,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + (isVB ? ")" : "]");
             }
-            return t.FullName ?? ( t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
+            return t.FullName ?? (t.IsGenericParameter ? GetSimpleNameHandleArray(t, language) : t.Namespace + "." + GetSimpleNameHandleArray(t, language));
         }
 
         /// <summary>
@@ -285,7 +386,7 @@ namespace Orleans.Runtime
                     yield return field;
                 }
 
-                current = current.BaseType;
+                current = current.GetTypeInfo().BaseType;
             }
         }
 
@@ -302,9 +403,9 @@ namespace Orleans.Runtime
                 grainChevronType = ToReflectionOnlyType(grainChevronType);
             }
 
-            if (grainType == type || grainChevronType == type) return false; 
+            if (grainType == type || grainChevronType == type) return false;
 
-            if (!grainType.GetTypeInfo().IsAssignableFrom(type)) return false;
+            if (!grainType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
             return !IsGeneratedType(type);
@@ -324,9 +425,9 @@ namespace Orleans.Runtime
                 systemTargetBaseInterfaceType = ToReflectionOnlyType(systemTargetBaseInterfaceType);
             }
 
-            if (!systemTargetInterfaceType.GetTypeInfo().IsAssignableFrom(type) ||
-                !systemTargetBaseInterfaceType.GetTypeInfo().IsAssignableFrom(type) ||
-                !systemTargetType.GetTypeInfo().IsAssignableFrom(type)) return false;
+            if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
             return !IsGeneratedType(type);
@@ -424,9 +525,9 @@ namespace Orleans.Runtime
             {
                 generalType = ToReflectionOnlyType(generalType);
             }
-            return generalType.GetTypeInfo().IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));        
+            return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
-        
+
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);
@@ -434,7 +535,7 @@ namespace Orleans.Runtime
 
         public static bool TryResolveType(string fullName, out Type type)
         {
-            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);            
+            return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
         }
 
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
@@ -447,32 +548,54 @@ namespace Orleans.Runtime
             return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
         }
 
-        public static IEnumerable<Type> GetTypes(Assembly assembly, Func<Type, bool> whereFunc)
+        public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
         {
-            return assembly.IsDynamic ? Enumerable.Empty<Type>() : assembly.DefinedTypes.Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
+            return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<Type> GetTypes(Func<Type, bool> whereFunc)
+        public static IEnumerable<TypeInfo> GetDefinedTypes(Assembly assembly, Logger logger)
+        {
+            try
+            {
+                return assembly.DefinedTypes;
+            }
+            catch (Exception exception)
+            {
+                if (logger.IsWarning)
+                {
+                    var message =
+                        string.Format(
+                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
+                            assembly.FullName,
+                            exception);
+                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+
+                return Enumerable.Empty<TypeInfo>();
+            }
+        }
+
+        public static IEnumerable<Type> GetTypes(Predicate<Type> whereFunc, Logger logger)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
             foreach (var assembly in assemblies)
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc);
+                var types = GetTypes(assembly, whereFunc, logger);
                 result.AddRange(types);
             }
             return result;
         }
 
-        public static IEnumerable<Type> GetTypes(List<string> assemblies, Func<Type, bool> whereFunc)
+        public static IEnumerable<Type> GetTypes(List<string> assemblies, Predicate<Type> whereFunc, Logger logger)
         {
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
             foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
-                var types = GetTypes(assembly, whereFunc);
+                var types = GetTypes(assembly, whereFunc, logger);
                 result.AddRange(types);
             }
             return result;
@@ -502,11 +625,18 @@ namespace Orleans.Runtime
             {
                 type = ToReflectionOnlyType(type);
                 attribType = ToReflectionOnlyType(attribType);
+
+                // we can't use Type.GetCustomAttributes here because we could potentially be working with a reflection-only type.
+                return CustomAttributeData.GetCustomAttributes(type).Any(
+                        attrib => attribType.IsAssignableFrom(attrib.AttributeType));
             }
 
-            // we can't use Type.GetCustomAttributes here because we could potentially be working with a reflection-only type.
-            return CustomAttributeData.GetCustomAttributes(type).Any(
-                    attrib => attribType.GetTypeInfo().IsAssignableFrom(attrib.AttributeType));
+            return TypeHasAttribute(type.GetTypeInfo(), attribType);
+        }
+
+        public static bool TypeHasAttribute(TypeInfo typeInfo, Type attribType)
+        {
+            return typeInfo.GetCustomAttributes(attribType, true).Any();
         }
 
         /// <summary>
@@ -648,7 +778,7 @@ namespace Orleans.Runtime
             {
                 if (options.IncludeGenericTypeParameters)
                 {
-                    builder.Append(typeInfo.GetUnadornedTypeName());
+                    builder.Append(type.GetUnadornedTypeName());
                 }
 
                 return;
@@ -677,10 +807,10 @@ namespace Orleans.Runtime
                 builder.AppendFormat("{0}{1}", namespaceName, options.NestedTypeSeparator);
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (type.IsConstructedGenericType)
             {
                 // Get the unadorned name, the generic parameters, and add them together.
-                var unadornedTypeName = typeInfo.GetUnadornedTypeName() + options.NameSuffix;
+                var unadornedTypeName = type.GetUnadornedTypeName() + options.NameSuffix;
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
                     Enumerable.Range(0, Math.Min(typeInfo.GetGenericArguments().Count(), typeArguments.Count))
@@ -916,8 +1046,11 @@ namespace Orleans.Runtime
         /// <returns>A value indicating whether or not the provided assembly is the Orleans assembly or references it.</returns>
         internal static bool IsOrleansOrReferencesOrleans(Assembly assembly)
         {
+            // We want to be loosely coupled to the assembly version if an assembly depends on an older Orleans,
+            // but we want a strong assembly match for the Orleans binary itself 
+            // (so we don't load 2 different versions of Orleans by mistake)
             return DoReferencesContain(assembly.GetReferencedAssemblies(), OrleansCoreAssembly)
-                   || string.Equals(assembly.FullName, OrleansCoreAssembly, StringComparison.Ordinal);
+                   || string.Equals(assembly.GetName().FullName, OrleansCoreAssembly.FullName, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -926,14 +1059,14 @@ namespace Orleans.Runtime
         /// <param name="references">The references.</param>
         /// <param name="assemblyName">The assembly name.</param>
         /// <returns>A value indicating whether or not the specified references contain the provided assembly name.</returns>
-        private static bool DoReferencesContain(IReadOnlyCollection<AssemblyName> references, string assemblyName)
+        private static bool DoReferencesContain(IReadOnlyCollection<AssemblyName> references, AssemblyName assemblyName)
         {
             if (references.Count == 0)
             {
                 return false;
             }
 
-            return references.Any(asm => string.Equals(asm.FullName, assemblyName, StringComparison.InvariantCulture));
+            return references.Any(asm => string.Equals(asm.Name, assemblyName.Name, StringComparison.Ordinal));
         }
 
         /// <summary>
@@ -961,8 +1094,7 @@ namespace Orleans.Runtime
 
             yield return type;
 
-            var typeInfo = type.GetTypeInfo();
-            if (typeInfo.IsArray)
+            if (type.IsArray)
             {
                 foreach (var elementType in type.GetElementType().GetTypes(false, exclude: exclude))
                 {
@@ -970,10 +1102,10 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (type.IsConstructedGenericType)
             {
                 foreach (var genericTypeArgument in
-                    typeInfo.GetGenericArguments().SelectMany(_ => GetTypes(_, false, exclude: exclude)))
+                    type.GetGenericArguments().SelectMany(_ => GetTypes(_, false, exclude: exclude)))
                 {
                     yield return genericTypeArgument;
                 }

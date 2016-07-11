@@ -1,5 +1,4 @@
 ﻿using System;
-using Orleans.Core;
 using Orleans.Streams;
 using Orleans.Timers;
 
@@ -31,9 +30,9 @@ namespace Orleans.Runtime
         public IStreamProviderManager StreamProviderManager { get; private set;}
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public Logger GetLogger(string loggerName, TraceLogger.LoggerType logType)
+        public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, logType);
+            return LogManager.GetLogger(loggerName, LoggerType.Grain);
         }
 
         public void DeactivateOnIdle(Grain grain)

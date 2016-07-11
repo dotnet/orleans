@@ -40,7 +40,7 @@ namespace Orleans.Messaging
             {
                 while (!Cts.IsCancellationRequested)
                 {
-                    int bytesRead = FillBuffer(buffer.ReceiveBuffer);
+                    int bytesRead = FillBuffer(buffer.BuildReceiveBuffer());
                     if (bytesRead == 0)
                     {
                         continue;
@@ -58,13 +58,14 @@ namespace Orleans.Messaging
             }
             catch (Exception ex)
             {
+                buffer.Reset();
                 Log.Warn(ErrorCode.ProxyClientUnhandledExceptionWhileReceiving, String.Format("Unexpected/unhandled exception while receiving: {0}. Restarting gateway receiver for {1}.",
                     ex, gatewayConnection.Address), ex);
                 throw;
             }
         }
 
-        private int FillBuffer(List<ArraySegment<byte>> buffer)
+        private int FillBuffer(List<ArraySegment<byte>> bufferSegments)
         {
             Socket socketCapture = null;
             try
@@ -76,7 +77,7 @@ namespace Orleans.Messaging
                 socketCapture = gatewayConnection.Socket;
                 if (socketCapture != null && socketCapture.Connected)
                 {
-                    var bytesRead = socketCapture.Receive(buffer);
+                    var bytesRead = socketCapture.Receive(bufferSegments);
                     if (bytesRead == 0)
                     {
                         throw new EndOfStreamException("Socket closed");
@@ -86,6 +87,7 @@ namespace Orleans.Messaging
             }
             catch (Exception ex)
             {
+                buffer.Reset();
                 // Only try to reconnect if we're not shutting down
                 if (Cts.IsCancellationRequested) return 0;
 

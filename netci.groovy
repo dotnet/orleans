@@ -3,51 +3,28 @@
 import jobs.generation.Utilities;
 
 def project = GithubProject
+def branch = GithubBranchName
 // Define build string
-def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\Tools\\VsDevCmd.bat" && Build.cmd && Test.cmd'''
+def buildString = '''call Build.cmd && Test.cmd'''
 
 // Generate the builds for debug and release
 
 [true, false].each { isPR ->
     def newJob = job(Utilities.getFullJobName(project, '', isPR)) {
-        label('windows')
         steps {
             batchFile(buildString)
         }
     }
     
-    Utilities.simpleInnerLoopJobSetup(newJob, project, isPR, 'Debug and Release')
+    Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
+    Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
+    Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results.xml')
     // Archive only on commit builds.
     if (!isPR) {
         Utilities.addArchival(newJob, 'Binaries/**')
+        Utilities.addGithubPushTrigger(newJob)
     }
-    
-    newJob.with {
-        publishers {
-            archiveXUnit {
-                xUnitDotNET {
-                    pattern('src/TestResults/xUnit-Results.xml')
-                    skipNoTestFiles(true)
-                    failIfNotNew(true)
-                    deleteOutputFiles(true)
-                    stopProcessingIfError(true)
-                }
-                
-                failedThresholds {
-                    unstable(0)
-                    unstableNew(0)
-                    failure(0)
-                    failureNew(0)
-                }
-                skippedThresholds {
-                    unstable(100)
-                    unstableNew(100)
-                    failure(100)
-                    failureNew(100)
-                }
-                thresholdMode(ThresholdMode.PERCENT)
-                timeMargin(3000)
-            }
-        }
+    else {
+        Utilities.addGithubPRTriggerForBranch(newJob, branch, "Windows Debug and Release")
     }
 }

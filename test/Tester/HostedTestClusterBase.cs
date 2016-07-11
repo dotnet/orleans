@@ -1,7 +1,5 @@
 using System;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.ExceptionServices;
+using Orleans;
 using Orleans.TestingHost;
 using Tester;
 using Xunit;
@@ -14,7 +12,7 @@ namespace UnitTests.Tester
     [Collection("DefaultCluster")]
     public abstract class HostedTestClusterEnsureDefaultStarted : OrleansTestingBase
     {
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         public HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
@@ -23,22 +21,32 @@ namespace UnitTests.Tester
 
         public HostedTestClusterEnsureDefaultStarted()
         {
-
         }
     }
 
-    public abstract class HostedTestClusterPerTest : OrleansTestingBase, IDisposable
+    public abstract class TestClusterPerTest : OrleansTestingBase, IDisposable
     {
-        protected TestingSiloHost HostedCluster { get; private set; }
-
-        public HostedTestClusterPerTest()
+        static TestClusterPerTest()
         {
-            this.HostedCluster = this.CreateSiloHost();
+            TestClusterOptions.DefaultTraceToConsole = false;
         }
 
-        public virtual TestingSiloHost CreateSiloHost()
+        protected TestCluster HostedCluster { get; private set; }
+
+        public TestClusterPerTest()
         {
-            return new TestingSiloHost(true);
+            GrainClient.Uninitialize();
+            var testCluster = this.CreateTestCluster();
+            if (testCluster.Primary == null)
+            {
+                testCluster.Deploy();
+            }
+            this.HostedCluster = testCluster;
+        }
+
+        public virtual TestCluster CreateTestCluster()
+        {
+            return new TestCluster();
         }
 
         public virtual void Dispose()

@@ -19,11 +19,6 @@ namespace Host
                 AppDomainInitializerArguments = args,
             });
 
-            //Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
-
-            // TODO: once the previous call returns, the silo is up and running.
-            //       This is the place your custom logic, for example calling client logic
-            //       or initializing an HTTP front end for accepting incoming requests.
 
             Console.WriteLine("Orleans Silo is running.\nPress Enter to terminate...");
             Console.ReadLine();

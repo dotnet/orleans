@@ -21,11 +21,11 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, GlobalConfiguration config)
         {
-            logger = TraceLogger.GetLogger(this.GetType().FullName);
+            logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();

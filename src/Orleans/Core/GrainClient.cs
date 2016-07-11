@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -12,8 +14,6 @@ using Orleans.Streams;
 
 namespace Orleans
 {
-    using System.Runtime.ExceptionServices;
-
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
@@ -277,11 +277,22 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Test hook to uninitialize client without cleanup
+        /// </summary>
+        public static void HardKill()
+        {
+            lock (initLock)
+            {
+                InternalUninitialize(false);
+            }
+        }
+
+        /// <summary>
         /// This is the lock free version of uninitilize so we can share 
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>
-        private static void InternalUninitialize()
+        private static void InternalUninitialize(bool cleanup = true)
         {
             // Update this first so IsInitialized immediately begins returning
             // false.  Since this method should be protected externally by 
@@ -293,7 +304,7 @@ namespace Orleans
             {
                 try
                 {
-                    RuntimeClient.Current.Reset();
+                    RuntimeClient.Current.Reset(cleanup);
                 }
                 catch (Exception) { }
 

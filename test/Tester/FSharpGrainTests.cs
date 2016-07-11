@@ -4,7 +4,6 @@ using Microsoft.FSharp.Core;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using UnitTests.FSharpTypes;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Tester;
 
@@ -20,7 +19,7 @@ namespace UnitTests.General
             var id = Guid.NewGuid();
             var grain = GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var output = await grain.Ping(input);
-            Assert.AreEqual(input, output);
+            Assert.Equal(input, output);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp")]
@@ -80,7 +79,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_IntOption_Some()
         {
-            var input = FSharpOption<int>.Some(0);
+            var input = FSharpOption<int>.Some(10);
             await PingTest<FSharpOption<int>>(input);
         }
 

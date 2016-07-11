@@ -21,7 +21,7 @@ namespace Orleans.Runtime.ConsistentRing
         
         /// list of silo members sorted by the hash value of their address
         private readonly List<SiloAddress> membershipRingList;
-        private readonly TraceLogger log;
+        private readonly Logger log;
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners;
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         public ConsistentRingProvider(SiloAddress siloAddr)
         {
-            log = TraceLogger.GetLogger(typeof(ConsistentRingProvider).Name);
+            log = LogManager.GetLogger(typeof(ConsistentRingProvider).Name);
             membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
