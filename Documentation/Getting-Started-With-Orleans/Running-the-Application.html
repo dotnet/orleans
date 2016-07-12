@@ -1,0 +1,135 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Running the Application | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Running the Application | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.0.1.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    <meta property="docfx:rel" content="../../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Running-the-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <h2 id="configuring-connections-to-orleans">Configuring Connections to Orleans</h2>
+              
+<p>To allow applications to communicate with grains from outside Orleans, the framework includes a client library.
+This client library might be used by a desktop or mobile application, or by a front end server that renders interactive web pages or exposes a web services API.
+The client library provides an API for writing asynchronous clients that communicate with Orleans grains.
+Once the client library is connected to an Orleans gateway, a client can send messages to grains, receive responses and receive asynchronous notifications from grains via observers.</p>
+<h2 id="connecting-to-a-gateway">Connecting to a Gateway</h2>
+<p>To establish a connection, a client calls <code>GrainClient.Initialize()</code>.
+This will connect to the gateway silo at the IP address and port specified in the <em>ClientConfiguration.xml</em> file.
+This file must be placed in the same directory as the <em>Orleans.dll</em> library used by the client.
+As an alternative, a configuration object can be passed to <code>GrainClient.Initialize()</code> programmatically instead of loading it from a file.</p>
+<h2 id="configuring-the-client">Configuring the Client</h2>
+<p>In <em>ClientConfiguration.xml</em>, the <code>Gateway</code> element specifies the address and port of the gateway endpoint that need to match those in <em>OrleansConfiguration.xml</em> on the silo side:</p>
+<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;Gateway Address=&quot;&lt;IP address or host name of silo&gt;&quot; Port=&quot;30000&quot; /&gt;
+&lt;/ClientConfiguration&gt;
+</code></pre>
+<p>If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn&#39;t be statically configured.
+Refer to the <a href="../Samples-Overview/Azure-Web-Sample.html">Azure application sample</a> for an example of how to configure the client.</p>
+<h2 id="configuring-silos">Configuring Silos</h2>
+<p>In <em>OrleansConfiguration.xml</em>, the <code>ProxyingGateway</code> element specifies the gateway endpoint of the silo, which is separate from the inter-silo endpoint defined by the Networking element and must have a different port number:</p>
+<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+    &lt;Defaults&gt;
+    &lt;Networking Address=&quot;&quot; Port=&quot;11111&quot; /&gt;
+    &lt;ProxyingGateway Address=&quot;&quot; Port=&quot;30000&quot; /&gt;
+    &lt;/Defaults&gt;
+&lt;/OrleansConfiguration&gt;
+</code></pre>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+            </nav>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

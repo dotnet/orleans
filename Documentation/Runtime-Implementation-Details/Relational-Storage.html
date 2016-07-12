@@ -1,0 +1,132 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Relational Storage | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Relational Storage | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.0.1.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:rel" content="../../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Relational-Storage.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <h1></h1>
+              <p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
+<p>To make Orleans code function with a given relational database backend, two things are needed:</p>
+<ol>
+<li>Appropriate ADO.NET libraries need to be loaded to the process. This should be defined as usual, e.g. via <a href="https://msdn.microsoft.com/en-us/library/dd0w4a2z(v=vs.110).aspx">DbProviderFactories</a> element in application configuration.</li>
+<li>Orleans should know about which libraries to use (multiple can exist in GAC or otherwise). The ADO.NET invariant is provided via <code>AdoInvariant</code> attribute in the element defining the connection string, by default it is <code>System.Data.SqlClient</code></li>
+<li>The database needs to exist so that it is compatible with the code. This is most conveniently done by creating a vendor specific database creation script. Currently there is database script defined for SQL Server for versions 2000 and newer (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_SqlServer.sql</a>). If you need other ones, open an issue or please, stop by at <a href="https://gitter.im/dotnet/orleans?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge">Orleans Gitter</a>.</li>
+</ol>
+<p>Orleans uses a fixed set of queries defined in a well-known table <code>OrleansQuery</code>. These are the only queries used by Orleans. The queries are loaded when silo starts using the given connection string. All the queries are also parameterized, i.e. Orleans does not use techniques such as string formatting to run queries. From the perspective of Orleans database code, the code will technically work with any given database structure as long as the following are defined (this is the interface contract between Orleans and relational storage):</p>
+<ol>
+<li>The names of the queries defined in <code>OrleansQuery</code> are defined as Orleans expects them. The keys are hardcoded in Orleans database code.</li>
+<li>The column names and types are what Orleans expects when Orleans issues a <code>SELECT</code> query.</li>
+<li>The parameter names and types are what Orleans expects when Orleans issues other than <code>SELECT</code> query.</li>
+</ol>
+<p>Specifically from the aforementioned three rules it follows that table names and layout, indexing and so forth can be defined and tuned without code changes as long as the used names and types are retained. The interface contract is written in more detail in <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_SqlServer.sql</a>, which contains a throughout description of the table structure and how it related to the
+<a href="Runtime-Tables">Runtime Tables</a>, <a href="Cluster-Management">Cluster Management</a> and the concrete <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs">membership protocol implementation</a>. Also, the SQL Server implementation contains SQL Server edition specific tuning.</p>
+<p>Currently all but one query are single row inserts or updates (note, one could replace <code>UPDATE</code> queries with <code>INSERT</code> ones provided the associated <code>SELECT</code> queries would provide the last write) except for statistic inserts. Statistic insert, as defined by <code>InsertOrleansStatisticsKey</code> writes the statistics in batches of predefined maximum size (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/SqlStatisticsPublisher.cs#L206">currently 200 rows</a>) using <code>UNION ALL</code> for all databases except for Oracle, for which a <code>UNION ALL FROM DUAL</code> construct is used. <code>InsertOrleansStatisticsKey</code> is the only query that defines a kind of a template parameters of which Orleans multiplies as many times as there are parameters with differing values.</p>
+<h2 id="known-issues">Known issues</h2>
+<p>Currently there is a database script only for SQL Server. Closely related to this is that the current implementation is only tested with SQL Server. To add a new backend and test it with the current set, the following needs to be done:</p>
+<ol>
+<li>Add a new script to create the database.</li>
+<li>Add the vendor invariant name (e.g. <em>System.Data.SqlClient</em>) to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/AdoNetInvariants.cs#L34">AdoNetInvariants</a>. This is used to select the correct statistics insert mode (i.e. the <code>UNION ALL</code> with or without <code>FROM DUAL</code>) and in automatic testing.</li>
+<li>Add some other ADO.NET provider specific data to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/QueryConstantsBag.cs#L43">QueryConstantsBag</a>. These are (potentially) used in some query operations.</li>
+<li>Patch the test runner so it accepts the invariant name as a parameter, see at <a href="https://github.com/dotnet/orleans/blob/master/src/Tester/RelationalUtilities/SqlTestsEnvironment.cs#L38">SqlTestsEnvironment</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/Tester/MembershipTests/LivenessTests.cs#L423">LivenessTests_SqlServer</a>. The relational setup testing code is a good candinate for refactoring. For instance one could detect if a database is installed in listening to connections when it has a script defined and if so, run the storage tests on it.</li>
+</ol>
+<p>Currently there is no automatic storage tests to detect correct metrics or statistics operations</p>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+            </nav>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
