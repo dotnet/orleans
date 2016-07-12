@@ -4,61 +4,61 @@
     href: prerequisites.md
   - name: NuGet Packages
     href: NuGets.md
-- name: Advanced Concepts
-  href: Advanced-Concepts/index.md
-  homepage: Advanced-Concepts/index.md
-  items:
-    - name: Interceptors
-      href: Advanced-Concepts/Interceptors.md
-    - name: Reentrant Grains
-      href: Advanced-Concepts/Reentrant-Grains.md
-    - name: Request Context
-      href: Advanced-Concepts/Request-Context.md
-    - name: Runtime Monitoring
-      href: Advanced-Concepts/Runtime-Monitoring.md
-    - name: Serialization
-      href: Advanced-Concepts/Serialization.md
-    - name: Silo Error Code Monitoring
-      href: Advanced-Concepts/Silo-Error-Code-Monitoring.md
-    - name: Timers and Reminders
-      href: Advanced-Concepts/Timers-and-Reminders.md
-    - name: Two Way Client Observers (old)
-      href: Advanced-Concepts/Two-Way-Client-Observers-old.md
-    - name: Using Azure Web Apps
-      href: Advanced-Concepts/Using-Azure-Web-Apps.md
-    - name: Using Immutable to Optimize Copying
-      href: Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md
-    - name: Activation Garbage Collection
-      href: Advanced-Concepts/Activation-Garbage-Collection.md
-    - name: Application Bootstrap within a Silo
-      href: Advanced-Concepts/Application-Bootstrap-within-a-Silo.md
-    - name: Client Error Code Monitoring
-      href: Advanced-Concepts/Client-Error-Code-Monitoring.md
-    - name: Configuring .NET Garbage Collection
-      href: Advanced-Concepts/Configuring-.NET-Garbage-Collection.md
-    - name: Configuring SQL Tables
-      href: Advanced-Concepts/Configuring-SQL-Tables.md
-    - name: External Tasks and Grains
-      href: Advanced-Concepts/External-Tasks-and-Grains.md
 - name: Getting Started with Orleans
   href: Getting-Started-With-Orleans/Grains.md
   homepage: Getting-Started-With-Orleans/Grains.md
   items:
-    - name: Grains
-      href: Getting-Started-With-Orleans/Grains.md
-    - name: Developing a Grain
-      href: Getting-Started-With-Orleans/Developing-a-Grain.md
-    - name: Developing a Client
-      href: Getting-Started-With-Orleans/Developing-a-Client.md
-    - name: Grain Persistence
-      href: Getting-Started-With-Orleans/Grain-Persistence.md
-    - name: Observers
-      href: Getting-Started-With-Orleans/Observers.md
-    - name: Running the Application
-      href: Getting-Started-With-Orleans/Running-the-Application.md
-    - name: Silos
-      href: Getting-Started-With-Orleans/Silos.md
-    - name: Clients
-      href: Getting-Started-With-Orleans/Clients.md
-    - name: Debugging
-      href: Getting-Started-With-Orleans/Debugging.md
+  - name: Grains
+    href: Getting-Started-With-Orleans/Grains.md
+  - name: Developing a Grain
+    href: Getting-Started-With-Orleans/Developing-a-Grain.md
+  - name: Developing a Client
+    href: Getting-Started-With-Orleans/Developing-a-Client.md
+  - name: Grain Persistence
+    href: Getting-Started-With-Orleans/Grain-Persistence.md
+  - name: Observers
+    href: Getting-Started-With-Orleans/Observers.md
+  - name: Running the Application
+    href: Getting-Started-With-Orleans/Running-the-Application.md
+  - name: Silos
+    href: Getting-Started-With-Orleans/Silos.md
+  - name: Clients
+    href: Getting-Started-With-Orleans/Clients.md
+  - name: Debugging
+    href: Getting-Started-With-Orleans/Debugging.md
+- name: Advanced Concepts
+  href: Advanced-Concepts/index.md
+  homepage: Advanced-Concepts/index.md
+  items:
+  - name: Interceptors
+    href: Advanced-Concepts/Interceptors.md
+  - name: Reentrant Grains
+    href: Advanced-Concepts/Reentrant-Grains.md
+  - name: Request Context
+    href: Advanced-Concepts/Request-Context.md
+  - name: Runtime Monitoring
+    href: Advanced-Concepts/Runtime-Monitoring.md
+  - name: Serialization
+    href: Advanced-Concepts/Serialization.md
+  - name: Silo Error Code Monitoring
+    href: Advanced-Concepts/Silo-Error-Code-Monitoring.md
+  - name: Timers and Reminders
+    href: Advanced-Concepts/Timers-and-Reminders.md
+  - name: Two Way Client Observers (old)
+    href: Advanced-Concepts/Two-Way-Client-Observers-old.md
+  - name: Using Azure Web Apps
+    href: Advanced-Concepts/Using-Azure-Web-Apps.md
+  - name: Using Immutable to Optimize Copying
+    href: Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md
+  - name: Activation Garbage Collection
+    href: Advanced-Concepts/Activation-Garbage-Collection.md
+  - name: Application Bootstrap within a Silo
+    href: Advanced-Concepts/Application-Bootstrap-within-a-Silo.md
+  - name: Client Error Code Monitoring
+    href: Advanced-Concepts/Client-Error-Code-Monitoring.md
+  - name: Configuring .NET Garbage Collection
+    href: Advanced-Concepts/Configuring-.NET-Garbage-Collection.md
+  - name: Configuring SQL Tables
+    href: Advanced-Concepts/Configuring-SQL-Tables.md
+  - name: External Tasks and Grains
+    href: Advanced-Concepts/External-Tasks-and-Grains.md
