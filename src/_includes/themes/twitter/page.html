@@ -1,0 +1,15 @@
+<div class="header"> 
+	<div class="container">
+		<a href="/orleans" class="title"><h1>Orleans Documentation</h1></a>
+	</div>
+</div>
+
+<div class="container">
+	<div class="row">
+		<div class="col-md-3 menu">{% include menu.html %}</div>
+		<div class="col-md-9">
+			<h1>{{ page.title }} {% if page.tagline %} <small>{{ page.tagline }}</small>{% endif %}</h1>
+			{{ content }}
+		</div>
+	</div>
+</div>

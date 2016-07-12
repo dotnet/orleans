@@ -1,0 +1,9 @@
+- name: Documentation
+  href: Documentation/What's-new-in-Orleans.md
+  homepage: What's-new-in-Orleans.md
+- name: Tutorials
+  href: Tutorials/index.md
+  homepage: index.md
+- name: Community
+  href: Community/Who-Is-Using-Orleans.md
+  homepage: Who-Is-Using-Orleans.md
