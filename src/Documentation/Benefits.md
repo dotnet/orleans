@@ -3,6 +3,8 @@ layout: page
 title: Main Benefits
 ---
 
+# Benefits
+
 The main benefits of Orleans are: **developer productivity**, even for non-expert programmers; and **transparent scalability by default** with no special effort from the programmer. We expand on each of these benefits below.
 
 ### Developer Productivity
@@ -25,4 +27,3 @@ The Orleans programming model is designed to guide the programmer down a path of
 * **Multiplexed communication**. Actors in Orleans have logical endpoints, and messaging between them is multiplexed across a fixed set of all-to-all physical connections (TCP sockets). This allows the  runtime to host a very large number (millions) of addressable entities with low OS overhead per actor. In addition, activation/deactivation of an actor does not incur the cost of registering/unregistering of a physical endpoint, such as a TCP port or a HTTP URL, or even closing a TCP connection.
 * **Efficient scheduling**. The runtime schedules execution of a large number of single-threaded actors across a custom thread pool with a thread per physical processor core. With actor code written in the non-blocking continuation based style (a requirement of the Orleans programming model) application code runs in a very efficient “cooperative” multi-threaded manner with no contention. This allows the system to reach high throughput and run at very high CPU utilization (up to 90%+) with great stability. The fact that a growth in the number of actors in the system and the load does not lead to additional threads or other OS primitives helps scalability of individual nodes and the whole system.
 * **Explicit asynchrony**. The Orleans programming model makes the asynchronous nature of a distributed application explicit and guides programmers to write non-blocking asynchronous code. Combined with asynchronous messaging and efficient scheduling, this enables a large degree of distributed parallelism and overall throughput without the explicit use of multi-threading.
-

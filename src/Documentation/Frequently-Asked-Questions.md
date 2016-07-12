@@ -3,8 +3,7 @@ layout: page
 title: Frequently Asked Questions
 ---
 
-
-
+# Frequently Asked Questions
 
 ## Does Microsoft support Orleans?
 
