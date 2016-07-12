@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Two Way Client Observers | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Two Way Client Observers | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.0.1.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    <meta property="docfx:rel" content="../../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <a href="https://github.com/richorama/orleans/blob/gh-pages/Documentation/Advanced-Concepts/Two-Way-Client-Observers-old.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <h1></h1>
+              <p><strong>THE BELOW IS WRONG!!!!!!</strong></p>
+<p>In addition to regular, one-way <a href="http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers">Client Observers</a>, 
+Orleans also provides an advanced feature of two-way (RPC) client observers. 
+This feature allows a grain to make a call into a client observer and receive a response back.</p>
+<h2 id="programming-interface">Programming Interface</h2>
+<p>To enable this feature start with writing a regular client observer - a class that extends <code>IGrainObserver</code> interface.
+To make it two-way you need to add the following:</p>
+<p>1) Add a <code>[Factory(FactoryAttribute.FactoryTypes.ClientObject)]</code>  attribute on this class.</p>
+<p>2) Change the methods signatures to be async (return <code>Task</code> or <code>Task&lt;T&gt;</code>).</p>
+<p>From now on follow the regular observers programming pattern: call <code>CreateObjectReference()</code> to create an observer reference and then send it to a grain that will use it to notify the client.
+The notifying grain can use this observer reference as any regular grain reference: make calls on it and <code>await</code> them. </p>
+<p>Notice that since the observer reference represents a client object 
+and not a virtual actor (grain), if the actual client is down, or the observer reference on the client was deleted 
+(either by an explicit call to <code>DeleteObjectReference</code> or just garbage collected since it was not rooted), the <code>Task</code> returned from the call to it will break with an exception.</p>
+<h2 id="usage-considerations-and-guidelines">Usage considerations and guidelines</h2>
+<p>Please take into account that making RPC calls from actors (a server) to clients may sometimes be considered an <strong>anti-pattern</strong>.
+Traditional distributed system client server applications usually do not allow such capability. The reason is that it can potentially create <strong>too strong coupling 
+between the client and the server</strong>, making: (a) server logic relay too much on the client logic, (b) making server resources consumption be directly impacted and controlled by the client.
+In traditional synchronous RPC systems making an RPC call from a server to client would mean that the server thread is blocked until the client responds, potentially taking valuable resources.
+In the general case of uncontrolled (and maybe even malicious) clients, this is a realy bad pattern. Therefore, traditional distributed system avoided such capability.</p>
+<p>In Orleans context we feel this feature is potentiality less dangerous since:</p>
+<p>1) Orleans clients are usually considered part of the trusted domain, running usually as front ends in the same service deployment. Therefore, they are assumed to be non-malicious.</p>
+<p>2) Orleans RPCs are asynchronous and essentially do not consume any additional resources beyond a regular message call 
+(we still need to store a callback context to be able to process the response, just like we do for regular grain to grain calls, but this is a small object and its overhead is very small).</p>
+<p>One should still consider the potential dangers of using two way client RPCs with Orleans:</p>
+<p>If the grain making the call is non re-entrant (the default mode) the grain will be blocked until the response arrives or the built-in time-out occurs. 
+It means the grain might be unresponsive for some time. Even with non malicious clients, since Orleans does not control client side resources, 
+it cannot guarantee that client responds in a timely manner to this RPC call. 
+As such, even in Orleans, this feature creates a tighter coupling between the client and the server, which is generally undesired.</p>
+<p>Therefore, our recommendation is to use this feature sparsely, only if you fully control and trust the client code, and if all other alternative solutions 
+(regular <a href="http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Observers">one way client side observers</a> and <a href="http://dotnet.github.io/orleans/Orleans-Streams/">client streams</a>) do not work for your scenario.</p>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+            </nav>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

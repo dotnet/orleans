@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Developing a Client | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Developing a Client | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.0.1.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    <meta property="docfx:rel" content="../../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <a href="https://github.com/richorama/orleans/blob/gh-pages/Documentation/Getting-Started-With-Orleans/Developing-a-Client.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <h1></h1>
+              <p>Once we have our grain type implemented, we can write a client application that uses the type.</p>
+<p>The following Orleans DLLs from either the <code>[SDK-ROOT]\Binaries\PresenceClient_ or _[SDK-ROOT]\Samples\References</code> directories need to be referenced in the client application project:</p>
+<ul>
+<li>Orleans.dll</li>
+<li>OrleansRuntimeInterfaces.dll</li>
+</ul>
+<p>Almost any client will involve use of the grain factory class.
+The <code>GetGrain()</code> method is used for getting a grain reference for a particular ID.
+As was already mentioned, grains cannot be explicitly created or deleted.</p>
+<pre><code class="lang-csharp">GrainClient.Initialize();
+
+// Hardcoded player ID
+Guid playerId = new Guid(&quot;{2349992C-860A-4EDA-9590-000000000006}&quot;);
+IPlayerGrain player = GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);
+
+IGameGrain game = player.CurrentGame.Result;
+var watcher = new GameObserver();
+var observer = GrainClient.GrainFactory.CreateObjectReference&lt;IGameObserver&gt;(watcher);
+await game.SubscribeForGameUpdates();
+</code></pre>
+<p>If this code is used from the main thread of a console application, you have to call <code>Wait()</code> on the task returned by <code>game.SubscribeForGameUpdates()</code> because <code>await</code> does not prevent the <code>Main()</code> function from returning, which will cause the client process to exit.</p>
+<p>See the Key Concepts section for more details on the various ways to use <code>Task</code>s for execution scheduling and exception flow.</p>
+<h2 id="find-or-create-grains">Find or create grains</h2>
+<p>After establishing a connection by calling <code>GrainClient.Initialize()</code>, static methods in the generic factory class may be used to get a reference to a grain, such as <code>GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;()</code> for the <code>PlayerGrain</code>. The grain interface is passed as a type argument to <code>GrainFactory.GetGrain&lt;T&gt;()</code>.</p>
+<h2 id="sending-messages-to-grains">Sending messages to grains</h2>
+<p>The programming model for communicating with grains from a client is almost the same as from a grain.
+The client holds grain references which implement a grain interface like <code>IPlayerGrain</code>.
+It invokes methods on that grain reference, and these return asynchronous values: <code>Task</code>/<code>Task&lt;T&gt;</code>, or another grain interface inheriting from <code>IGrain</code>.
+The client can use the <code>await</code> keyword or <code>ContinueWith()</code> method to queue continuations to be executed when these asynchronous values resolve, or the <code>Wait()</code> method to block the current thread.</p>
+<p>The one key difference between communicating with a grain from within a client or from within another grain is the single-threaded execution model.
+Grains are constrained to be single-threaded by the Orleans scheduler, while clients may be multi-threaded.
+The client library uses the TPL thread pool to manage continuations and callbacks, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, TPL tasks, etc.</p>
+<h2 id="receiving-notifications">Receiving notifications</h2>
+<p>There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications.
+For example, a user might want to be notified when a new message has been published by someone that she is following.</p>
+<p>An observer is a one-way asynchronous interface that inherits from <code>IGrainObserver</code>, and all its methods must be <code>void</code>.
+The grain sends a notification to the observer by invoking it like a grain interface method, except that it has no return value, and so the grain need not depend on the result.
+The Orleans runtime will ensure one-way delivery of the notifications.
+A grain that publishes such notifications should provide an API to add or remove observers.</p>
+<p>To subscribe to a notification, the client must first create a local C# object that implements the observer interface.
+It then calls <code>CreateObjectReference()</code> method on the grain factory, to turn the C# object into a grain reference, which can then be passed to the subscription method on the notifying grain.</p>
+<p>This model can also be used by other grains to receive asynchronous notifications.
+Unlike in the client subscription case, the subscribing grain simply implements the observer interface as a facet, and passes in a reference to itself (e.g. <code>this.AsReference&lt;IChirperViewer&gt;</code>).</p>
+<h2 id="example">Example</h2>
+<p>Here is an extended version of the example given above of a client application that connects to Orleans, finds the player account, subscribes for updates to the game session the player is part of, and prints out notifications until the program is manually terminated.</p>
+<pre><code class="lang-csharp">namespace PlayerWatcher
+{
+    class Program
+    {
+        /// &lt;summary&gt;
+        /// Simulates a companion application that connects to the game
+        /// that a particular player is currently part of, and subscribes
+        /// to receive live notifications about its progress.
+        /// &lt;/summary&gt;
+        static void Main(string[] args)
+        {
+            try
+            {
+                GrainClient.Initialize();
+
+                // Hardcoded player ID
+                Guid playerId = new Guid(&quot;{2349992C-860A-4EDA-9590-000000000006}&quot;);
+                IPlayerGrain player = GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);
+                IGameGrain game = null;
+
+                while (game == null)
+                {
+                    Console.WriteLine(&quot;Getting current game for player {0}...&quot;, playerId);
+
+                    try
+                    {
+                        game = player.CurrentGame.Result;
+                        if (game == null) // Wait until the player joins a game
+                            Thread.Sleep(5000);
+                    }
+                    catch (Exception exc)
+                    {
+                        Console.WriteLine(&quot;Exception: &quot;, exc.GetBaseException());
+                    }
+                }
+
+                Console.WriteLine(&quot;Subscribing to updates for game {0}...&quot;, game.GetPrimaryKey());
+
+                // Subscribe for updates
+                var watcher = new GameObserver();
+                game.SubscribeForGameUpdates(GrainClient.GrainFactory.CreateObjectReference&lt;IGameObserver&gt;(watcher)).Wait();
+
+                // .Wait will block main thread so that the process doesn&#39;t exit.
+                // Updates arrive on thread pool threads.
+                Console.WriteLine(&quot;Subscribed successfully. Press &lt;Enter&gt; to stop.&quot;);
+                Console.ReadLine();
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine(&quot;Unexpected Error: {0}&quot;, exc.GetBaseException());
+            }
+        }
+
+        /// &lt;summary&gt;
+        /// Observer class that implements the observer interface.
+        /// Need to pass a grain reference to an instance of this class to subscribe for updates.
+        /// &lt;/summary&gt;
+        private class GameObserver : IGameObserver
+        {
+            // Receive updates
+            public void UpdateGameScore(string score)
+            {
+                Console.WriteLine(&quot;New game score: {0}&quot;, score);
+            }
+        }
+    }
+}
+</code></pre>
+<h2 id="next">Next</h2>
+<p><a href="Running-the-Application.html">Running the Application</a></p>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+            </nav>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>
