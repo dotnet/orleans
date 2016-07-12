@@ -1,7 +1,9 @@
-
-- name: Advanced Concepts
-  href: Advanced-Concepts/
-  homepage: Advanced-Concepts/index.md
-- name: Getting Started with Orleans
-  href: Getting-Started-With-Orleans/
-  homepage: Getting-Started-With-Orleans/Developing-a-Grain.md
+- name: Documentation
+  href: Documentation/What's-new-in-Orleans.md
+  homepage: What's-new-in-Orleans.md
+- name: Tutorials
+  href: Tutorials/index.md
+  homepage: index.md
+- name: Community
+  href: Community/Who-Is-Using-Orleans.md
+  homepage: Who-Is-Using-Orleans.md

@@ -1,13 +1,39 @@
 ---
-layout: index
+documentType: index
 title: Microsoft Orleans
 tagline: A straightforward approach to building distributed, high-scale applications in .NET
 ---
+<style>
+.subtitle {
+    font-size:20px;
+}
+.main_logo {
+    width:100%
+}
+.jumbotron{
+    text-align: center;
+}
+</style>
 
-Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
-It was created by Microsoft Research and designed for use in the cloud.
 
-Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 and Halo 5 cloud services, as well as by a growing number of other companies.
+<div class="jumbotron">
+    <div class="container">
+      <img src="images/logo.svg" class="main_logo" />
+      <h1 class="title"><small class="subtitle">A straightforward approach to building distributed, high-scale applications in .NET</small></h1>
+      <div class="options">
+        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Get the code</a> <a class="btn btn-lg btn-primary" href="Documentation/What's-new-in-Orleans.html">Read the documentation</a>
+      </div>
+    </div>
+</div>
+
+<p class="lead">
+    Orleans is a framework that provides a straightforward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns.
+    It was created by Microsoft Research and designed for use in the cloud.
+</p>
+
+<p class="lead">
+    Orleans has been used extensively in Microsoft Azure by several Microsoft product groups, most notably by 343 Industries as a platform for all of Halo 4 and Halo 5 cloud services, as well as by a growing number of other companies.
+</p>
 
 ---
 

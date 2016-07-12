@@ -1,29 +1,15 @@
 {
-  "metadata": [
-    {
-      "src": [
-        {
-          "files": [
-            "src/**.csproj"
-          ],
-          "exclude": [
-            "**/obj/**",
-            "**/bin/**",
-            "_site/**"
-          ]
-        }
-      ],
-      "dest": "api"
-    }
-  ],
+
   "build": {
     "content": [
       {
         "files": [
-          "Advanced-Concepts/**.yml",
-          "Advanced-Concepts/**.md",
-          "Getting-Started-With-Orleans/**.yml",
-          "Getting-Started-With-Orleans/**.md"
+          "Documentation/**/**.yml",
+          "Documentation/**/**.md",
+          "Tutorials/**.yml",
+          "Tutorials/**.md",
+          "Community/**.yml",
+          "Community/**.md"
         ]
       },
       {
@@ -43,7 +29,8 @@
       {
         "files": [
           "images/**",
-          "logo.svg"
+          "logo.svg",
+          "logo-light.svg"
         ],
         "exclude": [
           "obj/**",
@@ -53,9 +40,7 @@
     ],
     "overwrite": [
       {
-        "files": [
-          "apidoc/**.md"
-        ],
+        "files": [ ],
         "exclude": [
           "obj/**",
           "_site/**"
@@ -66,6 +51,11 @@
     "template": [
       "default", "template"
     ],
-    "noLangKeyword": false
+    "noLangKeyword": false,
+    "globalMetadata": {
+      "_appTitle": "Microsoft Orleans Website",
+      "_enableSearch": true
+    }
   }
+
 }
