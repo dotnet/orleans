@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using UnitTests.StreamingTests;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -115,7 +114,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public CachedMessageBlock<TestCachedMessage> Allocate()
             {
-                return new CachedMessageBlock<TestCachedMessage>(this, TestBlockSize);
+                return new CachedMessageBlock<TestCachedMessage>(TestBlockSize){Pool = this};
             }
 
             public void Free(CachedMessageBlock<TestCachedMessage> resource)

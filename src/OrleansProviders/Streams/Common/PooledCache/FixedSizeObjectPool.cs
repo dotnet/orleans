@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="poolSize"></param>
         /// <param name="factoryFunc"></param>
-        public FixedSizeObjectPool(int poolSize, Func<IObjectPool<T>,T> factoryFunc)
+        public FixedSizeObjectPool(int poolSize, Func<T> factoryFunc)
             : base(factoryFunc, poolSize)
         {
             if (poolSize < MinObjectCount)

@@ -61,10 +61,8 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Block of cached messages
         /// </summary>
-        /// <param name="pool"></param>
         /// <param name="blockSize"></param>
-        public CachedMessageBlock(IObjectPool<CachedMessageBlock<TCachedMessage>> pool, int blockSize = DefaultCachedMessagesPerBlock)
-            : base(pool)
+        public CachedMessageBlock(int blockSize = DefaultCachedMessagesPerBlock)
         {
             this.blockSize = blockSize;
             cachedMessages = new TCachedMessage[blockSize];
