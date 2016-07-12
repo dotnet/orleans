@@ -169,7 +169,7 @@ Located in the `<Deployment>` element.
 ```
 
 ## Orleans Silo Configuration
-Refer to  [Server Configuration](../Orleans-Configuration-Guide/Server-Configuration) for information on silo configuration.
+Refer to  [Server Configuration](../Orleans-Configuration-Guide/Server-Configuration.md) for information on silo configuration.
 
 ## Orleans Powershell Scripts
 The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring.
@@ -226,7 +226,7 @@ If everything works well, you should see something like this:
 
 
 ## Running the Client
-We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file _DevTestClientConfiguratio.xml_ needs to be edited according to the [Client Configuration](../Orleans-Configuration-Guide/Client-Configuration) section.
+We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file _DevTestClientConfiguratio.xml_ needs to be edited according to the [Client Configuration](../Orleans-Configuration-Guide/Client-Configuration.md) section.
 The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration.
 In the author's setup, Azure is not involved, so the client configuration looks like this:
 

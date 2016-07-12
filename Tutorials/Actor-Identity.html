@@ -126,7 +126,7 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
     return base.OnActivateAsync();
 }
 </code></pre>
-<p>The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
+<p>The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
 <h2 id="using-compound-primary-key">Using Compound Primary Key</h2>
 <p>If you have a system that doesn&#39;t fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.</p>
 <p>You can inherit your interface from &#39;IGrainWithGuidCompoundKey&#39; or &#39;IGrainWithIntegerCompoundKey&quot; interface like this:</p>

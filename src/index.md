@@ -90,9 +90,9 @@ await grain.SayHello("World");
 
 ## Where Next?
 
-To learn more about the concepts in Orleans, read the [introduction](Introduction).
+To learn more about the concepts in Orleans, read the [introduction](Documentation/Introduction.md).
 
-There are a number of [step-by-step tutorials](Step-by-step-Tutorials).
+There are a number of [step-by-step tutorials](Tutorials/index.md).
 
 Discuss your Orleans questions on the [gitter chat room](https://gitter.im/dotnet/orleans).
 

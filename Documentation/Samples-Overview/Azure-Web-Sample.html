@@ -74,26 +74,26 @@
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Azure-Web-Sample.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1></h1>
               <p><strong>Important note</strong>: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!</p>
-<p>This sample is essentially the same as the <a href="Hello-World">Hello World</a> sample, except that it hosts the grains in an Azure Worker Role instead of in the client process itself.</p>
+<p>This sample is essentially the same as the <a href="Hello-World.html">Hello World</a> sample, except that it hosts the grains in an Azure Worker Role instead of in the client process itself.</p>
 <p>While the communication interface and grain implementation are identical, three projects replace the client:</p>
 <p><strong>OrleansAzureSample</strong>, which is the Azure configuration project.
 <strong>OrleansAzureSilos</strong>, the Worker Role integration logic that hosts the Orleans silo in the cloud.
 <strong>WebRole</strong>, which provides a simple HTML UI for the Orleans backend.</p>
 <h2 id="run-azurewebsample-locally">Run AzureWebSample Locally</h2>
-<p>The sample is configured to run inside of the Azure Compute Emulator on your desktop by default, so make sure that <strong>OrleansAzureSample</strong> is set as the <strong>Startup Project</strong> in this solution and just press F5 to build and run the sample locally. </p>
-<p>You do not need to start Visual Studio with administrative privileges to run this sample in the emulator - it is designed to use both <strong>IIS Express</strong> and <strong>Express Emulator</strong>, so make sure these options are selected in OrleansAzureSample-&gt;Properties-&gt;Web. 
-You may also need to select the &quot;Use IIS Express for web sites and projects&quot; in Tools-&gt;Options-&gt;Projects and Solutions-&gt;Web Projects. </p>
+<p>The sample is configured to run inside of the Azure Compute Emulator on your desktop by default, so make sure that <strong>OrleansAzureSample</strong> is set as the <strong>Startup Project</strong> in this solution and just press F5 to build and run the sample locally.</p>
+<p>You do not need to start Visual Studio with administrative privileges to run this sample in the emulator - it is designed to use both <strong>IIS Express</strong> and <strong>Express Emulator</strong>, so make sure these options are selected in OrleansAzureSample-&gt;Properties-&gt;Web.
+You may also need to select the &quot;Use IIS Express for web sites and projects&quot; in Tools-&gt;Options-&gt;Projects and Solutions-&gt;Web Projects.</p>
 <h2 id="run-azurewebsample-in-azure-cloud">Run AzureWebSample in Azure Cloud</h2>
 <p>To get the sample running in the Azure cloud, open the <code>ServiceConfiguration.Cloud.cscfg</code> file in the OrleansAzureSample project.</p>
 <p>Edit the connection strings, replacing <code>MYACCOUNTNAME</code> and <code>MYACCOUNTKEY</code> with data you get from the Azure portal, logged in to your account. It may be useful to set up a new storage account within your subscription just for samples testing. All four connection strings will look exactly the same.</p>
 <p>In the file <code>ServiceDefinition.csdef</code>, the configuration sets up all instances as ExtraSmall to avoid any unpleasant surprises. If you want something else, modify the settings as you see fit.</p>
 <p>Then, build the solution with Visual Studio and right-click on the OrleansAzureSample project, selecting &#39;Publish.&#39; Visual Studio will take you through the process of publishing your project to Azure, which will take a few minutes.</p>
 <p>If things work out, you should see something like this:
-<img src="AzureSample 3.png" alt=""></p>
+<img src="AzureSample%203.png" alt=""></p>
 <p>This means that the site and its backend are ready. Start a web browser and navigate to the link that VS displayed (or just click on it). You will be greeted by this screen:</p>
-<p><img src="AzureSample 1.png" alt=""></p>
+<p><img src="AzureSample%201.png" alt=""></p>
 <p> Enter a greeting and wait for the response. The first time you interact with the site, it may take a few seconds, since the whole system need to warm up. After that first greeting, it should go quickly.</p>
-<p><img src="AzureSample 2.png" alt=""></p>
+<p><img src="AzureSample%202.png" alt=""></p>
 
             </article>
           </div>

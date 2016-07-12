@@ -86,7 +86,7 @@ public override Task OnActivateAsync()
 }
 ```
 
-The stock ticker example used in the [Interaction with Libraries and Services](Interaction-with-Libraries-and-Services) uses a string keys to activate grains representing different stock symbols.
+The stock ticker example used in the [Interaction with Libraries and Services](Interaction-with-Libraries-and-Services.md) uses a string keys to activate grains representing different stock symbols.
 
 ## Using Compound Primary Key
 

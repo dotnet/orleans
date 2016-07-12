@@ -3,7 +3,7 @@ layout: page
 title: Relational Storage
 ---
 
-Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in [Runtime Tables](Runtime-Tables). Setting up the connection strings are done as explained in [Orleans Configuration Guide ](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/) and [SQL Tables](http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables).
+Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in [Runtime Tables](Runtime-Tables.md). Setting up the connection strings are done as explained in [Orleans Configuration Guide ](../Orleans-Configuration-Guide/index.md) and [SQL Tables](http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables).
 
 To make Orleans code function with a given relational database backend, two things are needed:
 
@@ -18,7 +18,7 @@ Orleans uses a fixed set of queries defined in a well-known table ``OrleansQuery
 3. The parameter names and types are what Orleans expects when Orleans issues other than ``SELECT`` query.
 
 Specifically from the aforementioned three rules it follows that table names and layout, indexing and so forth can be defined and tuned without code changes as long as the used names and types are retained. The interface contract is written in more detail in [CreateOrleansTables_SqlServer.sql](https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql), which contains a throughout description of the table structure and how it related to the
-[Runtime Tables](Runtime-Tables), [Cluster Management](Cluster-Management) and the concrete [membership protocol implementation](https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs). Also, the SQL Server implementation contains SQL Server edition specific tuning.
+[Runtime Tables](Runtime-Tables.md), [Cluster Management](Cluster-Management.md) and the concrete [membership protocol implementation](https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs). Also, the SQL Server implementation contains SQL Server edition specific tuning.
 
 Currently all but one query are single row inserts or updates (note, one could replace ``UPDATE`` queries with ``INSERT`` ones provided the associated ``SELECT`` queries would provide the last write) except for statistic inserts. Statistic insert, as defined by ``InsertOrleansStatisticsKey`` writes the statistics in batches of predefined maximum size ([currently 200 rows](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/SqlStatisticsPublisher.cs#L206)) using ``UNION ALL`` for all databases except for Oracle, for which a ``UNION ALL FROM DUAL`` construct is used. ``InsertOrleansStatisticsKey`` is the only query that defines a kind of a template parameters of which Orleans multiplies as many times as there are parameters with differing values.
 

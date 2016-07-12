@@ -19,7 +19,7 @@ A typical scenario for Orleans Streams is when you have per user streams and you
 
 Users change their interests all the time, hence their subscriptions to specific streams of events come and go dynamically, thus **the streaming topology changes dynamically and rapidly**. On top of that, **the processing logic per user evolves and changes dynamically as well, based on user state and external events**. External events may modify the  processing logic for a particular user. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updated with the new rule to detect this new violation. This needs to be done of course **without disrupting the ongoing processing pipeline**. Bulk data-flow stream processing engines were not build to support such scenarios.
 
-It goes almost without saying that such a system has to run on a number of network-connected machines, not on a signle node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.
+It goes almost without saying that such a system has to run on a number of network-connected machines, not on a single node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.
 
 ### New Requirements
 
@@ -62,11 +62,11 @@ And of course, our system should have all the properties of a **"good distribute
 4. _Efficiency_ - use the underlying resources efficiently
 5. _Responsiveness_ - enable near real time scenarios.
 
-These were the requirements we had in mind for building [**Orleans Streaming**](index).
+These were the requirements we had in mind for building [**Orleans Streaming**](index.md).
 
 ---
 
-_Clarificaton_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described [here](Streams-Programming-APIs). Providing declarative dataflow expressions is our future goal.
+_Clarificaton_: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described [here](Streams-Programming-APIs.md). Providing declarative dataflow expressions is our future goal.
 
 ## Next
-[Orleans Streams Programming APIs](Streams-Programming-APIs)
+[Orleans Streams Programming APIs](Streams-Programming-APIs.md)

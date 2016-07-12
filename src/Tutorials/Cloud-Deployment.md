@@ -6,7 +6,7 @@ title: Cloud Deployment
 # Cloud Deployment
 
 ## Deploying Orleans to Windows Azure
-This walkthrough shows the steps required to deploy the sample created in the  [Front Ends for Orleans Services](Front-Ends-for-Orleans-Services) to Windows Azure Cloud Services.
+This walkthrough shows the steps required to deploy the sample created in the  [Front Ends for Orleans Services](Front-Ends-for-Orleans-Services.md) to Windows Azure Cloud Services.
 
 In Azure, one or more worker roles will be used to host the Orleans silos, and an Azure web role will act as the presentation layer for the application and client to the application grains running in the Orleans silos.
 
@@ -41,7 +41,7 @@ Copies of these files can be found in the _.\Binaries\OrleansServer_ folder unde
 * Orleans.dll
 * OrleansAzureUtils.dll
 * OrleansRuntime.dll
-* OrleansProviders.dll (Only required if you your grains use the [Declarative Persistence](Declarative-Persistence) functionality.)
+* OrleansProviders.dll (Only required if you your grains use the [Declarative Persistence](Declarative-Persistence.md) functionality.)
 
 Note: All of these references MUST have _Copy Local = 'True'_ settings to ensure the necessary library DLLs get copied into the `OrleansAzureSilo` project output directory.
 

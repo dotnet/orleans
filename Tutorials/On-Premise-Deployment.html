@@ -185,7 +185,7 @@ Located in the <code>&lt;Deployment&gt;</code> element.</p>
     xmlns=&quot;urn:xcg-deployment&quot;&gt;
 </code></pre>
 <h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
-<p>Refer to  <a href="../Orleans-Configuration-Guide/Server-Configuration">Server Configuration</a> for information on silo configuration.</p>
+<p>Refer to  <a href="../Orleans-Configuration-Guide/Server-Configuration.md">Server Configuration</a> for information on silo configuration.</p>
 <h2 id="orleans-powershell-scripts">Orleans Powershell Scripts</h2>
 <p>The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring.
 (Use the /? option to get the latest usage info directly from the scripts.)</p>
@@ -261,7 +261,7 @@ OrleansHost running on host002:
 
 2 processes running
 </code></pre><h2 id="running-the-client">Running the Client</h2>
-<p>We&#39;ve edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file <em>DevTestClientConfiguratio.xml</em> needs to be edited according to the <a href="../Orleans-Configuration-Guide/Client-Configuration">Client Configuration</a> section.
+<p>We&#39;ve edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file <em>DevTestClientConfiguratio.xml</em> needs to be edited according to the <a href="../Orleans-Configuration-Guide/Client-Configuration.md">Client Configuration</a> section.
 The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration.
 In the author&#39;s setup, Azure is not involved, so the client configuration looks like this:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;

@@ -73,7 +73,7 @@
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Implementation.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1></h1>
-              <p>This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visible on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading <a href="Streams-Extensibility">Streams Extensibility section</a>.</p>
+              <p>This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visible on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading <a href="Streams-Extensibility.html">Streams Extensibility section</a>.</p>
 <p><em>Terminology</em>:</p>
 <p>We refer by the word &quot;queue&quot; to any durable storage technology that can ingest stream events and allows either to pull events or provides a push-based mechanism to consume events. Usually, to provide scalability, those technologies provide sharded/partitions queues. For example, Azure Queues allow to create multiple queues, Event Hubs have multiple hubs, Kafka topics, ...</p>
 <h2 id="persistent-streams-a-name-persistent-streams-a-">Persistent Streams<a name="Persistent-Streams"></a></h2>
@@ -110,7 +110,7 @@ This handshake between the agent and the pub-sub guarantees <strong>strong strea
 <p>The latter is provided by the built-in Orleans messaging delivery mechanism. Every stream event is delivered from the agent to consumers via the standard Orleans grain messaging, one at a time. That is, the agents sends one event (or a limited size batch of events) to each individual stream consumer and awaits this call. The next event will not start being delivered until the Task for the previous event was resolved or broken. That way we naturally limit the per-consumer delivery rate to one message at a time.</p>
 <p>With regard to bringing stream events from the queue to the agent Orleans Streaming provides a new special Backpressure mechanism. Since the agent decouples de-queuing of events from the queue and delivering them to consumers, it is possible that a single slow consumer will fall behind so much that the <code>IQueueCache</code> will fill up. To prevent <code>IQueueCache</code> from growing indefinitely, we limit its size (the size limit is configurable). However, the agent never throws away undelivered events. Instead, when the cache starts to fill up, the agents slows the rate of dequeing events from the queue. That way, we can &quot;ride&quot; the slow delivery periods by adjusting the rate at which we consume from the queue (&quot;backpressure&quot;) and get back into fast consumption rate later on. To detect the &quot;slow delivery&quot; valleys the <code>IQueueCache</code> uses an internal data structure of cache buckets that track the progress of delivery of events to individual stream consumer. This results in a very responsive and self-adjusting systems.</p>
 <h2 id="next">Next</h2>
-<p><a href="Streams-Extensibility">Orleans Streams Extensibility</a></p>
+<p><a href="Streams-Extensibility.html">Orleans Streams Extensibility</a></p>
 
             </article>
           </div>

@@ -30,7 +30,10 @@
         "files": [
           "images/**",
           "logo.svg",
-          "logo-light.svg"
+          "logo-light.svg",
+          "Documentation/**/**.png",
+          "Tutorials/**.png",
+          "Community/**.png"
         ],
         "exclude": [
           "obj/**",

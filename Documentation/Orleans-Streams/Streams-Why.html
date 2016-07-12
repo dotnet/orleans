@@ -82,7 +82,7 @@ But there are other use cases where you need to express fundamentally different 
 <p>It all started with requests from Orleans users to support returning a sequence of items from a grain method call. As you can imagine, that was only the tip of the iceberg. They actually needed much more than that.</p>
 <p>A typical scenario for Orleans Streams is when you have per user streams and you want to perform <strong>different processing for each user</strong>, within the context of an individual user. We may have millions of users but some of them are interested in weather and can subscribe to weather alerts for a particular location, while some are interested in sports events; somebody is tracking status of a particular flight. Processing those events requires different logic, but you don&#39;t want to run two independent instances of stream processing. Some users are interested in only a particular stock and only if certain external condition applies, condition that may not necessarily be part of the stream data (thus needs to be checked dynamically at runtime as part of processing).</p>
 <p>Users change their interests all the time, hence their subscriptions to specific streams of events come and go dynamically, thus <strong>the streaming topology changes dynamically and rapidly</strong>. On top of that, <strong>the processing logic per user evolves and changes dynamically as well, based on user state and external events</strong>. External events may modify the  processing logic for a particular user. For example, in a game cheating detection system, when a new way to cheat is discovered the processing logic needs to be updated with the new rule to detect this new violation. This needs to be done of course <strong>without disrupting the ongoing processing pipeline</strong>. Bulk data-flow stream processing engines were not build to support such scenarios.</p>
-<p>It goes almost without saying that such a system has to run on a number of network-connected machines, not on a signle node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.</p>
+<p>It goes almost without saying that such a system has to run on a number of network-connected machines, not on a single node. Hence, the processing logic has to be distributed in a scalable and elastic manner across a cluster of servers.</p>
 <h3 id="new-requirements">New Requirements</h3>
 <p>We identified 4 basic requirements for our Stream Processing system that will allow it to target the above scenarios.</p>
 <ol>
@@ -110,11 +110,11 @@ But there are other use cases where you need to express fundamentally different 
 <li><em>Efficiency</em> - use the underlying resources efficiently</li>
 <li><em>Responsiveness</em> - enable near real time scenarios.</li>
 </ol>
-<p>These were the requirements we had in mind for building <a href="index"><strong>Orleans Streaming</strong></a>.</p>
+<p>These were the requirements we had in mind for building <a href="index.html"><strong>Orleans Streaming</strong></a>.</p>
 <hr>
-<p><em>Clarificaton</em>: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described <a href="Streams-Programming-APIs">here</a>. Providing declarative dataflow expressions is our future goal.</p>
+<p><em>Clarificaton</em>: Orleans currently does not directly support writing declarative dataflow expressions like in the example above. The current Orleans Streaming APIs are more low level building blocks, as described <a href="Streams-Programming-APIs.html">here</a>. Providing declarative dataflow expressions is our future goal.</p>
 <h2 id="next">Next</h2>
-<p><a href="Streams-Programming-APIs">Orleans Streams Programming APIs</a></p>
+<p><a href="Streams-Programming-APIs.html">Orleans Streams Programming APIs</a></p>
 
             </article>
           </div>

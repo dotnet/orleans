@@ -75,7 +75,7 @@
               <h1></h1>
               <p>Applications interact with streams via APIs that are very similar to the well known <a href="https://msdn.microsoft.com/en-us/data/gg577609.aspx">Reactive Extensions (Rx) in .NET</a>. The main difference is that Orleans stream extensions are <strong>asynchronous</strong>, to make processing more efficient in Orleans&#39; distributed and scalable compute fabric.</p>
 <h3 id="async-stream-a-name-async-stream-a-">Async Stream<a name="Async-Stream"></a></h3>
-<p>An application starts by using a <em>stream provider</em> to get a handle to a stream. You can read more about stream providers <a href="http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers">here</a>, but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:</p>
+<p>An application starts by using a <em>stream provider</em> to get a handle to a stream. You can read more about stream providers <a href="Stream-Providers.html">here</a>, but for now you can think of it as stream factory that allows implementers to customize streams behavior and semantics:</p>
 <pre><code class="lang-csharp">IStreamProvider streamProvider = base.GetStreamProvider(&quot;SimpleStreamProvider&quot;);
 IAsyncStream&lt;T&gt; stream = streamProvider.GetStream&lt;T&gt;(Guid, &quot;MyStreamNamespace&quot;);
 </code></pre>
@@ -193,7 +193,7 @@ This is currently not implemented (due to priority constrains). An attempt to su
 For initial development you can use the memory storage as well.
 In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from producers to consumers, manages all runtime resources allocated to actively used streams, and transparently garbage collects runtime resources from unused streams.</p>
 <h3 id="configuration-a-name-configuration-a-">Configuration<a name="Configuration"></a></h3>
-<p>In order to use streams you need to enable stream providers via configuration. You can read more about stream providers <a href="http://dotnet.github.io/orleans/Orleans-Streams/Stream-Providers">here</a>. Sample stream providers configuration:</p>
+<p>In order to use streams you need to enable stream providers via configuration. You can read more about stream providers <a href="Stream-Providers.html">here</a>. Sample stream providers configuration:</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
     &lt;StreamProviders&gt;
@@ -209,7 +209,7 @@ In addition to the Pub-Sub, Orleans Streaming Runtime delivers events from produ
 public void RegisterStreamProvider&lt;T&gt;(string providerName, IDictionary&lt;string, string&gt; properties = null) where T : IStreamProvider
 </code></pre>
 <h2 id="next">Next</h2>
-<p><a href="Stream-Providers">Orleans Stream Providers</a></p>
+<p><a href="Stream-Providers.html">Orleans Stream Providers</a></p>
 
             </article>
           </div>

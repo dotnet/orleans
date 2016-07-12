@@ -84,7 +84,7 @@
 <li>Clients Statistics table</li>
 </ol>
 <h2 id="orleans-silo-instances-table">Orleans Silo Instances table</h2>
-<p>Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the <a href="Cluster-Management">Cluster Management Protocol</a> that maintains this table.</p>
+<p>Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the <a href="Cluster-Management.html">Cluster Management Protocol</a> that maintains this table.</p>
 <p>All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40"><code>SiloInstanceTableEntry</code></a>):</p>
 <ol>
 <li><em>PartitionKey</em> - deployment id.</li>
@@ -101,8 +101,8 @@
 <li><em>InstanceName</em> - If running is Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.</li>
 <li><em>UpdateZone</em> - Azure update zone, if running is Azure.</li>
 <li><em>FaultZone</em> - Azure fault zone, if running is Azure.</li>
-<li><em>SuspectingSilos</em> - the list of silos that suspect this silo. Managed by cluster management protocol. </li>
-<li><em>SuspectingTimes</em> - the list of times when this silo was suspected. Managed by cluster management protocol. </li>
+<li><em>SuspectingSilos</em> - the list of silos that suspect this silo. Managed by cluster management protocol.</li>
+<li><em>SuspectingTimes</em> - the list of times when this silo was suspected. Managed by cluster management protocol.</li>
 <li><em>StartTime</em> - the time when this silo was started.</li>
 <li><em>IAmAliveTime</em> - the last time this silo reoprted that it is alive. Used for diagnostics and troubleshooting only.</li>
 </ol>
@@ -110,8 +110,8 @@
 <ol>
 <li><em>PartitionKey</em> - deployment id.</li>
 <li><em>RowKey</em> - &quot;VersionRow&quot; costant string</li>
-<li><em>DeploymentId</em> </li>
-<li><em>MembershipVersion</em> - the latest version of the current membership configuration. </li>
+<li><em>DeploymentId</em></li>
+<li><em>MembershipVersion</em> - the latest version of the current membership configuration.</li>
 </ol>
 <h3 id="naming-">Naming:</h3>
 <p>The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
@@ -175,7 +175,7 @@ On premises (<code>SiloHost</code>) the role name is the executing  assembly nam
 </ol>
 <h2 id="silo-statistics-table">Silo Statistics table</h2>
 <p>Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper <a href="http://research.microsoft.com/apps/pubs/?id=217109">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept</a>.
-Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table. </p>
+Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table.</p>
 <p>Each row is in the format (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38"><code>StatsTableData</code></a>):</p>
 <ol>
 <li><em>PartitionKey</em> - <code>DeploymentId$ReverseTimestampToTheNearestHour</code> - deploymentId and last hour</li>

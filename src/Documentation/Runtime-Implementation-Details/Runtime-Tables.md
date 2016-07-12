@@ -16,7 +16,7 @@ Runtime tables:
 
 ## Orleans Silo Instances table
 
-Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the [Cluster Management Protocol](Cluster-Management) that maintains this table.
+Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the [Cluster Management Protocol](Cluster-Management.md) that maintains this table.
 
 All rows in this table consist of the following columns ([`SiloInstanceTableEntry`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40)):
 
@@ -34,8 +34,8 @@ All rows in this table consist of the following columns ([`SiloInstanceTableEntr
 12. *InstanceName* - If running is Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.
 13. *UpdateZone* - Azure update zone, if running is Azure.
 14. *FaultZone* - Azure fault zone, if running is Azure.
-15. *SuspectingSilos* - the list of silos that suspect this silo. Managed by cluster management protocol. 
-16. *SuspectingTimes* - the list of times when this silo was suspected. Managed by cluster management protocol. 
+15. *SuspectingSilos* - the list of silos that suspect this silo. Managed by cluster management protocol.
+16. *SuspectingTimes* - the list of times when this silo was suspected. Managed by cluster management protocol.
 17. *StartTime* - the time when this silo was started.
 18. *IAmAliveTime* - the last time this silo reoprted that it is alive. Used for diagnostics and troubleshooting only.
 
@@ -43,8 +43,8 @@ There is also a special row in this table, called membership version row, with t
 
 1. *PartitionKey* - deployment id.
 2. *RowKey* - "VersionRow" costant string
-3. *DeploymentId* 
-4. *MembershipVersion* - the latest version of the current membership configuration. 
+3. *DeploymentId*
+4. *MembershipVersion* - the latest version of the current membership configuration.
 
 ### Naming:
 The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
@@ -119,7 +119,7 @@ Silo metrics table containes a small set of per-Orleans-client important key per
 ## Silo Statistics table
 
 Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper [PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept](http://research.microsoft.com/apps/pubs/?id=217109).
-Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table. 
+Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table.
 
 Each row is in the format ([`StatsTableData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38)):
 
