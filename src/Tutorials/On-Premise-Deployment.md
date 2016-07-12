@@ -66,7 +66,7 @@ Note that the user running the scripts must be a member of the Administrators Gr
 ## Deployment Steps
 In this tutorial , we will deploy the _HelloWorld_ sample to a set of servers.
 The Orleans repo includes a _RemoteDeployment_ folder (https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment) where everything we need can be found.
-Start by building the [Hello World sample](../Samples-Overview/Hello-World), commenting out (or removing) the silo initialization and shutdown code:
+Start by building the [Hello World sample](../Documentation/Samples-Overview/Hello-World.md), commenting out (or removing) the silo initialization and shutdown code:
 
 ``` csharp
 static void Main(string[] args)
@@ -169,7 +169,7 @@ Located in the `<Deployment>` element.
 ```
 
 ## Orleans Silo Configuration
-Refer to  [Server Configuration](../Orleans-Configuration-Guide/Server-Configuration.md) for information on silo configuration.
+Refer to  [Server Configuration](../Documentation/Orleans-Configuration-Guide/Server-Configuration.md) for information on silo configuration.
 
 ## Orleans Powershell Scripts
 The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring.
@@ -226,7 +226,7 @@ If everything works well, you should see something like this:
 
 
 ## Running the Client
-We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file _DevTestClientConfiguratio.xml_ needs to be edited according to the [Client Configuration](../Orleans-Configuration-Guide/Client-Configuration.md) section.
+We've edited the Hello World program not to start a silo in-process, but in order to run the client, the client configuration file _DevTestClientConfiguratio.xml_ needs to be edited according to the [Client Configuration](../Documentation/Orleans-Configuration-Guide/Client-Configuration.md) section.
 The setup needs to conform to how the server was set up, specifically whether or not Azure Storage is used to keep track of the deployment configuration.
 In the author's setup, Azure is not involved, so the client configuration looks like this:
 

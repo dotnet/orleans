@@ -1,9 +1,9 @@
 - name: Installation
   items:
   - name: Prerequisites
-    href: prerequisites.md
+    href: Installation/prerequisites.md
   - name: NuGet Packages
-    href: NuGets.md
+    href: Installation/NuGets.md
 - name: Getting Started with Orleans
   href: Getting-Started-With-Orleans/Grains.md
   homepage: Getting-Started-With-Orleans/Grains.md
