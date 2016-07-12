@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Typical-Configurations.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>Below are examples of typical configurations that can be used for development and production deployments.</p>
+              <h1 id="typical-configurations">Typical Configurations</h1>
+              
+<p>Below are examples of typical configurations that can be used for development and production deployments.</p>
 <h2 id="local-development">Local Development</h2>
 <p>For local development, where there is only one silo running locally on the programmer’s machine, the configuration is already included in the <em>Orleans Dev/Test Host</em> project template of <a href="https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4">Microsoft Orleans Tools for Visual Studio</a>. The local silo that can be started by running a project created with the <em>Orleans Dev/Test Host</em> template is configured as follows in DevTestServerConfiguration.xml.</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
@@ -96,8 +97,8 @@
 <p> The format of the DataConnection string is &quot;DefaultEndpointsProtocol=https;AccountName=<azure storage="" account="">;AccountKey=<azure table="" storage="" account="" key="">&quot;<p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
-    &lt;SystemStore SystemStoreType=&quot;AzureTable&quot; 
-         DeploymentId=&quot;&lt;your deployment ID&gt;&quot; 
+    &lt;SystemStore SystemStoreType=&quot;AzureTable&quot;
+         DeploymentId=&quot;&lt;your deployment ID&gt;&quot;
          DataConnectionString=&quot;&lt;&lt;see comment above&gt;&gt;&quot; /&gt;
     &lt;Liveness LivenessType =&quot;AzureTable&quot; /&gt;
   &lt;/Globals&gt;
@@ -114,7 +115,7 @@
 </code></pre>
 <h2 id="reliable-production-deployment-using-zookeeper">Reliable Production Deployment Using ZooKeeper</h2>
 <p>For a reliable production deployment using ZooKeeper, you need to use the ZooKeeper option for cluster membership. This configuration is typical of deployments to on-premise servers.</p>
-<p> The format of the DataConnection string is documented in the <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions">ZooKeeper Programmer&#39;s Guide</a>. A minimum of 5 ZooKeeper servers is <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup">recommended</a>. </p>
+<p> The format of the DataConnection string is documented in the <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions">ZooKeeper Programmer&#39;s Guide</a>. A minimum of 5 ZooKeeper servers is <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup">recommended</a>.</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
@@ -195,8 +196,8 @@
 <p>That&#39;s it for the worker role hosting the Orleans runtime. However, when deploying to Azure, there is typically a front end of some sort, either a web site or a web service, since making the Orleans ports public is not a good idea. Therefore, the client configuration is configuration of the web or worker role (or web site) that sits in front of Orleans.</p>
 <p> Assuming that the frontend is a web role, a simple ClientConfiguration file should be used:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Tracing DefaultTraceLevel=&quot;Info&quot; 
-           TraceToConsole=&quot;true&quot; 
+  &lt;Tracing DefaultTraceLevel=&quot;Info&quot;
+           TraceToConsole=&quot;true&quot;
            TraceToFile=&quot;{0}-{1}.log&quot;
            WriteTraces=&quot;false&quot;/&gt;
 &lt;/ClientConfiguration&gt;

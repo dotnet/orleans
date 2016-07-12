@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Client-Configuration.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
+              <h1 id="client-configuration">Client Configuration</h1>
+              
+<p>The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
 <h2 id="fixed-gateway-configuration">Fixed Gateway Configuration</h2>
 <p>A fixed set of gateways is specified in the ClientConfiguration.xml with one or more Gateway nodes:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
@@ -91,14 +92,14 @@
                DataConnectionString=&quot;Azure storage connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
 </code></pre>
-<p> or </p>
+<p> or</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;SqlServer&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;SQL connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
 </code></pre>
-<p> or </p>
+<p> or</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot;
                DeploymentId=&quot;target deployment ID&quot;
@@ -112,14 +113,14 @@
 &lt;/ClientConfiguration&gt;
 </code></pre>
 <h2 id="web-role-client-in-azure">Web Role Client in Azure</h2>
-<p>When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role. </p>
+<p>When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role.</p>
 <pre><code class="lang-xml">&lt;ServiceConfiguration  ...&gt;
   &lt;Role name=&quot;WebRole&quot;&gt; ...
     &lt;ConfigurationSettings&gt;
       &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot; /&gt;
     &lt;/ConfigurationSettings&gt;
   &lt;/Role&gt;
-  ... 
+  ...
 &lt;/ServiceConfiguration&gt;
 </code></pre>
 <p>Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
@@ -142,7 +143,7 @@ var config = new ClientConfiguration
     DataConnectionString = dataConnection,
     PropagateActivityId = true,
 
-    // Tracing 
+    // Tracing
     DefaultTraceLevel = Severity.Info,
     TraceToConsole = false,
     TraceFilePattern = @&quot;Client_{0}-{1}.log&quot;,
@@ -170,7 +171,7 @@ config.RegisterStreamProvider&lt;SimpleMessageStreamProvider&gt;(&quot;SimpleMes
         { &quot;PubSubType&quot;, &quot;ExplicitGrainBasedAndImplicit&quot; }
     });
 
-// Initialize client using config defined above 
+// Initialize client using config defined above
 while (!GrainClient.IsInitialized)
 {
     try

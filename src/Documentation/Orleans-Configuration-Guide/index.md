@@ -3,6 +3,7 @@ layout: page
 title: Orleans Configuration Guide
 ---
 
+# Orleans Configuration Guide
 
 This Configuration Guide explains the key configuration parameters and how they should be used for several most typical usage scenarios.
 

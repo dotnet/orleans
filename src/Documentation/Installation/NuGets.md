@@ -3,7 +3,7 @@ layout: page
 title: Orleans NuGet Packages
 ---
 
-
+# Nuget Packages
 
 ## Orleans NuGet packages as of [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0)
 
@@ -12,7 +12,7 @@ There are 4 key NuGet packages you will need to use in most scenarios:
 ### [Microsoft.Orleans.OrleansCodeGenerator.Build](http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/)
 
 ```
-PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build 
+PM> Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
 ```
 
 Build support for grain interfaces and implementation projects. Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers. `Microsoft.Orleans.Templates.Interfaces` and `Microsoft.Orleans.Templates.Grains` packages are obsolete and provided only for backward compatibility and migration.
@@ -139,4 +139,3 @@ Includes the telemetry consumer for NewRelic.
 PM> Install-Package Microsoft.Orleans.Serialization.Bond
 ```
 Includes support for [Bond serializer](https://github.com/microsoft/bond).
-

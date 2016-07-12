@@ -74,3 +74,13 @@
     href: Advanced-Concepts/External-Tasks-and-Grains.md
   - name: Deployment and Versioning of Dependencies
     href: Advanced-Concepts/Deployment-and-Versioning-of-Dependencies.md
+- name: Orleans Configuration Guide
+  homepage: Orleans-Configuration-Guide/index.md
+  href: Orleans-Configuration-Guide/index.md
+  items:
+  - name: Client Configuration
+    href: Orleans-Configuration-Guide/Client-Configuration.md
+  - name: Server Configuration
+    href: Orleans-Configuration-Guide/Server-Configuration.md
+  - name: Typical Configurations
+    href: Orleans-Configuration-Guide/Typical-Configurations.md

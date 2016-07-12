@@ -3,10 +3,11 @@ layout: page
 title: Typical Configurations
 ---
 
+# Typical Configurations
 
 Below are examples of typical configurations that can be used for development and production deployments.
 
-## Local Development 
+## Local Development
 For local development, where there is only one silo running locally on the programmer’s machine, the configuration is already included in the *Orleans Dev/Test Host* project template of [Microsoft Orleans Tools for Visual Studio](https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4). The local silo that can be started by running a project created with the *Orleans Dev/Test Host* template is configured as follows in DevTestServerConfiguration.xml.
 
 ``` xml
@@ -38,8 +39,8 @@ For a reliable production deployment using Azure, you need to use the Azure Tabl
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
-    <SystemStore SystemStoreType="AzureTable" 
-         DeploymentId="<your deployment ID>" 
+    <SystemStore SystemStoreType="AzureTable"
+         DeploymentId="<your deployment ID>"
          DataConnectionString="<<see comment above>>" />
     <Liveness LivenessType ="AzureTable" />
   </Globals>
@@ -61,7 +62,7 @@ Clients need to be configured to use Azure Table for discovering the gateways, t
 ## Reliable Production Deployment Using ZooKeeper
 For a reliable production deployment using ZooKeeper, you need to use the ZooKeeper option for cluster membership. This configuration is typical of deployments to on-premise servers.
 
- The format of the DataConnection string is documented in the [ZooKeeper Programmer's Guide](http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions). A minimum of 5 ZooKeeper servers is [recommended](http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup). 
+ The format of the DataConnection string is documented in the [ZooKeeper Programmer's Guide](http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions). A minimum of 5 ZooKeeper servers is [recommended](http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup).
 
 
 ``` xml
@@ -88,7 +89,7 @@ Clients need to be configured to use ZooKeeper for discovering the gateways, the
 </ClientConfiguration>
 ```
 
-## Unreliable Deployment on a Cluster of Dedicated Servers 
+## Unreliable Deployment on a Cluster of Dedicated Servers
 For testing on a cluster of dedicated servers when reliability isn’t a concern you can leverage MembershipTableGrain and avoid dependency on Azure Table. You just need to designate one of the nodes as a Primary.
 
 ``` xml
@@ -169,8 +170,8 @@ That's it for the worker role hosting the Orleans runtime. However, when deployi
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
-  <Tracing DefaultTraceLevel="Info" 
-           TraceToConsole="true" 
+  <Tracing DefaultTraceLevel="Info"
+           TraceToConsole="true"
            TraceToFile="{0}-{1}.log"
            WriteTraces="false"/>
 </ClientConfiguration>

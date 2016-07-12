@@ -3,10 +3,11 @@ layout: page
 title: Client Configuration
 ---
 
+# Client Configuration
 
 The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.
 
-## Fixed Gateway Configuration 
+## Fixed Gateway Configuration
 A fixed set of gateways is specified in the ClientConfiguration.xml with one or more Gateway nodes:
 
 ``` xml
@@ -31,7 +32,7 @@ To configure the client to automatically find gateways from the silo cluster mem
 </ClientConfiguration>
 ```
 
- or 
+ or
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
@@ -41,7 +42,7 @@ To configure the client to automatically find gateways from the silo cluster mem
 </ClientConfiguration>
 ```
 
- or 
+ or
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
@@ -63,7 +64,7 @@ For the local development/test configuration that uses a local silo, the client 
 ```
 
 ## Web Role Client in Azure
-When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the "DataConnectionString" setting defined in the service configuration for the deployment & role. 
+When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the "DataConnectionString" setting defined in the service configuration for the deployment & role.
 
 
 ``` xml
@@ -73,7 +74,7 @@ When the client is a web role running inside the same Azure deployment as the si
       <Setting name="DataConnectionString" value="DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY" />
     </ConfigurationSettings>
   </Role>
-  ... 
+  ...
 </ServiceConfiguration>
 ```
 
@@ -105,7 +106,7 @@ var config = new ClientConfiguration
     DataConnectionString = dataConnection,
     PropagateActivityId = true,
 
-    // Tracing 
+    // Tracing
     DefaultTraceLevel = Severity.Info,
     TraceToConsole = false,
     TraceFilePattern = @"Client_{0}-{1}.log",
@@ -133,7 +134,7 @@ config.RegisterStreamProvider<SimpleMessageStreamProvider>("SimpleMessagingStrea
         { "PubSubType", "ExplicitGrainBasedAndImplicit" }
     });
 
-// Initialize client using config defined above 
+// Initialize client using config defined above
 while (!GrainClient.IsInitialized)
 {
     try
@@ -147,4 +148,3 @@ while (!GrainClient.IsInitialized)
     Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: developer may want to add counter to break up infinity cycle (circuit breaker pattern)
 }
 ```
-

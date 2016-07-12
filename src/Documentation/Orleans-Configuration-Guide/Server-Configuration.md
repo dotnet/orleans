@@ -3,17 +3,18 @@ layout: page
 title: Server Configuration
 ---
 
+# Server Configuration
 
-There are two key aspects of silo configuration: 
+There are two key aspects of silo configuration:
 
-* Connectivity: silo’s endpoints for other silos and clients 
+* Connectivity: silo’s endpoints for other silos and clients
 * Cluster membership and reliability: how silos discover each other in a deployment and detect node failures.
 
 Depending on the environment you want to run Orleans in some of these parameters may or may not be important. For example, for a single silo development environment one usually doesn’t need reliability, and all the endpoints can be localhost. Or if you only use self-managed grains in your application, you don’t need to configure grain index.
 
  The following sections detail the configuration setting for the four mentioned key aspects. Then in the scenarios section you can find the recommended combinations of the settings for the most typical deployment scenarios.
 
-## Connectivity 
+## Connectivity
 The connectivity settings define two TCP/IP endpoints: one for inter-silo communication and one for client connections, also referred to as client gateway or simply gateway.
 
 **Inter-silo Endpoint**
@@ -61,7 +62,7 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
              DataConnectionString="..."/>
 ```
 
- or 
+ or
 
 ``` xml
 <SystemStore SystemStoreType="SqlServer"
@@ -70,7 +71,7 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 
 ```
 
- or 
+ or
 
 ``` xml
 <SystemStore SystemStoreType="ZooKeeper"
@@ -91,7 +92,7 @@ The connectivity settings define two TCP/IP endpoints: one for inter-silo commun
 ## Primary Silo
 In a reliable deployment, one that is configured with membership using Azure Table, SQL Server or ZooKeeper, all silos are created equal, with no notion of primary or secondary silos. That is the configuration that is recommended for production that will survive a failure of any individual node or a combination of nodes. For example, Azure periodically rolls out OS patches and that causes all of the role instances to reboot eventually.
 
- For development or a non-reliable deployment when MembershipTableGrain is used, one of the silos has to be designated as Primary and has to start and initialize before other, Secondary, silos that wait for Primary to initialize before joining the cluster. In case of a failure of the Primary node, the whole deployment stops working properly and has to be restarted. 
+ For development or a non-reliable deployment when MembershipTableGrain is used, one of the silos has to be designated as Primary and has to start and initialize before other, Secondary, silos that wait for Primary to initialize before joining the cluster. In case of a failure of the Primary node, the whole deployment stops working properly and has to be restarted.
 
 Primary is designated in the configuration file with the following setting within the Globals section.
 
@@ -101,7 +102,7 @@ Primary is designated in the configuration file with the following setting withi
 ```
 
 Here is an example how to configure and launch Orleans silo hosted inside worker-role.
-This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment. 
+This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.
 
 ```csharp
 var dataConnection = "DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY";
@@ -113,14 +114,14 @@ var config = new ClusterConfiguration
         DeploymentId = RoleEnvironment.DeploymentId,
         ResponseTimeout = TimeSpan.FromSeconds(30),
         DataConnectionString = dataConnection,
-        
+
         LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
         ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
     },
     Defaults =
     {
         PropagateActivityId = true,
-        
+
         // Tracing
         DefaultTraceLevel = Severity.Info,
         TraceToConsole = false,
@@ -133,7 +134,7 @@ var config = new ClusterConfiguration
     }
 };
 
-// Register bootstrap provider class 
+// Register bootstrap provider class
 config.Globals.RegisterBootstrapProvider<AutoStartBootstrapProvider>("MyAutoStartBootstrapProvider");
 
 // Add Storage Providers
@@ -169,7 +170,7 @@ config.Globals.RegisterStorageProvider<BlobStorageProvider>("BlobStorage",
         { "DataConnectionString", dataConnection }
     });
 
-// Add Stream Providers 
+// Add Stream Providers
 config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>("AzureQueueStreams",
     new Dictionary<string, string>
     {
