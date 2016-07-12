@@ -1,6 +1,6 @@
 - name: Documentation
-  href: Documentation/What's-new-in-Orleans.md
-  homepage: Documentation/What's-new-in-Orleans.md
+  href: Documentation/Introduction.md
+  homepage: Documentation/Introduction.md
 - name: Tutorials
   href: Tutorials/index.md
   homepage: index.md
