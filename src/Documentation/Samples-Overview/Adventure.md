@@ -3,14 +3,15 @@ layout: page
 title: Adventure
 ---
 
+# Adventure
 
 A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.
 
 ### Instructions:
-1. Build Adventure.sln 
-2. Start your local Silo from a command window using command file  #1. 
-3. The game map initialization script, #2 
-4. Start the client #3 
+1. Build Adventure.sln
+2. Start your local Silo from a command window using command file  #1.
+3. The game map initialization script, #2
+4. Start the client #3
 5. Reminisce about the good old days before graphical user interfaces
 
 ### Overview
@@ -37,6 +38,3 @@ Things such as keys are modeled as plain old objects - they are really just simp
 2. Make the brass key unlock something
 3. Allow players to message each other
 4. Make eating food and drinking water possible and meaningful
-
-
-

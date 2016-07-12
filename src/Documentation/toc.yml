@@ -74,6 +74,22 @@
     href: Advanced-Concepts/External-Tasks-and-Grains.md
   - name: Deployment and Versioning of Dependencies
     href: Advanced-Concepts/Deployment-and-Versioning-of-Dependencies.md
+- name: Streams
+  href: Orleans-Streams/index.md
+  homepage: Orleans-Streams/index.md
+  items:
+    - name: Streams-Quick-Start
+      href: Orleans-Streams/Streams-Quick-Start.md
+    - name: Streams Why
+      href: Orleans-Streams/Streams-Why.md
+    - name: Streams Programming APIs
+      href: Orleans-Streams/Streams-Programming-APIs.md
+    - name: Stream Providers
+      href: Orleans-Streams/Stream-Providers.md
+    - name: Streams Implementation
+      href: Orleans-Streams/Streams-Implementation.md
+    - name: Streams Extensibility
+      href: Orleans-Streams/Streams-Extensibility.md
 - name: Orleans Configuration Guide
   homepage: Orleans-Configuration-Guide/index.md
   href: Orleans-Configuration-Guide/index.md

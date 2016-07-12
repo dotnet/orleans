@@ -72,24 +72,26 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Storage-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/">download</a> and install MongoDB.</p>
+              <h1 id="storage-providers">Storage Providers</h1>
+              
+<p><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/">download</a> and install MongoDB.</p>
 <p>Custom storage providers allow you to extend the capabilities of Orleans to store application data in new storage services. In this sample, we have code to store data in a file system (presumably networked) and in MongoDB.</p>
 <p>While binary formatting is almost always better to use for persistent storage, this sample chooses to use JSON as the external format for one reason: it&#39;s easier to read and verify, which is a good thing in a sample. As you adopt the sample code for more realistic use, you will probably want to switch to something else than JSON as the external format.</p>
 <h3 id="running-the-sample">Running the sample</h3>
 <p>The sample solution consists of four projects -- the storage provider library, and three test libraries, with the same client+server structure that the <a href="Hello-World.html">Hello World</a> sample has.</p>
 <p><img src="ProvidersSample.png" alt=""></p>
 <p>Edit the <code>DevTestServerConfiguration.xml</code> file in the Test.Client project, uncommenting the element of the file-storage provider.</p>
-<pre><code>           &lt;!-- To test the sample storage providers, uncomment one of the following two lines:
-           &lt;Provider Type=&quot;Samples.StorageProviders.MongoDBStorage&quot;
-                     Name=&quot;TestStore&quot;
-                     Database=&quot;orleanssamples&quot;
-                     ConnectionString=&quot;mongodb://localhost:27017/&quot; /&gt;
-           --&gt;
-           &lt;Provider Type=&quot;Samples.StorageProviders.OrleansFileStorage&quot;
-                     Name=&quot;TestStore&quot;
-                     RootDirectory=&quot;.\Samples.FileStorage&quot;/&gt;
-</code></pre><p>Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
+<pre><code class="lang-xml">&lt;!-- To test the sample storage providers, uncomment one of the following two lines:
+&lt;Provider Type=&quot;Samples.StorageProviders.MongoDBStorage&quot;
+         Name=&quot;TestStore&quot;
+         Database=&quot;orleanssamples&quot;
+         ConnectionString=&quot;mongodb://localhost:27017/&quot; /&gt;
+--&gt;
+&lt;Provider Type=&quot;Samples.StorageProviders.OrleansFileStorage&quot;
+         Name=&quot;TestStore&quot;
+         RootDirectory=&quot;.\Samples.FileStorage&quot;/&gt;
+</code></pre>
+<p>Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
 <p>Set the &#39;Test.Client&#39; project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:</p>
 <pre><code>Successfully started Orleans silo &#39;host-001&#39; as a Primary node.
 

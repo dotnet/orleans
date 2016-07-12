@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Hello-World.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that&#39;s that. Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
+              <h1 id="hello-world">Hello World</h1>
+              
+<p>In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that&#39;s that. Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
 <p>There are three projects involved -- one for declaring the communication interfaces, one for the grain implementations, and one for the client, which also hosts the Orleans silo that loads the grain when activated.</p>
 <p>There&#39;s only one communication interface, in IHello.cs:</p>
 <pre><code class="lang-csharp">public interface IHello : Orleans.IGrain

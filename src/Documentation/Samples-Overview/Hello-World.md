@@ -3,6 +3,7 @@ layout: page
 title: Hello World
 ---
 
+# Hello World
 
 In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that's that. Simple enough in theory, but since there's distribution involved, there's a bit more to it.
 
@@ -41,5 +42,3 @@ Console.WriteLine("\n\n{0}\n\n", friend.SayHello("Good morning!").Result);
 
 
 There's other code in the method, too, but that is unrelated to the client logic, it's hosting the Orleans silo.
-
-

@@ -3,6 +3,7 @@ layout: page
 title: Orleans Streams Quick Start
 ---
 
+# Orleans Streams Quick Start
 
 This guide will show you a quick way to setup and use Orleans Streams.
 To learn more about the details of the streaming features, read other parts of this documentation.

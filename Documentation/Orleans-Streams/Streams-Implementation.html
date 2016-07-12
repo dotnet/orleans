@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Implementation.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visible on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading <a href="Streams-Extensibility.html">Streams Extensibility section</a>.</p>
+              <h1 id="orleans-streams-implementation-details">Orleans Streams Implementation Details</h1>
+              
+<p>This section provides a high level overview of Orleans Stream implementation. It describes concepts and details that are not visible on the application level. If you only plan to use streams, you do not have to read this section. However, if you plan to extend streams, please read this section before reading <a href="Streams-Extensibility.html">Streams Extensibility section</a>.</p>
 <p><em>Terminology</em>:</p>
 <p>We refer by the word &quot;queue&quot; to any durable storage technology that can ingest stream events and allows either to pull events or provides a push-based mechanism to consume events. Usually, to provide scalability, those technologies provide sharded/partitions queues. For example, Azure Queues allow to create multiple queues, Event Hubs have multiple hubs, Kafka topics, ...</p>
 <h2 id="persistent-streams-a-name-persistent-streams-a-">Persistent Streams<a name="Persistent-Streams"></a></h2>

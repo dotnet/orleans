@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Why.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>There is already a wide range of technologies that allow to build stream processing systems.
+              <h1 id="why-orleans-streams-">Why Orleans Streams?</h1>
+              
+<p>There is already a wide range of technologies that allow to build stream processing systems.
 Those include systems to <strong>durably store stream data</strong> (e.g., <a href="http://azure.microsoft.com/en-us/services/event-hubs/">Event Hubs</a> and <a href="http://kafka.apache.org/">Kafka</a>) and systems to express <strong>compute operations</strong> over the stream data (e.g., <a href="http://azure.microsoft.com/en-us/services/stream-analytics/">Azure Stream Analytics</a>, <a href="https://storm.apache.org/">Apache Storm</a>, and <a href="https://spark.apache.org/streaming/">Apache Spark Streaming</a>). Those are great systems that allow to build effecient data stream processing pipelines.</p>
 <h3 id="limitations-of-existing-systems">Limitations of Existing Systems</h3>
 <p>However, those systems are not suitable for <strong>fine-grained free-form compute over stream data</strong>. The Streaming Compute systems mentioned above all allow to specify a <strong>unified data-flow graph of operations that are applied in the same way to all stream items</strong>. This is a powerful model when data is uniform and you want to express the same set of transformations, filtering or aggregation operations over this data.

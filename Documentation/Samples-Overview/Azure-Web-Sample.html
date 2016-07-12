@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Azure-Web-Sample.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p><strong>Important note</strong>: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!</p>
+              <h1 id="azure-web-sample">Azure Web Sample</h1>
+              
+<p><strong>Important note</strong>: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!</p>
 <p>This sample is essentially the same as the <a href="Hello-World.html">Hello World</a> sample, except that it hosts the grains in an Azure Worker Role instead of in the client process itself.</p>
 <p>While the communication interface and grain implementation are identical, three projects replace the client:</p>
 <p><strong>OrleansAzureSample</strong>, which is the Azure configuration project.

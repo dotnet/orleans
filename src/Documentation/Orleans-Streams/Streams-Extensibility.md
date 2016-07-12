@@ -3,6 +3,7 @@ layout: page
 title: Orleans Streams Extensibility
 ---
 
+# Orleans Streams Extensibility
 
 There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:
 

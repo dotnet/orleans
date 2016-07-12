@@ -3,6 +3,7 @@ layout: page
 title: Storage Providers
 ---
 
+# Storage Providers
 
 **Note**: This sample requires the "Official MongoDB C# Driver" NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to [download](https://www.mongodb.org/) and install MongoDB.
 
@@ -17,16 +18,17 @@ The sample solution consists of four projects -- the storage provider library, a
 
 Edit the `DevTestServerConfiguration.xml` file in the Test.Client project, uncommenting the element of the file-storage provider.
 
-               <!-- To test the sample storage providers, uncomment one of the following two lines:
-               <Provider Type="Samples.StorageProviders.MongoDBStorage"
-                         Name="TestStore"
-                         Database="orleanssamples"
-                         ConnectionString="mongodb://localhost:27017/" />
-               -->
-               <Provider Type="Samples.StorageProviders.OrleansFileStorage"
-                         Name="TestStore"
-                         RootDirectory=".\Samples.FileStorage"/>
-
+```xml
+<!-- To test the sample storage providers, uncomment one of the following two lines:
+<Provider Type="Samples.StorageProviders.MongoDBStorage"
+         Name="TestStore"
+         Database="orleanssamples"
+         ConnectionString="mongodb://localhost:27017/" />
+-->
+<Provider Type="Samples.StorageProviders.OrleansFileStorage"
+         Name="TestStore"
+         RootDirectory=".\Samples.FileStorage"/>
+```
 
 Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.
 

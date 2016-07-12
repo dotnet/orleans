@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/GPS-Tracker.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>A sample application to show how Orleans could be used in conjunction with <a href="https://orleans.codeplex.com/wikipage?title=https%3a%2f%2fgithub.com%2fSignalR%2fSignalR&amp;referringTitle=GPS%20Tracker">SignalR</a> to monitor the position of a number of GPS enabled devices, and report these to a web browser.</p>
+              <h1 id="gps-tracker">GPS Tracker</h1>
+              
+<p>A sample application to show how Orleans could be used in conjunction with <a href="https://orleans.codeplex.com/wikipage?title=https%3a%2f%2fgithub.com%2fSignalR%2fSignalR&amp;referringTitle=GPS%20Tracker">SignalR</a> to monitor the position of a number of GPS enabled devices, and report these to a web browser.</p>
 <p><img src="GPS.png" alt=""></p>
 <p>In order to run this sample, you need a Bing Maps API key. The key is used by the <code>GPSTracker.Web</code> project, in Views\Home\Index.cshtml.</p>
 <p><a href="http://msdn.microsoft.com/en-us/library/ff428642.aspx">Get a Bing Maps Key</a></p>
@@ -90,12 +91,12 @@
 </ol>
 <h3 id="how-it-works">How it Works</h3>
 <p>The <code>GPSTracker.FakeDeviceGateway.exe</code> program simulates data generated from 20 GPS devices. It randomly alters their speed and heading to simulate the devices moving within rectangular boundaries. It sends the position data to Orleans once a second.</p>
-<p>In Orleans, each device is represented by a <code>Device</code> grain. The grain records the previous position of the device, and can therefore calculate the speed of the device. If the devices has moved, the &#39;Device&#39; grain forwards position and speed to a <code>PushNotification</code> grain. </p>
+<p>In Orleans, each device is represented by a <code>Device</code> grain. The grain records the previous position of the device, and can therefore calculate the speed of the device. If the devices has moved, the &#39;Device&#39; grain forwards position and speed to a <code>PushNotification</code> grain.</p>
 <p>This &#39;PushNotification&#39; grain maintains a C# SignalR client, which connects to a SignalR hub hosted in the <code>GPSTracker.Web</code> project. This allows the grain to &#39;push&#39; messages to the hub without the need for polling the Orleans API. The grain will batch messages together to improve network performance.</p>
 <p>The <code>GPSTracker.Web</code> application forwards all messages to connected web browsers using SignalR.</p>
 <p>JavaScript running in the browser positions the pins using a Bing Maps control. If the pin has a low velocity it colors it blue, otherwise orange.</p>
 <h3 id="advantages-of-using-orleans">Advantages of using Orleans</h3>
-<p>This sample is designed to show Orleans as a low-latency messaging system. Orleans is able to hold state for each device in memory (of which there may be many), allowing a quick calculation to be performed (calculating velocity) based on previous state. </p>
+<p>This sample is designed to show Orleans as a low-latency messaging system. Orleans is able to hold state for each device in memory (of which there may be many), allowing a quick calculation to be performed (calculating velocity) based on previous state.</p>
 <p>The grain in Orleans can also decide whether the message is worthy of forwarding downstream (has the device moved?) and can therefore filter out unnecessary messages and reduce noise.</p>
 <p>The sample also illustrates how SignalR may be used from inside a grain to allow &#39;push&#39; messaging directly to clients.</p>
 <p>In a real life scenario you would probably not forward all messages to the browser, and would filter based on groups or device type.</p>
