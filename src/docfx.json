@@ -14,8 +14,6 @@
       },
       {
         "files": [
-          "articles/**.md",
-          "articles/**/toc.yml",
           "toc.yml",
           "*.md"
         ],
@@ -43,7 +41,8 @@
     ],
     "overwrite": [
       {
-        "files": [ ],
+        "files": [
+        ],
         "exclude": [
           "obj/**",
           "_site/**"

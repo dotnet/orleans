@@ -77,7 +77,9 @@ Since Orleans uses a cooperative multi-tasking model, it will not preempt the ex
 This can never happen during normal operations and each grain will have one and only one instance per ID.
 The only time this can occur is when a silo crashes or if it's killed without being allowed to properly shutdown.
 In that case there is a 30-60 seconds window (based on configuration) where a grain can exist in multiple silos before one is removed from the system.
+
 The mapping from grain IDs to their activation (instance) addresses is stored in a distributed directory (implemented with DHT) and each silo owns a partition of this directory. When membership views of two silos differ, both can request creation of an instance and as a result. two instances of the grain may co-exist. Once the cluster silos reach an agreement on membership, one of the instances will be deactivated and only one activation will survive.
 You can find out more about how Orleans manages the clusters at [Cluster Management](Runtime-Implementation-Details/Cluster-Management.md) page.
+
 Also you can take a look at Orleans's [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
 You just need to consider the rare possibility of having two instances of an actor while writing your application.

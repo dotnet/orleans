@@ -111,10 +111,10 @@ Note also that there is a delay between the time when a silo fails and when the 
 <h2 id="in-what-cases-can-a-split-brain-same-grain-activated-in-multiple-silos-at-the-same-time-happen-">In what cases can a split brain (same grain activated in multiple silos at the same time) happen?</h2>
 <p>This can never happen during normal operations and each grain will have one and only one instance per ID.
 The only time this can occur is when a silo crashes or if it&#39;s killed without being allowed to properly shutdown.
-In that case there is a 30-60 seconds window (based on configuration) where a grain can exist in multiple silos before one is removed from the system.
-The mapping from grain IDs to their activation (instance) addresses is stored in a distributed directory (implemented with DHT) and each silo owns a partition of this directory. When membership views of two silos differ, both can request creation of an instance and as a result. two instances of the grain may co-exist. Once the cluster silos reach an agreement on membership, one of the instances will be deactivated and only one activation will survive.
-You can find out more about how Orleans manages the clusters at <a href="Runtime-Implementation-Details/Cluster-Management.html">Cluster Management</a> page.
-Also you can take a look at Orleans&#39;s <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf">paper</a> for a more detailed information, however you don&#39;t need to understand it fully to be able to write your application code.
+In that case there is a 30-60 seconds window (based on configuration) where a grain can exist in multiple silos before one is removed from the system.</p>
+<p>The mapping from grain IDs to their activation (instance) addresses is stored in a distributed directory (implemented with DHT) and each silo owns a partition of this directory. When membership views of two silos differ, both can request creation of an instance and as a result. two instances of the grain may co-exist. Once the cluster silos reach an agreement on membership, one of the instances will be deactivated and only one activation will survive.
+You can find out more about how Orleans manages the clusters at <a href="Runtime-Implementation-Details/Cluster-Management.html">Cluster Management</a> page.</p>
+<p>Also you can take a look at Orleans&#39;s <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf">paper</a> for a more detailed information, however you don&#39;t need to understand it fully to be able to write your application code.
 You just need to consider the rare possibility of having two instances of an actor while writing your application.</p>
 
             </article>
