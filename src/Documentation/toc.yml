@@ -1,3 +1,13 @@
+- name: Introduction
+  href: Introduction.md
+  homepage: Introduction.md
+  items:
+  - name: Benefits
+    href: Benefits.md
+  - name: What's new in Orleans
+    href: What's-new-in-Orleans.md
+  - name: Frequently Asked Questions
+    href: Frequently-Asked-Questions.md
 - name: Installation
   items:
   - name: Prerequisites
@@ -62,3 +72,5 @@
     href: Advanced-Concepts/Configuring-SQL-Tables.md
   - name: External Tasks and Grains
     href: Advanced-Concepts/External-Tasks-and-Grains.md
+  - name: Deployment and Versioning of Dependencies
+    href: Advanced-Concepts/Deployment-and-Versioning-of-Dependencies.md
