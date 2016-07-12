@@ -21,7 +21,7 @@ tagline: A straightforward approach to building distributed, high-scale applicat
       <img src="images/logo.svg" class="main_logo" />
       <h1 class="title"><small class="subtitle">A straightforward approach to building distributed, high-scale applications in .NET</small></h1>
       <div class="options">
-        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Get the code</a> <a class="btn btn-lg btn-primary" href="Documentation/What's-new-in-Orleans.md">Read the documentation</a>
+        <a class="btn btn-lg btn-primary" href="https://github.com/dotnet/orleans">Get the code</a> <a class="btn btn-lg btn-primary" href="Documentation/Introduction.md">Read the documentation</a>
       </div>
     </div>
 </div>
