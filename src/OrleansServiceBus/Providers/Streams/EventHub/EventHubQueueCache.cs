@@ -45,7 +45,7 @@ namespace Orleans.ServiceBus.Providers
             cacheDataAdapter.PurgeAction = cache.Purge;
             cache.OnPurged = OnPurge;
 
-            cachePressureMonitor = new AveragingCachePressureMonitor();
+            cachePressureMonitor = new AveragingCachePressureMonitor(logger);
         }
 
         /// <summary>
@@ -97,7 +97,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         public int GetMaxAddCount()
         {
-            return cachePressureMonitor.IsUnderPressure() ? 0 : defaultMaxAddCount;
+            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
         }
 
         /// <summary>
@@ -133,38 +133,74 @@ namespace Orleans.ServiceBus.Providers
             if (!cache.TryGetNextMessage(cursorObj, out message))
                 return false;
             double cachePressureContribution;
-            if (TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution))
-            {
-                cachePressureMonitor.RecordCachePressureContribution(cachePressureContribution);
-            }
+            cachePressureMonitor.RecordCachePressureContribution(
+                TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
+                    ? cachePressureContribution
+                    : 0.0);
             return true;
         }
 
-        private class AveragingCachePressureMonitor
+    }
+
+    internal class AveragingCachePressureMonitor
+    {
+        private static readonly TimeSpan checkPeriod = TimeSpan.FromSeconds(2);
+        const double pressureThreshold = 1.0 / 3.0;
+        private readonly Logger logger;
+
+        private double accumulatedCachePressure;
+        private double cachePressureContributionCount;
+        private DateTime nextCheckedTime;
+        private bool isUnderPressure;
+
+        public AveragingCachePressureMonitor(Logger logger)
         {
-            const double pressureThreshold = 1.0/3.0;
+            this.logger = logger.GetSubLogger("-flowcontrol");
+            nextCheckedTime = DateTime.MinValue;
+            isUnderPressure = false;
+        }
 
-            private double accumulatedCachePressure;
-            private int cachePressureContributionCount;
+        public void RecordCachePressureContribution(double cachePressureContribution)
+        {
+            // Weight unhealthy contributions thrice as much as healthy ones.
+            // This is a crude compensation for the fact that healthy consumers wil consume more often than unhealthy ones.
+            double weight = cachePressureContribution < pressureThreshold ? 1.0 : 3.0;
+            accumulatedCachePressure += cachePressureContribution * weight;
+            cachePressureContributionCount += weight;
+        }
 
-            public void RecordCachePressureContribution(double cachePressureContribution)
+        public bool IsUnderPressure(DateTime utcNow)
+        {
+            if (nextCheckedTime < utcNow)
             {
-                accumulatedCachePressure += cachePressureContribution;
-                cachePressureContributionCount++;
+                CalculatePressure();
+                nextCheckedTime = utcNow + checkPeriod;
+            }
+            return isUnderPressure;
+        }
+
+        private void CalculatePressure()
+        {
+            // if we don't have any contributions, don't change status
+            if (cachePressureContributionCount < 0.5)
+            {
+                // after 5 checks with no contributions, check anyway
+                cachePressureContributionCount += 0.1;
+                return;
             }
 
-            public bool IsUnderPressure()
+            double pressure = accumulatedCachePressure / cachePressureContributionCount;
+            bool wasUnderPressure = isUnderPressure;
+            isUnderPressure = pressure > pressureThreshold;
+            // If we changed state, log
+            if (isUnderPressure != wasUnderPressure)
             {
-                if (cachePressureContributionCount == 0)
-                    return false;
-
-                double pressure = accumulatedCachePressure/cachePressureContributionCount;
-
-                cachePressureContributionCount = 0;
-                accumulatedCachePressure = 0;
-
-                return pressure > pressureThreshold;
+                logger.Info(isUnderPressure
+                    ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {pressureThreshold}"
+                    : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {pressureThreshold}");
             }
+            cachePressureContributionCount = 0.0;
+            accumulatedCachePressure = 0.0;
         }
     }
 
