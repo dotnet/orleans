@@ -165,7 +165,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             // 10 buffers of 1k each
             public TestBlockPool()
-                : base(PooledBufferCount, pool => new FixedSizeBuffer(PooledBufferSize, pool))
+                : base(PooledBufferCount, () => new FixedSizeBuffer(PooledBufferSize))
             {
             }
 

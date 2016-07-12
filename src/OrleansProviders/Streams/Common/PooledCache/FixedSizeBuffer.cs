@@ -23,14 +23,8 @@ namespace Orleans.Providers.Streams.Common
         /// Manages access to a fixed size byte buffer.
         /// </summary>
         /// <param name="blockSize"></param>
-        /// <param name="pool"></param>
-        public FixedSizeBuffer(int blockSize, IObjectPool<FixedSizeBuffer> pool)
-            : base(pool)
+        public FixedSizeBuffer(int blockSize)
         {
-            if (pool == null)
-            {
-                throw new ArgumentNullException("pool");
-            }
             if (blockSize < 0)
             {
                 throw new ArgumentOutOfRangeException("blockSize", "blockSize must be positive value.");
