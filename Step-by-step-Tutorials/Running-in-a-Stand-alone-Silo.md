@@ -37,7 +37,9 @@ static void Main(string[] args)
 }
 ```
 
-Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. You also need to change the client gateway port in the OrleansConfiguration.xml file added to the collection project by Microsoft.Orleans.Server to match the programmatically defined `config` object, which is `30000`. if OrleansConfiguration.xml does not exist, you can create one using the instruction in [Minimal Orleans Application tutorial](Minimal-Orleans-Application#host--orleansconfigurationxml). Then, open OrleansConfiguration.xml, find the `ProxyingGateway` element inside its Defaults section, and change it to.
+Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. Try to not mix NuGet package versions, make sure all Orlean packages are aligned in the solution.
+
+You also need to add a OrleansConfiguration.xml file, you can create it using the instruction in [Minimal Orleans Application tutorial](Minimal-Orleans-Application#host--orleansconfigurationxml). Then, in this file, make sure that the `ProxyingGateway` element inside its Defaults section matches this value:
 
 ```xml
 <ProxyingGateway Address="localhost" Port="30000" />

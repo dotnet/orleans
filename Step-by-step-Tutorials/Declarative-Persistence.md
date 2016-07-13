@@ -65,9 +65,11 @@ siloHost = new SiloHost(siloName, config);
 ```
 
 If this is hosted in Azure Cloud Services, then one can use:
+
 ```csharp
 config.AddAzureBlobStorageProvider("AzureStore");
 ```
+
 and it will pick up the same connection string used in `config.Globals.DataConnectionString`.
 
 The `MemoryStorage` provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store.
