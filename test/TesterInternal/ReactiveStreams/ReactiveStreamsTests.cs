@@ -13,7 +13,7 @@ namespace UnitTests.ReactiveStreams
         public async Task AdHocStreamTest()
         {
             var grain = GrainFactory.GetGrain<IReactiveGrain<int>>(Guid.NewGuid());
-            var expected = new[] {1, 2, 3, 4, 5, 6};
+            var expected = new[] { 1, 2, 3, 4, 5, 6 };
             var stream = grain.GetStream(expected);
             var observer = new BufferedObserver<int>();
             var disposable = await stream.SubscribeAsync(observer);
@@ -25,7 +25,7 @@ namespace UnitTests.ReactiveStreams
         public async Task AdHocStreamTestWithStrings()
         {
             var grain = GrainFactory.GetGrain<IReactiveGrain<string>>(Guid.NewGuid());
-            var expected = new[] {"always", "leave", "a", "note"};
+            var expected = new[] { "always", "leave", "a", "note" };
             var stream = grain.GetStream(expected);
             var observer = new BufferedObserver<string>();
             var disposable = await stream.SubscribeAsync(observer);
@@ -51,7 +51,7 @@ namespace UnitTests.ReactiveStreams
             Assert.Equal(2, await roomGrain.GetCurrentUserCount());
 
             // Send a couple of messages to the room.
-            var messages = new[] {"These things are fun", "Issue #940 needs some attention..."};
+            var messages = new[] { "These things are fun", "Issue #940 needs some attention..." };
             await roomGrain.SendMessage(messages[0]);
             await roomGrain.SendMessage(messages[1]);
 
@@ -60,14 +60,12 @@ namespace UnitTests.ReactiveStreams
             Assert.Equal(1, await roomGrain.GetCurrentUserCount());
 
             // Send another message.
-            await roomGrain.SendMessage(messages[1].ToUpperInvariant()).ContinueWith(_ => _);
+            await roomGrain.SendMessage(messages[1].ToUpperInvariant());
 
             // Check that the observers received the right messages.
             Assert.Equal(messages, messagesFromProxyGrain.Buffer);
             await subscription.UnsubscribeAsync();
-            Assert.Equal(
-                new[] {messages[0], messages[1], messages[1].ToUpperInvariant()},
-                messagesFromRoom.Buffer);
+            Assert.Equal(new[] { messages[0], messages[1], messages[1].ToUpperInvariant() }, messagesFromRoom.Buffer);
             Assert.Equal(0, await roomGrain.GetCurrentUserCount());
             await roomGrain.SendMessage("NO ONE WILL RECEIVE THIS!");
         }

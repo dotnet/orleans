@@ -23,9 +23,7 @@ namespace Orleans.Runtime
             IObserverGrainExtensionRemote handler;
             if (!this.extensionManager.TryGetExtensionHandler(out handler))
             {
-                this.extensionManager.TryAddExtension(
-                    handler = new ObserverGrainExtension(), 
-                    typeof(IObserverGrainExtensionRemote));
+                this.extensionManager.TryAddExtension(handler = new ObserverGrainExtension(), typeof(IObserverGrainExtensionRemote));
             }
 
             return handler as IObserverGrainExtension;
@@ -34,15 +32,14 @@ namespace Orleans.Runtime
 
     internal class ObserverGrainExtension : IObserverGrainExtension
     {
-        private readonly Dictionary<Guid, IUntypedGrainObserver> observers =
-            new Dictionary<Guid, IUntypedGrainObserver>();
+        private readonly Dictionary<Guid, IUntypedGrainObserver> observers = new Dictionary<Guid, IUntypedGrainObserver>();
 
         public Task OnNext(Guid streamId, object value, StreamSequenceToken token) => this.observers[streamId].OnNextAsync(streamId, value, token);
 
         public Task OnError(Guid streamId, Exception exception) => this.GetAndRemove(streamId).OnErrorAsync(streamId, exception);
 
         public Task OnCompleted(Guid streamId) => this.GetAndRemove(streamId).OnCompletedAsync(streamId);
-        
+
         public void Register(Guid streamId, IUntypedGrainObserver observer) => this.observers.Add(streamId, observer);
 
         public void Remove(Guid streamId) => this.observers.Remove(streamId);
@@ -104,7 +101,7 @@ namespace Orleans.Runtime
 
             var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
             var result = await invoker.Invoke(this.grain, request);
-            
+
             try
             {
                 subscription = await StreamDelegateHelper.Subscribe(result, receiver, streamId, token);

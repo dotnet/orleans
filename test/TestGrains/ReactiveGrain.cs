@@ -35,8 +35,7 @@ namespace UnitTests.Grains
             });
         }
 
-        public IAsyncObservable<string> JoinChatRoom(string room)
-            => GrainFactory.GetGrain<IChatRoomGrain>(room).JoinRoom();
+        public IAsyncObservable<string> JoinChatRoom(string room) => GrainFactory.GetGrain<IChatRoomGrain>(room).JoinRoom();
     }
 
     public class ChatRoomGrain : Grain, IChatRoomGrain, IGrainInvokeInterceptor
@@ -48,11 +47,12 @@ namespace UnitTests.Grains
         public Task SendMessage(string message) => room.OnNext(message);
 
         public Task<int> GetCurrentUserCount() => Task.FromResult(room.Count);
+
         private Logger log;
 
         public async Task<object> Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker)
         {
-            var msg = $"{method.Name}({string.Join(", ", request.Arguments ?? new object[] {})})";
+            var msg = $"{method.Name}({string.Join(", ", request.Arguments ?? new object[] { })})";
             log.Info(msg);
             try
             {
@@ -81,11 +81,12 @@ namespace UnitTests.Grains
 
         private Guid lifetimeId;
 
-        private IAsyncObserver<string> GetObserver(ChatRoomMailbox room) => new BufferedObserver<string>(room.Messages) { OnNextDelegate = (_, __) => this.WriteStateAsync() };
+        private IAsyncObserver<string> GetObserver(ChatRoomMailbox room)
+            => new BufferedObserver<string>(room.Messages) { OnNextDelegate = (_, __) => this.WriteStateAsync() };
 
         public async Task<object> Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker)
         {
-            var msg = $"{method.Name}({string.Join(", ", request.Arguments ?? new object[] {})})";
+            var msg = $"{method.Name}({string.Join(", ", request.Arguments ?? new object[] { })})";
             log.Info(msg);
             try
             {
@@ -185,22 +186,19 @@ namespace UnitTests.Grains
 
         public async Task OnNext(T value)
         {
-            var tasks = new List<Task>(observers.Count);
             List<IAsyncObserver<T>> toRemove = null;
-            tasks.AddRange(observers.Select(async observer =>
-            {
-                try
-                {
-                    await observer.OnNextAsync(value);
-                }
-                catch
-                {
-                    if (toRemove == null) toRemove = new List<IAsyncObserver<T>>();
-                    toRemove.Add(observer);
-                }
-            }));
-
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(observers.Select(async observer =>
+                                                      {
+                                                          try
+                                                          {
+                                                              await observer.OnNextAsync(value);
+                                                          }
+                                                          catch
+                                                          {
+                                                              if (toRemove == null) toRemove = new List<IAsyncObserver<T>>();
+                                                              toRemove.Add(observer);
+                                                          }
+                                                      }));
             toRemove?.ForEach(_ => observers.Remove(_));
         }
 
@@ -322,7 +320,8 @@ namespace UnitTests.Grains
 
         private class FuncObservable<T> : IAsyncObservable<T>
         {
-            [NonSerialized] private readonly Func<IAsyncObserver<T>, Task<StreamSubscriptionHandle<T>>> onSubscribe;
+            [NonSerialized]
+            private readonly Func<IAsyncObserver<T>, Task<StreamSubscriptionHandle<T>>> onSubscribe;
 
             public FuncObservable(Func<IAsyncObserver<T>, Task<StreamSubscriptionHandle<T>>> onSubscribe)
             {
