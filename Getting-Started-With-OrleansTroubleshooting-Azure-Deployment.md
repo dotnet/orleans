@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Troubleshooting Azure Deployment
+title: Troubleshooting Deployment
 ---
 {% include JB/setup %}
 
