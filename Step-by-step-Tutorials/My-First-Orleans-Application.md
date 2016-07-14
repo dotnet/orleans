@@ -25,7 +25,7 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 
 ## Getting Started
 
-After starting either Visual Studio 2012 or 2013, go to create a new project.
+After starting Visual Studio, go to create a new project.
 Under "Visual C#," you should see the following:
 
 ![](../Images/New DevTest 1.PNG)
