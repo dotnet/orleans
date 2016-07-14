@@ -20,6 +20,9 @@
 
             result = await grain.NotIntercepted();
             Assert.Equal("not intercepted", result);
+
+            result = await grain.SayHello();
+            Assert.Equal("Hello", result);
         }
     }
 }
