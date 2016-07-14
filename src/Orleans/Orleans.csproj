@@ -134,6 +134,7 @@
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Streams\AdHoc\GrainObservableProxy.cs" />
+    <Compile Include="Core\IGrainExtensionManager.cs" />
     <Compile Include="Streams\AdHoc\IGrainObserver.cs" />
     <Compile Include="Streams\AdHoc\StreamDelegateHelper.cs" />
     <Compile Include="Streams\AdHoc\TransientStreamSubscriptionHandle.cs" />

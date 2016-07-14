@@ -13,6 +13,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime.Providers
 {
+    using Orleans.Core;
+
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime, IGrainExtensionManager
     { 
         private static volatile SiloProviderRuntime instance;
@@ -209,16 +211,24 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
-            if(interfaces.Count != 1)
-                throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
+            Type interfaceType;
+            if (!handlerType.IsInterface)
+            {
+                var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
+                if (interfaces.Count != 1) throw new InvalidOperationException($"Extension type {handlerType.FullName} implements more than one grain interface.");
+                interfaceType = interfaces.First();
+            }
+            else
+            {
+                interfaceType = handlerType;
+            }
 
-            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
+            var interfaceId = GrainInterfaceUtils.ComputeInterfaceId(interfaceType);
             var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker) invoker;
             
-            throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
+            throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", nameof(handlerType));
         }
 
         public object GetCurrentSchedulingContext()

@@ -9,7 +9,7 @@ namespace Orleans.Streams.AdHoc
     /// <summary>
     /// Represents an untyped observer.
     /// </summary>
-    internal interface IUntypedGrainObserver : IGrainExtension
+    internal interface IUntypedGrainObserver : IAddressable
     {
         /// <summary>
         /// Called when a new value has been produced in the specified stream.
@@ -53,7 +53,7 @@ namespace Orleans.Streams.AdHoc
         /// <summary>
         /// Adds an extension handler to the current grain.
         /// </summary>
-        /// <param name="handler">The extension handler to add.</param>
+        /// <param name="handler">The extension handler.</param>
         /// <param name="extensionType">The extension interface type which the handler will be registered for.</param>
         /// <returns><see langword="true"/> if successful or <see langword="false"/> otherwise.</returns>
         bool TryAddExtension(IGrainExtension handler, Type extensionType);
@@ -92,14 +92,14 @@ namespace Orleans.Streams.AdHoc
     /// <summary>
     /// The remote interface for <see cref="IObserverGrainExtension"/>.
     /// </summary>
-    internal interface IObserverGrainExtensionRemote : IUntypedGrainObserver
+    internal interface IObserverGrainExtensionRemote : IGrainExtension, IUntypedGrainObserver
     {
     }
 
     /// <summary>
     /// The interface for the extension which allows grains to subscribe to observables.
     /// </summary>
-    internal interface IObserverGrainExtension : IObserverGrainExtensionLocal, IUntypedGrainObserver
+    internal interface IObserverGrainExtension : IObserverGrainExtensionLocal, IObserverGrainExtensionRemote
     {
     }
 

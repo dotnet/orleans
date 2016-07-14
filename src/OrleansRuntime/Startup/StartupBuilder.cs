@@ -9,6 +9,8 @@ using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime.Startup
 {
+    using Orleans.Core;
+
     /// <summary>
     /// Configure dependency injection at startup
     /// </summary>
