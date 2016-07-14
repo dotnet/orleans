@@ -34,11 +34,11 @@ namespace Orleans.Runtime
     {
         private readonly Dictionary<Guid, IUntypedGrainObserver> observers = new Dictionary<Guid, IUntypedGrainObserver>();
 
-        public Task OnNext(Guid streamId, object value, StreamSequenceToken token) => this.observers[streamId].OnNextAsync(streamId, value, token);
+        public Task OnNextAsync(Guid streamId, object value, StreamSequenceToken token) => this.observers[streamId].OnNextAsync(streamId, value, token);
 
-        public Task OnError(Guid streamId, Exception exception) => this.GetAndRemove(streamId).OnErrorAsync(streamId, exception);
+        public Task OnErrorAsync(Guid streamId, Exception exception) => this.GetAndRemove(streamId).OnErrorAsync(streamId, exception);
 
-        public Task OnCompleted(Guid streamId) => this.GetAndRemove(streamId).OnCompletedAsync(streamId);
+        public Task OnCompletedAsync(Guid streamId) => this.GetAndRemove(streamId).OnCompletedAsync(streamId);
 
         public void Register(Guid streamId, IUntypedGrainObserver observer) => this.observers.Add(streamId, observer);
 
@@ -91,9 +91,8 @@ namespace Orleans.Runtime
 
             return handler as ObservableGrainExtension;
         }
-
-#warning automatically unsubscribe if remote endpoint fails.
-        public async Task SubscribeClient(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver receiver, StreamSequenceToken token)
+        
+        public async Task Subscribe(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver remoteClient, StreamSequenceToken token)
         {
             // If an existing subscription exists, then this is a resume call and nothing needs to be done.
             object subscription;
@@ -104,33 +103,12 @@ namespace Orleans.Runtime
 
             try
             {
-                subscription = await StreamDelegateHelper.Subscribe(result, receiver, streamId, token);
+                subscription = await StreamDelegateHelper.Subscribe(result, remoteClient, streamId, token);
                 this.observers.Add(streamId, subscription);
             }
             catch (Exception exception)
             {
-                await receiver.OnErrorAsync(streamId, exception);
-            }
-        }
-
-        public async Task SubscribeGrain(Guid streamId, InvokeMethodRequest request, GrainReference remoteGrain, StreamSequenceToken token)
-        {
-            // If an existing subscription exists, then this is a resume call and nothing needs to be done.
-            object subscription;
-            if (this.observers.TryGetValue(streamId, out subscription)) return;
-
-            var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
-            var result = await invoker.Invoke(this.grain, request);
-            var receiver = remoteGrain.AsReference<IObserverGrainExtensionRemote>();
-
-            try
-            {
-                subscription = await StreamDelegateHelper.Subscribe(result, receiver, streamId, token);
-                this.observers.Add(streamId, subscription);
-            }
-            catch (Exception exception)
-            {
-                await receiver.OnError(streamId, exception);
+                await remoteClient.OnErrorAsync(streamId, exception);
             }
         }
 

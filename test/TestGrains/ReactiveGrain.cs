@@ -7,7 +7,6 @@ using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Streams.AdHoc;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -188,34 +187,28 @@ namespace UnitTests.Grains
         {
             List<IAsyncObserver<T>> toRemove = null;
             await Task.WhenAll(observers.Select(async observer =>
-                                                      {
-                                                          try
-                                                          {
-                                                              await observer.OnNextAsync(value);
-                                                          }
-                                                          catch
-                                                          {
-                                                              if (toRemove == null) toRemove = new List<IAsyncObserver<T>>();
-                                                              toRemove.Add(observer);
-                                                          }
-                                                      }));
+            {
+                try
+                {
+                    await observer.OnNextAsync(value);
+                }
+                catch
+                {
+                    if (toRemove == null) toRemove = new List<IAsyncObserver<T>>();
+                    toRemove.Add(observer);
+                }
+            }));
             toRemove?.ForEach(_ => observers.Remove(_));
         }
 
         public int Count => observers.Count;
     }
 
-    public class SimpleStreamSubscriptionHandle<T> : StreamSubscriptionHandle<T>, IAsyncDisposable
+    public class SimpleStreamSubscriptionHandle<T> : StreamSubscriptionHandle<T>
     {
         private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
 
         public Task Disposed => completion.Task;
-
-        public Task Dispose()
-        {
-            completion.TrySetResult(0);
-            return Task.FromResult(0);
-        }
 
         public bool IsDisposed => completion.Task.IsCompleted;
 
@@ -224,7 +217,11 @@ namespace UnitTests.Grains
 #warning implement this!
         public override Guid HandleId { get; }
 
-        public override Task UnsubscribeAsync() => this.Dispose();
+        public override Task UnsubscribeAsync()
+        {
+            this.completion.TrySetResult(0);
+            return Task.FromResult(0);
+        }
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null)
         {
@@ -233,7 +230,7 @@ namespace UnitTests.Grains
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
         {
-            throw new NotImplementedException();
+            return object.Equals(other, this);
         }
     }
 
@@ -265,7 +262,7 @@ namespace UnitTests.Grains
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
         {
-            throw new NotImplementedException();
+            return object.Equals(other, this);
         }
     }
 

@@ -133,7 +133,12 @@
     <Compile Include="Runtime\IGrainRuntime.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Streams\AdHoc\GrainObservableProxy.cs" />
     <Compile Include="Streams\AdHoc\IGrainObserver.cs" />
+    <Compile Include="Streams\AdHoc\StreamDelegateHelper.cs" />
+    <Compile Include="Streams\AdHoc\TransientStreamSubscriptionHandle.cs" />
+    <Compile Include="Streams\AdHoc\TypedToUntypedObserverAdapter.cs" />
+    <Compile Include="Streams\AdHoc\UntypedToTypedObserverAdapter.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
