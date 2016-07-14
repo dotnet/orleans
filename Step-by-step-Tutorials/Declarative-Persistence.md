@@ -237,4 +237,4 @@ Generally speaking reading and writing a grain's state is a good mechanism to ha
 
 Next, we'll see how we can call our grains from an MVC web application.
 
-[Front Ends for Orleans Services](Front-Ends-for-Orleans-Services)
+[How To Handle Failures](Failure-Handling)
