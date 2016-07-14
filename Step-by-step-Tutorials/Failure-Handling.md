@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Declarative Persistence
+title: Handling Failures
 ---
 {% include JB/setup %}
 
