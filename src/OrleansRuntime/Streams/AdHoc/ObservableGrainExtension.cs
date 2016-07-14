@@ -23,7 +23,7 @@
         /// <summary>
         /// The mapping between stream id and disposable for each observer.
         /// </summary>
-        private readonly Dictionary<Guid, object> observers = new Dictionary<Guid, object>();
+        private readonly Dictionary<Guid, Subscription> observers = new Dictionary<Guid, Subscription>();
 
         public ObservableGrainExtension(IInvokable invokable, string genericGrainType, IAddressable grain)
         {
@@ -44,34 +44,59 @@
             return handler as ObservableGrainExtension;
         }
         
-        public async Task Subscribe(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver remoteClient, StreamSequenceToken token)
+        public async Task Subscribe(Guid streamId, InvokeMethodRequest request, IUntypedGrainObserver observer, StreamSequenceToken token)
         {
-            // If an existing subscription exists, then this is a resume call and nothing needs to be done.
-            object subscription;
-            if (this.observers.TryGetValue(streamId, out subscription)) return;
+            // If an existing subscription exists, then this is a resume call, so update the observer p
+            Subscription subscription;
+            if (this.observers.TryGetValue(streamId, out subscription))
+            {
+                // Update the existing observer's endpoint to point to the new observer.
+                subscription.Observer.Observer = observer;
+                return;
+            }
 
             var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
-            var result = await invoker.Invoke(this.grain, request);
+            var observable = await invoker.Invoke(this.grain, request);
 
             try
             {
-                subscription = await StreamDelegateHelper.Subscribe(result, remoteClient, streamId, token);
+                IUntypedObserverWrapper wrapper;
+                var subscriptionHandle = await StreamDelegateHelper.Subscribe(observable, observer, streamId, token, out wrapper);
+                subscription = new Subscription(subscriptionHandle, wrapper);
                 this.observers.Add(streamId, subscription);
             }
             catch (Exception exception)
             {
-                await remoteClient.OnErrorAsync(streamId, exception);
+                await observer.OnErrorAsync(streamId, exception);
             }
         }
 
         public Task Unsubscribe(Guid streamId)
         {
             // If no subscription exists, return success.
-            object subscription;
+            Subscription subscription;
             if (!this.observers.TryGetValue(streamId, out subscription)) return Task.FromResult(0);
 
             this.observers.Remove(streamId);
-            return StreamDelegateHelper.Unsubscribe(subscription);
+            return subscription.Unsubscribe();
+        }
+
+        private class Subscription
+        {
+            private readonly object handle;
+
+            public Subscription(object handle, IUntypedObserverWrapper observer)
+            {
+                this.handle = handle;
+                this.Observer = observer;
+            }
+
+            public IUntypedObserverWrapper Observer { get; }
+
+            public Task Unsubscribe()
+            {
+                return StreamDelegateHelper.Unsubscribe(this.handle);
+            }
         }
     }
 }

@@ -11,7 +11,12 @@ namespace Orleans.Streams.AdHoc
     /// </summary>
     internal static class StreamDelegateHelper
     {
-        private delegate Task<object> SubscribeDelegate(object observable, IUntypedGrainObserver receiver, Guid streamId, StreamSequenceToken token);
+        private delegate Task<object> SubscribeDelegate(
+            object observable,
+            IUntypedGrainObserver receiver,
+            Guid streamId,
+            StreamSequenceToken token,
+            out IUntypedObserverWrapper wrapper);
 
         private delegate Task UnsubscribeDelegate(object handle);
 
@@ -33,9 +38,12 @@ namespace Orleans.Streams.AdHoc
             TObservable observable,
             IUntypedGrainObserver receiver,
             Guid streamId,
-            StreamSequenceToken token) where TObservable : IAsyncObservable<TElement>
+            StreamSequenceToken token,
+            out IUntypedObserverWrapper wrapper) where TObservable : IAsyncObservable<TElement>
         {
-            return observable.SubscribeAsync(new UntypedToTypedObserverAdapter<TElement>(streamId, receiver), token);
+            var typedObserver = new UntypedToTypedObserverAdapter<TElement>(streamId, receiver);
+            wrapper = typedObserver;
+            return observable.SubscribeAsync(typedObserver, token);
         }
         
         private static Task UnsubscribeInternal<TElement, THandle>(THandle observable) where THandle : StreamSubscriptionHandle<TElement>
@@ -43,7 +51,7 @@ namespace Orleans.Streams.AdHoc
             return observable.UnsubscribeAsync();
         }
 
-        public static Task<object> Subscribe(object observable, IUntypedGrainObserver receiver, Guid streamId, StreamSequenceToken token)
+        public static Task<object> Subscribe(object observable, IUntypedGrainObserver receiver, Guid streamId, StreamSequenceToken token, out IUntypedObserverWrapper wrapper)
         {
             if (observable == null) throw new ArgumentNullException(nameof(observable));
             var type = observable.GetType();
@@ -58,7 +66,7 @@ namespace Orleans.Streams.AdHoc
                 subscribeDelegate = SubscribeDelegates.GetOrAdd(type, CreateSubscribeDelegate);
             }
 
-            return subscribeDelegate(observable, receiver, streamId, token);
+            return subscribeDelegate(observable, receiver, streamId, token, out wrapper);
         }
         
         public static Task Unsubscribe(object handle)
@@ -82,12 +90,18 @@ namespace Orleans.Streams.AdHoc
         private static SubscribeDelegate CreateSubscribeDelegate(Type observableType)
         {
             // Create a method to hold the generated IL.
-            var method = new DynamicMethod(
-                observableType.Name + typeof(IUntypedGrainObserver).Name,
-                typeof(Task<object>),
-                new[] { typeof(object), typeof(IUntypedGrainObserver), typeof(Guid), typeof(StreamSequenceToken) },
-                observableType.GetTypeInfo().Module,
-                true);
+            var method = new DynamicMethod(observableType.Name + typeof(IUntypedGrainObserver).Name,
+                                           typeof(Task<object>),
+                                           new[]
+                                           {
+                                               typeof(object),
+                                               typeof(IUntypedGrainObserver),
+                                               typeof(Guid),
+                                               typeof(StreamSequenceToken),
+                                               typeof(IUntypedObserverWrapper).MakeByRefType()
+                                           },
+                                           observableType.GetTypeInfo().Module,
+                                           true);
 
             // Construct the method which this IL will call.
             var genericMethod = SubscribeMethodInfo.MakeGenericMethod(observableType.GetTypeInfo().GetGenericArguments()[0], observableType);
@@ -98,6 +112,7 @@ namespace Orleans.Streams.AdHoc
             emitter.Emit(OpCodes.Ldarg_1);
             emitter.Emit(OpCodes.Ldarg_2);
             emitter.Emit(OpCodes.Ldarg_3);
+            emitter.Emit(OpCodes.Ldarg_S, (short)0x04);
             emitter.Emit(OpCodes.Call, genericMethod);
             emitter.Emit(OpCodes.Ret);
 

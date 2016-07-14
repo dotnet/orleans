@@ -3,22 +3,40 @@ namespace Orleans.Streams.AdHoc
     using System;
     using System.Threading.Tasks;
 
-    internal class UntypedToTypedObserverAdapter<T> : IAsyncObserver<T>
+    /// <summary>
+    /// Adapts an <see cref="IUntypedGrainObserver"/> into an <see cref="IAsyncObserver{T}"/>.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    internal class UntypedToTypedObserverAdapter<T> : IAsyncObserver<T>, IUntypedObserverWrapper
     {
         private readonly Guid streamId;
 
-        public UntypedToTypedObserverAdapter(Guid streamId, IUntypedGrainObserver receiver)
+        public UntypedToTypedObserverAdapter(Guid streamId, IUntypedGrainObserver observer)
         {
-            this.Receiver = receiver;
+            this.Observer = observer;
             this.streamId = streamId;
         }
 
-        public IUntypedGrainObserver Receiver { get; }
+        public IUntypedGrainObserver Observer { get; set; }
 
-        public Task OnNextAsync(T value, StreamSequenceToken token = null) => this.Receiver.OnNextAsync(this.streamId, value, token);
+        public Task OnNextAsync(T value, StreamSequenceToken token = null) => this.Observer.OnNextAsync(this.streamId, value, token);
 
-        public Task OnErrorAsync(Exception exception) => this.Receiver.OnErrorAsync(this.streamId, exception);
+        public Task OnErrorAsync(Exception exception) => this.Observer.OnErrorAsync(this.streamId, exception);
 
-        public Task OnCompletedAsync() => this.Receiver.OnCompletedAsync(this.streamId);
+        public Task OnCompletedAsync() => this.Observer.OnCompletedAsync(this.streamId);
+    }
+
+    /// <summary>
+    /// Interface for classes which hold an <see cref="IUntypedGrainObserver"/> object.
+    /// </summary>
+    /// <remarks>
+    /// This allows for reusing the container and changing the underlying observer on-the-fly.
+    /// </remarks>
+    internal interface IUntypedObserverWrapper
+    {
+        /// <summary>
+        /// Gets or sets the underlying observer.
+        /// </summary>
+        IUntypedGrainObserver Observer { get; set; }
     }
 }

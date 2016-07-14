@@ -135,7 +135,8 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Streams\AdHoc\GrainObservableProxy.cs" />
     <Compile Include="Core\IGrainExtensionManager.cs" />
-    <Compile Include="Streams\AdHoc\IGrainObserver.cs" />
+    <Compile Include="Streams\AdHoc\GrainExtensions.cs" />
+    <Compile Include="Streams\AdHoc\IUntypedGrainObserver.cs" />
     <Compile Include="Streams\AdHoc\StreamDelegateHelper.cs" />
     <Compile Include="Streams\AdHoc\TransientStreamSubscriptionHandle.cs" />
     <Compile Include="Streams\AdHoc\TypedToUntypedObserverAdapter.cs" />

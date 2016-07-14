@@ -7,6 +7,8 @@ using Xunit;
 
 namespace UnitTests.ReactiveStreams
 {
+    using Orleans.Serialization;
+
     public class ReactiveStreamsTests : HostedTestClusterEnsureDefaultStarted
     {
         [Fact, TestCategory("Functional")]
@@ -91,12 +93,35 @@ namespace UnitTests.ReactiveStreams
             Assert.NotEqual(originalLifetime, await jeff.GetLifetimeId());
         }
 
+        [Fact, TestCategory("Functional")]
+        public async Task ClientResumeAsync()
+        {
+            var room = GrainFactory.GetGrain<IChatRoomGrain>("#orleans");
+
+            // Subscribe and send a message.
+            var first = new BufferedObserver<string>();
+            var observable = room.JoinRoom();
+            observable = SerializationManager.RoundTripSerializationForTesting(observable);
+            var handle = await observable.SubscribeAsync(first);
+            await room.SendMessage("one!");
+
+            // Round-trip the handle through serialization and resume with a new observer.
+            handle = SerializationManager.RoundTripSerializationForTesting(handle);
+            var second = new BufferedObserver<string>();
+            await handle.ResumeAsync(second);
+            await room.SendMessage("two!");
+
+            Assert.Equal(new[] { "one!" }, first.Buffer);
+            Assert.Equal(new[] { "two!" }, second.Buffer);
+            await handle.UnsubscribeAsync();
+        }
+
         // TODO: Tests:
-        // Client calling ResumeAsync
         // Grain call OnNext for deactivated grain which does *not* called ResumeAsync on reactivation.
         // Client detects remote endpoint crash
         // Grain detects remote client crash (note grain observer crashes should not result in an error or removal of the observer)
         // Round-trip all serializable types
         // Reentrancy tests
+        // Fault injection tests
     }
 }
