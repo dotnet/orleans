@@ -32,7 +32,7 @@ namespace Orleans.TestingHost
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
         }
 
-        public static short DefaultInitialSilosCount { get; set; } = 1;
+        public static short DefaultInitialSilosCount { get; set; } = 2;
         public static bool DefaultTraceToConsole { get; set; } = true;
         public static string DefaultLogsFolder { get; set; } = "logs";
 
@@ -113,10 +113,11 @@ namespace Orleans.TestingHost
             NodeConfiguration nodeConfig = config.GetOrCreateNodeConfigurationForSilo(siloName);
             nodeConfig.HostNameOrIPAddress = "loopback";
             nodeConfig.Port = baseSiloPort + instanceNumber;
-            nodeConfig.ProxyGatewayEndpoint = 
-                nodeConfig.ProxyGatewayEndpoint?.Address != null 
-                ? new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, baseGatewayPort + instanceNumber) 
-                : new IPEndPoint(config.Defaults.ProxyGatewayEndpoint.Address, baseGatewayPort + instanceNumber);
+            var proxyAddress = nodeConfig.ProxyGatewayEndpoint?.Address ?? config.Defaults.ProxyGatewayEndpoint?.Address;
+            if (proxyAddress != null)
+            {
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(proxyAddress, baseGatewayPort + instanceNumber);
+            }
 
             config.Overrides[siloName] = nodeConfig;
             return nodeConfig;
@@ -124,15 +125,41 @@ namespace Orleans.TestingHost
 
         public static ClientConfiguration BuildClientConfiguration(ClusterConfiguration clusterConfig)
         {
-            var config = new ClientConfiguration { GatewayProvider = ClientConfiguration.GatewayProviderType.Config };
+            var config = new ClientConfiguration();
             config.TraceFilePattern = clusterConfig.Defaults.TraceFilePattern;
             config.TraceToConsole = DefaultTraceToConsole;
-            config.Gateways.Add(clusterConfig.Overrides[Silo.PrimarySiloName].ProxyGatewayEndpoint);
-            foreach (var nodeConfiguration in clusterConfig.Overrides.Values.Where(x => x.SiloName != Silo.PrimarySiloName))
+            switch (clusterConfig.Globals.LivenessType)
             {
-                config.Gateways.Add(nodeConfiguration.ProxyGatewayEndpoint);
+                case GlobalConfiguration.LivenessProviderType.AzureTable:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
+                    break;
+                case GlobalConfiguration.LivenessProviderType.SqlServer:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
+                    break;
+                case GlobalConfiguration.LivenessProviderType.ZooKeeper:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
+                    break;
+                case GlobalConfiguration.LivenessProviderType.Custom:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.Custom;
+                    config.CustomGatewayProviderAssemblyName = clusterConfig.Globals.MembershipTableAssembly;
+                    break;
+                case GlobalConfiguration.LivenessProviderType.NotSpecified:
+                case GlobalConfiguration.LivenessProviderType.MembershipTableGrain:
+                default:
+                    config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
+                    var primaryProxyEndpoint = clusterConfig.Overrides[Silo.PrimarySiloName].ProxyGatewayEndpoint;
+                    if (primaryProxyEndpoint != null)
+                    {
+                        config.Gateways.Add(primaryProxyEndpoint);
+                    }
+                    foreach (var nodeConfiguration in clusterConfig.Overrides.Values.Where(x => x.SiloName != Silo.PrimarySiloName && x.ProxyGatewayEndpoint != null))
+                    {
+                        config.Gateways.Add(nodeConfiguration.ProxyGatewayEndpoint);
+                    }
+                    break;
             }
 
+            config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
             if (Debugger.IsAttached)
@@ -157,7 +184,7 @@ namespace Orleans.TestingHost
             string prefix = "testdepid-";
             int randomSuffix = ThreadSafeRandom.Next(1000);
             DateTime now = DateTime.UtcNow;
-            string DateTimeFormat = @"yyyy-MM-dd-HH\tmm-ss";
+            string DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
             string depId = $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{this.BaseSiloPort}-{randomSuffix}";
             return depId;
         }

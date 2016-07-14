@@ -7,6 +7,7 @@ using System.Text;
 using System.Xml;
 using Orleans.Providers;
 using System.Reflection;
+using System.Threading;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -351,10 +352,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerTypeInfo))
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
@@ -412,7 +413,7 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendLine("Client Configuration:");
             sb.Append("   Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
-            sb.Append("   Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("   Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("   Gateway Provider: ").Append(GatewayProvider);
             if (GatewayProvider == GatewayProviderType.None)
             {
@@ -459,6 +460,13 @@ namespace Orleans.Runtime.Configuration
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
+            sb.Append("   .NET: ").AppendLine();
+            int workerThreads;
+            int completionPortThreads;
+            ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
             sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();

@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;

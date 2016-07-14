@@ -25,12 +25,12 @@ namespace UnitTests.TimerTests
 
         private Guid ServiceId;
 
-        private TraceLogger log;
+        private Logger log;
         
         public ReminderTests_Azure_Standalone(ITestOutputHelper output)
         {
             this.output = output;
-            log = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
+            log = LogManager.GetLogger(GetType().Name, LoggerType.Application);
 
             ServiceId = Guid.NewGuid();
 

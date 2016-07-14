@@ -4,7 +4,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.General
 {
@@ -37,7 +36,7 @@ namespace UnitTests.General
             await setPromise;
 
             Task<int> intPromise = grain.GetAxB();
-            Assert.AreEqual(6, await intPromise);
+            Assert.Equal(6, await intPromise);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -50,7 +49,16 @@ namespace UnitTests.General
             await Task.WhenAll(setAPromise, setBPromise);
             var x = await grain.GetAxB();
 
-            Assert.AreEqual(12, x);
+            Assert.Equal(12, x);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
+        {
+            ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
+
+            var actual = await grain.GetA();
+            Assert.Equal(MultipleConstructorsSimpleGrain.ValueUsedByParameterlessConstructor, actual);
         }
     }
 }

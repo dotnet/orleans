@@ -18,15 +18,17 @@ namespace Orleans.Streams
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamId"></param>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
         /// <param name="events"></param>
+        /// <param name="token"></param>
+        /// <param name="requestContext"></param>
         /// <returns></returns>
         Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
 
         /// <summary>
         /// Creates a quere receiver for the specificed queueId
         /// </summary>
-        /// <param name="requesterId">Id of requester, for monitoring/logging purposes</param>
         /// <param name="queueId"></param>
         /// <returns></returns>
         IQueueAdapterReceiver CreateReceiver(QueueId queueId);

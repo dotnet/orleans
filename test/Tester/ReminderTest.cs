@@ -2,7 +2,6 @@
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Tester
 {
@@ -13,7 +12,7 @@ namespace Tester
         {
             IReminderTestGrain grain = GrainFactory.GetGrain<IReminderTestGrain>(GetRandomGrainId());
             bool notExists = await grain.IsReminderExists("not exists");
-            Assert.IsFalse(notExists);
+            Assert.False(notExists);
         }
     }
 }

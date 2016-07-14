@@ -80,11 +80,11 @@ namespace Orleans.Runtime
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
-        private static readonly TraceLogger logger;
+        private static readonly Logger logger;
         
         static Message()
         {
-            logger = TraceLogger.GetLogger("Message", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Message", LoggerType.Runtime);
         }
 
         public enum Categories

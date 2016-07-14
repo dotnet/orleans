@@ -57,8 +57,8 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.StreamProvider_AddObserverException, String.Format("{0} StreamConsumerExtension.AddObserver({1}) caugth exception.",
-                    providerRuntime.ExecutingEntityIdentity(), stream.StreamId), exc);
+                logger.Error(ErrorCode.StreamProvider_AddObserverException,
+                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.StreamId}) caugth exception.", exc);
                 throw;
             }
         }

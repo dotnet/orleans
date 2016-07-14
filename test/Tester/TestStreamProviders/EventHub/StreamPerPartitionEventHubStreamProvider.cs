@@ -3,6 +3,7 @@ using System;
 using System.Text;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 
@@ -17,11 +18,11 @@ namespace Tester.TestStreamProviders.EventHub
                 CacheFactory = CreateQueueCache;
             }
 
-            private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer)
+            private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger log)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool);
-                return new EventHubQueueCache(checkpointer, dataAdapter);
+                return new EventHubQueueCache(checkpointer, dataAdapter, log);
             }
         }
 

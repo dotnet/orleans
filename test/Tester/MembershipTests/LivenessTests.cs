@@ -12,7 +12,6 @@ using UnitTests.Tester;
 using Orleans.SqlUtils;
 using Tester;
 using UnitTests.General;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -41,9 +40,9 @@ namespace UnitTests.MembershipTests
             foreach (var pair in statuses)
             {
                 output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                Assert.AreEqual(SiloStatus.Active, pair.Value);
+                Assert.Equal(SiloStatus.Active, pair.Value);
             }
-            Assert.AreEqual(3, statuses.Count);
+            Assert.Equal(3, statuses.Count);
 
             IPEndPoint address = silo3.Endpoint;
             output.WriteLine("About to stop {0}", address);
@@ -60,15 +59,14 @@ namespace UnitTests.MembershipTests
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
-                    Assert.IsTrue(pair.Value.Equals(SiloStatus.ShuttingDown)
+                    Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
                         || pair.Value.Equals(SiloStatus.Stopping)
                         || pair.Value.Equals(SiloStatus.Dead),
-                        "SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}",
-                        silo, pair.Value);
+                        string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else
                 {
-                    Assert.AreEqual(SiloStatus.Active, pair.Value, "SiloStatus for {0}", silo);
+                    Assert.Equal(SiloStatus.Active, pair.Value);
                 }
             }
         }
@@ -159,8 +157,8 @@ namespace UnitTests.MembershipTests
             try
             {
                 ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
-                Assert.AreEqual(key, grain.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
+                Assert.Equal(key, grain.GetPrimaryKeyLong());
+                Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);
                 if (startTimers)
                 {
@@ -196,25 +194,25 @@ namespace UnitTests.MembershipTests
             return new TestCluster(options);
         }
 
-        //[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_2_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_3_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -239,6 +237,8 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
@@ -248,7 +248,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
@@ -266,7 +266,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(2);
         }
 
-        // [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -284,10 +284,12 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
-        [Fact,  TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
             await Do_Liveness_OracleTest_1();
@@ -330,6 +332,8 @@ namespace UnitTests.MembershipTests
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 
@@ -377,6 +381,8 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
             return new TestCluster(options);
         }
 

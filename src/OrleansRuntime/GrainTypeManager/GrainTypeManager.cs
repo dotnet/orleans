@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     {
         private IDictionary<string, GrainTypeData> grainTypes;
         private readonly IGrainFactory grainFactory;
-        private readonly TraceLogger logger = TraceLogger.GetLogger("GrainTypeManager");
+        private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
                             {
                                 // Instantiate the specific type from generic template
                                 var genericGrainTypeData = (GenericGrainTypeData)grainTypes[templateName];
-                                Type[] typeArgs = TypeUtils.GenericTypeArgs(className);
+                                Type[] typeArgs = TypeUtils.GenericTypeArgsFromClassName(className);
                                 var concreteTypeData = genericGrainTypeData.MakeGenericType(typeArgs);
 
                                 // Add to lookup tables for next time
@@ -152,9 +152,10 @@ namespace Orleans.Runtime
 
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
-            var grainClassCompleteName = TypeUtils.GetFullName(grainClass);
-            var isGenericGrainClass = grainClass.ContainsGenericParameters;
-            var grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
+            var grainTypeInfo = grainClass.GetTypeInfo();
+            var grainClassCompleteName = TypeUtils.GetFullName(grainTypeInfo);
+            var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
+            var grainClassTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
             var placement = GrainTypeData.GetPlacementStrategy(grainClass);
             var registrationStrategy = GrainTypeData.GetMultiClusterRegistrationStrategy(grainClass);
 
@@ -163,9 +164,9 @@ namespace Orleans.Runtime
                 var ifaceCompleteName = TypeUtils.GetFullName(iface);
                 var ifaceName = TypeUtils.GetRawClassName(ifaceCompleteName);
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
-                var ifaceId = CodeGeneration.GrainInterfaceUtils.GetGrainInterfaceId(iface);
+                var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(iface);
                 grainInterfaceMap.AddEntry(ifaceId, iface, grainClassTypeCode, ifaceName, grainClassCompleteName,
-                    grainClass.Assembly.CodeBase, isGenericGrainClass, placement, registrationStrategy, isPrimaryImplementor);
+                    grainTypeInfo.Assembly.CodeBase, isGenericGrainClass, placement, registrationStrategy, isPrimaryImplementor);
             }
 
             if (isUnordered)
@@ -191,7 +192,7 @@ namespace Orleans.Runtime
             return grainTypes.TryGetValue(name, out result);
         }
 
-        internal GrainInterfaceMap GetTypeCodeMap()
+        internal IGrainTypeResolver GetTypeCodeMap()
         {
             // the map is immutable at this point
             return grainInterfaceMap;
@@ -255,24 +256,30 @@ namespace Orleans.Runtime
 
             public IGrainMethodInvoker GetInvoker(string genericGrainType = null)
             {
-                if (String.IsNullOrEmpty(genericGrainType))
+                // if the grain class is non-generic
+                if (cachedGenericInvokersLockObj == null)
+                {
                     return invoker ?? (invoker = (IGrainMethodInvoker)Activator.CreateInstance(baseInvokerType));
-                lock (cachedGenericInvokersLockObj)
-                {
-                    if (cachedGenericInvokers.ContainsKey(genericGrainType))
-                        return cachedGenericInvokers[genericGrainType];
                 }
-
-                var typeArgs = TypeUtils.GenericTypeArgs(genericGrainType);
-                var concreteType = baseInvokerType.MakeGenericType(typeArgs);
-                var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
-                lock (cachedGenericInvokersLockObj)
+                else
                 {
-                    if (!cachedGenericInvokers.ContainsKey(genericGrainType))
-                        cachedGenericInvokers[genericGrainType] = inv;
-                }
+                    lock (cachedGenericInvokersLockObj)
+                    {
+                        if (cachedGenericInvokers.ContainsKey(genericGrainType))
+                            return cachedGenericInvokers[genericGrainType];
+                    }
+                    var typeArgs = TypeUtils.GenericTypeArgsFromArgsString(genericGrainType);
+                    var concreteType = baseInvokerType.MakeGenericType(typeArgs);
+                    var inv = (IGrainMethodInvoker)Activator.CreateInstance(concreteType);
 
-                return inv;
+                    lock (cachedGenericInvokersLockObj)
+                    {
+                        if (!cachedGenericInvokers.ContainsKey(genericGrainType))
+                            cachedGenericInvokers[genericGrainType] = inv;
+                    }
+
+                    return inv;
+                }
             }
         }
     }

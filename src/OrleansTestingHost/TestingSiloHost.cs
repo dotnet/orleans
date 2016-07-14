@@ -150,7 +150,7 @@ namespace Orleans.TestingHost
                 // More details: http://dobrzanski.net/2010/09/20/mstest-unit-test-adapter-threw-exception-type-is-not-resolved-for-member/
                 throw new Exception(
                     string.Format("Exception during test initialization: {0}",
-                        TraceLogger.PrintException(baseExc)));
+                        LogFormatter.PrintException(baseExc)));
             }
         }
 

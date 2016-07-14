@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.Common
             }
             dataAdapter = cacheDataAdapter;
             messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(
-                pool => new CachedMessageBlock<TCachedMessage>(pool));
+                () => new CachedMessageBlock<TCachedMessage>());
         }
 
         /// <summary>
@@ -36,6 +36,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="queueMessage"></param>
         /// <param name="dequeueTimeUtc"></param>
+        /// <param name="streamPosition"></param>
         /// <returns></returns>
         public CachedMessageBlock<TCachedMessage> AllocateMessage(TQueueMessage queueMessage, DateTime dequeueTimeUtc, out StreamPosition streamPosition)
         {

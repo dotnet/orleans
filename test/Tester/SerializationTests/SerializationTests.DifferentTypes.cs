@@ -1,11 +1,9 @@
 using System;
 using System.Globalization;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Xunit;
-using Orleans.Serialization;
 using System.Collections.Generic;
-using Orleans.TestingHost;
+using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
@@ -26,22 +24,22 @@ namespace UnitTests.Serialization
             DateTime inputLocal = DateTime.Now;
 
             DateTime outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
-            Assert.AreEqual(inputLocal.ToString(CultureInfo.InvariantCulture), outputLocal.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputLocal.Kind, outputLocal.Kind);
+            Assert.Equal(inputLocal.ToString(CultureInfo.InvariantCulture), outputLocal.ToString(CultureInfo.InvariantCulture));
+            Assert.Equal(inputLocal.Kind, outputLocal.Kind);
 
             // UTC Kind
             DateTime inputUtc = DateTime.UtcNow;
 
             DateTime outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
-            Assert.AreEqual(inputUtc.ToString(CultureInfo.InvariantCulture), outputUtc.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputUtc.Kind, outputUtc.Kind);
+            Assert.Equal(inputUtc.ToString(CultureInfo.InvariantCulture), outputUtc.ToString(CultureInfo.InvariantCulture));
+            Assert.Equal(inputUtc.Kind, outputUtc.Kind);
 
             // Unspecified Kind
             DateTime inputUnspecified = new DateTime(0x08d27e2c0cc7dfb9);
 
             DateTime outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
-            Assert.AreEqual(inputUnspecified.ToString(CultureInfo.InvariantCulture), outputUnspecified.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputUnspecified.Kind, outputUnspecified.Kind);
+            Assert.Equal(inputUnspecified.ToString(CultureInfo.InvariantCulture), outputUnspecified.ToString(CultureInfo.InvariantCulture));
+            Assert.Equal(inputUnspecified.Kind, outputUnspecified.Kind);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -52,33 +50,33 @@ namespace UnitTests.Serialization
             DateTimeOffset inputLocal = new DateTimeOffset(inputLocalDateTime);
 
             DateTimeOffset outputLocal = SerializationManager.RoundTripSerializationForTesting(inputLocal);
-            Assert.AreEqual(inputLocal, outputLocal, "Local time");
-            Assert.AreEqual(
+            Assert.Equal(inputLocal, outputLocal);
+            Assert.Equal(
                 inputLocal.ToString(CultureInfo.InvariantCulture),
                 outputLocal.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputLocal.DateTime.Kind, outputLocal.DateTime.Kind);
+            Assert.Equal(inputLocal.DateTime.Kind, outputLocal.DateTime.Kind);
 
             // UTC Kind
             DateTime inputUtcDateTime = DateTime.UtcNow;
             DateTimeOffset inputUtc = new DateTimeOffset(inputUtcDateTime);
 
             DateTimeOffset outputUtc = SerializationManager.RoundTripSerializationForTesting(inputUtc);
-            Assert.AreEqual(inputUtc, outputUtc, "UTC time");
-            Assert.AreEqual(
+            Assert.Equal(inputUtc, outputUtc);
+            Assert.Equal(
                 inputUtc.ToString(CultureInfo.InvariantCulture),
                 outputUtc.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputUtc.DateTime.Kind, outputUtc.DateTime.Kind);
+            Assert.Equal(inputUtc.DateTime.Kind, outputUtc.DateTime.Kind);
 
             // Unspecified Kind
             DateTime inputUnspecifiedDateTime = new DateTime(0x08d27e2c0cc7dfb9);
             DateTimeOffset inputUnspecified = new DateTimeOffset(inputUnspecifiedDateTime);
 
             DateTimeOffset outputUnspecified = SerializationManager.RoundTripSerializationForTesting(inputUnspecified);
-            Assert.AreEqual(inputUnspecified, outputUnspecified, "Unspecified time");
-            Assert.AreEqual(
+            Assert.Equal(inputUnspecified, outputUnspecified);
+            Assert.Equal(
                 inputUnspecified.ToString(CultureInfo.InvariantCulture),
                 outputUnspecified.ToString(CultureInfo.InvariantCulture));
-            Assert.AreEqual(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
+            Assert.Equal(inputUnspecified.DateTime.Kind, outputUnspecified.DateTime.Kind);
         }
 
         [Serializable]

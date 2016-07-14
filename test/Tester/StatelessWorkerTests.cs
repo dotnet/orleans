@@ -1,29 +1,42 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Orleans.Runtime;
 using Tester;
+using UnitTests.Grains;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
     public class StatelessWorkerTests : HostedTestClusterEnsureDefaultStarted
     {
-        private readonly int ExpectedMaxLocalActivations = 1; // System.Environment.ProcessorCount;
+        private readonly int ExpectedMaxLocalActivations = StatelessWorkerGrain.MaxLocalWorkers; // System.Environment.ProcessorCount;
+        private readonly ITestOutputHelper output;
+
+        public StatelessWorkerTests(DefaultClusterFixture fixture, ITestOutputHelper output) : base(fixture)
+        {
+            this.output = output;
+        }
 
         [Fact, TestCategory("Functional"), TestCategory("StatelessWorker")]
-        public async Task StatelessWorker()
+        public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
-            IStatelessWorkerGrain grain = GrainClient.GrainFactory.GetGrain<IStatelessWorkerGrain>(0);
+            var gatewaysCount = HostedCluster.ClientConfiguration.Gateways.Count;
+            // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
+            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
+
+            IStatelessWorkerGrain grain = GrainClient.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
 
-            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
-                promises.Add(grain.LongCall()); // trigger activation of ExpectedMaxLocalActivations local activations
+            // warmup
+            for (int i = 0; i < gatewaysCount; i++)
+                promises.Add(grain.LongCall()); 
             await Task.WhenAll(promises);
 
             await Task.Delay(2000);
@@ -31,36 +44,64 @@ namespace UnitTests.General
             promises.Clear();
             var stopwatch = Stopwatch.StartNew();
 
-            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
+            for (int i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
             stopwatch.Stop();
 
-            //Assert.IsTrue(stopwatch.Elapsed > TimeSpan.FromSeconds(19.5), "50 requests with a 2 second processing time shouldn't take less than 20 seconds on 10 activations. But it took " + stopwatch.Elapsed);
-
             promises.Clear();
-            for (int i = 0; i < ExpectedMaxLocalActivations * 3; i++)
-                promises.Add(grain.GetCallStats());  // gather stats
+
+            var statsTasks = new List<Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>>>();
+            for (int i = 0; i < numberOfCalls; i++)
+                statsTasks.Add(grain.GetCallStats());  // gather stats
             await Task.WhenAll(promises);
 
-            HashSet<Guid> activations = new HashSet<Guid>();
-            foreach (var promise in promises)
+            var responsesPerSilo = statsTasks.Select(t => t.Result).GroupBy(s => s.Item2);
+            foreach (var siloGroup in responsesPerSilo)
             {
-                Tuple<Guid, List<Tuple<DateTime, DateTime>>> response = await (Task<Tuple<Guid, List<Tuple<DateTime, DateTime>>>>)promise;
+                var silo = siloGroup.Key;
 
-                if (activations.Contains(response.Item1))
-                    continue; // duplicate response from the same activation
+                HashSet<Guid> activations = new HashSet<Guid>();
 
-                activations.Add(response.Item1);
+                foreach (var response in siloGroup)
+                {
+                    if (activations.Contains(response.Item1))
+                        continue; // duplicate response from the same activation
 
-                logger.Info(" {0}: Activation {1}", activations.Count, response.Item1);
-                int count = 1;
-                foreach (Tuple<DateTime, DateTime> call in response.Item2)
-                    logger.Info("\t{0}: {1} - {2}", count++, TraceLogger.PrintDate(call.Item1), TraceLogger.PrintDate(call.Item2));
+                    activations.Add(response.Item1);
+
+                    output.WriteLine($"Silo {silo} with {activations.Count} activations: Activation {response.Item1}");
+                    int count = 1;
+                    foreach (Tuple<DateTime, DateTime> call in response.Item3)
+                        output.WriteLine($"\t{count++}: {LogFormatter.PrintDate(call.Item1)} - {LogFormatter.PrintDate(call.Item2)}");
+                }
+
+                Assert.True(activations.Count <= ExpectedMaxLocalActivations, $"activations.Count = {activations.Count} in silo {silo} but expected no more than {ExpectedMaxLocalActivations}");
+            }
+        }
+
+        [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
+        {
+            var gatewaysCount = HostedCluster.ClientConfiguration.Gateways.Count;
+
+            if (gatewaysCount < 2)
+            {
+                throw new SkipException("This test was created to run with more than 1 gateway. 2 is the default at the time of this writing");
             }
 
-            Assert.IsTrue(activations.Count <= ExpectedMaxLocalActivations, "activations.Count = " + activations.Count + " but expected no more than " + ExpectedMaxLocalActivations);
+            // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
+            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
+
+            IStatelessWorkerGrain grain = GrainClient.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
+            List<Task> promises = new List<Task>();
+            
+            for (int i = 0; i < numberOfCalls; i++)
+                promises.Add(grain.LongCall());
+            await Task.WhenAll(promises);
+
+            // Calls should not have thrown ForwardingFailed exceptions.
         }
     }
 }

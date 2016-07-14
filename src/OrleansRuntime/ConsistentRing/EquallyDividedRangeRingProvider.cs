@@ -10,7 +10,7 @@ namespace Orleans.Runtime.ConsistentRing
     {
         private readonly IConsistentRingProvider ringProvider;
         private readonly List<IAsyncRingRangeListener> grainStatusListeners;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly int numSubRanges;
         private readonly int mySubRangeIndex;
         private IRingRange myRange;
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.ConsistentRing
             this.mySubRangeIndex = mySubRangeIndex;
             grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
-            logger = TraceLogger.GetLogger(typeof(EquallyDividedRangeRingProvider).Name);
+            logger = LogManager.GetLogger(typeof(EquallyDividedRangeRingProvider).Name);
         }
 
         public IRingRange GetMyRange()

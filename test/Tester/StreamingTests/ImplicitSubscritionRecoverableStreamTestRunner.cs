@@ -1,13 +1,11 @@
-﻿
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestGrainInterfaces;
 using UnitTests.Grains;
+using Xunit;
 
 namespace Tester.StreamingTests
 {
@@ -59,10 +57,10 @@ namespace Tester.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.AreEqual(streamCount, report.Count, "Stream count");
+                Assert.Equal(streamCount, report.Count);
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.AreEqual(eventsInStream, eventsPerStream, "Events per stream");
+                    Assert.Equal(eventsInStream, eventsPerStream);
                 }
             }
             else if (streamCount != report.Count ||

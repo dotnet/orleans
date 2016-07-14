@@ -10,7 +10,6 @@ using System.Security.Principal;
 using System.Text;
 using System.Xml.Linq;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests
 {
@@ -109,12 +108,12 @@ namespace UnitTests
 
             }
 
-            Assert.AreEqual(0, nonPdbFiles.Count, "{0} files (non-.pdb) were not removed from the target directory ({1}).", nonPdbFiles.Count, targetFolder);
+            Assert.Equal(0, nonPdbFiles.Count);
 
             string[] cacheFilesAfterScript = Directory.GetFiles(factoryCacheFolder, "*.*", SearchOption.AllDirectories);
             int cacheFileCountAfterScript = cacheFilesAfterScript.Count();
 
-            Assert.AreEqual(0, cacheFileCountAfterScript, "{0} files were not deleted from the cache folder ({1}).", cacheFileCountAfterScript, factoryCacheFolder);
+            Assert.Equal(0, cacheFileCountAfterScript);
         }
 
         /// <summary>
@@ -152,14 +151,17 @@ namespace UnitTests
             ProcessStartInfo calcStartInfo = new ProcessStartInfo("calc.exe");
             calcStartInfo.UseShellExecute = false;
             Process calcProcess = Process.Start(calcStartInfo);
+            
             // Give the process time to start up.
             System.Threading.Thread.Sleep(500);
             string processName = string.Format("\"{0}\"", calcProcess.ProcessName);
             Collection<PSObject> results = RunPowerShellCommand(".\\IsProcessRunning.ps1", calcProcess.ProcessName, "localHost");
+
             // Run the script; result should be "True".
-            Assert.IsNotNull(results, "No results returned (results = null).");
-            Assert.IsTrue(results.Count > 0, "Process not found on target machine (results.Count = 0).");
-            Assert.IsTrue(results[0].ToString().Contains(calcProcess.Id.ToString()), "The .\\IsProcessRunning script did not detect the running process.");
+            Assert.NotNull(results);
+            Assert.True(results.Count > 0, "Process not found on target machine (results.Count = 0).");
+            Assert.True(results[0].ToString().Contains(calcProcess.Id.ToString()), "The .\\IsProcessRunning script did not detect the running process.");
+            
             // Clean up after the test.
             calcProcess.Kill();
         }
@@ -190,7 +192,7 @@ namespace UnitTests
                 {
                     resultsBuilder.AppendLine(result.ToString());
                 }
-                Assert.Fail("IsProcessRunning.ps1 script returned information when it should have return nothing: {0}", resultsBuilder);
+                Assert.True(false, string.Format("IsProcessRunning.ps1 script returned information when it should have return nothing: {0}", resultsBuilder));
             }
         }
 
@@ -219,7 +221,7 @@ namespace UnitTests
             Process[] orleansHostTestProcess = Process.GetProcessesByName("OrleansHost");
             // Check the results for an error or exception.
             CheckResultsForErrors(results);
-            Assert.IsTrue(orleansHostTestProcess.Count() > 0, "OrleansHost not started by .\\StartOrleans.ps1");
+            Assert.True(orleansHostTestProcess.Count() > 0, "OrleansHost not started by .\\StartOrleans.ps1");
 
         }
 
@@ -247,7 +249,7 @@ namespace UnitTests
 
             CheckResultsForErrors(results);
 
-            Assert.IsTrue(orleansHostTestProcess.Count() < 1, "OrleansHost is still running.");
+            Assert.True(orleansHostTestProcess.Count() < 1, "OrleansHost is still running.");
 
             // Check to see if the expected message or an error was returned.
             KeyValuePair<string, string> notStartedSearchPair = new KeyValuePair<string, string>("\tOrleansHost is not running on deployment machine(s)", "The script did not report that the OrleansHost was not started.");
@@ -280,7 +282,7 @@ namespace UnitTests
 
             // Check to see if Orleans Host is still running.
             orleansHostTestProcess = Process.GetProcessesByName("OrleansHost");
-            Assert.IsTrue(orleansHostTestProcess.Count() < 1, "OrleansHost is still running.");
+            Assert.True(orleansHostTestProcess.Count() < 1, "OrleansHost is still running.");
 
             // Check the results for an error or exception.
             CheckResultsForErrors(results);
@@ -347,29 +349,28 @@ namespace UnitTests
             // Test "/?"
             Collection<PSObject> results = RunPowerShellCommand(scriptName, "/?");
             string usageText = results[1].ToString();
-            Assert.IsTrue(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is /?");
+            Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is /?");
 
             // Test "/help"
             results = RunPowerShellCommand(scriptName, "/help");
             usageText = results[1].ToString();
-            Assert.IsTrue(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is /help");
+            Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is /help");
 
             // Test "help"
             results = RunPowerShellCommand(scriptName, "help");
             usageText = results[1].ToString();
-            Assert.IsTrue(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is help");
-
+            Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is help");
 
             // TODO: Enable when code is added to the script to detect the dash character differently.
             //// Test "-?"
             //results = InvokePowerShellScript(scriptName, "-?");
             //useageText = results[1].ToString();
-            //Assert.IsTrue(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is -?");
+            //Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is -?");
 
             //// Test "-help"
             //results = InvokePowerShellScript(scriptName, "-help");
             //useageText = results[1].ToString();
-            //Assert.IsTrue(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is -help");
+            //Assert.True(usageText.StartsWith("\tUsage:"), "Usage text not displayed when first parameter is -help");
         }
 
         /// <summary>
@@ -411,7 +412,7 @@ namespace UnitTests
                 foreach (KeyValuePair<string, string> searchPair in searchPairs)
                 {
                     bool found = resultString.IndexOf(searchPair.Key, StringComparison.OrdinalIgnoreCase) != -1;
-                    Assert.IsTrue(found == assertKeysAreFound, searchPair.Value, resultString);
+                    Assert.True(found == assertKeysAreFound, string.Format(searchPair.Value, resultString));
                 }
             }
         }
@@ -481,12 +482,12 @@ namespace UnitTests
                 throw new SkipException("Cannot Run Test: Could not find configuration file " + configFile);
             }
             XDocument configDoc = XDocument.Load(configFile);
-            Assert.IsNotNull(configDoc, string.Format("Could not load test configuration file: {0}", configFile));
+            Assert.NotNull(configDoc);
             XNamespace deployNamespace = "urn:xcg-deployment";
             XElement targetElement = configDoc.Root.Element(deployNamespace + "TargetLocation");
-            Assert.IsNotNull(targetElement, "Could not find the TargetLocation element in the configuration file: {0}", configFile);
+            Assert.NotNull(targetElement); // "Could not find the TargetLocation element in the configuration file: {0}", configFile);
             XAttribute pathAttribute = targetElement.Attribute("Path");
-            Assert.IsNotNull(pathAttribute, "The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile);
+            Assert.NotNull(pathAttribute); // The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile);
             pathValue = pathAttribute.Value;
             return pathValue;
         }
@@ -602,7 +603,7 @@ namespace UnitTests
 
             System.Threading.Thread.Sleep(9000);
             Process[] orleansPostTestProcess = Process.GetProcessesByName("OrleansHost");
-            Assert.IsTrue(orleansPostTestProcess.Count() > 0, "OrleansHost is not started.");
+            Assert.True(orleansPostTestProcess.Count() > 0, "OrleansHost is not started.");
         }
 
         private bool RunningAsAdmin()

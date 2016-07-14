@@ -2,7 +2,6 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
@@ -71,7 +70,7 @@ namespace UnitTests.StreamingTests
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
-            Assert.AreEqual(numExpectedSilos, results.Length, "numExpectedSilos-" + callContext);
+            Assert.Equal(numExpectedSilos, results.Length);
 
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
             // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824 
@@ -79,7 +78,7 @@ namespace UnitTests.StreamingTests
             logger.Info("Got back NumberRunningAgents: {0}." + Utils.EnumerableToString(numAgents));
             foreach (var agents in numAgents)
             {
-                Assert.AreEqual(numExpectedAgentsPerSilo, agents, "numExpectedAgentsPerSilo-" + callContext);
+                Assert.Equal(numExpectedAgentsPerSilo, agents);
             }
         }
     }

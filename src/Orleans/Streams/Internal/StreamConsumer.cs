@@ -21,7 +21,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
-        private readonly TraceLogger                logger;
+        private readonly Logger logger;
 
         public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, bool isRewindable)
         {
@@ -29,7 +29,7 @@ namespace Orleans.Streams
             if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
             if (pubSub == null) throw new ArgumentNullException("pubSub");
 
-            logger = TraceLogger.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), LoggerType.Runtime);
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
@@ -164,7 +164,7 @@ namespace Orleans.Streams
 
             } catch (Exception exc)
             {
-                logger.Warn((int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+                logger.Warn(ErrorCode.StreamProvider_ConsumerFailedToUnregister,
                     "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
             }
             myExtension = null;

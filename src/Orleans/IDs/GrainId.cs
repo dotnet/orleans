@@ -105,6 +105,11 @@ namespace Orleans.Runtime
             get { return ToDetailedString(); }
         }
 
+        public bool IsLongKey
+        {
+            get { return Key.IsLongKey; }
+        }
+
         public long GetPrimaryKeyLong(out string keyExt)
         {
             return Key.PrimaryKeyToLong(out keyExt);

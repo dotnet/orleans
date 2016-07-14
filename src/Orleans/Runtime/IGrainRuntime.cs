@@ -37,7 +37,7 @@ namespace Orleans.Runtime
 
         IServiceProvider ServiceProvider { get; }
 
-        Logger GetLogger(string loggerName, TraceLogger.LoggerType logType);
+        Logger GetLogger(string loggerName);
 
         void DeactivateOnIdle(Grain grain);
 

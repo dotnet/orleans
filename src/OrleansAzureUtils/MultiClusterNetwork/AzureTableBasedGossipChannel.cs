@@ -13,7 +13,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
     /// </summary>
     internal class AzureTableBasedGossipChannel : IGossipChannel
     {
-        private TraceLogger logger;
+        private Logger logger;
         private GossipTableInstanceManager tableManager;
         private static int sequenceNumber;
 
@@ -22,7 +22,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         public async Task Initialize(Guid serviceid, string connectionstring)
         {
             Name = "AzureTableBasedGossipChannel-" + ++sequenceNumber;
-            logger = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(Name, LoggerType.Runtime);
 
             logger.Info("Initializing Gossip Channel for ServiceId={0} using connection: {1}, SeverityLevel={2}",
                 serviceid, ConfigUtilities.RedactConnectionStringInfo(connectionstring), logger.SeverityLevel);

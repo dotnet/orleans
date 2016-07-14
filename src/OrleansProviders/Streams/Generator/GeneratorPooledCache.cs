@@ -2,21 +2,30 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.Remoting.Messaging;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using static System.String;
 
 namespace Orleans.Providers.Streams.Generator
 {
+    /// <summary>
+    /// Pooled cache for generator stream provider
+    /// </summary>
     public class GeneratorPooledCache : IQueueCache
     {
         private readonly PooledQueueCache<GeneratedBatchContainer, CachedMessage> cache;
 
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool)
+        /// <summary>
+        /// Pooled cache for generator stream provider
+        /// </summary>
+        /// <param name="bufferPool"></param>
+        /// <param name="logger"></param>
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool);
-            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance);
+            cache = new PooledQueueCache<GeneratedBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
             dataAdapter.PurgeAction = cache.Purge;
         }
 
@@ -41,10 +50,10 @@ namespace Orleans.Providers.Streams.Generator
                     : 0 - realToken.EventIndex;
             }
 
-            public int Compare(CachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(CachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
-                int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                return results != 0 ? results : String.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+                var results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+                return results == 0 && string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal)==0;
             }
         }
 
@@ -91,7 +100,7 @@ namespace Orleans.Providers.Streams.Generator
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
-                        string errmsg = String.Format(CultureInfo.InvariantCulture,
+                        string errmsg = Format(CultureInfo.InvariantCulture,
                             "Message size is to big. MessageSize: {0}", size);
                         throw new ArgumentOutOfRangeException("queueMessage", errmsg);
                     }
@@ -174,8 +183,15 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
+        /// <summary>
+        /// The limit of the maximum number of items that can be added
+        /// </summary>
         public int GetMaxAddCount() { return 100; }
 
+        /// <summary>
+        /// Add messages to the cache
+        /// </summary>
+        /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
             DateTime dequeueTimeUtc = DateTime.UtcNow;
@@ -185,17 +201,32 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
+        /// <summary>
+        /// Ask the cache if it has items that can be purged from the cache 
+        /// (so that they can be subsequently released them the underlying queue).
+        /// </summary>
+        /// <param name="purgedItems"></param>
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
             return false;
         }
 
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
         public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             return new Cursor(cache, streamIdentity, token);
         }
 
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
         public bool IsUnderPressure()
         {
             return false;

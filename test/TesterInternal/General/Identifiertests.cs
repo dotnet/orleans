@@ -142,7 +142,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void GrainId_ToFromPrintableString()
         {
             Guid guid = Guid.NewGuid();

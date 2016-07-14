@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,8 +33,8 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{Name}")]
     public class MemoryStorage : IStorageProvider
     {
-        internal const int NumStorageGrainsDefaultValue = 10;
-        internal const string NumStorageGrainsPropertyName = "NumStorageGrains";
+        public const int NumStorageGrainsDefaultValue = 10;
+        public const string NumStorageGrainsPropertyName = "NumStorageGrains";
         private int numStorageGrains;
         private static int counter;
         private readonly int id;
@@ -48,18 +49,21 @@ namespace Orleans.Storage
         /// <see cref="IStorageProvider.Log"/>
         public Logger Log { get; private set; }
 
+        /// <summary> Default constructor. </summary>
         public MemoryStorage()
             : this(NumStorageGrainsDefaultValue)
         {
         }
 
+        /// <summary> Constructor - use the specificed number of store grains. </summary>
+        /// <param name="numStoreGrains">Number of store grains to use.</param>
         protected MemoryStorage(int numStoreGrains)
         {
             id = Interlocked.Increment(ref counter);
             numStorageGrains = numStoreGrains;
         }
 
-        protected virtual string GetLoggerName()
+        private string GetLoggerName()
         {
             return string.Format("Storage.{0}.{1}", GetType().Name, id);
         }
@@ -89,7 +93,6 @@ namespace Orleans.Storage
         }
 
         /// <summary> Shutdown function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.Close"/>
         public virtual Task Close()
         {
             for (int i = 0; i < numStorageGrains; i++)
@@ -102,7 +105,7 @@ namespace Orleans.Storage
         /// <see cref="IStorageProvider.ReadStateAsync"/>
         public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
 
             if (Log.IsVerbose2) Log.Verbose2("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
             
@@ -120,7 +123,7 @@ namespace Orleans.Storage
         /// <see cref="IStorageProvider.WriteStateAsync"/>
         public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             if (Log.IsVerbose2) Log.Verbose2("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
@@ -131,11 +134,12 @@ namespace Orleans.Storage
         /// <see cref="IStorageProvider.ClearStateAsync"/>
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            var keys = MakeKeys(grainType, grainReference);
+            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
             if (Log.IsVerbose2) Log.Verbose2("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
+            grainState.ETag = null;
         }
 
         #endregion

@@ -1,5 +1,4 @@
 using System;
-using System.Configuration;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -122,7 +121,7 @@ namespace Orleans
                 if (now - startExecutionTime > maxExecutionTime)
                 {
                     Exception timeoutException = new TimeoutException(String.Format("ExecuteWithRetries has exceeded its max execution time of {0}. Now is {1}, started at {2}, passed {3}",
-                            maxExecutionTime, TraceLogger.PrintDate(now), TraceLogger.PrintDate(startExecutionTime), now - startExecutionTime));
+                            maxExecutionTime, LogFormatter.PrintDate(now), LogFormatter.PrintDate(startExecutionTime), now - startExecutionTime));
                     throw timeoutException;
                 }
             }

@@ -10,7 +10,7 @@ namespace Orleans.Serialization
     internal class OrleansJsonSerializer : IExternalSerializer
     {
         private static JsonSerializerSettings defaultSettings;
-        private TraceLogger logger;
+        private Logger logger;
 
         /// <summary>
         /// Returns a configured <see cref="JsonSerializerSettings"/> 
@@ -49,7 +49,7 @@ namespace Orleans.Serialization
         /// Initializes the serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }

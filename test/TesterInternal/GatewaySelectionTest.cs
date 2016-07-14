@@ -49,7 +49,7 @@ namespace UnitTests.MessageCenterTests
             Test_GatewaySelection(listProvider);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Gateway")]
         public void GatewaySelection_ClientInit_EmptyList()
         {
             var cfg = new ClientConfiguration();
@@ -92,7 +92,7 @@ namespace UnitTests.MessageCenterTests
             };
 
             var membership = new SqlMembershipTable();
-            var logger = TraceLogger.GetLogger(membership.GetType().Name);
+            var logger = LogManager.GetLogger(membership.GetType().Name);
             await membership.InitializeMembershipTable(cfg, true, logger);
 
             IMembershipTable membershipTable = membership;
@@ -207,7 +207,7 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
-            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, TraceLogger traceLogger)
+            public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
             {
                 return TaskDone.Done;
             }

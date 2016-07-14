@@ -66,7 +66,7 @@ namespace UnitTests.StreamingTests
         {
             var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
             dataManager.InitTableAsync().Wait();
-            dataManager.DeleteTableAsync().Wait();
+            dataManager.ClearTableAsync().Wait();
             base.Dispose();
         }
 
@@ -76,12 +76,12 @@ namespace UnitTests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
                 await RestartAgents();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream * 2, assertIsTrue), TimeSpan.FromSeconds(90));
             }
             finally
             {
@@ -96,7 +96,7 @@ namespace UnitTests.StreamingTests
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
-                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(30));
+                await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
                 HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();

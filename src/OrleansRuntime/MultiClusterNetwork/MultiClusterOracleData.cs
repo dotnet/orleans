@@ -4,11 +4,11 @@
     {
         private volatile MultiClusterData localData;  // immutable, can read without lock
 
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal MultiClusterData Current { get { return localData; } }
 
-        internal MultiClusterOracleData(TraceLogger log)
+        internal MultiClusterOracleData(Logger log)
         {
             logger = log;
             localData = new MultiClusterData();

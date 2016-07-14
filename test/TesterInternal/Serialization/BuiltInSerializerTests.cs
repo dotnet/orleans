@@ -2,13 +2,10 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Net;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Orleans;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -53,8 +50,7 @@ namespace UnitTests.Serialization
                     useJsonFallbackSerializer = true;
                     break;
                 default:
-                    Assert.Fail("Invalid Serializer was selected");
-                    break;
+                    throw new InvalidOperationException("Invalid Serializer was selected");
             }
 
             SerializationManager.Initialize(useStandardSerializer, serializationProviders, useJsonFallbackSerializer);
@@ -64,7 +60,7 @@ namespace UnitTests.Serialization
         public BuiltInSerializerTests(ITestOutputHelper output)
         {
             this.output = output;
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -76,18 +72,18 @@ namespace UnitTests.Serialization
             //SerializationManager.UseStandardSerializer = false;
             var grain = GrainId.NewId();
             var addr = ActivationAddress.GetAddress(null, grain, null, MultiClusterStatus.Doubtful);
-            var deserialized = OrleansSerializationLoop(addr, false);
-            Assert.IsInstanceOfType(deserialized, typeof(ActivationAddress), "ActivationAddress copied as wrong type");
-            Assert.IsNull(((ActivationAddress)deserialized).Activation, "Activation no longer null after copy");
-            Assert.IsNull(((ActivationAddress)deserialized).Silo, "Silo no longer null after copy");
-            Assert.AreEqual(grain, ((ActivationAddress)deserialized).Grain, "Grain different after copy");
-            Assert.AreEqual(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status, "MultiClusterStatus different after copy");
+            object deserialized = OrleansSerializationLoop(addr, false);
+            Assert.IsAssignableFrom<ActivationAddress>(deserialized);
+            Assert.Null(((ActivationAddress)deserialized).Activation); //Activation no longer null after copy
+            Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after copy
+            Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
+            Assert.Equal(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status); //MultiClusterStatus different after copy
             deserialized = OrleansSerializationLoop(addr);
-            Assert.IsInstanceOfType(deserialized, typeof(ActivationAddress), "ActivationAddress full serialization loop as wrong type");
-            Assert.IsNull(((ActivationAddress)deserialized).Activation, "Activation no longer null after full serialization loop");
-            Assert.IsNull(((ActivationAddress)deserialized).Silo, "Silo no longer null after full serialization loop");
-            Assert.AreEqual(grain, ((ActivationAddress)deserialized).Grain, "Grain different after copy");
-            Assert.AreEqual(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status, "MultiClusterStatus different after copy");
+            Assert.IsAssignableFrom<ActivationAddress>(deserialized); //ActivationAddress full serialization loop as wrong type
+            Assert.Null(((ActivationAddress)deserialized).Activation); //Activation no longer null after full serialization loop
+            Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after full serialization loop
+            Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
+            Assert.Equal(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status); //MultiClusterStatus different after copy
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -99,10 +95,10 @@ namespace UnitTests.Serialization
             SerializationManager.UseStandardSerializer = false;
             var list = new List<int>();
             var deserialized = OrleansSerializationLoop(list, false);
-            Assert.IsInstanceOfType(deserialized, typeof (List<int>), "Empty list of integers copied as wrong type");
+            Assert.IsAssignableFrom<List<int>>(deserialized); //Empty list of integers copied as wrong type");
             ValidateList(list, (List<int>)deserialized, "int (empty, copy)");
             deserialized = OrleansSerializationLoop(list);
-            Assert.IsInstanceOfType(deserialized, typeof(List<int>), "Empty list of integers full serialization loop as wrong type");
+            Assert.IsAssignableFrom<List<int>>(deserialized); //Empty list of integers full serialization loop as wrong type
             ValidateList(list, (List<int>)deserialized, "int (empty)");
         }
 
@@ -192,7 +188,7 @@ namespace UnitTests.Serialization
             var deserialized = OrleansSerializationLoop(source1);
             ValidateDictionary<string, string>(source1, deserialized, "case-insensitive string/string");
             Dictionary<string, string> result1 = deserialized as Dictionary<string, string>;
-            Assert.AreEqual<string>(source1["Hello"], result1["hElLo"], "Round trip for case insensitive string/string dictionary lost the custom comparer");
+            Assert.Equal<string>(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
 
             Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
             source2[3] = DateTime.Now;
@@ -200,7 +196,7 @@ namespace UnitTests.Serialization
             deserialized = OrleansSerializationLoop(source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
             Dictionary<int, DateTime> result2 = (Dictionary<int, DateTime>)deserialized;
-            Assert.AreEqual<DateTime>(source2[3], result2[13], "Round trip for case insensitive int/DateTime dictionary lost the custom comparer");
+            Assert.Equal<DateTime>(source2[3], result2[13]); //Round trip for case insensitive int/DateTime dictionary lost the custom comparer");
         }
 
         [Serializable]
@@ -245,24 +241,24 @@ namespace UnitTests.Serialization
             SerializationManager.UseStandardSerializer = false;
 
             var result = OrleansSerializationLoop(IntEnum.Value2);
-            Assert.IsInstanceOfType(result, typeof(IntEnum), "Serialization round-trip resulted in incorrect type, " + result.GetType().Name + ", for int enum");
-            Assert.AreEqual(IntEnum.Value2, (IntEnum)result, "Serialization round-trip resulted in incorrect value for int enum");
+            Assert.IsAssignableFrom<>(result, typeof(IntEnum), "Serialization round-trip resulted in incorrect type, " + result.GetType().Name + ", for int enum");
+            Assert.Equal(IntEnum.Value2, (IntEnum)result, "Serialization round-trip resulted in incorrect value for int enum");
 
             var result2 = OrleansSerializationLoop(UShortEnum.Value3);
-            Assert.IsInstanceOfType(result2, typeof(UShortEnum), "Serialization round-trip resulted in incorrect type, " + result2.GetType().Name + ", for ushort enum");
-            Assert.AreEqual(UShortEnum.Value3, (UShortEnum)result2, "Serialization round-trip resulted in incorrect value for ushort enum");
+            Assert.IsAssignableFrom<>(result2, typeof(UShortEnum), "Serialization round-trip resulted in incorrect type, " + result2.GetType().Name + ", for ushort enum");
+            Assert.Equal(UShortEnum.Value3, (UShortEnum)result2, "Serialization round-trip resulted in incorrect value for ushort enum");
 
             var test = new ClassWithEnumTestData { EnumValue = TestEnum.Third, Enemy = CampaignEnemyTestType.Enemy3 };
             var result3 = OrleansSerializationLoop(test);
-            Assert.IsInstanceOfType(result3, typeof(ClassWithEnumTestData), "Serialization round-trip resulted in incorrect type, " + result3.GetType().Name +
+            Assert.IsAssignableFrom<>(result3, typeof(ClassWithEnumTestData), "Serialization round-trip resulted in incorrect type, " + result3.GetType().Name +
                 ", for enum-containing class");
             var r3 = (ClassWithEnumTestData) result3;
-            Assert.AreEqual(TestEnum.Third, r3.EnumValue, "Serialization round-trip resulted in incorrect value for enum-containing class (Third)");
-            Assert.AreEqual(CampaignEnemyTestType.Enemy3, r3.Enemy, "Serialization round-trip resulted in incorrect value for enum-containing class (Enemy)");
+            Assert.Equal(TestEnum.Third, r3.EnumValue, "Serialization round-trip resulted in incorrect value for enum-containing class (Third)");
+            Assert.Equal(CampaignEnemyTestType.Enemy3, r3.Enemy, "Serialization round-trip resulted in incorrect value for enum-containing class (Enemy)");
 
             var result4 = OrleansSerializationLoop(CampaignEnemyType.Enemy3);
-            Assert.IsInstanceOfType(result4, typeof(CampaignEnemyType), "Serialization round-trip resulted in incorrect type, " + result4.GetType().Name + ", for sbyte enum");
-            Assert.AreEqual(CampaignEnemyType.Enemy3, (CampaignEnemyType)result4, "Serialization round-trip resulted in incorrect value for sbyte enum");
+            Assert.IsAssignableFrom<>(result4, typeof(CampaignEnemyType), "Serialization round-trip resulted in incorrect type, " + result4.GetType().Name + ", for sbyte enum");
+            Assert.Equal(CampaignEnemyType.Enemy3, (CampaignEnemyType)result4, "Serialization round-trip resulted in incorrect value for sbyte enum");
         }*/
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -308,14 +304,14 @@ namespace UnitTests.Serialization
             source1.Add("two");
             source1.Add("three");
             var deserialized = OrleansSerializationLoop(source1);
-            Assert.IsInstanceOfType(deserialized, source1.GetType(), "Type is wrong after round-trip of string hash set with comparer");
+            Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string hash set with comparer
             var result = deserialized as HashSet<string>;
-            Assert.AreEqual(source1.Count, result.Count, "Count is wrong after round-trip of string hash set with comparer");
+            Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string hash set with comparer
             foreach (var key in source1)
             {
-                Assert.IsTrue(result.Contains(key), "Key " + key + " is missing after round-trip of string hash set with comparer");
+                Assert.True(result.Contains(key)); //key is missing after round-trip of string hash set with comparer
             }
-            Assert.IsTrue(result.Contains("One"), "Comparer is wrong after round-trip of string hash set with comparer");
+            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string hash set with comparer
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -331,15 +327,15 @@ namespace UnitTests.Serialization
             source1.Push("two");
             source1.Push("three");
             object deserialized = OrleansSerializationLoop(source1);
-            Assert.IsInstanceOfType(deserialized, source1.GetType(), "Type is wrong after round-trip of string stack");
+            Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string stack
             var result = deserialized as Stack<string>;
-            Assert.AreEqual(source1.Count, result.Count, "Count is wrong after round-trip of string stack");
+            Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string stack
 
             var srcIter = source1.GetEnumerator();
             var resIter = result.GetEnumerator();
             while (srcIter.MoveNext() && resIter.MoveNext())
             {
-                Assert.AreEqual<string>(srcIter.Current, resIter.Current, "Data is wrong after round-trip of string stack");
+                Assert.Equal<string>(srcIter.Current, resIter.Current); //Data is wrong after round-trip of string stack
             }
         }
 
@@ -356,14 +352,14 @@ namespace UnitTests.Serialization
             source1.Add("two");
             source1.Add("three");
             object deserialized = OrleansSerializationLoop(source1);
-            Assert.IsInstanceOfType(deserialized, source1.GetType(), "Type is wrong after round-trip of string sorted set with comparer");
+            Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string sorted set with comparer
             var result = (SortedSet<string>)deserialized;
-            Assert.AreEqual(source1.Count, result.Count, "Count is wrong after round-trip of string sorted set with comparer");
+            Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string sorted set with comparer
             foreach (var key in source1)
             {
-                Assert.IsTrue(result.Contains(key), "Key " + key + " is missing after round-trip of string sorted set with comparer");
+                Assert.True(result.Contains(key)); //key is missing after round-trip of string sorted set with comparer
             }
-            Assert.IsTrue(result.Contains("One"), "Comparer is wrong after round-trip of string sorted set with comparer");
+            Assert.True(result.Contains("One")); //Comparer is wrong after round-trip of string sorted set with comparer
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -415,15 +411,14 @@ namespace UnitTests.Serialization
             source3[1][2].Add("and another");
             source3[2][0].Add("but not yet another");
             deserialized = OrleansSerializationLoop(source3);
-            Assert.IsInstanceOfType(deserialized, typeof(HashSet<string>[][]), "Array of arrays of hash sets type is wrong on deserialization");
-            var result = (HashSet<string>[][])deserialized;
-            Assert.AreEqual(3, result.Length, "Outer array size wrong on array of array of sets");
-            Assert.AreEqual(2, result[0][0].Count, "Inner set size wrong on array of array of sets, element 0,0");
-            Assert.AreEqual(0, result[0][1].Count, "Inner set size wrong on array of array of sets, element 0,1");
-            Assert.AreEqual(1, result[1][0].Count, "Inner set size wrong on array of array of sets, element 1,0");
-            Assert.IsNull(result[1][1], "Inner set not null on array of array of sets, element 1, 1");
-            Assert.AreEqual(1, result[1][2].Count, "Inner set size wrong on array of array of sets, element 1,2");
-            Assert.AreEqual(1, result[2][0].Count, "Inner set size wrong on array of array of sets, element 2,0");
+            var result = Assert.IsAssignableFrom<HashSet<string>[][]>(deserialized); //Array of arrays of hash sets type is wrong on deserialization
+            Assert.Equal(3, result.Length); //Outer array size wrong on array of array of sets
+            Assert.Equal(2, result[0][0].Count); //Inner set size wrong on array of array of sets, element 0,0
+            Assert.Equal(0, result[0][1].Count); //Inner set size wrong on array of array of sets, element 0,1
+            Assert.Equal(1, result[1][0].Count); //Inner set size wrong on array of array of sets, element 1,0
+            Assert.Null(result[1][1]); //Inner set not null on array of array of sets, element 1, 1
+            Assert.Equal(1, result[1][2].Count); //Inner set size wrong on array of array of sets, element 1,2
+            Assert.Equal(1, result[2][0].Count); //Inner set size wrong on array of array of sets, element 2,0
 
             var source4 = new GrainReference[3][];
             source4[0] = new GrainReference[2];
@@ -504,11 +499,10 @@ namespace UnitTests.Serialization
             const string message = "This is a test message";
             var source = new UnserializableException(message);
             object deserialized = OrleansSerializationLoop(source);
-            Assert.IsInstanceOfType(deserialized, typeof(Exception), "Type is wrong after round trip of unserializable exception");
-            var result = (Exception)deserialized;
+            var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
             var expectedMessage = "Non-serializable exception of type " +
                                   typeof(UnserializableException).OrleansTypeName() + ": " + message;
-            Assert.IsTrue(result.Message.StartsWith(expectedMessage), "Exception message is wrong after round trip of unserializable exception");
+            Assert.True(result.Message.StartsWith(expectedMessage)); //Exception message is wrong after round trip of unserializable exception
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -525,27 +519,26 @@ namespace UnitTests.Serialization
             source["one"] = val;
             source["two"] = val;
             source["three"] = val2;
-            Assert.IsTrue(object.ReferenceEquals(source["one"], source["two"]), "Object identity lost before round trip of string/list dict!!!");
+            Assert.Same(source["one"], source["two"]); //Object identity lost before round trip of string/list dict!!!
 
             var deserialized = OrleansSerializationLoop(source);
-            Assert.IsInstanceOfType(deserialized, typeof(Dictionary<string, List<string>>), "Type is wrong after round-trip of string/list dict");
-            var result = (Dictionary<string, List<string>>)deserialized;
-            Assert.AreEqual(source.Count, result.Count, "Count is wrong after round-trip of string/list dict");
+            var result = Assert.IsAssignableFrom<Dictionary<string, List<string>>>(deserialized); //Type is wrong after round-trip of string/list dict
+            Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of string/list dict
 
             List<string> list1;
             List<string> list2;
             List<string> list3;
-            Assert.IsTrue(result.TryGetValue("one", out list1), "Key 'one' not found after round trip of string/list dict");
-            Assert.IsTrue(result.TryGetValue("two", out list2), "Key 'two' not found after round trip of string/list dict");
-            Assert.IsTrue(result.TryGetValue("three", out list3), "Key 'three' not found after round trip of string/list dict");
+            Assert.True(result.TryGetValue("one", out list1)); //Key 'one' not found after round trip of string/list dict
+            Assert.True(result.TryGetValue("two", out list2)); //Key 'two' not found after round trip of string/list dict
+            Assert.True(result.TryGetValue("three", out list3)); //Key 'three' not found after round trip of string/list dict
 
             ValidateList<string>(val, list1, "string");
             ValidateList<string>(val, list2, "string");
             ValidateList<string>(val2, list3, "string");
 
-            Assert.IsTrue(object.ReferenceEquals(list1, list2), "Object identity lost after round trip of string/list dict");
-            Assert.IsFalse(object.ReferenceEquals(list2, list3), "Object identity gained after round trip of string/list dict");
-            Assert.IsFalse(object.ReferenceEquals(list1, list3), "Object identity gained after round trip of string/list dict");
+            Assert.Same(list1, list2); //Object identity lost after round trip of string/list dict
+            Assert.NotSame(list2, list3); //Object identity gained after round trip of string/list dict
+            Assert.NotSame(list1, list3); //Object identity gained after round trip of string/list dict
         }
 
         [Serializable]
@@ -563,10 +556,9 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             var test1 = new Unrecognized { A = 3, B = 27 };
             var raw = OrleansSerializationLoop(test1, false);
-            Assert.IsInstanceOfType(raw, typeof(Unrecognized), "Type is wrong after deep copy of unrecognized");
-            var result = (Unrecognized)raw;
-            Assert.AreEqual(3, result.A, "Property A is wrong after deep copy of unrecognized");
-            Assert.AreEqual(27, result.B, "Property B is wrong after deep copy of unrecognized");
+            var result = Assert.IsAssignableFrom<Unrecognized>(raw); //Type is wrong after deep copy of unrecognized
+            Assert.Equal(3, result.A); //Property A is wrong after deep copy of unrecognized");
+            Assert.Equal(27, result.B); //Property B is wrong after deep copy of unrecognized");
 
             var test2 = new Unrecognized[3];
             for (int i = 0; i < 3; i++)
@@ -574,13 +566,13 @@ namespace UnitTests.Serialization
                 test2[i] = new Unrecognized { A = i, B = 2 * i };
             }
             raw = OrleansSerializationLoop(test2);
-            Assert.IsInstanceOfType(raw, typeof(Unrecognized[]), "Type is wrong after round trip of array of unrecognized");
+            Assert.IsAssignableFrom<Unrecognized[]>(raw); //Type is wrong after round trip of array of unrecognized
             var result2 = (Unrecognized[])raw;
-            Assert.AreEqual(3, result2.Length, "Array length is wrong after round trip of array of unrecognized");
+            Assert.Equal(3, result2.Length); //Array length is wrong after round trip of array of unrecognized
             for (int j = 0; j < 3; j++)
             {
-                Assert.AreEqual(j, result2[j].A, "Property A at index " + j + "is wrong after round trip of array of unrecognized");
-                Assert.AreEqual(2 * j, result2[j].B, "Property B at index " + j + "is wrong after round trip of array of unrecognized");
+                Assert.Equal(j, result2[j].A); //Property A at index " + j + "is wrong after round trip of array of unrecognized
+                Assert.Equal(2 * j, result2[j].B); //Property B at index " + j + "is wrong after round trip of array of unrecognized
             }
         }
 
@@ -592,8 +584,8 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             var test1 = new ImmutableType(3, 27);
             var raw = SerializationManager.DeepCopy(test1);
-            Assert.IsInstanceOfType(raw, typeof(ImmutableType), "Type is wrong after deep copy of [Immutable] type");
-            Assert.AreSame(test1, raw, "Deep copy of [Immutable] object made a copy instead of just copying the pointer");
+            Assert.IsAssignableFrom<ImmutableType>(raw); //Type is wrong after deep copy of [Immutable] type
+            Assert.Same(test1, raw); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
 
             var test2list = new List<int>();
             for (int i = 0; i < 3; i++)
@@ -602,13 +594,13 @@ namespace UnitTests.Serialization
             }
             var test2 = new Immutable<List<int>>(test2list);
             raw = SerializationManager.DeepCopy(test2);
-            Assert.IsInstanceOfType(raw, typeof(Immutable<List<int>>), "Type is wrong after round trip of array of Immutable<>");
-            Assert.AreSame(test2.Value, ((Immutable<List<int>>)raw).Value, "Deep copy of Immutable<> object made a copy instead of just copying the pointer");
+            Assert.IsAssignableFrom<Immutable<List<int>>>(raw); //Type is wrong after round trip of array of Immutable<>
+            Assert.Same(test2.Value, ((Immutable<List<int>>)raw).Value); //Deep copy of Immutable<> object made a copy instead of just copying the pointer
 
             var test3 = new EmbeddedImmutable("test", 1, 2, 3, 4);
             raw = SerializationManager.DeepCopy(test3);
-            Assert.IsInstanceOfType(raw, typeof(EmbeddedImmutable), "Type is wrong after deep copy of type containing an Immutable<> field");
-            Assert.AreSame(test3.B.Value, ((EmbeddedImmutable)raw).B.Value, "Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer");
+            Assert.IsAssignableFrom<EmbeddedImmutable>(raw); //Type is wrong after deep copy of type containing an Immutable<> field
+            Assert.Same(test3.B.Value, ((EmbeddedImmutable)raw).B.Value); //Deep copy of embedded [Immutable] object made a copy instead of just copying the pointer
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -621,13 +613,13 @@ namespace UnitTests.Serialization
             {
                 Uri test1 = new Uri("http://www.microsoft.com/" + i);
                 object raw = SerializationManager.DeepCopy(test1);
-                Assert.IsInstanceOfType(raw, typeof(Uri), "Type is wrong after deep copy of Uri");
-                Assert.AreSame(test1, raw, "Deep copy made a copy instead of just copying the pointer");
+                Assert.IsAssignableFrom<Uri>(raw); //Type is wrong after deep copy of Uri
+                Assert.Same(test1, raw); //Deep copy made a copy instead of just copying the pointer
 
                 object deserialized = OrleansSerializationLoop(test1);
-                Assert.IsInstanceOfType(deserialized, typeof(Uri), "Type is wrong after round-trip of Uri");
+                Assert.IsAssignableFrom<Uri>(deserialized); //Type is wrong after round-trip of Uri
                 Uri result = (Uri)deserialized;
-                Assert.AreEqual(test1, result, "Wrong contents after round-trip of Uri");
+                Assert.Equal(test1, result); //Wrong contents after round-trip of Uri
             });
         }
 
@@ -657,10 +649,10 @@ namespace UnitTests.Serialization
         //    //IEnumerable<RequestInvocationHistory> dstArray = ((IEnumerable)deserialized[Message.Header.CallChainHeader]).Cast<RequestInvocationHistory>();
         //    //RequestInvocationHistory dst = dstArray.FirstOrDefault();
 
-        //    //Assert.AreEqual(src.GrainId, dst.GrainId);
-        //    //Assert.AreEqual(src.ActivationId, dst.ActivationId);
-        //    //Assert.AreEqual(src.InterfaceId, dst.InterfaceId);
-        //    //Assert.AreEqual(src.MethodId, dst.MethodId);
+        //    //Assert.Equal(src.GrainId, dst.GrainId);
+        //    //Assert.Equal(src.ActivationId, dst.ActivationId);
+        //    //Assert.Equal(src.InterfaceId, dst.InterfaceId);
+        //    //Assert.Equal(src.MethodId, dst.MethodId);
         //}
 
         //private Dictionary<string, object> SerializeMessage(Message msg)
@@ -680,15 +672,13 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             GrainId grainId = GrainId.NewId();
             GrainReference input = GrainReference.FromGrainId(grainId);
-            GrainReference grainRef;
 
             object deserialized = OrleansSerializationLoop(input);
 
-            Assert.IsInstanceOfType(deserialized, typeof(GrainReference), "GrainReference copied as wrong type");
-            grainRef = (GrainReference) deserialized;
-            Assert.AreEqual(grainId, grainRef.GrainId, "GrainId different after copy");
-            Assert.AreEqual(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey(), "PK different after copy");
-            Assert.AreEqual(input, grainRef, "Wrong contents after round-trip of " + input);
+            var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
+            Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
+            Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
+            Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -699,15 +689,13 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             GrainId grainId = GrainId.NewId();
             GrainReference input = GrainReference.FromGrainId(grainId);
-            GrainReference grainRef;
 
             object deserialized = DotNetSerializationLoop(input);
 
-            Assert.IsInstanceOfType(deserialized, typeof(GrainReference), "GrainReference copied as wrong type");
-            grainRef = (GrainReference) deserialized;
-            Assert.AreEqual(grainId, grainRef.GrainId, "GrainId different after copy");
-            Assert.AreEqual(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey(), "PK different after copy");
-            Assert.AreEqual(input, grainRef, "Wrong contents after round-trip of " + input);
+            var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
+            Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
+            Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
+            Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -718,23 +706,11 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             Grain input = new EchoTaskGrain();
 
-            object deserialized;
+            // Expected exception:
+            // OrleansException: No copier found for object of type EchoTaskGrain. Perhaps you need to mark it [Serializable]?
+            var exc = Assert.Throws<OrleansException>(() => OrleansSerializationLoop(input));
 
-            try
-            {
-                // Expected exception:
-                // OrleansException: No copier found for object of type EchoTaskGrain. Perhaps you need to mark it [Serializable]?
-
-                // ReSharper disable once RedundantAssignment
-                deserialized = OrleansSerializationLoop(input);
-
-                Assert.Fail("Should not be able to serialize grain class");
-            }
-            catch (OrleansException exc)
-            {
-                if (!exc.Message.Contains("No copier found for object of type"))
-                    throw;
-            }
+            Assert.Contains("No copier found for object of type", exc.Message);
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -745,23 +721,12 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             Grain input = new EchoTaskGrain();
 
-            object deserialized;
+            // Expected exception:
+            // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.
 
-            try
-            {
-                // Expected exception:
-                // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.
-                
-                // ReSharper disable once RedundantAssignment
-                deserialized = DotNetSerializationLoop(input);
+            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input));
 
-                Assert.Fail("Should not be able to serialize grain class");
-            }
-            catch (SerializationException exc)
-            {
-                if (!exc.Message.Contains("is not marked as serializable"))
-                    throw;
-            }
+            Assert.Contains("is not marked as serializable", exc.Message);
         }
 
         private static int staticFilterValue1 = 41;
@@ -882,7 +847,7 @@ namespace UnitTests.Serialization
         //    foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
         //    {
         //        output.WriteLine("{0} -- Compare value={1}", what, val);
-        //        Assert.AreEqual(Expression..ev expr1(), expr1(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
+        //        Assert.Equal(Expression..ev expr1(), expr1(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
         //    }
         //}
 
@@ -894,7 +859,7 @@ namespace UnitTests.Serialization
             foreach (int val in new[] {staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4})
             {
                 output.WriteLine("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(func1(val), func2(val), "{0} -- Wrong function after round-trip of {1} with value={2}", what, func1, val);
+                Assert.Equal(func1(val), func2(val)); //"{0} -- Wrong function after round-trip of {1} with value={2}", what, func1, val);
             }
         }
 
@@ -906,7 +871,7 @@ namespace UnitTests.Serialization
             foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
             {
                 output.WriteLine("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(pred1(val), pred2(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
+                Assert.Equal(pred1(val), pred2(val)); //"{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
             }
         }
 
@@ -962,31 +927,31 @@ namespace UnitTests.Serialization
             List<ArraySegment<byte>> actual5 = ByteArrayBuilder.BuildSegmentListWithLengthLimit(underTest, 8, 2);
 
             // 1: {[1}, {2], 3}
-            Assert.AreEqual(0, actual1[0].Offset);
-            Assert.AreEqual(1, actual1[0].Count);
-            Assert.AreEqual(array1, actual1[0].Array);
-            Assert.AreEqual(0, actual1[1].Offset);
-            Assert.AreEqual(1, actual1[1].Count);
-            Assert.AreEqual(array2, actual1[1].Array);
+            Assert.Equal(0, actual1[0].Offset);
+            Assert.Equal(1, actual1[0].Count);
+            Assert.Equal(array1, actual1[0].Array);
+            Assert.Equal(0, actual1[1].Offset);
+            Assert.Equal(1, actual1[1].Count);
+            Assert.Equal(array2, actual1[1].Array);
             // 2: {2, [3}, {4], 5, 6}
-            Assert.AreEqual(1, actual2[0].Offset);
-            Assert.AreEqual(1, actual2[0].Count);
-            Assert.AreEqual(array2, actual2[0].Array);
-            Assert.AreEqual(0, actual2[1].Offset);
-            Assert.AreEqual(1, actual2[1].Count);
-            Assert.AreEqual(array3, actual2[1].Array);
+            Assert.Equal(1, actual2[0].Offset);
+            Assert.Equal(1, actual2[0].Count);
+            Assert.Equal(array2, actual2[0].Array);
+            Assert.Equal(0, actual2[1].Offset);
+            Assert.Equal(1, actual2[1].Count);
+            Assert.Equal(array3, actual2[1].Array);
             // 3: {4, [5, 6]}
-            Assert.AreEqual(1, actual3[0].Offset);
-            Assert.AreEqual(2, actual3[0].Count);
-            Assert.AreEqual(array3, actual3[0].Array);
+            Assert.Equal(1, actual3[0].Offset);
+            Assert.Equal(2, actual3[0].Count);
+            Assert.Equal(array3, actual3[0].Array);
             // 4: {[7, 8], 9, 10}
-            Assert.AreEqual(0, actual4[0].Offset);
-            Assert.AreEqual(2, actual4[0].Count);
-            Assert.AreEqual(array4, actual4[0].Array);
+            Assert.Equal(0, actual4[0].Offset);
+            Assert.Equal(2, actual4[0].Count);
+            Assert.Equal(array4, actual4[0].Array);
             // 5: {7, 8, [9, 10]}
-            Assert.AreEqual(2, actual5[0].Offset);
-            Assert.AreEqual(2, actual5[0].Count);
-            Assert.AreEqual(array4, actual5[0].Array);
+            Assert.Equal(2, actual5[0].Offset);
+            Assert.Equal(2, actual5[0].Count);
+            Assert.Equal(array4, actual5[0].Array);
         }
 
         internal bool AreByteArraysAreEqual(byte[] array1, byte[] array2)
@@ -1010,9 +975,9 @@ namespace UnitTests.Serialization
         {
             InitializeSerializer(serializerToUse);
             Type t = typeof(Dictionary<string, object>);
-            Assert.IsFalse(t.IsOrleansShallowCopyable(), "IsOrleansShallowCopyable: {0}", t.Name);
+            Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
             t = typeof(Dictionary<string, int>);
-            Assert.IsFalse(t.IsOrleansShallowCopyable(), "IsOrleansShallowCopyable: {0}", t.Name);
+            Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
         }
 
         private object OrleansSerializationLoop(object input, bool includeWire = true)
@@ -1046,99 +1011,93 @@ namespace UnitTests.Serialization
 
         private void ValidateDictionary<K, V>(Dictionary<K, V> source, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(Dictionary<K, V>), "Type is wrong after round-trip of " + type + " dict");
-            Dictionary<K, V> result = deserialized as Dictionary<K, V>;
+            var result = Assert.IsAssignableFrom<Dictionary<K, V>>(deserialized); //Type is wrong after round-trip of dict
             ValidateDictionaryContent(source, result, type);
         }
 
         private void ValidateDictionaryContent<K, V>(IDictionary<K, V> source, IDictionary<K, V> result, string type)
         {
-            Assert.AreEqual(source.Count, result.Count, "Count is wrong after round-trip of " + type + " dict");
+            Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of " + type + " dict");
             foreach (var pair in source)
             {
-                Assert.IsTrue(result.ContainsKey(pair.Key),
-                    "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " dict");
-                Assert.AreEqual<V>(pair.Value, result[pair.Key],
-                    "Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " dict");
+                Assert.True(result.ContainsKey(pair.Key), "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " dict");
+                Assert.Equal<V>(pair.Value, result[pair.Key]); //Key has wrong value after round-trip
             }
         }
 
         private void ValidateReadOnlyDictionary<K, V>(ReadOnlyDictionary<K, V> source, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(ReadOnlyDictionary<K, V>), "Type is wrong after round-trip of " + type + " dict");
-            ReadOnlyDictionary<K, V> result = deserialized as ReadOnlyDictionary<K, V>;
+            var result = Assert.IsAssignableFrom<ReadOnlyDictionary<K, V>>(deserialized); //Type is wrong after round-trip
             ValidateDictionaryContent(source, result, type);
         }
 
         private void ValidateSortedDictionary<K, V>(SortedDictionary<K, V> source, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(SortedDictionary<K, V>), "Type is wrong after round-trip of " + type + " sorted dict");
+            Assert.IsAssignableFrom<SortedDictionary<K, V>>(deserialized);
             SortedDictionary<K, V> result = deserialized as SortedDictionary<K, V>;
-            Assert.AreEqual(source.Count, result.Count, "Count is wrong after round-trip of " + type + " sorted dict");
+            Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of " + type + " sorted dict
             foreach (var pair in source)
             {
-                Assert.IsTrue(result.ContainsKey(pair.Key), "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " sorted dict");
-                Assert.AreEqual<V>(pair.Value, result[pair.Key], "Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " sorted dict");
+                Assert.True(result.ContainsKey(pair.Key)); //Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " sorted dict
+                Assert.Equal<V>(pair.Value, result[pair.Key]); //Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " sorted dict
             }
 
             var sourceKeys = source.Keys.GetEnumerator();
             var resultKeys = result.Keys.GetEnumerator();
             while (sourceKeys.MoveNext() && resultKeys.MoveNext())
             {
-                Assert.AreEqual<K>(sourceKeys.Current, resultKeys.Current, "Keys out of order after round-trip of " + type + " sorted dict");
+                Assert.Equal<K>(sourceKeys.Current, resultKeys.Current); //Keys out of order after round-trip of " + type + " sorted dict
             }
         }
 
         private void ValidateSortedList<K, V>(SortedList<K, V> source, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(SortedList<K, V>), "Type is wrong after round-trip of " + type + " sorted list");
+            Assert.IsAssignableFrom<SortedList<K, V>>(deserialized);
             SortedList<K, V> result = deserialized as SortedList<K, V>;
-            Assert.AreEqual(source.Count, result.Count, "Count is wrong after round-trip of " + type + " sorted list");
+            Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of " + type + " sorted list");
             foreach (var pair in source)
             {
-                Assert.IsTrue(result.ContainsKey(pair.Key), "Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " sorted list");
-                Assert.AreEqual<V>(pair.Value, result[pair.Key], "Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " sorted list");
+                Assert.True(result.ContainsKey(pair.Key)); //Key " + pair.Key.ToString() + " is missing after round-trip of " + type + " sorted list
+                Assert.Equal<V>(pair.Value, result[pair.Key]); //Key " + pair.Key.ToString() + " has wrong value after round-trip of " + type + " sorted list
             }
 
             var sourceKeys = source.Keys.GetEnumerator();
             var resultKeys = result.Keys.GetEnumerator();
             while (sourceKeys.MoveNext() && resultKeys.MoveNext())
             {
-                Assert.AreEqual<K>(sourceKeys.Current, resultKeys.Current, "Keys out of order after round-trip of " + type + " sorted list");
+                Assert.Equal<K>(sourceKeys.Current, resultKeys.Current); //Keys out of order after round-trip of " + type + " sorted list
             }
         }
 
         private void ValidateReadOnlyCollectionList<T>(ReadOnlyCollection<T> expected, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(ReadOnlyCollection<T>), "Type is wrong after round-trip of " + type + " array");
+            Assert.IsAssignableFrom<ReadOnlyCollection<T>>(deserialized); //Type is wrong after round-trip of " + type + " array
             ValidateList(expected, deserialized as IList<T>, type);
         }
 
         private void ValidateList<T>(IList<T> expected, IList<T> result, string type)
         {
-            Assert.AreEqual(expected.Count, result.Count, "Count is wrong after round-trip of " + type + " list");
+            Assert.Equal(expected.Count, result.Count);
             for (int i = 0; i < expected.Count; i++)
             {
-                Assert.AreEqual<T>(expected[i], result[i], "Item " + i + " is wrong after round trip of " + type + " list");
+                Assert.Equal<T>(expected[i], result[i]); //Item " + i + " is wrong after round trip of " + type + " list
             }
         }
 
         private void ValidateArray<T>(T[] expected, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(T[]), "Type is wrong after round-trip of " + type + " array");
-            var result = deserialized as T[];
-            Assert.AreEqual(expected.Length, result.Length, "Length is wrong after round-trip of " + type + " array");
+            var result = Assert.IsAssignableFrom<T[]> (deserialized);
+            Assert.Equal(expected.Length, result.Length); //Length is wrong after round-trip of " + type + " array");
             for (int i = 0; i < expected.Length; i++)
             {
-                Assert.AreEqual<T>(expected[i], result[i], "Item " + i + " is wrong after round trip of " + type + " array");
+                Assert.Equal<T>(expected[i], result[i]); //Item " + i + " is wrong after round trip of " + type + " array");
             }
         }
 
         private void ValidateArrayOfArrays<T>(T[][] expected, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(T[][]), "Type is wrong after round-trip of " + type + " array of arrays");
-            var result = deserialized as T[][];
-            Assert.AreEqual(expected.Length, result.Length, "Length is wrong after round-trip of " + type + " array of arrays");
+            var result = Assert.IsAssignableFrom<T[][]>(deserialized); //Type is wrong after round-trip of " + type + " array of arrays");
+            Assert.Equal(expected.Length, result.Length); //Length is wrong after round-trip of " + type + " array of arrays");
             for (int i = 0; i < expected.Length; i++)
             {
                 ValidateArray<T>(expected[i], result[i], "Array of " + type + "[" + i + "] ");
@@ -1147,9 +1106,8 @@ namespace UnitTests.Serialization
 
         private void ValidateArrayOfArrayOfArrays<T>(T[][][] expected, object deserialized, string type)
         {
-            Assert.IsInstanceOfType(deserialized, typeof(T[][][]), "Type is wrong after round-trip of " + type + " array of arrays");
-            var result = deserialized as T[][][];
-            Assert.AreEqual(expected.Length, result.Length, "Length is wrong after round-trip of " + type + " array of arrays");
+            var result = Assert.IsAssignableFrom<T[][][]>(deserialized); //Type is wrong after round-trip of " + type + " array of arrays");
+            Assert.Equal(expected.Length, result.Length); //Length is wrong after round-trip of " + type + " array of arrays");
             for (int i = 0; i < expected.Length; i++)
             {
                 ValidateArrayOfArrays<T>(expected[i], result[i], "Array of " + type + "[" + i + "][]");
@@ -1168,12 +1126,12 @@ namespace UnitTests.Serialization
             c1.CircularTest2 = c2;
 
             var deserialized = (CircularTest1)OrleansSerializationLoop(c1);
-            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.Equal(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
 
             deserialized = (CircularTest1)OrleansSerializationLoop(c1, true);
-            Assert.AreEqual(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.AreEqual(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
+            Assert.Equal(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
         }
 
         [Serializable]

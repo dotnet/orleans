@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -21,8 +20,7 @@ namespace UnitTests.SerializerTests
             this.output = output;
             MessagingStatisticsGroup.Init(false);
 
-            var orleansConfig = new ClusterConfiguration();
-            orleansConfig.StandardLoad();
+            var orleansConfig = ClusterConfiguration.LocalhostPrimarySilo();
             BufferPool.InitGlobalBufferPool(orleansConfig.Globals);
 
             SerializationManager.InitializeForTesting();
@@ -72,7 +70,7 @@ namespace UnitTests.SerializerTests
 
             int headerLength = BitConverter.ToInt32(data, 0);
             int bodyLength = BitConverter.ToInt32(data, 4);
-            Assert.AreEqual<int>(length, headerLength + bodyLength + 8, "Serialized lengths are incorrect");
+            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
             byte[] header = new byte[headerLength];
             Array.Copy(data, 8, header, 0, headerLength);
             byte[] body = new byte[bodyLength];
@@ -85,20 +83,19 @@ namespace UnitTests.SerializerTests
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
-            Assert.AreEqual<Message.Categories>(resp.Category, resp1.Category, "Category is incorrect");
-            Assert.AreEqual<Message.Directions>(resp.Direction, resp1.Direction, "Direction is incorrect");
-            Assert.AreEqual<CorrelationId>(resp.Id, resp1.Id, "Correlation ID is incorrect");
-            Assert.AreEqual<bool>((bool)resp.GetHeader(Message.Header.ALWAYS_INTERLEAVE), (bool)resp1.GetHeader(Message.Header.ALWAYS_INTERLEAVE), "Foo Boolean is incorrect");
-            Assert.AreEqual<string>((string)resp.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER), (string)resp1.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER), "Bar string is incorrect");
-            Assert.IsTrue(resp.TargetSilo.Equals(resp1.TargetSilo), "TargetSilo is incorrect");
-            Assert.IsTrue(resp.SendingSilo.Equals(resp1.SendingSilo), "SendingSilo is incorrect");
-            Assert.IsInstanceOfType(resp1.BodyObject, typeof(List<object>), "Body object is wrong type");
-            List<object> responseList = resp1.BodyObject as List<object>;
-            Assert.AreEqual<int>(numItems, responseList.Count, "Body list has wrong number of entries");
+            Assert.Equal<Message.Categories>(resp.Category, resp1.Category); //Category is incorrect"
+            Assert.Equal<Message.Directions>(resp.Direction, resp1.Direction); //Direction is incorrect
+            Assert.Equal<CorrelationId>(resp.Id, resp1.Id); //Correlation ID is incorrect
+            Assert.Equal<bool>((bool)resp.GetHeader(Message.Header.ALWAYS_INTERLEAVE), (bool)resp1.GetHeader(Message.Header.ALWAYS_INTERLEAVE)); //Foo Boolean is incorrect
+            Assert.Equal<string>((string)resp.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER), (string)resp1.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER)); //Bar string is incorrect
+            Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo)); //TargetSilo is incorrect
+            Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
+            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
+            Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)
             {
-                Assert.IsInstanceOfType(responseList[k], typeof(string), "Body list item " + k + " has wrong type");
-                Assert.AreEqual<string>((string)(requestBody[k]), (string)(responseList[k]), "Body list item " + k + " is incorrect");
+                Assert.IsAssignableFrom<string>(responseList[k]); //Body list item " + k + " has wrong type
+                Assert.Equal<string>((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
             }
         }
     }

@@ -10,14 +10,14 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly GrainDirectoryPartition partition;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal RemoteGrainDirectory(LocalGrainDirectory r, GrainId id)
             : base(id, r.MyAddress)
         {
             router = r;
             partition = r.DirectoryPartition;
-            logger = TraceLogger.GetLogger("Orleans.GrainDirectory.CacheValidator", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Orleans.GrainDirectory.CacheValidator", LoggerType.Runtime);
         }
 
         public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation, int hopCount)

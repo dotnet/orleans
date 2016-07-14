@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
         internal bool SimulateReflectionOnlyLoadFailure { get; set; }
@@ -22,7 +22,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             this.dirEnumArgs = dirEnumArgs;
             this.pathNameCriteria = pathNameCriteria;
@@ -56,7 +56,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             var loader =
                 NewAssemblyLoader(
@@ -79,7 +79,7 @@ namespace Orleans.Runtime
             return discoveredAssemblyLocations;
         }
 
-        public static T TryLoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
             {
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
                     TypeUtils.GetTypes(
                         assembly,
                         type =>
-                        typeof(T).GetTypeInfo().IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
+                        typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
                         && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
                 if (foundType == null)
                 {
@@ -109,7 +109,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
             {
@@ -131,7 +131,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             if (null == dirEnumArgs)
                 throw new ArgumentNullException("dirEnumArgs");

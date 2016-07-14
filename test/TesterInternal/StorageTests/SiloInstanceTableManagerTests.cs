@@ -35,7 +35,7 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                TraceLogger.Initialize(new NodeConfiguration());
+                LogManager.Initialize(new NodeConfiguration());
                 TestUtils.CheckForAzureStorage();
             }
         }
@@ -45,13 +45,13 @@ namespace UnitTests.StorageTests
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly ITestOutputHelper output;
 
         public SiloInstanceTableManagerTests(ITestOutputHelper output)
         {
             this.output = output;
-            logger = TraceLogger.GetLogger("SiloInstanceTableManagerTests", TraceLogger.LoggerType.Application);
+            logger = LogManager.GetLogger("SiloInstanceTableManagerTests", LoggerType.Application);
 
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
@@ -237,7 +237,7 @@ namespace UnitTests.StorageTests
                 SiloName = "MyInstance",
                 UpdateZone = "0",
                 FaultZone = "0",
-                StartTime = TraceLogger.PrintDate(DateTime.UtcNow),
+                StartTime = LogFormatter.PrintDate(DateTime.UtcNow),
             };
 
             logger.Info("MyEntry={0}", myEntry);

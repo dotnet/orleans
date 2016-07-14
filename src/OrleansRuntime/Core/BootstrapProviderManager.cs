@@ -13,7 +13,7 @@ namespace Orleans.Runtime
 
         internal BootstrapProviderManager()
         {
-            var logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            var logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
             pluginManager = new PluginManager<IBootstrapProvider>(logger);
         }
@@ -48,9 +48,9 @@ namespace Orleans.Runtime
         private class PluginManager<T> : IProviderManager where T : class, IProvider
         {
             private readonly ProviderLoader<T> providerLoader = new ProviderLoader<T>();
-            private readonly TraceLogger logger;
+            private readonly Logger logger;
 
-            internal PluginManager(TraceLogger logger)
+            internal PluginManager(Logger logger)
             {
                 this.logger = logger;
             }

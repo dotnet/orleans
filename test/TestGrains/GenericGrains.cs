@@ -6,8 +6,11 @@ using Orleans.Concurrency;
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 using System.Globalization;
+using System.Threading;
 using System.Reflection;
+using Orleans.Async;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace UnitTests.Grains
 {
@@ -581,9 +584,66 @@ namespace UnitTests.Grains
 
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
+        public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
+        {
+            tc.CancellationToken.Register(() =>
+            {
+                throw new InvalidOperationException("From cancellation token callback");
+            });
+
+            return TaskDone.Done;
+        }
+
+        public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
+        {
+            var tc = new GrainCancellationTokenSource();
+            var grainTask = target.CancellationTokenCallbackResolve(tc.Token);
+            await Task.Delay(300);
+            await tc.Cancel();
+            return await grainTask;
+        }
+
+        public Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var orleansTs = TaskScheduler.Current;
+            tc.CancellationToken.Register(() =>
+            {
+                if (TaskScheduler.Current != orleansTs)
+                {
+                    tcs.SetException(new Exception("Callback executed on wrong thread"));
+                }
+                else
+                {
+                    tcs.SetResult(true);
+                }
+            });
+
+            return tcs.Task;
+        }
+
         public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay)
         {
             return await target.LongRunningTask(t, delay);
+        }
+
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay)
+        {
+            await target.LongWait(tc, delay);
+        }
+
+        public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
+        {
+            var tcs = new GrainCancellationTokenSource();
+            var task = target.LongWait(tcs.Token, delay);
+            await Task.Delay(delayBeforeCancel);
+            await tcs.Cancel();
+            await task;
+        }
+
+        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
+        {
+            await Task.Delay(delay, tc.CancellationToken);
         }
 
         public async Task<T> LongRunningTask(T t, TimeSpan delay)

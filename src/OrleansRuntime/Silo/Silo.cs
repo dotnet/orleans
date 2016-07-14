@@ -39,13 +39,17 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
     {
+        /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
 
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
+            /// <summary> No silo type specified. </summary>
             None = 0,
+            /// <summary> Primary silo. </summary>
             Primary,
+            /// <summary> Secondary silo. </summary>
             Secondary,
         }
 
@@ -64,7 +68,7 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingAgent;
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly GrainTypeManager typeManager;
         private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloType siloType;
@@ -89,8 +93,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
-        private readonly IServiceProvider services;
-        
+
         internal readonly string Name;
         internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
@@ -113,8 +116,9 @@ namespace Orleans.Runtime
             get { return allSiloProviders.AsReadOnly();  }
         }
 
-        internal IServiceProvider Services { get { return services; } }
+        internal IServiceProvider Services { get; }
 
+        /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
         {
             get { return globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null; } 
@@ -172,10 +176,10 @@ namespace Orleans.Runtime
             globalConfig = config.Globals;
             config.OnConfigChange("Defaults", () => nodeConfig = config.GetOrCreateNodeConfigurationForSilo(name));
 
-            if (!TraceLogger.IsInitialized)
-                TraceLogger.Initialize(nodeConfig);
+            if (!LogManager.IsInitialized)
+                LogManager.Initialize(nodeConfig);
 
-            config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
+            config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(nodeConfig, true), false);
             MultiClusterRegistrationStrategy.Initialize(config.Globals);
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
@@ -195,8 +199,8 @@ namespace Orleans.Runtime
                 generation = SiloAddress.AllocateNewGeneration();
                 nodeConfig.Generation = generation;
             }
-            TraceLogger.MyIPEndPoint = here;
-            logger = TraceLogger.GetLogger("Silo", TraceLogger.LoggerType.Runtime);
+            LogManager.MyIPEndPoint = here;
+            logger = LogManager.GetLogger("Silo", LoggerType.Runtime);
 
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC || !GCSettings.LatencyMode.Equals(GCLatencyMode.Batch))
@@ -216,24 +220,9 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = new DefaultServiceProvider();
-            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
-            if (startupBuilder != null)
-            {
-                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
-                try
-                {
-                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
-                }
-                catch (FileNotFoundException exc)
-                {
-                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
-                }
-            }
-            else
-            {
-                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
-            }
+            // Configure DI using Startup type
+            bool usingCustomServiceProvider;
+            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -294,8 +283,12 @@ namespace Orleans.Runtime
                 (IConsistentRingProvider) new VirtualBucketsRingProvider(SiloAddress, GlobalConfig.NumVirtualBucketsConsistentRing)
                 : new ConsistentRingProvider(SiloAddress);
 
+            // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
+            // service provider, meaning that he is explicitly opting into it.
+            var grainCreator = new GrainCreator(grainRuntime, usingCustomServiceProvider ? Services : null);
+
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 
@@ -331,7 +324,7 @@ namespace Orleans.Runtime
             SystemStatus.Current = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
-                () => TraceLogger.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
+                () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
             TestHook = new TestHooks(this);
 
@@ -356,7 +349,7 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.RemClusterGrainDirectory);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalGrainDirectory, LocalScheduler, OrleansConfig);
             RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
@@ -514,7 +507,7 @@ namespace Orleans.Runtime
                 scheduler.QueueTask(() => membershipFactory.WaitForTableToInit(membershipTable), statusOracleContext)
                         .WaitWithThrow(initTimeout);
             }
-            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
+            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(GlobalConfig, true, LogManager.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
                 .WaitWithThrow(initTimeout);
           
             scheduler.QueueTask(() => LocalSiloStatusOracle.Start(), statusOracleContext)
@@ -585,10 +578,6 @@ namespace Orleans.Runtime
                     mc.StartGateway(clientRegistrar);
                 }
                 if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
-
-                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
 
                 SystemStatus.Current = SystemStatus.Running;
             }
@@ -827,7 +816,7 @@ namespace Orleans.Runtime
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
             SafeExecute(() => SystemStatus.Current = SystemStatus.Terminated);
-            SafeExecute(TraceLogger.Close);
+            SafeExecute(LogManager.Close);
 
             // Setting the event should be the last thing we do.
             // Do nothijng after that!
@@ -843,7 +832,7 @@ namespace Orleans.Runtime
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            TraceLogger.Flush();
+            LogManager.Flush();
 
             try
             {
@@ -861,7 +850,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                TraceLogger.Close();
+                LogManager.Close();
             }
         }
 
@@ -878,9 +867,9 @@ namespace Orleans.Runtime
                 get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
             }
             
-            public bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
+            internal bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
 
-            public object StatisticsProvider
+            internal object StatisticsProvider
             {
                 get
                 {

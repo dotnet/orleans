@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -33,7 +34,12 @@ namespace Orleans.Providers.Streams.Common
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
+        private readonly Logger logger;
+        private int itemCount;
 
+        /// <summary>
+        /// Cached message most recently added
+        /// </summary>
         public TCachedMessage? Newest
         {
             get
@@ -44,6 +50,9 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        /// <summary>
+        /// Oldest message in cache
+        /// </summary>
         public TCachedMessage? Oldest
         {
             get
@@ -55,13 +64,19 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Called with the last item puraged after a cache purge has run.
+        /// Called with the newest item in the cache and last item purged after a cache purge has run.
         /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
         ///   of every set of events that get purged.
         /// </summary>
-        public Action<TCachedMessage> OnPurged { get; set; }
+        public Action<TCachedMessage?,TCachedMessage?> OnPurged { get; set; }
 
-        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer)
+        /// <summary>
+        /// Pooled queue cache is a cache of message that obtains resource from a pool
+        /// </summary>
+        /// <param name="cacheDataAdapter"></param>
+        /// <param name="comparer"></param>
+        /// <param name="logger"></param>
+        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger)
         {
             if (cacheDataAdapter == null)
             {
@@ -71,21 +86,22 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new ArgumentNullException("comparer");
             }
+            if (logger == null)
+            {
+                throw new ArgumentNullException("logger");
+            }
             this.cacheDataAdapter = cacheDataAdapter;
             this.comparer = comparer;
+            this.logger = logger.GetSubLogger("-cache");
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
             purgeQueue = new ConcurrentQueue<IDisposable>();
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
         }
 
-        public bool IsEmpty
-        {
-            get
-            {
-                return messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
-            }
-        }
-
+        /// <summary>
+        /// Indicates whether the cach is empty
+        /// </summary>
+        public bool IsEmpty => messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
 
         /// <summary>
         /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken, 
@@ -249,7 +265,7 @@ namespace Orleans.Providers.Streams.Common
                 }
 
                 // check if this message is in the cursor's stream
-                if (comparer.Compare(currentMessage, cursor.StreamIdentity) == 0)
+                if (comparer.Equals(currentMessage, cursor.StreamIdentity))
                 {
                     message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
                     cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index, cacheDataAdapter);
@@ -260,6 +276,12 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
+        /// <summary>
+        /// Add a queue message to the cache
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="dequeueTimeUtc"></param>
+        /// <returns></returns>
         public StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
         {
             if (message == null)
@@ -276,7 +298,7 @@ namespace Orleans.Providers.Streams.Common
             // If new block, add message block to linked list
             if (block != messageBlocks.FirstOrDefault())
                 messageBlocks.AddFirst(block.Node);
-
+            itemCount++;
             PerformPendingPurges();
 
             return streamPosition;
@@ -294,9 +316,12 @@ namespace Orleans.Providers.Streams.Common
         private void PerformPendingPurges()
         {
             IDisposable purgeRequest;
+            if (purgeQueue.IsEmpty) return;
             while (purgeQueue.TryDequeue(out purgeRequest))
             {
+                int currentItemCount = itemCount;
                 PerformBlockPurge(purgeRequest);
+                ReportBlockPurge(currentItemCount);
             }
         }
 
@@ -312,6 +337,7 @@ namespace Orleans.Providers.Streams.Common
                 }
                 lastMessagePurged = oldestMessageInCache;
                 messageBlocks.Last.Value.Remove();
+                itemCount--;
                 CachedMessageBlock<TCachedMessage> lastCachedMessageBlock = messageBlocks.Last.Value;
                 // if block is currently empty, but all capacity has been exausted, remove
                 if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
@@ -321,12 +347,21 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
-            if (lastMessagePurged.HasValue && OnPurged != null)
+            if (lastMessagePurged.HasValue)
             {
-                OnPurged(lastMessagePurged.Value);
+                OnPurged?.Invoke(lastMessagePurged, Newest);
             }
 
             purgeRequest.Dispose();
+        }
+
+        private void ReportBlockPurge(int startingItemCount)
+        {
+            if (IsEmpty)
+            {
+                logger.Info("BlockPurged: cache empty");
+            }
+            logger.Info($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
         }
 
         private enum CursorStates
@@ -356,8 +391,8 @@ namespace Orleans.Providers.Streams.Common
             public int Index;
 
             // utilities
-            public bool IsNewestInBlock { get { return Index == CurrentBlock.Value.NewestMessageIndex; } }
-            public TCachedMessage Message { get { return CurrentBlock.Value[Index]; } }
+            public bool IsNewestInBlock => Index == CurrentBlock.Value.NewestMessageIndex;
+            public TCachedMessage Message => CurrentBlock.Value[Index];
         }
     }
 }

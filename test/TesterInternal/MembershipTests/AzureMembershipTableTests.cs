@@ -17,17 +17,17 @@ namespace UnitTests.MembershipTests
     {
         public AzureMembershipTableTests(ConnectionStringFixture fixture):base(fixture)
         {
-            TraceLogger.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
-            TraceLogger.AddTraceLevelOverride("Storage", Severity.Verbose3);
+            LogManager.AddTraceLevelOverride("AzureTableDataManager", Severity.Verbose3);
+            LogManager.AddTraceLevelOverride("OrleansSiloInstanceManager", Severity.Verbose3);
+            LogManager.AddTraceLevelOverride("Storage", Severity.Verbose3);
         }
 
-        protected override IMembershipTable CreateMembershipTable(TraceLogger logger)
+        protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
             return new AzureBasedMembershipTable();
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(TraceLogger logger)
+        protected override IGatewayListProvider CreateGatewayListProvider(Logger logger)
         {
             return new AzureGatewayListProvider();
         }

@@ -19,8 +19,8 @@ namespace Orleans
         /// </summary>
         /// <param name="globalConfiguration">the give global configuration</param>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
-        /// <param name="traceLogger">the logger used by the membership table</param>
-        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, TraceLogger traceLogger);
+        /// <param name="logger">the logger used by the membership table</param>
+        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, Logger logger);
 
         /// <summary>
         /// Deletes all table entries of the given deploymentId
@@ -234,21 +234,51 @@ namespace Orleans
     [Serializable]
     public class MembershipEntry
     {
+        /// <summary>
+        /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
+        /// </summary>
         public SiloAddress SiloAddress { get; set; }
 
-        public string HostName { get; set; }          
-        public SiloStatus Status { get; set; }          
+        /// <summary>
+        /// The silo status. Managed by the Membership Protocol.
+        /// </summary>
+        public SiloStatus Status { get; set; }
+
+        /// <summary>
+        /// The list of silos that suspect this silo. Managed by the Membership Protocol.
+        /// </summary>
+        public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
+
+        /// <summary>
+        /// Silo to clients TCP port. Set on silo startup.
+        /// </summary>    
         public int ProxyPort { get; set; }
 
-        public string RoleName { get; set; }           // Optional - only for Azure role  
+        /// <summary>
+        /// The DNS host name of the silo. Equals to Dns.GetHostName(). Set on silo startup.
+        /// </summary>
+        public string HostName { get; set; }
+
+        /// <summary>
+        /// the name of the specific silo instance within a cluster. 
+        /// If running in Azure - the name of this role instance. Set on silo startup.
+        /// </summary>
         public string SiloName { get; set; }
-        public int UpdateZone { get; set; }            // Optional - only for Azure role
-        public int FaultZone { get; set; }             // Optional - only for Azure role
 
-        public DateTime StartTime { get; set; }             // Time this silo was started. For diagnostics.
-        public DateTime IAmAliveTime { get; set; }          // Time this silo updated it was alive. For diagnostics.
+        public string RoleName { get; set; } // Optional - only for Azure role  
+        public int UpdateZone { get; set; }  // Optional - only for Azure role
+        public int FaultZone { get; set; }   // Optional - only for Azure role
 
-        public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
+        /// <summary>
+        /// Time this silo was started. For diagnostics and troubleshooting only.
+        /// </summary>
+        public DateTime StartTime { get; set; }
+
+        /// <summary>
+        /// the last time this silo reported that it is alive. For diagnostics and troubleshooting only.
+        /// </summary>
+        public DateTime IAmAliveTime { get; set; }
+        
 
         private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
 
@@ -329,14 +359,14 @@ namespace Orleans
                 RoleName,
                 UpdateZone,
                 FaultZone,
-                TraceLogger.PrintDate(StartTime),
-                TraceLogger.PrintDate(IAmAliveTime),
+                LogFormatter.PrintDate(StartTime),
+                LogFormatter.PrintDate(IAmAliveTime),
                 suspecters == null
                     ? ""
                     : "Suspecters = " + Utils.EnumerableToString(suspecters, sa => sa.ToLongString()),
                 timestamps == null
                     ? ""
-                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, TraceLogger.PrintDate)
+                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, LogFormatter.PrintDate)
                 );
         }
     }

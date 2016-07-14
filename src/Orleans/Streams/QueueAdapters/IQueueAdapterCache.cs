@@ -5,7 +5,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Create a cache for a given queue id
         /// </summary>
-        /// <param name="messages"></param>
+        /// <param name="queueId"></param>
         IQueueCache CreateQueueCache(QueueId queueId);
     }
 }

@@ -143,11 +143,11 @@ namespace Orleans.Counter.Control
         {
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
-            TraceLogger.Initialize(cfg);
+            LogManager.Initialize(cfg);
 
             //TODO: Move it to use the APM APIs
             //var logWriter = new LogWriterToConsole(true, true); // Use compact console output & no timestamps / log message metadata
-            //TraceLogger.LogConsumers.Add(logWriter);
+            //LogManager.LogConsumers.Add(logWriter);
         }
 
         /// <summary>

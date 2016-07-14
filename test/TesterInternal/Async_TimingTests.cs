@@ -14,12 +14,12 @@ namespace UnitTests
 {
     public class Async_TimingTests
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public Async_TimingTests()
         {
-            TraceLogger.Initialize(ClientConfiguration.StandardLoad());
-            logger = TraceLogger.GetLogger("AC_TimingTests", TraceLogger.LoggerType.Application);
+            LogManager.Initialize(ClientConfiguration.StandardLoad());
+            logger = LogManager.GetLogger("AC_TimingTests", LoggerType.Application);
             logger.Info("----------------------------- STARTING AC_TimingTests -------------------------------------");
         }
 

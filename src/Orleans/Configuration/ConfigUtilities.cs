@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Configuration
                         
                         if (plugin is ITelemetryConsumer)
                         {
-                            Logger.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
+                            LogManager.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
                         }
                         else
                         {
@@ -165,7 +165,7 @@ namespace Orleans.Runtime.Configuration
 
                         if (plugin is ILogConsumer)
                         {
-                            TraceLogger.LogConsumers.Add(plugin as ILogConsumer);
+                            LogManager.LogConsumers.Add(plugin as ILogConsumer);
                         }
                         else
                         {
@@ -354,7 +354,7 @@ namespace Orleans.Runtime.Configuration
             return returnValue;
         }
 
-        internal static void ValidateSerializationProvider(Type type)
+        internal static void ValidateSerializationProvider(TypeInfo type)
         {
             if (type.IsClass == false)
             {
@@ -371,7 +371,7 @@ namespace Orleans.Runtime.Configuration
                 throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
             }
 
-            if (type.IsGenericType && type.IsConstructedGenericType == false)
+            if (type.IsGenericType && type.IsConstructedGenericType() == false)
             {
                 throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
             }

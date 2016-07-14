@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Providers.Streams.Generator;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
@@ -57,7 +58,7 @@ namespace UnitTests.StreamingTests
                 base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
-                dataManager.DeleteTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
             }
 
             private static Dictionary<string, string> BuildProviderSettings()

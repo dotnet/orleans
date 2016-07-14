@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
@@ -57,7 +58,7 @@ namespace Tester.StreamingTests
             base.Dispose();
             var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
             dataManager.InitTableAsync().Wait();
-            dataManager.DeleteTableAsync().Wait();
+            dataManager.ClearTableAsync().Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 

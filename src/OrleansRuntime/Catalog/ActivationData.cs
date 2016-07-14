@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         // defined for the grain class.
         // Note that in all cases we never have more than one copy of an actual invoker;
         // we may have a ExtensionInvoker per activation, in the worst case.
-        private class ExtensionInvoker : IGrainMethodInvoker
+        private class ExtensionInvoker : IGrainMethodInvoker, IGrainExtensionMap
         {
             // Because calls to ExtensionInvoker are allways made within the activation context,
             // we rely on the single-threading guarantee of the runtime and do not protect the map with a lock.
@@ -100,9 +101,7 @@ namespace Orleans.Runtime
             /// The base invoker will throw an appropriate exception if the request is not recognized.
             /// </summary>
             /// <param name="grain"></param>
-            /// <param name="interfaceId"></param>
-            /// <param name="methodId"></param>
-            /// <param name="arguments"></param>
+            /// <param name="request"></param>
             /// <returns></returns>
             public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
             {
@@ -124,6 +123,29 @@ namespace Orleans.Runtime
             {
                 get { return 0; } // 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
             }
+
+            /// <summary>
+            /// Gets the extension from this instance if it is available.
+            /// </summary>
+            /// <param name="interfaceId">The interface id.</param>
+            /// <param name="extension">The extension.</param>
+            /// <returns>
+            /// <see langword="true"/> if the extension is found, <see langword="false"/> otherwise.
+            /// </returns>
+            public bool TryGetExtension(int interfaceId, out IGrainExtension extension)
+            {
+                Tuple<IGrainExtension, IGrainExtensionMethodInvoker> value;
+                if (extensionMap != null && extensionMap.TryGetValue(interfaceId, out value))
+                {
+                    extension = value.Item1;
+                }
+                else
+                {
+                    extension = null;
+                }
+
+                return extension != null;
+            }
         }
 
         // This is the maximum amount of time we expect a request to continue processing
@@ -135,7 +157,7 @@ namespace Orleans.Runtime
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
         private HashSet<GrainTimer> timers;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
@@ -150,7 +172,7 @@ namespace Orleans.Runtime
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
             if (null == collector) throw new ArgumentNullException("collector");
 
-            logger = TraceLogger.GetLogger("ActivationData", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -375,9 +397,11 @@ namespace Orleans.Runtime
 
         public MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
-        // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
+        // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
 
+        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
+        internal bool IsUsingGrainDirectory { get { return !IsStatelessWorker; } }
 
         public Message Running { get; private set; }
 
@@ -492,14 +516,14 @@ namespace Orleans.Runtime
                 return true;
             }
         }
- 
+
         /// <summary>
         /// Check whether this activation is overloaded. 
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
-        /// <param name="log">TraceLogger to use for reporting any overflow condition</param>
+        /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(TraceLogger log)
+        public LimitExceededException CheckOverloaded(Logger log)
         {
             LimitValue limitValue = GetMaxEnqueuedRequestLimit();
 
@@ -545,7 +569,7 @@ namespace Orleans.Runtime
             if (maxEnqueuedRequestsLimit != null) return maxEnqueuedRequestsLimit;
             if (GrainInstanceType != null)
             {
-                string limitName = CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType)
+                string limitName = CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType.GetTypeInfo())
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
                 maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time

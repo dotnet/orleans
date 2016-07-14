@@ -13,13 +13,13 @@ namespace Orleans.Serialization
     {
         private static readonly ConcurrentDictionary<RuntimeTypeHandle, object> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, object>();
 
-        private TraceLogger logger;
+        private Logger logger;
 
         /// <summary>
         /// Initializes the external serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }

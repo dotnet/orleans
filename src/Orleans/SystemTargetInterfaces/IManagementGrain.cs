@@ -19,6 +19,15 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
 
+
+        /// <summary>
+        /// Get the list of silo hosts and membership information currently known about in this cluster.
+        /// </summary>
+        /// <param name="onlyActive">Whether data on just current active silos should be returned, 
+        /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
+        /// <returns></returns>
+        Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
+
         /// <summary>
         /// Set the current log level for system runtime components.
         /// </summary>
@@ -34,10 +43,10 @@ namespace Orleans.Runtime
         /// <returns>Completion promise for this operation.</returns>
         Task SetAppLogLevel(SiloAddress[] hostsIds, int traceLevel);
         /// <summary>
-        /// Set the current log level for a particular TraceLogger, by name (with prefix matching).
+        /// Set the current log level for a particular Logger, by name (with prefix matching).
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <param name="logName">Name of the TraceLogger (with prefix matching) to change.</param>
+        /// <param name="logName">Name of the Logger (with prefix matching) to change.</param>
         /// <param name="traceLevel">New log level to use.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task SetLogLevel(SiloAddress[] hostsIds, string logName, int traceLevel);

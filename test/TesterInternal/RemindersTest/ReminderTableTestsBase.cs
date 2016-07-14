@@ -14,7 +14,7 @@ namespace UnitTests.RemindersTest
 {
     public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         private readonly IReminderTable remindersTable;
 
@@ -22,9 +22,9 @@ namespace UnitTests.RemindersTest
         
         protected ReminderTableTestsBase(ConnectionStringFixture fixture)
         {
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
             
-            logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
+            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
             var serviceId = Guid.NewGuid();
             var deploymentId = "test-" + serviceId;
 

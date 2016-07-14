@@ -124,7 +124,7 @@ namespace Orleans.AzureUtils
         private readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
@@ -133,7 +133,7 @@ namespace Orleans.AzureUtils
         private OrleansSiloInstanceManager(string deploymentId, string storageConnectionString)
         {
             DeploymentId = deploymentId;
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
                 INSTANCE_TABLE_NAME, storageConnectionString, logger);
         }

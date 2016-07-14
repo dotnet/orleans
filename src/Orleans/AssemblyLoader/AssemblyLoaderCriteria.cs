@@ -43,7 +43,7 @@ namespace Orleans.Runtime
                         ignored = null;
                         foreach (var requiredType in requiredTypes)
                         {
-                            if (requiredType.GetTypeInfo().IsAssignableFrom(type))
+                            if (requiredType.IsAssignableFrom(type))
                             {
                                 //  we found a match! load the assembly.
                                 return true;

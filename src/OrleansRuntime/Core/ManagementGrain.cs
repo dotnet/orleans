@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Management
 
         public override Task OnActivateAsync()
         {
-            logger = TraceLogger.GetLogger("ManagementGrain", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ManagementGrain", LoggerType.Runtime);
             return TaskDone.Done;
         }
 
@@ -34,6 +34,26 @@ namespace Orleans.Runtime.Management
                 table.Members.Where(item => item.Item1.Status.Equals(SiloStatus.Active)).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
                 table.Members.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
             return t;
+        }
+
+        public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+        {
+            logger.Info("GetDetailedHosts onlyActive={0}", onlyActive);
+
+            var mTable = await GetMembershipTable();
+            var table = await mTable.ReadAll();
+
+            if (onlyActive)
+            {
+                return table.Members
+                    .Where(item => item.Item1.Status.Equals(SiloStatus.Active))
+                    .Select(x => x.Item1)
+                    .ToArray();
+            }
+
+            return table.Members
+                .Select(x => x.Item1)
+                .ToArray();
         }
 
         public Task SetSystemLogLevel(SiloAddress[] siloAddresses, int traceLevel)
@@ -228,7 +248,10 @@ namespace Orleans.Runtime.Management
         private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
         {
             var silos = await GetHosts(true);
-            logger.Info("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+
+            if(logger.IsVerbose) {
+                logger.Verbose("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+            }
 
             var actionPromises = new List<Task<object>>();
             foreach (SiloAddress siloAddress in silos.Keys.ToArray())
@@ -245,7 +268,7 @@ namespace Orleans.Runtime.Management
                 membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
 
                 await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
-                    TraceLogger.GetLogger(membershipTable.GetType().Name));
+                    LogManager.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }

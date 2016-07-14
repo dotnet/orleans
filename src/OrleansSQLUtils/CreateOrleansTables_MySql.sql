@@ -52,6 +52,7 @@ CREATE TABLE OrleansMembershipTable
 	Address VARCHAR(45) NOT NULL,
 	Port INT NOT NULL,
 	Generation INT NOT NULL,
+	SiloName NVARCHAR(150) NOT NULL,
 	HostName NVARCHAR(150) NOT NULL,
 	Status INT NOT NULL,
 	ProxyPort INT NULL,
@@ -179,7 +180,7 @@ VALUES
 (
 	'InsertMembershipKey','
 	call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation, 
-	@Version, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
+	@Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
 );
 
 DELIMITER $$
@@ -190,6 +191,7 @@ CREATE PROCEDURE InsertMembershipKey(
 	in	_Port INT,
 	in	_Generation INT,
 	in	_Version INT,
+	in	_SiloName NVARCHAR(150),
 	in	_HostName NVARCHAR(150),
 	in	_Status INT,
 	in	_ProxyPort INT,
@@ -205,6 +207,7 @@ BEGIN
 		Address,
 		Port,
 		Generation,
+		SiloName,
 		HostName,
 		Status,
 		ProxyPort,
@@ -216,6 +219,7 @@ BEGIN
 		_Address,
 		_Port,
 		_Generation,
+		_SiloName,
 		_HostName,
 		_Status,
 		_ProxyPort,
@@ -457,6 +461,7 @@ VALUES
 		m.Address,
 		m.Port,
 		m.Generation,
+		m.SiloName,
 		m.HostName,
 		m.Status,
 		m.ProxyPort,
@@ -484,6 +489,7 @@ VALUES
 		m.Address,
 		m.Port,
 		m.Generation,
+		m.SiloName,
 		m.HostName,
 		m.Status,
 		m.ProxyPort,

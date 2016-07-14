@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private Thread t;
         protected CancellationTokenSource Cts;
         protected object Lockable;
-        protected TraceLogger Log;
+        protected Logger Log;
         private readonly string type;
         protected FaultBehavior OnFault;
 
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
+            Log = LogManager.GetLogger(Name, LoggerType.Runtime);
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
 
 #if TRACK_DETAILED_STATS
@@ -159,7 +159,7 @@ namespace Orleans.Runtime
             var agent = obj as AsynchAgent;
             if (agent == null)
             {
-                var log = TraceLogger.GetLogger("RuntimeCore.AsynchAgent");
+                var log = LogManager.GetLogger("RuntimeCore.AsynchAgent");
                 log.Error(ErrorCode.Runtime_Error_100022, "Agent thread started with incorrect parameter type");
                 return;
             }
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
             return Name;
         }
 
-        private static void LogStatus(TraceLogger log, string msg, params object[] args)
+        private static void LogStatus(Logger log, string msg, params object[] args)
         {
             if (SystemStatus.Current.Equals(SystemStatus.Creating))
             {

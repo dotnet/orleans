@@ -32,14 +32,12 @@ namespace Orleans.ServiceBus.Providers
         {
             int readOffset = 0;
             StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset));
+            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
             SequenceNumber = cachedMessage.SequenceNumber;
             EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
             DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
             Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties();
             object offsetObj;
-            Offset = Properties.TryGetValue("Offset", out offsetObj)
-                ? offsetObj as string
-                : default(string);
             PartitionKey = Properties.TryGetValue("PartitionKey", out offsetObj)
                 ? offsetObj as string
                 : default(string);
@@ -71,14 +69,14 @@ namespace Orleans.ServiceBus.Providers
                 : 0 - realToken.EventIndex;
         }
 
-        public int Compare(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
+        public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
         {
             int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return result;
+            if (result != 0) return false;
 
             int readOffset = 0;
             string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
         }
     }
 
@@ -171,10 +169,11 @@ namespace Orleans.ServiceBus.Providers
         // Placed object message payload into a segment.
         private ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition streamPosition, EventData queueMessage)
         {
-            byte[] propertiesBytes = queueMessage.Properties.SerializeProperties();
+            byte[] propertiesBytes = queueMessage.SerializeProperties();
             byte[] payload = queueMessage.GetBytes();
             // get size of namespace, offset, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(streamPosition.StreamIdentity.Namespace) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.Offset) +
             SegmentBuilder.CalculateAppendSize(propertiesBytes) +
             SegmentBuilder.CalculateAppendSize(payload);
 
@@ -184,6 +183,7 @@ namespace Orleans.ServiceBus.Providers
             // encode namespace, offset, properties and payload into segment
             int writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, streamPosition.StreamIdentity.Namespace);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset);
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);
 

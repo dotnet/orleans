@@ -19,6 +19,8 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Extensions.DependencyInjection" version="1.0.0" />
+      <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>
@@ -26,9 +28,5 @@
     <file src="OrleansRuntime.dll" target="lib\net451" />
     <file src="OrleansRuntime.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
-    <file src="OrleansDependencyInjection.XML" target="lib\net451" />
-    <file src="OrleansDependencyInjection.dll" target="lib\net451" />
-    <file src="OrleansDependencyInjection.pdb" target="lib\net451" />
-    <file src="$SRC_DIR$OrleansDependencyInjection\*.cs" target="src" />
   </files>
 </package>

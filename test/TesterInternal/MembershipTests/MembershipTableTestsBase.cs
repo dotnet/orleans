@@ -16,7 +16,7 @@ namespace UnitTests.MembershipTests
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
         private static readonly string hostName = Dns.GetHostName();
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
         private readonly string deploymentId;
@@ -25,8 +25,8 @@ namespace UnitTests.MembershipTests
 
         protected MembershipTableTestsBase(ConnectionStringFixture fixture)
         {
-            TraceLogger.Initialize(new NodeConfiguration());
-            logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Application);
+            LogManager.Initialize(new NodeConfiguration());
+            logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
             deploymentId = "test-" + Guid.NewGuid();
 
             logger.Info("DeploymentId={0}", deploymentId);
@@ -65,8 +65,8 @@ namespace UnitTests.MembershipTests
             }
         }
         
-        protected abstract IGatewayListProvider CreateGatewayListProvider(TraceLogger logger);
-        protected abstract IMembershipTable CreateMembershipTable(TraceLogger logger);
+        protected abstract IGatewayListProvider CreateGatewayListProvider(Logger logger);
+        protected abstract IMembershipTable CreateMembershipTable(Logger logger);
         protected abstract string GetConnectionString();
 
         protected virtual string GetAdoInvariant()
@@ -347,6 +347,7 @@ namespace UnitTests.MembershipTests
             {
                 SiloAddress = siloAddress,
                 HostName = hostName,
+                SiloName = "TestSiloName",
                 Status = SiloStatus.Joining,
                 ProxyPort = siloAddress.Endpoint.Port,
                 StartTime = GetUtcNowWithSecondsResolution(),

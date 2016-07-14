@@ -111,6 +111,15 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns whether part of the primary key is of type long.
+        /// </summary>
+        /// <param name="grain">The target grain.</param>
+        public static bool IsPrimaryKeyBasedOnLong(this IAddressable grain)
+        {
+            return GetGrainId(grain).IsLongKey;
+        }
+
+        /// <summary>
         /// Returns the long representation of a grain primary key.
         /// </summary>
         /// <param name="grain">The grain to find the primary key for.</param>

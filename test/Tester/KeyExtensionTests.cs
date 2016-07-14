@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -28,15 +27,8 @@ namespace UnitTests.General
             var grainId2 = await grain2.GetGrainReference();
             var activationId2 = await grain2.GetActivationId();
 
-            Assert.AreNotEqual(
-                grainId1,
-                grainId2,
-                "Mismatched key extensions should differentiate an identical base primary key.");
-
-            Assert.AreNotEqual(
-                activationId1,
-                activationId2,
-                "Mismatched key extensions should differentiate an identical base primary key.");
+            Assert.NotEqual(grainId1, grainId2); // Mismatched key extensions should differentiate an identical base primary key.
+            Assert.NotEqual(activationId1, activationId2); // Mismatched key extensions should differentiate an identical base primary key.
         }
 
         [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
@@ -55,15 +47,8 @@ namespace UnitTests.General
             var grainId2 = await grain2.GetGrainReference();
             var activationId2 = await grain2.GetActivationId();
 
-            Assert.AreNotEqual(
-                grainId1,
-                grainId2,
-                "Mismatched base keys should differentiate between identical extended keys.");
-
-            Assert.AreNotEqual(
-                activationId1,
-                activationId2,
-                "Mismatched base keys should differentiate between identical extended keys.");
+            Assert.NotEqual(grainId1, grainId2); // Mismatched base keys should differentiate between identical extended keys.
+            Assert.NotEqual(activationId1, activationId2); // Mismatched base keys should differentiate between identical extended keys.
         }
 
         [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
@@ -109,7 +94,7 @@ namespace UnitTests.General
             var localGrainRef = GrainClient.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
             var remoteGrainRef = await localGrainRef.GetGrainReference();
 
-            Assert.AreEqual(localGrainRef, remoteGrainRef, "Mismatched grain ID.");
+            Assert.Equal(localGrainRef, remoteGrainRef); // Mismatched grain ID.
         }
 
         [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
@@ -120,7 +105,7 @@ namespace UnitTests.General
             var grain = GrainClient.GrainFactory.GetGrain<IStringGrain>(key);
             var key2 = ((GrainReference) grain).GetPrimaryKeyString();
 
-            Assert.AreEqual(key, key2, "Unexpected key was returned.");
+            Assert.Equal(key, key2); // Unexpected key was returned.
         }
 
         [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
@@ -128,7 +113,7 @@ namespace UnitTests.General
         {
             var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(0);
             var key = ((GrainReference)grain).GetPrimaryKeyString();
-            Assert.IsNull(key);
+            Assert.Null(key);
         }
     }
 }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
@@ -52,7 +53,7 @@ namespace UnitTests.StreamingTests
                 base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
-                dataManager.DeleteTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)

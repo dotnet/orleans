@@ -98,7 +98,7 @@ namespace Orleans.Core
                 try
                 {
                     sw.Restart();
-                    store.Log.Warn((int)ErrorCode.StorageProvider_ForceReRead, "Forcing re-read of last good state for grain Type={0}", grainTypeName);
+                    store.Log.Warn(ErrorCode.StorageProvider_ForceReRead, "Forcing re-read of last good state for grain Type={0}", grainTypeName);
                     await store.ReadStateAsync(grainTypeName, grainRef, grain.GrainState);
                     StorageStatisticsGroup.OnStorageRead(store, grainTypeName, grainRef, sw.Elapsed);
                 }
@@ -163,7 +163,7 @@ namespace Orleans.Core
 
             GrainReference grainReference = baseGrain.GrainReference;
             return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}" + Environment.NewLine + " {5}",
-                what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, TraceLogger.PrintException(exc));
+                what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, LogFormatter.PrintException(exc));
         }
     }
 }

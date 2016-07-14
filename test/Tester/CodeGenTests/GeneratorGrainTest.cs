@@ -8,7 +8,6 @@ using UnitTests.Tester;
 using System;
 using System.Collections.Generic;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Tester.CodeGenTests
 {
@@ -32,12 +31,12 @@ namespace Tester.CodeGenTests
             expectedStruct.SetValueWithPrivateSetter(8);
             expectedStruct.SetPrivateValue(9);
             var actualStruct = await grain.RoundTripStruct(expectedStruct);
-            Assert.AreEqual(expectedStruct.Id, actualStruct.Id);
-            Assert.AreEqual(expectedStruct.ReadonlyField, actualStruct.ReadonlyField);
-            Assert.AreEqual(expectedStruct.PublicValue, actualStruct.PublicValue);
-            Assert.AreEqual(expectedStruct.ValueWithPrivateSetter, actualStruct.ValueWithPrivateSetter);
-            Assert.AreEqual(expectedStruct.GetPrivateValue(), actualStruct.GetPrivateValue());
-            Assert.AreEqual(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
+            Assert.Equal(expectedStruct.Id, actualStruct.Id);
+            Assert.Equal(expectedStruct.ReadonlyField, actualStruct.ReadonlyField);
+            Assert.Equal(expectedStruct.PublicValue, actualStruct.PublicValue);
+            Assert.Equal(expectedStruct.ValueWithPrivateSetter, actualStruct.ValueWithPrivateSetter);
+            Assert.Equal(expectedStruct.GetPrivateValue(), actualStruct.GetPrivateValue());
+            Assert.Equal(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
 
             // Test abstract class serialization.
             var input = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
@@ -60,46 +59,46 @@ namespace Tester.CodeGenTests
 
             var output = await grain.RoundTripClass(input);
 
-            Assert.AreEqual(input.Int, output.Int);
-            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.AreEqual(input.Classes.Count, output.Classes.Count);
-            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
-            Assert.AreEqual(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
+            Assert.Equal(input.Int, output.Int);
+            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
+            Assert.Equal(input.Classes.Count, output.Classes.Count);
+            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
+            Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
 
 #pragma warning disable 618
-            Assert.AreEqual(input.ObsoleteInt, output.ObsoleteInt);
+            Assert.Equal(input.ObsoleteInt, output.ObsoleteInt);
 #pragma warning restore 618
             
-            Assert.AreEqual(0, output.NonSerializedInt);
+            Assert.Equal(0, output.NonSerializedInt);
 
             // Test abstract class serialization with state.
             await grain.SetState(input);
             output = await grain.GetState();
-            Assert.AreEqual(input.Int, output.Int);
-            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.AreEqual(input.Classes.Count, output.Classes.Count);
-            Assert.AreEqual(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
-            Assert.AreEqual(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
+            Assert.Equal(input.Int, output.Int);
+            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
+            Assert.Equal(input.Classes.Count, output.Classes.Count);
+            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
+            Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
 #pragma warning disable 618
-            Assert.AreEqual(input.ObsoleteInt, output.ObsoleteInt);
+            Assert.Equal(input.ObsoleteInt, output.ObsoleteInt);
 #pragma warning restore 618
-            Assert.AreEqual(0, output.NonSerializedInt);
+            Assert.Equal(0, output.NonSerializedInt);
 
             // Test interface serialization.
             var expectedInterface = input;
             var actualInterface = await grain.RoundTripInterface(expectedInterface);
-            Assert.AreEqual(input.Int, actualInterface.Int);
+            Assert.Equal(input.Int, actualInterface.Int);
             
             // Test enum serialization.
             const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
             var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
-            Assert.AreEqual(ExpectedEnum, actualEnum);
+            Assert.Equal(ExpectedEnum, actualEnum);
 
             // Test serialization of a generic class which has a value-type constraint.
             var expectedStructConstraintObject = new ClassWithStructConstraint<int> { Value = 38 };
             var actualStructConstraintObject =
                 (ClassWithStructConstraint<int>)await grain.RoundTripObject(expectedStructConstraintObject);
-            Assert.AreEqual(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
+            Assert.Equal(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain")]
@@ -109,15 +108,15 @@ namespace Tester.CodeGenTests
             IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
             
             bool isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsTrue(isNull);
+            Assert.True(isNull);
 
             await grain.StringSet("Begin");
             
             isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsFalse(isNull);
+            Assert.False(isNull);
 
             MemberVariables members = await grain.GetMemberVariables();
-            Assert.AreEqual("Begin", members.stringVar);
+            Assert.Equal("Begin", members.stringVar);
             
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
@@ -129,9 +128,9 @@ namespace Tester.CodeGenTests
             members = await grain.GetMemberVariables();
             ASCIIEncoding enc = new ASCIIEncoding();
 
-            Assert.AreEqual("ByteBegin", enc.GetString(members.byteArray));
-            Assert.AreEqual("StringBegin", members.stringVar);
-            Assert.AreEqual(ReturnCode.Fail, members.code);
+            Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
+            Assert.Equal("StringBegin", members.stringVar);
+            Assert.Equal(ReturnCode.Fail, members.code);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
@@ -140,15 +139,15 @@ namespace Tester.CodeGenTests
             IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             
             bool isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsTrue(isNull);
+            Assert.True(isNull);
 
             await grain.StringSet("Begin");
 
             isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsFalse(isNull);
+            Assert.False(isNull);
 
             MemberVariables members = await grain.GetMemberVariables();
-            Assert.AreEqual("Begin", members.stringVar);
+            Assert.Equal("Begin", members.stringVar);
 
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
@@ -160,9 +159,9 @@ namespace Tester.CodeGenTests
             members = await grain.GetMemberVariables();
             ASCIIEncoding enc = new ASCIIEncoding();
 
-            Assert.AreEqual("ByteBegin", enc.GetString(members.byteArray));
-            Assert.AreEqual("StringBegin", members.stringVar);
-            Assert.AreEqual(ReturnCode.Fail, members.code);
+            Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
+            Assert.Equal("StringBegin", members.stringVar);
+            Assert.Equal(ReturnCode.Fail, members.code);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
@@ -172,15 +171,15 @@ namespace Tester.CodeGenTests
             IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
 
             bool boolPromise = await grain.StringIsNullOrEmpty();
-            Assert.IsTrue(boolPromise);
+            Assert.True(boolPromise);
 
             await grain.StringSet("Begin");
 
             boolPromise = await grain.StringIsNullOrEmpty();
-            Assert.IsFalse(boolPromise);
+            Assert.False(boolPromise);
 
             MemberVariables members = await grain.GetMemberVariables();
-            Assert.AreEqual("Begin", members.stringVar);
+            Assert.Equal("Begin", members.stringVar);
 
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
@@ -192,12 +191,12 @@ namespace Tester.CodeGenTests
             members = await grain.GetMemberVariables();
             ASCIIEncoding enc = new ASCIIEncoding();
 
-            Assert.AreEqual("ByteBegin", enc.GetString(members.byteArray));
-            Assert.AreEqual("StringBegin", members.stringVar);
-            Assert.AreEqual(ReturnCode.Fail, members.code);
+            Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
+            Assert.Equal("StringBegin", members.stringVar);
+            Assert.Equal(ReturnCode.Fail, members.code);
 
             string strPromise = await grain.StringConcat("Begin", "Cont", "End");
-            Assert.AreEqual("BeginContEnd", strPromise);
+            Assert.Equal("BeginContEnd", strPromise);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
@@ -206,26 +205,26 @@ namespace Tester.CodeGenTests
             IGeneratorTestDerivedDerivedGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
             
             bool isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsTrue(isNull);
+            Assert.True(isNull);
 
             await grain.StringSet("Begin");
 
             isNull = await grain.StringIsNullOrEmpty();
-            Assert.IsFalse(isNull);
+            Assert.False(isNull);
 
             MemberVariables members = await grain.GetMemberVariables();
-            Assert.AreEqual("Begin", members.stringVar);
+            Assert.Equal("Begin", members.stringVar);
 
             ReplaceArguments arguments = new ReplaceArguments("Begin", "End");
             string strPromise = await grain.StringReplace(arguments);
-            Assert.AreEqual("End", strPromise);
+            Assert.Equal("End", strPromise);
 
             strPromise = await grain.StringConcat("Begin", "Cont", "End");
-            Assert.AreEqual("BeginContEnd", strPromise);
+            Assert.Equal("BeginContEnd", strPromise);
 
             string[] strArray = { "Begin", "Cont", "Cont", "End" };
             strPromise = await grain.StringNConcat(strArray);
-            Assert.AreEqual("BeginContContEnd", strPromise);
+            Assert.Equal("BeginContContEnd", strPromise);
 
             ASCIIEncoding encoding = new ASCIIEncoding();
             byte[] bytes = encoding.GetBytes("ByteBegin");
@@ -238,9 +237,9 @@ namespace Tester.CodeGenTests
 
             ASCIIEncoding enc = new ASCIIEncoding();
 
-            Assert.AreEqual("ByteBegin", enc.GetString(members.byteArray));
-            Assert.AreEqual("StringBegin", members.stringVar);
-            Assert.AreEqual(ReturnCode.Fail, members.code);
+            Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
+            Assert.Equal("StringBegin", members.stringVar);
+            Assert.Equal(ReturnCode.Fail, members.code);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
@@ -249,7 +248,7 @@ namespace Tester.CodeGenTests
             var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
             var input = 1;
             var output = await grain.Echo(input);
-            Assert.AreEqual(input, output);
+            Assert.Equal(input, output);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("FSharp")]
@@ -258,7 +257,7 @@ namespace Tester.CodeGenTests
             var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
             var input = 1;
             var output = await grain.Echo(input);
-            Assert.AreEqual(input, output);
+            Assert.Equal(input, output);
         }
     }
 }

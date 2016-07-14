@@ -162,6 +162,7 @@ namespace OrleansSQLUtils.Storage
                     entry = new MembershipEntry
                     {
                         SiloAddress = GetSiloAddress(record, nameof(Columns.Port)),
+                        SiloName = TryGetSiloName(record),
                         HostName = record.GetValue<string>(nameof(Columns.HostName)),
                         Status = record.GetValue<SiloStatus>(nameof(Columns.Status)),
                         ProxyPort = record.GetValue<int>(nameof(Columns.ProxyPort)),
@@ -177,12 +178,28 @@ namespace OrleansSQLUtils.Storage
                         {
                             var split = s.Split(',');
                             return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]),
-                                TraceLogger.ParseDate(split[1]));
+                                LogFormatter.ParseDate(split[1]));
                         }));
                     }
                 }
 
                 return Tuple.Create(entry, GetVersion(record));
+            }
+
+            /// <summary>
+            /// This method is for compatibility with membership tables that
+            /// do not contain a SiloName field
+            /// </summary>
+            private static string TryGetSiloName(IDataRecord record)
+            {
+                for (var i = 0; i < record.FieldCount; ++i)
+                {
+                    if (record.GetName(i) == nameof(Columns.SiloName))
+                    {
+                        return (string) record.GetValue(i);
+                    }
+                }
+                return null;
             }
 
             internal static int GetVersion(IDataRecord record)
@@ -370,6 +387,11 @@ namespace OrleansSQLUtils.Storage
                 set { Add(nameof(DeploymentId), value); }
             }
 
+            internal string SiloName
+            {
+                set { Add(nameof(SiloName), value); }
+            }
+
             internal string HostName
             {
                 set { Add(nameof(HostName), value); }
@@ -417,7 +439,7 @@ namespace OrleansSQLUtils.Storage
                     Add(nameof(SuspectTimes), value == null
                         ? null
                         : string.Join("|", value.Select(
-                            s => $"{s.Item1.ToParsableString()},{TraceLogger.PrintDate(s.Item2)}")));
+                            s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
             }
         }

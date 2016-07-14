@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         internal ISiloMessageCenter Transport { get; private set; }
 
         private readonly Catalog catalog;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly ClusterConfiguration config;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
@@ -35,7 +35,7 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
-            logger = TraceLogger.GetLogger("Dispatcher", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
             errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;
@@ -85,8 +85,8 @@ namespace Orleans.Runtime
                 ActivationData target = catalog.GetOrCreateActivation(
                     message.TargetAddress, 
                     message.IsNewPlacement, 
-                    message.NewGrainType, 
-                    message.GenericGrainType, 
+                    message.NewGrainType,
+                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
                     out ignore);
 
@@ -487,7 +487,7 @@ namespace Orleans.Runtime
         /// Send an outgoing message
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
-        /// - add ordering info & maintain send order
+        /// - add ordering info and maintain send order
         /// 
         /// </summary>
         /// <param name="message"></param>
@@ -529,7 +529,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Resolve target address for a message
         /// - use transaction info
-        /// - check ordering info in message & sending activation
+        /// - check ordering info in message and sending activation
         /// - use sender's placement strategy
         /// </summary>
         /// <param name="message"></param>

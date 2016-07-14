@@ -13,14 +13,14 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class AzureBasedMembershipTable : IMembershipTable
     {
-        private TraceLogger logger;
+        private Logger logger;
         private OrleansSiloInstanceManager tableManager;
 
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger log)
         {
-            logger = traceLogger;
+            logger = log;
             AzureTableDefaultPolicies.MaxBusyRetries = config.MaxStorageBusyRetries;
-            TraceLogger.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
+            LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
                 config.DeploymentId, config.DataConnectionString);
@@ -52,8 +52,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_20, String.Format("Intermediate error reading silo entry for key {0} from the table {1}.",
-                                key.ToLongString(), tableManager.TableName), exc);
+                logger.Warn(ErrorCode.AzureTable_20,
+                    $"Intermediate error reading silo entry for key {key.ToLongString()} from the table {tableManager.TableName}.", exc);
                 throw;
             }
         }
@@ -70,8 +70,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_21, String.Format(
-                    "Intermediate error reading all silo entries {0}.", tableManager.TableName), exc);
+                logger.Warn(ErrorCode.AzureTable_21,
+                    $"Intermediate error reading all silo entries {tableManager.TableName}.", exc);
                 throw;
             }
         }
@@ -88,13 +88,14 @@ namespace Orleans.Runtime.MembershipService
                     tableEntry, versionEntry, tableVersion.VersionEtag);
 
                 if (result == false)
-                    logger.Warn(ErrorCode.AzureTable_22, String.Format("Insert failed due to contention on the table. Will retry. Entry {0}, table version = {1}", entry.ToFullString(), tableVersion));
+                    logger.Warn(ErrorCode.AzureTable_22,
+                        $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, table version = {tableVersion}");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_23, String.Format("Intermediate error inserting entry {0} tableVersion {1} to the table {2}.",
-                    entry.ToFullString(), (tableVersion == null ? "null" : tableVersion.ToString()), tableManager.TableName), exc);
+                logger.Warn(ErrorCode.AzureTable_23,
+                    $"Intermediate error inserting entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
                 throw;
             }
         }
@@ -109,13 +110,14 @@ namespace Orleans.Runtime.MembershipService
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
-                    logger.Warn(ErrorCode.AzureTable_24, String.Format("Update failed due to contention on the table. Will retry. Entry {0}, eTag {1}, table version = {2} ", entry.ToFullString(), etag, tableVersion));
+                    logger.Warn(ErrorCode.AzureTable_24,
+                        $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}, table version = {tableVersion} ");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_25, String.Format("Intermediate error updating entry {0} tableVersion {1} to the table {2}.",
-                        entry.ToFullString(), (tableVersion == null ? "null" : tableVersion.ToString()), tableManager.TableName), exc);
+                logger.Warn(ErrorCode.AzureTable_25,
+                    $"Intermediate error updating entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
                 throw;
             }
         }
@@ -130,7 +132,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.AzureTable_26, String.Format("Intermediate error updating IAmAlive field for entry {0} to the table {1}.", entry.ToFullString(), tableManager.TableName), exc);
+                logger.Warn(ErrorCode.AzureTable_26,
+                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {tableManager.TableName}.", exc);
                 throw;
             }
         }
@@ -158,9 +161,8 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            logger.Error(ErrorCode.AzureTable_61, String.Format(
-                                "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {0}. Ignoring this entry.",
-                                tableEntry), exc);
+                            logger.Error(ErrorCode.AzureTable_61,
+                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.", exc);
                         }
                     }
                 }
@@ -169,9 +171,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.AzureTable_60, String.Format(
-                    "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {0}.", 
-                    Utils.EnumerableToString(entries, tuple => tuple.Item1.ToString())), exc);
+                logger.Error(ErrorCode.AzureTable_60,
+                    $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, tuple => tuple.Item1.ToString())}.", exc);
                 throw;
             }
         }
@@ -213,11 +214,11 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.FaultZone))
                 parse.FaultZone = int.Parse(tableEntry.FaultZone);
 
-            parse.StartTime = !string.IsNullOrEmpty(tableEntry.StartTime) ? 
-                TraceLogger.ParseDate(tableEntry.StartTime) : default(DateTime);
+            parse.StartTime = !string.IsNullOrEmpty(tableEntry.StartTime) ?
+                LogFormatter.ParseDate(tableEntry.StartTime) : default(DateTime);
 
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
-                TraceLogger.ParseDate(tableEntry.IAmAliveTime) : default(DateTime);
+                LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default(DateTime);
 
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();
@@ -235,7 +236,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 string[] times = tableEntry.SuspectingTimes.Split('|');
                 foreach (string time in times)
-                    suspectingTimes.Add(TraceLogger.ParseDate(time));
+                    suspectingTimes.Add(LogFormatter.ParseDate(time));
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
@@ -265,8 +266,8 @@ namespace Orleans.Runtime.MembershipService
                 InstanceName = memEntry.SiloName,
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
-                StartTime = TraceLogger.PrintDate(memEntry.StartTime),
-                IAmAliveTime = TraceLogger.PrintDate(memEntry.IAmAliveTime)
+                StartTime = LogFormatter.PrintDate(memEntry.StartTime),
+                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime)
             };
 
             if (memEntry.SuspectTimes != null)
@@ -282,7 +283,7 @@ namespace Orleans.Runtime.MembershipService
                         timeList.Append('|');
                     }
                     siloList.Append(tuple.Item1.ToParsableString());
-                    timeList.Append(TraceLogger.PrintDate(tuple.Item2));
+                    timeList.Append(LogFormatter.PrintDate(tuple.Item2));
                     first = false;
                 }
 
@@ -305,7 +306,7 @@ namespace Orleans.Runtime.MembershipService
             return new SiloInstanceTableEntry
             {
                 DeploymentId = deploymentId,
-                IAmAliveTime = TraceLogger.PrintDate(memEntry.IAmAliveTime),
+                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 PartitionKey = deploymentId,
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)
             };

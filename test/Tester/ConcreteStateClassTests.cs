@@ -4,7 +4,6 @@ using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.General
 {
@@ -28,9 +27,9 @@ namespace UnitTests.General
             await grain.SetA(98, true); // deactivate grain after setting A
 
             var newVersion = await grain.GetVersion(); // get a new version from the new activation
-            Assert.AreNotEqual(originalVersion, newVersion);
+            Assert.NotEqual(originalVersion, newVersion);
             var a = await grain.GetA();
-            Assert.AreEqual(98, a); // value of A survive deactivation and reactivation of the grain
+            Assert.Equal(98, a); // value of A survive deactivation and reactivation of the grain
         }
     }
 }

@@ -393,6 +393,7 @@ namespace Orleans.SqlUtils
                 {
                     DeploymentId = deploymentId,
                     IAmAliveTime = membershipEntry.IAmAliveTime,
+                    SiloName = membershipEntry.SiloName,
                     HostName = membershipEntry.HostName,
                     SiloAddress = membershipEntry.SiloAddress,
                     StartTime = membershipEntry.StartTime,

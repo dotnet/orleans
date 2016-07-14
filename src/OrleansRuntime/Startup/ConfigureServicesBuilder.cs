@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Startup
         {
             if (configureServices == null)
             {
-                throw new ArgumentNullException("configureServices");
+                throw new ArgumentNullException(nameof(configureServices));
             }
 
             // Only support IServiceCollection parameters
@@ -25,17 +25,15 @@ namespace Orleans.Runtime.Startup
             MethodInfo = configureServices;
         }
 
-        public MethodInfo MethodInfo { get; private set; }
-
         public IServiceProvider Build (object instance, IServiceCollection services)
         {
             if (instance == null)
             {
-                throw new ArgumentNullException("instance");
+                throw new ArgumentNullException(nameof(instance));
             }
             if (services == null)
             {
-                throw new ArgumentNullException("services");
+                throw new ArgumentNullException(nameof(services));
             }
             return Invoke(instance, services);
         }
@@ -64,5 +62,7 @@ namespace Orleans.Runtime.Startup
 
             return serviceProvider;
         }
+
+        public MethodInfo MethodInfo { get; }
     }
 }

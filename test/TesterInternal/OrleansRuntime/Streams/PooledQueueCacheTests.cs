@@ -6,7 +6,7 @@ using System.Linq;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using UnitTests.StreamingTests;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -71,10 +71,10 @@ namespace UnitTests.OrleansRuntime.Streams
                     : 0 - realToken.EventIndex;
             }
 
-            public int Compare(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
                 int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                return results != 0 ? results : String.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+                return results == 0 && string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal)==0;
             }
         }
 
@@ -165,7 +165,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             // 10 buffers of 1k each
             public TestBlockPool()
-                : base(PooledBufferCount, pool => new FixedSizeBuffer(PooledBufferSize, pool))
+                : base(PooledBufferCount, () => new FixedSizeBuffer(PooledBufferSize))
             {
             }
 
@@ -189,7 +189,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             RunGoldenPath(cache, 111);
         }
@@ -203,7 +203,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             int startSequenceNuber = 222;
             startSequenceNuber = RunGoldenPath(cache, startSequenceNuber);
@@ -304,7 +304,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var bufferPool = new TestBlockPool();
             var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance);
+            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NoOpTestLogger.Instance);
             dataAdapter.PurgeAction = cache.Purge;
             int sequenceNumber = 10;
             IBatchContainer batch;

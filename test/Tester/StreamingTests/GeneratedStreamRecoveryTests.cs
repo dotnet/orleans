@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -61,7 +60,7 @@ namespace UnitTests.StreamingTests
                 Fixture.StreamProviderName);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
@@ -71,7 +70,7 @@ namespace UnitTests.StreamingTests
                 100);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
@@ -91,11 +90,11 @@ namespace UnitTests.StreamingTests
 
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-            Assert.AreEqual(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)
             {
-                Assert.AreEqual(true, result, "Control command result");
+                Assert.True(result, "Control command result");
             }
         }
     }

@@ -30,7 +30,7 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// The log.
         /// </summary>
-        private static readonly TraceLogger Log = TraceLogger.GetLogger("CodeGenerator");
+        private static readonly Logger Log = LogManager.GetLogger("CodeGenerator");
 
         /// <summary>
         /// Empty generated assemblies.
