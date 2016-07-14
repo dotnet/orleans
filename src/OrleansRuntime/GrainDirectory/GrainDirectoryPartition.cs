@@ -40,8 +40,6 @@ namespace Orleans.Runtime.GrainDirectory
     {
         public Dictionary<ActivationId, IActivationInfo> Instances { get; private set; }
         public int VersionTag { get; private set; }
-
-        // TODO the following field creates memory overhead for ALL grains in directory, perhaps it could be done differently
         public bool SingleInstance { get; private set; }
 
         private static readonly SafeRandom rand;
