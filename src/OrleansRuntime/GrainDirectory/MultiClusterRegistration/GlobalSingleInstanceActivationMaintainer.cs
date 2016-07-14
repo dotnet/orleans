@@ -39,6 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     await Task.Delay(period);
+                    if (!router.Running) break;
 
                     logger.Verbose("GSIP:M running periodic check (having waited {0})", period);
 
@@ -147,8 +148,6 @@ namespace Orleans.Runtime.GrainDirectory
         }
         private Task RunBatchedDemotion(List<Tuple<GrainId, KeyValuePair<ActivationId, IActivationInfo>>> entries)
         {
-            var addresses = new List<ActivationAddress>();
-
             foreach (var entry in entries)
                 router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.Doubtful, MultiClusterStatus.Owned);
 

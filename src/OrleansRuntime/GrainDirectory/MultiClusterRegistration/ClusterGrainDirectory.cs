@@ -13,9 +13,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly string clusterId;
         private readonly Logger logger;
 
-        // given that this is the most likely return value, pre-cache it
-        private readonly Task<RemoteClusterActivationResponse> cachedPassTask = Task.FromResult(RemoteClusterActivationResponse.Pass);
-
         public ClusterGrainDirectory(LocalGrainDirectory r, GrainId grainId, string clusterId) : base(grainId, r.MyAddress)
         {
             this.router = r;
@@ -56,10 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (forwardAddress == null)
             {
-                var response = ProcessRequestLocal(grain, requestClusterId);
-                return response == RemoteClusterActivationResponse.Pass 
-                    ? await cachedPassTask
-                    : ProcessRequestLocal(grain, requestClusterId);
+                return ProcessRequestLocal(grain, requestClusterId);
             }
             else
             {
@@ -205,11 +199,11 @@ namespace Orleans.Runtime.GrainDirectory
             return router.UnregisterManyAsync(addresses, 0);
         }
 
-        public Task ProcessDeletion(GrainId gid)
+        public Task ProcessDeletion(GrainId grainId)
         {
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
-            return router.DeleteGrainAsync(gid, 0);
+            return router.DeleteGrainAsync(grainId, 0);
         }
     }
 }

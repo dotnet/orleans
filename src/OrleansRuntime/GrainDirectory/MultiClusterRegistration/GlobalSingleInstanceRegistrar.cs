@@ -148,22 +148,22 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task UnregisterAsync(List<ActivationAddress> addresses, bool force)
         {
-            List<ActivationAddress> former_activations_in_this_cluster = null;
+            List<ActivationAddress> formerActivationsInThisCluster = null;
 
             foreach (var address in addresses)
             {
-                var existingact = directoryPartition.LookupAndRemoveActivation(address, force);
-                if (existingact != null
-                    && (existingact.RegistrationStatus == MultiClusterStatus.Owned 
-                        || existingact.RegistrationStatus == MultiClusterStatus.Doubtful))
+                var existingAct = directoryPartition.LookupAndRemoveActivation(address, force);
+                if (existingAct != null
+                    && (existingAct.RegistrationStatus == MultiClusterStatus.Owned 
+                        || existingAct.RegistrationStatus == MultiClusterStatus.Doubtful))
                 {
-                    if (former_activations_in_this_cluster == null)
-                        former_activations_in_this_cluster = new List<ActivationAddress>();
-                    former_activations_in_this_cluster.Add(address);
+                    if (formerActivationsInThisCluster == null)
+                        formerActivationsInThisCluster = new List<ActivationAddress>();
+                    formerActivationsInThisCluster.Add(address);
                 }
             }
 
-            if (former_activations_in_this_cluster == null)
+            if (formerActivationsInThisCluster == null)
                 return TaskDone.Done;
 
             // we must also remove cached references to former activations in this cluster
@@ -175,19 +175,19 @@ namespace Orleans.Runtime.GrainDirectory
                 return TaskDone.Done; // single cluster - no broadcast required
 
             // target clusters in current configuration, other than this one
-            var remoteclusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration().Clusters
+            var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration().Clusters
                 .Where(id => id != myClusterId).ToList();
 
             var tasks = new List<Task>();
-            foreach (var remotecluster in remoteclusters)
+            foreach (var remoteCluster in remoteClusters)
             {
                 // find gateway
-                var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
-                var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
+                var gossipOracle = Silo.CurrentSilo.LocalMultiClusterOracle;
+                var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
-                tasks.Add(clusterGrainDir.ProcessDeactivations(former_activations_in_this_cluster));
+                tasks.Add(clusterGrainDir.ProcessDeactivations(formerActivationsInThisCluster));
             }
             return Task.WhenAll(tasks);
         }
@@ -204,15 +204,15 @@ namespace Orleans.Runtime.GrainDirectory
                 return TaskDone.Done; // single cluster - no broadcast required
 
             // target ALL clusters, not just clusters in current configuration
-            var remoteclusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetActiveClusters()
+            var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetActiveClusters()
                 .Where(id => id != myClusterId).ToList();
 
             var tasks = new List<Task>();
-            foreach (var remotecluster in remoteclusters)
+            foreach (var remoteCluster in remoteClusters)
             {
                 // find gateway
-                var gossiporacle = Silo.CurrentSilo.LocalMultiClusterOracle;
-                var clusterGatewayAddress = gossiporacle.GetRandomClusterGateway(remotecluster);
+                var gossipOracle = Silo.CurrentSilo.LocalMultiClusterOracle;
+                var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
