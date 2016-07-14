@@ -57,18 +57,11 @@
 
             var invoker = this.invokable.GetInvoker(request.InterfaceId, this.genericGrainType);
             var observable = await invoker.Invoke(this.grain, request);
-
-            try
-            {
-                IUntypedObserverWrapper wrapper;
-                var subscriptionHandle = await StreamDelegateHelper.Subscribe(observable, observer, streamId, token, out wrapper);
-                subscription = new Subscription(subscriptionHandle, wrapper);
-                this.observers.Add(streamId, subscription);
-            }
-            catch (Exception exception)
-            {
-                await observer.OnErrorAsync(streamId, exception);
-            }
+            
+            IUntypedObserverWrapper wrapper;
+            var subscriptionHandle = await StreamDelegateHelper.Subscribe(observable, observer, streamId, token, out wrapper);
+            subscription = new Subscription(subscriptionHandle, wrapper);
+            this.observers.Add(streamId, subscription);
         }
 
         public Task Unsubscribe(Guid streamId)

@@ -11,6 +11,10 @@ namespace UnitTests.GrainInterfaces
     {
         IAsyncObservable<T> GetStream(T[] values);
         IAsyncObservable<string> JoinChatRoom(string room);
+        IAsyncObservable<T> Error(string message);
+        IAsyncObservable<T> ThrowOnSubscribe(string message);
+        IAsyncObservable<T> ThrowImmediately(string message);
+        IAsyncObservable<T> Empty();
     }
 
     public interface IChatRoomGrain : IGrainWithStringKey
@@ -55,6 +59,8 @@ namespace UnitTests.GrainInterfaces
         }
 
         public Func<T, StreamSequenceToken, Task> OnNextDelegate { get; set; } = (_, __) => Task.FromResult(0);
+        public Func<Exception, Task> OnErrorDelegate { get; set; } = _ => Task.FromResult(0);
+        public Func<Task> OnCompletedDelegate { get; set; } = () => Task.FromResult(0);
 
         public Task OnNextAsync(T value, StreamSequenceToken token = null)
         {
@@ -64,15 +70,13 @@ namespace UnitTests.GrainInterfaces
 
         public Task OnErrorAsync(Exception exception)
         {
-            return Task.FromResult(0);
+            return OnErrorDelegate(exception);
         }
 
         public Task OnCompletedAsync()
         {
-            return Task.FromResult(0);
+            return OnCompletedDelegate();
         }
-
-        public void Clear() => this.Buffer.Clear();
         
         public List<T> Buffer { get; }
     }

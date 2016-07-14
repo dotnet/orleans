@@ -116,6 +116,52 @@ namespace UnitTests.ReactiveStreams
             await handle.UnsubscribeAsync();
         }
 
+        /// <summary>
+        /// Tests that exceptions thrown by consumers are propagated to the producer.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Fact, TestCategory("Functional")]
+        public async Task ClientFaultTest()
+        {
+            var room = GrainFactory.GetGrain<IChatRoomGrain>("#orleans");
+
+            // Test consumer exceptions from OnNextAsync are propagated to the producer.
+            var observer = new BufferedObserver<string>();
+            var handle = await room.JoinRoom().SubscribeAsync(observer);
+            observer.OnNextDelegate = (value, token) => { throw new Exception(value); };
+            await Assert.ThrowsAsync<Exception>(() => room.SendMessage("hurrah!"));
+            await handle.UnsubscribeAsync();
+            
+            var grain = GrainFactory.GetGrain<IReactiveGrain<int>>(Guid.NewGuid());
+
+            // Test exceptions thrown in SubscribeAsync are propagated to consumers.
+            var observerTwo = new BufferedObserver<int>();
+            var exception = await Assert.ThrowsAsync<Exception>(() => grain.ThrowOnSubscribe("test").SubscribeAsync(observerTwo));
+            Assert.Equal("test", exception.Message);
+
+            // Test exceptions thrown in the method which returns the observable itself are propagated to consumers.
+            // Note that remote method is only invoked upon subscribe.
+            exception = await Assert.ThrowsAsync<Exception>(() => grain.ThrowImmediately("test again").SubscribeAsync(observerTwo));
+            Assert.Equal("test again", exception.Message);
+
+            // Test exceptions thrown in OnCompletedAsync are propagated to the producer.
+            observerTwo.OnCompletedDelegate = () => { throw new Exception("complete"); };
+            exception = await Assert.ThrowsAsync<Exception>(() => grain.Empty().SubscribeAsync(observerTwo));
+            Assert.Equal("complete", exception.Message);
+
+            observerTwo.OnErrorDelegate = e =>
+            {
+                Assert.Equal("error", e.Message);
+                return Task.FromResult(0);
+            };
+            await grain.Error("error").SubscribeAsync(observerTwo);
+
+            // Test exceptions thrown in OnErrorAsync are propagated to the producer.
+            observerTwo.OnErrorDelegate = _ => { throw new Exception("rorre"); };
+            exception = await Assert.ThrowsAsync<Exception>(() => grain.Error("error").SubscribeAsync(observerTwo));
+            Assert.Equal("rorre", exception.Message);
+        }
+
         // TODO: Tests:
         // Grain call OnNext for deactivated grain which does *not* called ResumeAsync on reactivation.
         // Client detects remote endpoint crash

@@ -12,7 +12,7 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     using Orleans.Streams;
-
+    
     public class ReactiveGrain<T> : Grain, IReactiveGrain<T>
     {
         public IAsyncObservable<T> GetStream(T[] values)
@@ -35,6 +35,30 @@ namespace UnitTests.Grains
         }
 
         public IAsyncObservable<string> JoinChatRoom(string room) => GrainFactory.GetGrain<IChatRoomGrain>(room).JoinRoom();
+
+        public IAsyncObservable<T> Error(string message)
+        {
+            return Observable.Create<T>(async observer =>
+            {
+                await observer.OnErrorAsync(new Exception(message));
+                return new SimpleStreamSubscriptionHandle<T>();
+            });
+        }
+
+        public IAsyncObservable<T> ThrowOnSubscribe(string message)
+        {
+            return Observable.Create<T>(observer =>
+            {
+                throw new Exception(message);
+            });
+        }
+
+        public IAsyncObservable<T> ThrowImmediately(string message)
+        {
+            throw new Exception(message);
+        }
+
+        public IAsyncObservable<T> Empty() => Observable.Empty<T>();
     }
 
     public class ChatRoomGrain : Grain, IChatRoomGrain, IGrainInvokeInterceptor
@@ -183,23 +207,7 @@ namespace UnitTests.Grains
             return this.SubscribeAsync(observer);
         }
 
-        public async Task OnNext(T value)
-        {
-            List<IAsyncObserver<T>> toRemove = null;
-            await Task.WhenAll(observers.Select(async observer =>
-            {
-                try
-                {
-                    await observer.OnNextAsync(value);
-                }
-                catch
-                {
-                    if (toRemove == null) toRemove = new List<IAsyncObserver<T>>();
-                    toRemove.Add(observer);
-                }
-            }));
-            toRemove?.ForEach(_ => observers.Remove(_));
-        }
+        public Task OnNext(T value) => Task.WhenAll(this.observers.Select(observer => observer.OnNextAsync(value)));
 
         public int Count => observers.Count;
     }
@@ -311,7 +319,7 @@ namespace UnitTests.Grains
                 StreamFilterPredicate filterFunc = null,
                 object filterData = null)
             {
-                throw new NotImplementedException();
+                return this.SubscribeAsync(observer);
             }
         }
 
