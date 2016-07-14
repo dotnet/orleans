@@ -110,6 +110,11 @@ namespace Orleans
             throw new ArgumentException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
+        public static bool IsPrimaryKeyBasedOnLong(this IAddressable grain)
+        {
+            return GetGrainId(grain).IsLongKey;
+        }
+
         /// <summary>
         /// Returns the long representation of a grain primary key.
         /// </summary>
