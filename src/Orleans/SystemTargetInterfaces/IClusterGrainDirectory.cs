@@ -86,14 +86,12 @@ namespace Orleans.SystemTargetInterfaces
         /// to give them the opportunity to remove the cached registration
         /// </summary>
         /// <param name="addresses">the list of activations</param>
-        /// <returns></returns>
         Task ProcessDeactivations(List<ActivationAddress> addresses);
 
         /// <summary>
         /// Called on remote clusters when deletion of all grain registrations is asked for.
         /// </summary>
-        /// <param name="gid"></param>
-        /// <returns></returns>
-        Task ProcessDeletion(GrainId gid);
+        /// <param name="grainId"></param>
+        Task ProcessDeletion(GrainId grainId);
     }
 }

@@ -652,7 +652,7 @@ namespace Orleans.Runtime.GrainDirectory
         private void UnregisterOrPutInForwardList(IEnumerable<ActivationAddress> addresses, int hopCount,
             ref Dictionary<SiloAddress, List<ActivationAddress>> forward, List<Task> tasks, string context)
         {
-            Dictionary<IGrainRegistrar, List<ActivationAddress>> unregister_batches = null;
+            Dictionary<IGrainRegistrar, List<ActivationAddress>> unregisterBatches = new Dictionary<IGrainRegistrar, List<ActivationAddress>>();
 
             foreach (var address in addresses)
             {
@@ -660,8 +660,9 @@ namespace Orleans.Runtime.GrainDirectory
                 var forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, context);
 
                 if (forwardAddress != null)
+                {
                     AddToDictionary(ref forward, forwardAddress, address);
-
+                }
                 else
                 {
                     // we are the owner
@@ -669,21 +670,21 @@ namespace Orleans.Runtime.GrainDirectory
                     var registrar = RegistrarManager.Instance.GetRegistrarForGrain(address.Grain);
 
                     if (registrar.IsSynchronous)
+                    {
                         registrar.Unregister(address, true);
+                    }
                     else
                     {
-                        if (unregister_batches == null)
-                            unregister_batches = new Dictionary<IGrainRegistrar, List<ActivationAddress>>();
                         List<ActivationAddress> list;
-                        if (!unregister_batches.TryGetValue(registrar, out list))
-                            unregister_batches.Add(registrar, list = new List<ActivationAddress>());
+                        if (!unregisterBatches.TryGetValue(registrar, out list))
+                            unregisterBatches.Add(registrar, list = new List<ActivationAddress>());
                         list.Add(address);
                     }
                 }
             }
 
             // batch-unregister for each asynchronous registrar
-            foreach(var kvp in unregister_batches)
+            foreach (var kvp in unregisterBatches)
             {
                 tasks.Add(kvp.Key.UnregisterAsync(kvp.Value, true));
             }
