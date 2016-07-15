@@ -9,6 +9,7 @@ using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
+using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace UnitTests.GeoClusterTests
 {
@@ -174,13 +175,14 @@ namespace UnitTests.GeoClusterTests
             await Task.Yield();
 
             var x = Next();
+            var gref = ClientA0.GetGrainRef(x);
             ClientA0.CallGrain(x);
             ClientA1.CallGrain(x);
             ClientB0.CallGrain(x);
             ClientB1.CallGrain(x);
             ClientC0.CallGrain(x);
             ClientC1.CallGrain(x);
-            Assert.Equal(7, ClientA0.CallGrain(x));
+            Assert.AreEqual(7, ClientA0.CallGrain(x), gref);
         }
 
         public async Task ParallelCalls()
@@ -188,6 +190,7 @@ namespace UnitTests.GeoClusterTests
             await Task.Yield();
 
             var x = Next();
+            var gref = ClientA0.GetGrainRef(x);
             Parallel.Invoke(
               () => ClientA0.CallGrain(x),
               () => ClientA1.CallGrain(x),
@@ -196,7 +199,7 @@ namespace UnitTests.GeoClusterTests
               () => ClientC0.CallGrain(x),
               () => ClientC1.CallGrain(x)
             );
-            Assert.Equal(7, ClientA0.CallGrain(x));
+            Assert.AreEqual(7, ClientA0.CallGrain(x), gref);
         }
 
         public async Task ManyParallelCalls()
@@ -204,15 +207,17 @@ namespace UnitTests.GeoClusterTests
             await Task.Yield();
 
             var x = Next();
+            var gref = ClientA0.GetGrainRef(x);
             var clients = new ClientWrapper[] { ClientA0, ClientB0, ClientC0 };
             // concurrently chaotically increment (numupdates) times
             Parallel.For(0, 20, new ParallelOptions() { MaxDegreeOfParallelism = 4 }, i => clients[i % 3].CallGrain(x));
-            Assert.Equal(21, ClientC1.CallGrain(x));
+            Assert.AreEqual(21, ClientC1.CallGrain(x), gref);
         }
 
         private class GrainInfo
         {
             public int x;
+            public string gref;
             public string runtimeid;
             public int client;
         }
@@ -231,9 +236,10 @@ namespace UnitTests.GeoClusterTests
                      var g = new GrainInfo();
                      g.x = Next();
                      g.client = i % Clients.Length;
+                     g.gref = Clients[g.client].GetGrainRef(g.x);
                      g.runtimeid = Clients[g.client].GetRuntimeId(g.x);
                      var count = Clients[g.client].CallGrain(g.x);
-                     Assert.Equal(1, count);
+                     Assert.AreEqual(1, count, g.gref);
                      list.Add(g);
                      return list;
                  },
@@ -249,7 +255,7 @@ namespace UnitTests.GeoClusterTests
                  });
 
             // there should be 6 different silos
-            Assert.Equal(6, grainsbysilo.Keys.Count);
+            Assert.AreEqual(6, grainsbysilo.Keys.Count, "all silos get some grains");
 
             foreach (var kvp in grainsbysilo)
             {
@@ -269,7 +275,7 @@ namespace UnitTests.GeoClusterTests
             // clients should have grains that are local to their cluster
             for (int i = 0; i < 6; i++)
                 foreach (var g in GrainsBySiloSorted[i])
-                    Assert.Equal(g.client / 3, i / 3);
+                    Assert.AreEqual(g.client / 3, i / 3, g.gref);
 
             // deactivate the grains
             Parallel.ForEach(grainsbysilo.SelectMany((kvp, i) => kvp.Value),
@@ -290,7 +296,7 @@ namespace UnitTests.GeoClusterTests
                {
                    // since grain was deactivated, count should be 1
                    var count = Clients[Next() % Clients.Length].CallGrain(g.x);
-                   Assert.Equal(1, count);
+                   Assert.AreEqual(1, count, g.gref);
                });
 
         }
@@ -298,10 +304,11 @@ namespace UnitTests.GeoClusterTests
         public async Task Deact()
         {
             var x = Next();
+            var gref = ClientA0.GetGrainRef(x);
             var id = ClientA0.GetRuntimeId(x);
             WriteLog("Grain {0} at {1}", ClientA0.GetGrainRef(x), id);
-            Assert.True(id == Clusters[ClusterA].Silos[0].Silo.SiloAddress.ToString()
-                     || id == Clusters[ClusterA].Silos[1].Silo.SiloAddress.ToString());
+            Assert.IsTrue(id == Clusters[ClusterA].Silos[0].Silo.SiloAddress.ToString()
+                     || id == Clusters[ClusterA].Silos[1].Silo.SiloAddress.ToString(), gref);
 
             // ensure presence in caches
             ClientA0.CallGrain(x);  
@@ -317,11 +324,11 @@ namespace UnitTests.GeoClusterTests
 
             // should be gone now, and allocated in same cluster as client
             var val = ClientB0.CallGrain(x);
-            Assert.Equal(1, val);
+            Assert.AreEqual(1, val, gref);
             var newid = ClientB0.GetRuntimeId(x);
             WriteLog("Grain {0} at {1}", ClientB0.GetGrainRef(x), newid);
-            Assert.True(newid == Clusters[ClusterB].Silos[0].Silo.SiloAddress.ToString()
-                     || newid == Clusters[ClusterB].Silos[1].Silo.SiloAddress.ToString());
+            Assert.IsTrue(newid == Clusters[ClusterB].Silos[0].Silo.SiloAddress.ToString()
+                     || newid == Clusters[ClusterB].Silos[1].Silo.SiloAddress.ToString(), gref);
         }
     }
 }
