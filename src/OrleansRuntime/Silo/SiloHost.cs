@@ -77,6 +77,7 @@ namespace Orleans.Runtime.Host
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
         private bool disposed;
+        private Exception initExc;
 
         /// <summary>
         /// Constructor
@@ -122,11 +123,13 @@ namespace Orleans.Runtime.Host
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
                 orleans = new Silo(Name, Type, Config);
+                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", Name, Type);
             }
             catch (Exception exc)
             {
                 ReportStartupError(exc);
                 orleans = null;
+                initExc = exc;
             }
         }
 
@@ -199,7 +202,7 @@ namespace Orleans.Runtime.Host
                 }
                 else
                 {
-                    throw new InvalidOperationException("Cannot start silo " + this.Name + " due to prior initialization error");
+                    throw new InvalidOperationException("Cannot start silo " + this.Name + " due to prior initialization error", initExc);
                 }
             }
             catch (Exception exc)
