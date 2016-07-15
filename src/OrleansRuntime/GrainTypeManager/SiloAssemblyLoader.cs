@@ -92,7 +92,7 @@ namespace Orleans.Runtime
                         if (definition == typeof(Grain<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
-                            if (stateArg.GetTypeInfo().IsClass)
+                            if (stateArg.GetTypeInfo().IsClass || stateArg.GetTypeInfo().IsValueType)
                             {
                                 grainStateType = stateArg;
                                 break;
