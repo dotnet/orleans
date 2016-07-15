@@ -205,7 +205,7 @@ namespace Orleans.Runtime.Host
         public void Stop()
         {
             logger.Info(ErrorCode.Runtime_Error_100290, "Stopping {0}", this.GetType().FullName);
-            serviceRuntimeWrapper.UnsubscribeFromStoppingNotifcation(this, HandleAzureRoleStopping);
+            serviceRuntimeWrapper.UnsubscribeFromStoppingNotification(this, HandleAzureRoleStopping);
             host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
@@ -247,7 +247,7 @@ namespace Orleans.Runtime.Host
 			logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
 
 			// Hook up to receive notification of Azure role stopping events
-            serviceRuntimeWrapper.SubscribeForStoppingNotifcation(this, HandleAzureRoleStopping);
+            serviceRuntimeWrapper.SubscribeForStoppingNotification(this, HandleAzureRoleStopping);
 
 			if (host.IsStarted)
 			{
