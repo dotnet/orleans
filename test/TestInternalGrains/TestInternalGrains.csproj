@@ -79,6 +79,7 @@
     <Compile Include="TestExtension.cs" />
     <Compile Include="TestGrain.cs" />
     <Compile Include="TimerGrain.cs" />
+    <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansManager\OrleansManager.csproj">

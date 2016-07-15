@@ -325,6 +325,26 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_Read_Write_Struct_State()
+        {
+            const string providerName = "test1";
+            Guid id = Guid.NewGuid();
+            var grain = GrainClient.GrainFactory.GetGrain<IValueTypeTestGrain>(id);
+
+            var initial = await grain.GetStateData();
+            Assert.AreEqual(0, initial);
+
+            await grain.SetStateData(long.MaxValue);
+
+            MockStorageProvider storageProvider = FindStorageProviderInUse(providerName);
+
+            Assert.AreEqual(2, storageProvider.ReadCount, "StorageProvider #Reads");
+            Assert.AreEqual(1, storageProvider.WriteCount, "StorageProvider #Writes");
+
+            Assert.AreEqual(long.MaxValue, storageProvider.GetLastState<System.Int64>(), "Store-Field1");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Write()
         {
             const string providerName = "test1";
