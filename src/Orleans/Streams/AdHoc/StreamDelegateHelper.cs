@@ -2,6 +2,7 @@ namespace Orleans.Streams.AdHoc
 {
     using System;
     using System.Collections.Concurrent;
+    using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
     using System.Threading.Tasks;
@@ -104,7 +105,11 @@ namespace Orleans.Streams.AdHoc
                                            true);
 
             // Construct the method which this IL will call.
-            var genericMethod = SubscribeMethodInfo.MakeGenericMethod(observableType.GetTypeInfo().GetGenericArguments()[0], observableType);
+            var elementType =
+                observableType.GetTypeInfo()
+                              .ImplementedInterfaces.First(_ => _.IsConstructedGenericType && _.GetGenericTypeDefinition() == typeof(IAsyncObservable<>))
+                              .GetGenericArguments()[0];
+            var genericMethod = SubscribeMethodInfo.MakeGenericMethod(elementType, observableType);
 
             // Emit IL which calls the constructed method.
             var emitter = method.GetILGenerator();
@@ -125,7 +130,8 @@ namespace Orleans.Streams.AdHoc
             var method = new DynamicMethod(handleType.Name + "Unsubscribe", typeof(Task), new[] { typeof(object) }, handleType.GetTypeInfo().Module, true);
 
             // Construct the method which this IL will call.
-            var genericMethod = UnsubscribeMethodInfo.MakeGenericMethod(handleType.GetTypeInfo().GetGenericArguments()[0], handleType);
+            var elementType = GetStreamSubscriptionHandleBaseType(handleType.GetTypeInfo())?.GetGenericArguments()[0];
+            var genericMethod = UnsubscribeMethodInfo.MakeGenericMethod(elementType, handleType);
 
             // Emit IL which calls the constructed method.
             var emitter = method.GetILGenerator();
@@ -134,6 +140,16 @@ namespace Orleans.Streams.AdHoc
             emitter.Emit(OpCodes.Ret);
 
             return (UnsubscribeDelegate)method.CreateDelegate(typeof(UnsubscribeDelegate));
+        }
+
+        private static Type GetStreamSubscriptionHandleBaseType(TypeInfo type)
+        {
+            while (true)
+            {
+                if (type == null) return null;
+                if (type.IsConstructedGenericType && type.GetGenericTypeDefinition() == typeof(StreamSubscriptionHandle<>)) return type;
+                type = type.BaseType?.GetTypeInfo();
+            }
         }
     }
 }

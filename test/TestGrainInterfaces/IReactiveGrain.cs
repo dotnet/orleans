@@ -15,6 +15,7 @@ namespace UnitTests.GrainInterfaces
         IAsyncObservable<T> ThrowOnSubscribe(string message);
         IAsyncObservable<T> ThrowImmediately(string message);
         IAsyncObservable<T> Empty();
+        IAsyncObservable<StreamSequenceToken> GetSequenceTokenObservable();
     }
 
     public interface IChatRoomGrain : IGrainWithStringKey
@@ -37,6 +38,21 @@ namespace UnitTests.GrainInterfaces
     public class ChatUserGrainState
     {
         public Dictionary<string, ChatRoomMailbox> Rooms { get; } = new Dictionary<string, ChatRoomMailbox>();
+    }
+
+    [Serializable]
+    public class SimpleStreamSequenceToken : StreamSequenceToken
+    {
+        public Guid Value { get; } = Guid.NewGuid();
+        public override bool Equals(StreamSequenceToken other)
+        {
+            return (other as SimpleStreamSequenceToken)?.Value == this.Value;
+        }
+
+        public override int CompareTo(StreamSequenceToken other)
+        {
+            return (other as SimpleStreamSequenceToken)?.Value.CompareTo(this.Value) ?? -1;
+        }
     }
 
     [Serializable]

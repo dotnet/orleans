@@ -8,6 +8,7 @@ using Xunit;
 namespace UnitTests.ReactiveStreams
 {
     using Orleans.Serialization;
+    using Orleans.Streams;
 
     public class ReactiveStreamsTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -131,7 +132,7 @@ namespace UnitTests.ReactiveStreams
             observer.OnNextDelegate = (value, token) => { throw new Exception(value); };
             await Assert.ThrowsAsync<Exception>(() => room.SendMessage("hurrah!"));
             await handle.UnsubscribeAsync();
-            
+
             var grain = GrainFactory.GetGrain<IReactiveGrain<int>>(Guid.NewGuid());
 
             // Test exceptions thrown in SubscribeAsync are propagated to consumers.
@@ -162,6 +163,36 @@ namespace UnitTests.ReactiveStreams
             Assert.Equal("rorre", exception.Message);
         }
 
+        /// <summary>
+        /// Tests that <see cref="StreamSequenceToken"/> is correctly propagated.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Fact, TestCategory("Functional")]
+        public async Task StreamSequenceTokenTests()
+        {
+            var grain = GrainFactory.GetGrain<IReactiveGrain<int>>(Guid.NewGuid());
+
+            // Test exceptions thrown in SubscribeAsync are propagated to consumers.
+            var token = new StreamSequenceToken[1];
+            var observer = new BufferedObserver<StreamSequenceToken>
+            {
+                OnNextDelegate = (val, tok) =>
+                {
+                    token[0] = val;
+                    Assert.Equal(val, tok);
+                    return Task.FromResult(0);
+                }
+            };
+
+            var testToken = new SimpleStreamSequenceToken();
+            var handle = await grain.GetSequenceTokenObservable().SubscribeAsync(observer, testToken);
+            Assert.Equal(token, observer.Buffer);
+
+            testToken = new SimpleStreamSequenceToken();
+            await handle.ResumeAsync(observer, testToken);
+            Assert.Equal(token, observer.Buffer);
+        }
+
         // TODO: Tests:
         // Grain call OnNext for deactivated grain which does *not* called ResumeAsync on reactivation.
         // Client detects remote endpoint crash
@@ -169,5 +200,9 @@ namespace UnitTests.ReactiveStreams
         // Round-trip all serializable types
         // Reentrancy tests
         // Fault injection tests
+
+        // StreamSubscriptionHandle<T>:
+        //   Ensure ResumeAsync is called on the SSH which the producer returns.
+        //   ResumeAsync() failure from producer-provided handle
     }
 }

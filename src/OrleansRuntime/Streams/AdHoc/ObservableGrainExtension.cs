@@ -21,7 +21,7 @@
         private readonly IAddressable grain;
 
         /// <summary>
-        /// The mapping between stream id and disposable for each observer.
+        /// The mapping between stream id and subscription.
         /// </summary>
         private readonly Dictionary<Guid, Subscription> observers = new Dictionary<Guid, Subscription>();
 
@@ -64,6 +64,7 @@
             this.observers.Add(streamId, subscription);
         }
 
+#warning call unsubscribe when remote endpoint fails
         public Task Unsubscribe(Guid streamId)
         {
             // If no subscription exists, return success.

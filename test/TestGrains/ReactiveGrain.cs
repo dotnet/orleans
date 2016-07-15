@@ -12,9 +12,11 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     using Orleans.Streams;
-    
+
     public class ReactiveGrain<T> : Grain, IReactiveGrain<T>
     {
+        private Task<StreamSequenceToken> lastStreamSequenceToken;
+
         public IAsyncObservable<T> GetStream(T[] values)
         {
             return Observable.Create<T>(async observer =>
@@ -59,6 +61,26 @@ namespace UnitTests.Grains
         }
 
         public IAsyncObservable<T> Empty() => Observable.Empty<T>();
+
+        public IAsyncObservable<StreamSequenceToken> GetSequenceTokenObservable() => new ObservableWhichUsesTokens();
+
+        private class ObservableWhichUsesTokens : IAsyncObservable<StreamSequenceToken>
+        {
+            public Task<StreamSubscriptionHandle<StreamSequenceToken>> SubscribeAsync(IAsyncObserver<StreamSequenceToken> observer)
+            {
+                throw new NotImplementedException();
+            }
+
+            public async Task<StreamSubscriptionHandle<StreamSequenceToken>> SubscribeAsync(
+                IAsyncObserver<StreamSequenceToken> observer,
+                StreamSequenceToken token,
+                StreamFilterPredicate filterFunc = null,
+                object filterData = null)
+            {
+                await observer.OnNextAsync(token, token);
+                return new SimpleStreamSubscriptionHandle<StreamSequenceToken>();
+            }
+        }
     }
 
     public class ChatRoomGrain : Grain, IChatRoomGrain, IGrainInvokeInterceptor
