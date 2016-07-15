@@ -470,7 +470,10 @@ namespace Orleans.Runtime
         public static Message CreateMessage(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
             var message = pool.Allocate();
+            if (message.metadata == null)
+            {
             message.metadata = new Dictionary<string, object>();
+            }
 
             var input = new BinaryTokenStreamReader(header);
             var headers = SerializationManager.DeserializeMessageHeaders(input);
