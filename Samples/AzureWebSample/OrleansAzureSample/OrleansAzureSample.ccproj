@@ -47,7 +47,6 @@
       <RoleType>Worker</RoleType>
       <RoleName>OrleansAzureSilos</RoleName>
       <UpdateDiagnosticsConnectionStringOnPublish>True</UpdateDiagnosticsConnectionStringOnPublish>
-      <!--<UpdateDiagnosticsConnectionStringOnPublish>True</UpdateDiagnosticsConnectionStringOnPublish>-->
     </ProjectReference>
     <ProjectReference Include="..\WebRole\WebRole.csproj">
       <Name>WebRole</Name>
