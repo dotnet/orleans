@@ -49,7 +49,6 @@
     <Compile Include="Streams\Common\PooledCache\FixedSizeObjectPool.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeBuffer.cs" />
     <Compile Include="Streams\Common\PooledCache\ICacheDataAdapter.cs" />
-    <Compile Include="Streams\Common\PooledCache\IObjectPool.cs" />
     <Compile Include="Streams\Common\PooledCache\PooledQueueCache.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessagePool.cs" />
     <Compile Include="Streams\Common\PooledCache\ObjectPool.cs" />

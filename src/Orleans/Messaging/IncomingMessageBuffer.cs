@@ -115,7 +115,7 @@ namespace Orleans.Runtime
             }
 
             // build message
-            msg = new Message(header, body, !supportForwarding);
+            msg = Message.CreateMessage(header, body, !supportForwarding);
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
             if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)

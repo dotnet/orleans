@@ -2,6 +2,7 @@
 using System.Linq;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
