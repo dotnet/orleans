@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
         public bool DisposeScheduled { get; set; }
 
-        private readonly Dictionary<Header, object> headers;
+        private Dictionary<Header, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
@@ -472,15 +472,17 @@ namespace Orleans.Runtime
             var message = pool.Allocate();
             if (message.metadata == null)
             {
-            message.metadata = new Dictionary<string, object>();
+                message.metadata = new Dictionary<string, object>();
             }
 
             var input = new BinaryTokenStreamReader(header);
-            var headers = SerializationManager.DeserializeMessageHeaders(input);
-            foreach (var h in headers)
+            if (message.headers == null)
             {
-                message.headers[h.Key] = h.Value;
+                // 17: see line 440
+                message.headers = new Dictionary<Header, object>(17);
             }
+
+            SerializationManager.DeserializeMessageHeaders(input, message.headers);
 
             if (deserializeBody)
             {
