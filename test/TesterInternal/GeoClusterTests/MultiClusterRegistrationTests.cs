@@ -1,5 +1,6 @@
 ﻿using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,10 +88,20 @@ namespace UnitTests.GeoClusterTests
             var globalserviceid = Guid.NewGuid();
             random = new Random();
 
+            Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
+            {
+                // logging  
+                foreach (var o in c.Overrides)
+                {
+                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Catalog", Severity.Verbose));
+                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Orleans.GrainDirectory.LocalGrainDirectory", Severity.Verbose));
+                }
+            };
+
             // Create 3 clusters, each with 2 silos. 
-            NewGeoCluster(globalserviceid, ClusterA, 2);
-            NewGeoCluster(globalserviceid, ClusterB, 2);
-            NewGeoCluster(globalserviceid, ClusterC, 2);
+            NewGeoCluster(globalserviceid, ClusterA, 2, addtracing);
+            NewGeoCluster(globalserviceid, ClusterB, 2, addtracing);
+            NewGeoCluster(globalserviceid, ClusterC, 2, addtracing);
 
             WriteLog("Clusters are ready (elapsed = {0})", stopwatch.Elapsed);
 
