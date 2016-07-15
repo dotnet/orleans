@@ -105,6 +105,7 @@ namespace Orleans.Streams.AdHoc
                                            true);
 
             // Construct the method which this IL will call.
+            // Note that this method will not function correctly for types which implement IAsyncOservable<> for more than one type.
             var elementType =
                 observableType.GetTypeInfo()
                               .ImplementedInterfaces.First(_ => _.IsConstructedGenericType && _.GetGenericTypeDefinition() == typeof(IAsyncObservable<>))
