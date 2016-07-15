@@ -1,4 +1,4 @@
-﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+﻿
 using Orleans.Counter.Control;
 using Xunit;
 
@@ -11,34 +11,34 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
             
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/r" }));
-            Assert.IsFalse(prog.Unregister);
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/register" }));
-            Assert.IsFalse(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/r" }));
+            Assert.False(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/register" }));
+            Assert.False(prog.Unregister);
 
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/u" }));
-            Assert.IsTrue(prog.Unregister);
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/unregister" }));
-            Assert.IsTrue(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/u" }));
+            Assert.True(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/unregister" }));
+            Assert.True(prog.Unregister);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseUsageArguments()
         {
             CounterControl prog = new CounterControl();
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/?" }));
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/help" }));
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/?", "/r", "/u" }));
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/r", "/u", "/?" }));
+            Assert.False(prog.ParseArguments(new string[] { "/?" }));
+            Assert.False(prog.ParseArguments(new string[] { "/help" }));
+            Assert.False(prog.ParseArguments(new string[] { "/?", "/r", "/u" }));
+            Assert.False(prog.ParseArguments(new string[] { "/r", "/u", "/?" }));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseBadArguments()
         {
             CounterControl prog = new CounterControl();
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/xyz" }));
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/xyz", "/r", "/u" }));
-            Assert.IsFalse(prog.ParseArguments(new string[] { "/r", "/u", "/xyz" }));
+            Assert.False(prog.ParseArguments(new string[] { "/xyz" }));
+            Assert.False(prog.ParseArguments(new string[] { "/xyz", "/r", "/u" }));
+            Assert.False(prog.ParseArguments(new string[] { "/r", "/u", "/xyz" }));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -46,20 +46,20 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
 
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/r", "/u" }));
-            Assert.IsTrue(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/r", "/u" }));
+            Assert.True(prog.Unregister);
 
             // Last arg wins
-            Assert.IsTrue(prog.ParseArguments(new string[] { "/u", "/r" }));
-            Assert.IsFalse(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { "/u", "/r" }));
+            Assert.False(prog.Unregister);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void ParseNoArgs()
         {
             CounterControl prog = new CounterControl();
-            Assert.IsTrue(prog.ParseArguments(new string[] { }));
-            Assert.IsFalse(prog.Unregister);
+            Assert.True(prog.ParseArguments(new string[] { }));
+            Assert.False(prog.Unregister);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -67,7 +67,7 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
             prog.ParseArguments(new string[] { "/r" });
-            Assert.IsTrue(prog.NeedRunAsAdministrator);
+            Assert.True(prog.NeedRunAsAdministrator);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -75,7 +75,7 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
             prog.ParseArguments(new string[] { "/u" });
-            Assert.IsTrue(prog.NeedRunAsAdministrator);
+            Assert.True(prog.NeedRunAsAdministrator);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -83,7 +83,7 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
             prog.ParseArguments(new string[] { "/?" });
-            Assert.IsFalse(prog.NeedRunAsAdministrator);
+            Assert.False(prog.NeedRunAsAdministrator);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -91,7 +91,7 @@ namespace UnitTests
         {
             CounterControl prog = new CounterControl();
             prog.ParseArguments(new string[] { "/xyz" });
-            Assert.IsFalse(prog.NeedRunAsAdministrator);
+            Assert.False(prog.NeedRunAsAdministrator);
         }
     }
 }

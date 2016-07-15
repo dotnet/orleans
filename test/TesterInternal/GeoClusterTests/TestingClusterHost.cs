@@ -9,8 +9,8 @@ using System.Globalization;
 using Orleans.Runtime.Configuration;
 using System.Net;
 using Orleans;
-using Assert = Xunit.Assert;
 using Tester;
+using Xunit;
 
 namespace Tests.GeoClusterTests
 {

@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
@@ -30,7 +30,7 @@ namespace UnitTests.Grains
             for (var i = 0; i < iterationCount; ++i)
             {
                 var n = await target.OnSerialStress(i);
-                Assert.AreEqual(10000 + i, n);
+                Assert.Equal(10000 + i, n);
             }
         }
 
@@ -45,8 +45,8 @@ namespace UnitTests.Grains
                     .ContinueWith(
                         completed =>
                             {
-                                Assert.IsTrue(completed.IsCompleted);
-                                Assert.AreEqual(10000 + n, completed.Result);
+                                Assert.True(completed.IsCompleted);
+                                Assert.Equal(10000 + n, completed.Result);
                             });
                 
             }

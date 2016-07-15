@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+
 using Orleans;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -28,13 +28,13 @@ namespace UnitTests.General
             bool ok = writer.SetValue(x).Wait(timeout);
             if (!ok) throw new TimeoutException();
             int y = reader.GetValue().Result;
-            Assert.AreEqual(x, y);
+            Assert.Equal(x, y);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
-            Xunit.Assert.Throws<InvalidCastException>(() =>
+            Assert.Throws<InvalidCastException>(() =>
             {
                 reader = GrainClient.GrainFactory.GetGrain<IMultifacetReader>(GetRandomGrainId());
                 writer = (IMultifacetWriter)reader;
@@ -50,7 +50,7 @@ namespace UnitTests.General
             IMultifacetReader reader = await factory.GetReader(grain /*"MultifacetFactory"*/);
             writer.SetValue(5).Wait();
             int v = reader.GetValue().Result;
-            Assert.AreEqual(5, v);
+            Assert.Equal(5, v);
             
         }
 
@@ -65,7 +65,7 @@ namespace UnitTests.General
             IMultifacetReader reader = await factory.GetReader();
             writer.SetValue(10).Wait();
             int v = reader.GetValue().Result;
-            Assert.AreEqual(10, v);
+            Assert.Equal(10, v);
         }
     }
 }

@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
@@ -10,7 +10,6 @@ using Orleans.TestingHost;
 using UnitTests.StorageTests;
 using Orleans.MultiCluster;
 using Xunit;
-using Assert = Xunit.Assert;
 
 namespace Tests.GeoClusterTests
 {
