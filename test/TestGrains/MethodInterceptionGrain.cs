@@ -56,5 +56,10 @@ namespace UnitTests.Grains
         public class MessWithResultAttribute : Attribute
         {
         }
+
+        public Task<string> SayHello()
+        {
+            return Task.FromResult("Hello");
+        }
     }
 }

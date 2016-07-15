@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.Common
             }
             dataAdapter = cacheDataAdapter;
             messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(
-                pool => new CachedMessageBlock<TCachedMessage>(pool));
+                () => new CachedMessageBlock<TCachedMessage>());
         }
 
         /// <summary>

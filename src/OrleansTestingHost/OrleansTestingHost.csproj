@@ -56,6 +56,11 @@
     <Compile Include="Extensions\TestConfigurationExtensions.cs" />
     <Compile Include="OrleansTestSecrets.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="TestStorageProviders\FaultInjectionStorageProvider.cs" />
+    <Compile Include="TestStorageProviders\FaultyMemoryStorage.cs" />
+    <Compile Include="TestStorageProviders\IStorageFaultGrain.cs" />
+    <Compile Include="TestStorageProviders\StorageFaultGrain.cs" />
     <Compile Include="Utils\AsyncResultHandle.cs" />
     <Compile Include="Utils\NoOpTestLogger.cs" />
     <Compile Include="Utils\StorageEmulator.cs" />
@@ -96,11 +101,25 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
 </Project>

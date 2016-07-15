@@ -20,7 +20,7 @@ namespace Tester.TestStreamProviders.EventHub
 
             private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger log)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, pool => new FixedSizeBuffer(1 << 20, pool));
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool);
                 return new EventHubQueueCache(checkpointer, dataAdapter, log);
             }

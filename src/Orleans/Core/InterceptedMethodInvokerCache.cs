@@ -88,35 +88,20 @@ namespace Orleans
             int interfaceId,
             Type implementationType)
         {
-            // Get the interface mapping for the current implementation.
             var interfaceTypes = GrainInterfaceUtils.GetRemoteInterfaces(implementationType);
-            var interfaceType = interfaceTypes[interfaceId];
-            var interfaceMapping = implementationType.GetTypeInfo().GetRuntimeInterfaceMap(interfaceType);
+            
+            // Get all interface mappings of all interfaces.
+            var interfaceMapping = implementationType
+                .GetInterfaces()
+                .Select(i => implementationType.GetTypeInfo().GetRuntimeInterfaceMap(i))
+                .SelectMany(map => map.InterfaceMethods
+                    .Zip(map.TargetMethods, (interfaceMethod, targetMethod) => new { interfaceMethod, targetMethod }))
+                .ToArray();
 
-            // Map the interface methods to implementation methods.
-            var interfaceMethods = GrainInterfaceUtils.GetMethods(interfaceType);
-            return interfaceMethods.ToDictionary(
-                GrainInterfaceUtils.ComputeMethodId,
-                interfaceMethod => GetImplementingMethod(interfaceMethod, interfaceMapping));
-        }
-
-        /// <summary>
-        /// Returns the <see cref="MethodInfo"/> of implementation of <paramref name="interfaceMethod"/>.
-        /// </summary>
-        /// <param name="interfaceMethod">The interface method.</param>
-        /// <param name="implementation">The implementation.</param>
-        /// <returns>The <see cref="MethodInfo"/> of implementation of <paramref name="interfaceMethod"/>.</returns>
-        private static MethodInfo GetImplementingMethod(MethodInfo interfaceMethod, InterfaceMapping implementation)
-        {
-            for (var i = 0; i < implementation.InterfaceMethods.Length; i++)
-            {
-                if (implementation.InterfaceMethods[i] == interfaceMethod)
-                {
-                    return implementation.TargetMethods[i];
-                }
-            }
-
-            return null;
+            // Map the grain interface methods to the implementation methods.
+            return GrainInterfaceUtils.GetMethods(interfaceTypes[interfaceId])
+                .ToDictionary(GrainInterfaceUtils.ComputeMethodId,
+                    m => interfaceMapping.SingleOrDefault(pair => pair.interfaceMethod == m)?.targetMethod);
         }
     }
 }
