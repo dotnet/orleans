@@ -676,7 +676,10 @@ namespace Orleans
         private void UnRegisterCallback(CorrelationId id)
         {
             CallbackData ignore;
-            callbacks.TryRemove(id, out ignore);
+            if (callbacks.TryRemove(id, out ignore))
+            {
+                ignore.Message.Dispose();
+            }
         }
 
         public void Reset(bool cleanup)
