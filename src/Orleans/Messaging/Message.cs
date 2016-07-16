@@ -64,8 +64,14 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        public bool DisposeScheduled { get; set; }
+        public bool DisposeScheduled
+        {
+            get { return _disposeScheduled; }
+            set { _disposeScheduled = value; }
+        }
 
+        [NonSerialized]
+        private bool _disposeScheduled;
         private Dictionary<Header, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
@@ -83,12 +89,12 @@ namespace Orleans.Runtime
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
         private static readonly Logger logger;
-        private static readonly IObjectPool<Message> pool;
+        private static readonly IObjectPool<Message> globalPool;
 
         static Message()
         {
             logger = LogManager.GetLogger("Message", LoggerType.Runtime);
-            pool = new ConcurrentObjectPool<Message>(() => new Message());
+            globalPool = new ConcurrentObjectPool<Message>(() => new Message());
         }
 
         public enum Categories
@@ -446,7 +452,7 @@ namespace Orleans.Runtime
 
         internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            var message = pool.Allocate();
+            var message = globalPool.Allocate();
             message.Category = Categories.Application;
             message.Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request;
             message.Id = CorrelationId.GetNext();
@@ -469,7 +475,7 @@ namespace Orleans.Runtime
         // Caller must clean up bytes
         public static Message CreateMessage(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
-            var message = pool.Allocate();
+            var message = globalPool.Allocate();
             if (message.metadata == null)
             {
                 message.metadata = new Dictionary<string, object>();
@@ -498,7 +504,7 @@ namespace Orleans.Runtime
 
         public Message CreateResponseMessage()
         {
-            var response = pool.Allocate();
+            var response = globalPool.Allocate();
             response.Category = Category;
             response.Direction = Directions.Response;
             response.Id = this.Id;
@@ -563,7 +569,7 @@ namespace Orleans.Runtime
 
         public Message CreatePromptExceptionResponse(Exception exception)
         {
-            var message = pool.Allocate();
+            var message = globalPool.Allocate();
             message.Category = Category;
             message.Direction = Directions.Response;
             message.Result = ResponseTypes.Error;
