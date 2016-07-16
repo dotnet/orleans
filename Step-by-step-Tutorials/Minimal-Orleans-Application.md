@@ -12,7 +12,7 @@ This tutorial provides step by step instructions for creating a basic functionin
 
 Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.
 
-You can find the final source code [here](https://github.com/OrleansContrib/Orleans.Tutorials.Minimal).
+You can find the final source code in `Samples\Tutorial.Minimal` folder ([see latest version online](https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal)).
 
 ## Project Setup
 
