@@ -118,15 +118,12 @@ namespace Orleans.Runtime
         private string GetFullName()
         {
             // the type information is really useless and just too long. 
-            string name;
             if (syncCallbackFunc != null)
-                name = "sync";
-            else if (asynTaskCallback != null)
-                name = "asynTask";
-            else
-                throw new InvalidOperationException("invalid SafeTimerBase state");
+                return "sync.SafeTimerBase";
+            if (asynTaskCallback != null)
+                return "asynTask.SafeTimerBase";
 
-            return String.Format("{0}.SafeTimerBase", name);
+            throw new InvalidOperationException("invalid SafeTimerBase state");
         }
 
         public bool CheckTimerFreeze(DateTime lastCheckTime, Func<string> callerName)
