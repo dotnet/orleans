@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -21,6 +22,9 @@ namespace Orleans.Runtime
         
         [NonSerialized]
         private static readonly Logger logger = LogManager.GetLogger("GrainReference", LoggerType.Runtime);
+
+        [NonSerialized]
+        private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
         [NonSerialized] private const bool USE_DEBUG_CONTEXT = true;
 
@@ -320,7 +324,19 @@ namespace Orleans.Runtime
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
-                debugContext = string.Intern(GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments));
+                if (USE_DEBUG_CONTEXT_PARAMS)
+                {
+                    debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                }
+                else
+                {
+                    var hash = InterfaceId ^ request.MethodId;
+                    if (!debugContexts.TryGetValue(hash, out debugContext))
+                    {
+                        debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                        debugContexts[hash] = debugContext;
+                    }
+                }
             }
 
             // Call any registered client pre-call interceptor function.
