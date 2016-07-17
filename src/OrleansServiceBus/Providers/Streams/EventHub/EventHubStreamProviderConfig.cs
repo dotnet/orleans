@@ -54,10 +54,10 @@ namespace Orleans.ServiceBus.Providers
                 EventHubSettingsType = typeof(EventHubSettings);
             }
 
-            var hubSettings = serviceProvider.GetService(EventHubSettingsType) as IEventHubSettings;
+            var hubSettings = (IEventHubSettings)(serviceProvider?.GetService(EventHubSettingsType) ?? Activator.CreateInstance(EventHubSettingsType));
             if (hubSettings == null)
             {
-                throw new ArgumentOutOfRangeException("providerConfig", "EventHubSettingsType not valid.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfig), "EventHubSettingsType not valid.");
             }
 
             // if settings is an EventHubSettings class, populate settings from providerConfig
@@ -78,10 +78,10 @@ namespace Orleans.ServiceBus.Providers
                 CheckpointerSettingsType = typeof(EventHubCheckpointerSettings);
             }
 
-            var checkpointerSettings = serviceProvider.GetService(CheckpointerSettingsType) as ICheckpointerSettings;
+            var checkpointerSettings = (ICheckpointerSettings)(serviceProvider?.GetService(CheckpointerSettingsType) ?? Activator.CreateInstance(CheckpointerSettingsType));
             if (checkpointerSettings == null)
             {
-                throw new ArgumentOutOfRangeException("providerConfig", "CheckpointerSettingsType not valid.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfig), "CheckpointerSettingsType not valid.");
             }
 
             // if settings is an EventHubCheckpointerSettings class, populate settings from providerConfig

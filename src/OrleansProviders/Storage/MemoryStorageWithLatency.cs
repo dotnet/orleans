@@ -39,11 +39,14 @@ namespace Orleans.Storage
         private TimeSpan latency;
         private bool mockCallsOnly;
 
+        /// <summary> Default constructor. </summary>
         public MemoryStorageWithLatency()
             : base(NUM_STORE_GRAINS)
         {
         }
 
+        /// <summary> Initialization function for this storage provider. </summary>
+        /// <see cref="IProvider.Init"/>
         public override async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             await base.Init(name, providerRuntime, config);
@@ -56,21 +59,28 @@ namespace Orleans.Storage
                 "true".Equals(config.Properties[MOCK_CALLS_PARAM_STRING], StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary> Shutdown function for this storage provider. </summary>
         public override async Task Close()
         {
             await MakeFixedLatencyCall(() => base.Close());
         }
 
+        /// <summary> Read state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.ReadStateAsync"/>
         public override async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ReadStateAsync(grainType, grainReference, grainState));
         }
 
+        /// <summary> Write state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.WriteStateAsync"/>
         public override async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
            await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
         }
 
+        /// <summary> Delete / Clear state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.ClearStateAsync"/>
         public override async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ClearStateAsync(grainType, grainReference, grainState));

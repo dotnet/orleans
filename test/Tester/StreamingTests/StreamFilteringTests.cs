@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
@@ -230,26 +231,20 @@ namespace Tester.StreamingTests
 
     public class StreamFilteringTests_SMS : StreamFilteringTestsBase, IClassFixture<StreamFilteringTests_SMS.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-	        protected override TestingSiloHost CreateClusterHost()
-	        {
-	            var siloOptions = new TestingSiloOptions
-	            {
-	                StartFreshOrleans = true,
-	                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingTesting_SMS.xml"),
-	                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-	                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-	            };
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(2);
 
-	            var clientOptions = new TestingClientOptions
-	            {
-	                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-	            };
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-	            return new TestingSiloHost(siloOptions, clientOptions);
-	        }
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
+                return new TestCluster(options);
+            }
         }
 
         public StreamFilteringTests_SMS()
@@ -293,26 +288,18 @@ namespace Tester.StreamingTests
     {
         private readonly string deploymentId;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-	        protected override TestingSiloHost CreateClusterHost()
-	        {
-	            var siloOptions = new TestingSiloOptions
-	            {
-	                StartFreshOrleans = true,
-	                SiloConfigFile = new FileInfo("OrleansConfigurationForStreamingUnitTests.xml"),
-	                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-	                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-	            };
+            protected override TestCluster CreateTestCluster()
+            {
+                var options = new TestClusterOptions(2);
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
-	            var clientOptions = new TestingClientOptions
-	            {
-	                ClientConfigFile = new FileInfo("ClientConfigurationForStreamTesting.xml")
-	            };
-
-	            return new TestingSiloHost(siloOptions, clientOptions);
-	        }
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
+                return new TestCluster(options);
+            }
 
             public override void Dispose()
             {
@@ -331,11 +318,11 @@ namespace Tester.StreamingTests
 
         public virtual void Dispose()
         {
-            AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
-                streamProviderName,
-                this.deploymentId,
-                StorageTestConstants.DataConnectionString).Wait();
-        }
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
+                    streamProviderName,
+                    this.deploymentId,
+                    StorageTestConstants.DataConnectionString).Wait();
+            }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]
         public async Task AQ_Filter_Basic()

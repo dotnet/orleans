@@ -8,6 +8,7 @@ using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -13,13 +13,13 @@ namespace Orleans.Runtime
         private DateTime lastHeartbeat;
         private DateTime lastWatchdogCheck;
         private readonly List<IHealthCheckParticipant> participants;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly CounterStatistic watchdogChecks;
         private CounterStatistic watchdogFailedChecks;
 
         public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables)
         {
-            logger = TraceLogger.GetLogger("Watchdog");
+            logger = LogManager.GetLogger("Watchdog");
             healthCheckPeriod = watchdogPeriod;
             participants = watchables;
             watchdogChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_HEALTH_CHECKS);
@@ -99,7 +99,7 @@ namespace Orleans.Runtime
             lastWatchdogCheck = DateTime.UtcNow;
         }
 
-        private static void CheckYourOwnHealth(DateTime lastCheckt, TraceLogger logger)
+        private static void CheckYourOwnHealth(DateTime lastCheckt, Logger logger)
         {
             var timeSinceLastTick = (DateTime.UtcNow - lastCheckt);
             if (timeSinceLastTick > heartbeatPeriod.Multiply(2))

@@ -1,11 +1,9 @@
 ﻿using System;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Xunit;
-
-using Orleans.Runtime.Configuration;
 using System.Linq;
-using Orleans.Serialization;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
@@ -15,32 +13,32 @@ namespace UnitTests.Serialization
         public void SerializationProvider_LoadWithSingleProviderTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer.xml");
-            Assert.AreEqual(1, clientConfig.SerializationProviders.Count);
-            Assert.AreEqual(typeof(FakeSerializer), clientConfig.SerializationProviders.First());
+            Assert.Equal(1, clientConfig.SerializationProviders.Count);
+            Assert.Equal(typeof(FakeSerializer), clientConfig.SerializationProviders.First());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithNoProvidersTest()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer2.xml");
-            Assert.AreEqual(0, clientConfig.SerializationProviders.Count);
+            Assert.Equal(0, clientConfig.SerializationProviders.Count);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithDuplicateProviders()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer3.xml");
-            Assert.AreEqual(1, clientConfig.SerializationProviders.Count);
-            Assert.IsTrue(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer)));
+            Assert.Equal(1, clientConfig.SerializationProviders.Count);
+            Assert.True(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationProvider_LoadWithMultipleProvider1()
         {
             var clientConfig = ClientConfiguration.LoadFromFile("SerializationTests\\ConfigurationTests\\ClientConfigurationForSerializer5.xml");
-            Assert.AreEqual(2, clientConfig.SerializationProviders.Count);
-            Assert.IsTrue(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer)));
-            Assert.IsTrue(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer2)));
+            Assert.Equal(2, clientConfig.SerializationProviders.Count);
+            Assert.True(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer)));
+            Assert.True(clientConfig.SerializationProviders.Contains(typeof(FakeSerializer2)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -86,7 +84,7 @@ namespace UnitTests.Serialization
 
         public static bool DeepCopyCalled { get; set; }
 
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             Initialized = true;
         }

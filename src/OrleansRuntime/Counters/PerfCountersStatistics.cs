@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Counters
     /// </summary>
     internal class PerfCountersStatistics
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("WindowsPerfCountersStatistics", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("WindowsPerfCountersStatistics", LoggerType.Runtime);
 
         private const int ERROR_THRESHOLD = 10; // A totally arbitrary value!
         private SafeTimer timer;

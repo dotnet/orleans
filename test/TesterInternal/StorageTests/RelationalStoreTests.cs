@@ -24,7 +24,7 @@ namespace UnitTests.StorageTests.SQLAdapter
 
     public class RelationalStoreTests : IClassFixture<RelationalStoreTests.Fixture>
     {
-        private const string testDatabaseName = "OrleansTest";
+        private const string testDatabaseName = "OrleansStreamTest";
         
         //This timeout limit should be clearly less than that defined in RelationalStorageForTesting.CancellationTestQuery. 
         private readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(1);

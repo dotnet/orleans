@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Messaging
     {
         private Gateway Gateway { get; set; }
         private IncomingMessageAcceptor ima;
-        private static readonly TraceLogger log = TraceLogger.GetLogger("Orleans.Messaging.MessageCenter");
+        private static readonly Logger log = LogManager.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
 
         // ReSharper disable NotAccessedField.Local

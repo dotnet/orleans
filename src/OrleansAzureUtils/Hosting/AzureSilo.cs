@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Host
         private SiloHost host;
         private OrleansSiloInstanceManager siloInstanceManager;
         private SiloInstanceTableEntry myEntry;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper();
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Orleans.Runtime.Host
             StartupRetryPause = AzureConstants.STARTUP_TIME_PAUSE; // 5 seconds
             MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
 
-            logger = TraceLogger.GetLogger("OrleansAzureSilo", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("OrleansAzureSilo", LoggerType.Runtime);
         }
 
         public static ClusterConfiguration DefaultConfiguration()
@@ -132,11 +132,11 @@ namespace Orleans.Runtime.Host
                 HostName = host.Config.GetOrCreateNodeConfigurationForSilo(host.Name).DNSHostName,
                 ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
-                RoleName = serviceRuntimeWrapper.RoleName, 
-                InstanceName = instanceName,
+                RoleName = serviceRuntimeWrapper.RoleName,
+                SiloName = instanceName,
                 UpdateZone = serviceRuntimeWrapper.UpdateDomain.ToString(CultureInfo.InvariantCulture),
                 FaultZone = serviceRuntimeWrapper.FaultDomain.ToString(CultureInfo.InvariantCulture),
-                StartTime = TraceLogger.PrintDate(DateTime.UtcNow),
+                StartTime = LogFormatter.PrintDate(DateTime.UtcNow),
 
                 PartitionKey = deploymentId,
                 RowKey = myEndpoint.Address + "-" + myEndpoint.Port + "-" + generation
@@ -153,7 +153,7 @@ namespace Orleans.Runtime.Host
             catch (Exception exc)
             {
                 var error = String.Format("Failed to create OrleansSiloInstanceManager. This means CreateTableIfNotExist for silo instance table has failed with {0}",
-                    TraceLogger.PrintException(exc));
+                    LogFormatter.PrintException(exc));
                 Trace.TraceError(error);
                 logger.Error(ErrorCode.AzureTable_34, error, exc);
                 throw new OrleansException(error, exc);
@@ -205,7 +205,7 @@ namespace Orleans.Runtime.Host
         public void Stop()
         {
             logger.Info(ErrorCode.Runtime_Error_100290, "Stopping {0}", this.GetType().FullName);
-            serviceRuntimeWrapper.UnsubscribeFromStoppingNotifcation(this, HandleAzureRoleStopping);
+            serviceRuntimeWrapper.UnsubscribeFromStoppingNotification(this, HandleAzureRoleStopping);
             host.ShutdownOrleansSilo();
             logger.Info(ErrorCode.Runtime_Error_100291, "Orleans silo '{0}' shutdown.", host.Name);
         }
@@ -247,7 +247,7 @@ namespace Orleans.Runtime.Host
 			logger.Info(ErrorCode.Runtime_Error_100289, "OrleansAzureHost entry point called");
 
 			// Hook up to receive notification of Azure role stopping events
-            serviceRuntimeWrapper.SubscribeForStoppingNotifcation(this, HandleAzureRoleStopping);
+            serviceRuntimeWrapper.SubscribeForStoppingNotification(this, HandleAzureRoleStopping);
 
 			if (host.IsStarted)
 			{

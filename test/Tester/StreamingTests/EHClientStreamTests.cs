@@ -1,20 +1,22 @@
 ﻿
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
+using Tester.TestStreamProviders;
+using Tester.TestStreamProviders.EventHub;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
-    public class EHClientStreamTests : HostedTestClusterPerTest
+    public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "StreamNamespace";
@@ -34,29 +36,30 @@ namespace Tester.StreamingTests
                 CheckpointNamespace,
                 TimeSpan.FromSeconds(10));
 
-        private ClientStreamTestRunner runner;
+        private readonly ITestOutputHelper output;
+        private readonly ClientStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public EHClientStreamTests(ITestOutputHelper output)
         {
-            var siloHost = new TestingSiloHost(new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                AdjustConfig = AdjustConfig
-            }, new TestingClientOptions
-            {
-                AdjustConfig = AdjustConfig
-            });
-            runner = new ClientStreamTestRunner(siloHost);
-            return siloHost;
+            this.output = output;
+            runner = new ClientStreamTestRunner(this.HostedCluster);
+        }
+
+        public override TestCluster CreateTestCluster()
+        {
+            var options = new TestClusterOptions(2);
+            AdjustConfig(options.ClusterConfiguration);
+            AdjustConfig(options.ClientConfiguration);
+            return new TestCluster(options);
         }
 
         public override void Dispose()
         {
+            base.Dispose();
             var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
             dataManager.InitTableAsync().Wait();
-            dataManager.DeleteTableAsync().Wait();
-            base.Dispose();
+            dataManager.ClearTableAsync().Wait();
+            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
@@ -65,19 +68,26 @@ namespace Tester.StreamingTests
             logger.Info("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
-        
+
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        public async Task EHStreamConsumerOnDroppedClientTest()
+        {
+            logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
+            await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
+        }
+
         private static void AdjustConfig(ClusterConfiguration config)
         {
             // register stream provider
             config.AddMemoryStorageProvider("PubSubStore");
-            config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
+            config.Globals.RegisterStreamProvider<TestEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
             config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
         }
 
         private static void AdjustConfig(ClientConfiguration config)
         {
             config.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
         }
 
         private static Dictionary<string, string> BuildProviderSettings()

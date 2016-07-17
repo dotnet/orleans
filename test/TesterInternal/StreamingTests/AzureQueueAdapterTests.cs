@@ -35,7 +35,7 @@ namespace UnitTests.StorageTests
         {
             this.output = output;
             this.deploymentId = MakeDeploymentId();
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.InitializeForTesting();
         }
@@ -56,7 +56,7 @@ namespace UnitTests.StorageTests
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, TraceLogger.GetLogger("AzureQueueAdapter", TraceLogger.LoggerType.Application), new DefaultServiceProvider());
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
@@ -98,10 +98,10 @@ namespace UnitTests.StorageTests
                         foreach (AzureQueueBatchContainer message in messages.Cast<AzureQueueBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<IStreamIdentity> { new TestStreamIdentity { Guid = message.StreamGuid, Namespace = message.StreamGuid.ToString() } },
+                                id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },
                                 (id, set) =>
                                 {
-                                    set.Add(new TestStreamIdentity { Guid = message.StreamGuid, Namespace = message.StreamGuid.ToString() });
+                                    set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
                                     return set;
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,

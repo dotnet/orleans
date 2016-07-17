@@ -149,6 +149,24 @@ namespace UnitTests.StorageTests
             Assert.AreEqual(initialValue, readValue, "Read previously stored value");
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
+        public async Task Persistence_Grain_Activate_StoredValue_Generic() 
+        {
+            const string providerName = "test1";
+            string grainType = typeof(PersistenceTestGenericGrain<int>).FullName;
+            Guid guid = Guid.NewGuid();
+            string id = guid.ToString("N");
+
+            var grain = GrainClient.GrainFactory.GetGrain<IPersistenceTestGenericGrain<int>>(guid);
+
+            // Store initial value in storage
+            int initialValue = 567;
+            SetStoredValue<PersistenceTestGrainState>(providerName, grainType, grain, "Field1", initialValue);
+
+            int readValue = await grain.GetValue();
+            Assert.AreEqual(initialValue, readValue, "Read previously stored value");
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Activate_Error()
         {
@@ -234,7 +252,7 @@ namespace UnitTests.StorageTests
 
             Assert.AreEqual(42, ((PersistenceTestGrainState)storageProvider.LastState).Field1, "Store-Field1");
         }
-
+        
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
@@ -257,6 +275,20 @@ namespace UnitTests.StorageTests
             val = await grain.DoRead();
 
             Assert.AreEqual(2, val, "Value after Re-Read");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
+        public async Task MemoryStore_Delete()
+        {
+            Guid id = Guid.NewGuid();
+            var grain = GrainClient.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
+            await grain.DoWrite(1);
+            await grain.DoDelete();
+            int val = await grain.GetValue(); // Should this throw instead?
+            Assert.AreEqual(0, val, "Value after Delete");
+            await grain.DoWrite(2);
+            val = await grain.GetValue();
+            Assert.AreEqual(2, val, "Value after Delete + New Write");
         }
 
         [Fact, TestCategory("Stress"), TestCategory("CorePerf"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -1141,7 +1173,7 @@ namespace UnitTests.StorageTests
             int val = await grain.GetValue();
             Assert.AreEqual(1, val);
         }
-
+        
         #region Utility functions
         // ---------- Utility functions ----------
         private void SetStoredValue<TState>(string providerName, string grainType, IGrain grain, string fieldName, int newValue)

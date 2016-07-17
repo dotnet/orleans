@@ -29,6 +29,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansRuntime.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <OutputPath>bin\Release\</OutputPath>
@@ -43,9 +44,18 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansRuntime.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.Extensions.DependencyInjection, Version=1.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.DependencyInjection.1.0.0\lib\netstandard1.1\Microsoft.Extensions.DependencyInjection.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0\lib\netstandard1.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
@@ -58,8 +68,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
+    <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="Startup\ConfigureServicesBuilder.cs" />
+    <Compile Include="Startup\StartupBuilder.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
+    <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
+    <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />
@@ -82,7 +102,7 @@
     <Compile Include="ConsistentRing\IConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\ConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\VirtualBucketsRingProvider.cs" />
-    <Compile Include="ConsistentRing\EquallyDevidedRangeRingProvider.cs" />
+    <Compile Include="ConsistentRing\EquallyDividedRangeRingProvider.cs" />
     <Compile Include="Core\IHealthCheckParticipant.cs" />
     <Compile Include="MembershipService\IMembershipOracle.cs" />
     <Compile Include="MembershipService\MembershipOracleData.cs" />
@@ -185,8 +205,9 @@
       <Name>Orleans</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
-    <Folder Include="Startup\" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->

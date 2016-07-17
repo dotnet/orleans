@@ -71,14 +71,21 @@
   <ItemGroup>
     <Compile Include="AssemblyLoader\AssemblyProcessor.cs" />
     <Compile Include="Async\AsyncBatchedContinuationQueue.cs" />
+    <Compile Include="Async\BatchWorker.cs" />
     <Compile Include="Async\MultiTaskCompletionSource.cs" />
     <Compile Include="Async\AsyncSerialExecutor.cs" />
     <Compile Include="Async\AsyncExecutorWithRetries.cs" />
     <Compile Include="Async\AsyncLock.cs" />
     <Compile Include="Async\AsyncPipeline.cs" />
+    <Compile Include="Cancellation\GrainCancellationToken.cs" />
     <Compile Include="Async\TaskUtility.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
+    <Compile Include="Logging\LoggerExtensions.cs" />
+    <Compile Include="Logging\LoggerImpl.cs" />
+    <Compile Include="Logging\LogFormatter.cs" />
+    <Compile Include="Logging\LogManager.cs" />
+    <Compile Include="MultiCluster\IMultiClusterGatewayInfo.cs" />
     <Compile Include="CodeGeneration\CodeGeneratorManager.cs" />
     <Compile Include="CodeGeneration\GrainState.cs" />
     <Compile Include="CodeGeneration\ICodeGeneratorCache.cs" />
@@ -88,23 +95,24 @@
     <Compile Include="CodeGeneration\KnownAssemblyAttribute.cs" />
     <Compile Include="CodeGeneration\Language.cs" />
     <Compile Include="CodeGeneration\OrleansCodeGenerationTargetAttribute.cs" />
-    <Compile Include="CodeGeneration\KnownTypeAttribute.cs" />
+    <Compile Include="CodeGeneration\ConsiderForCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\SkipCodeGenerationAttribute.cs" />
     <Compile Include="CodeGeneration\IGrainState.cs" />
     <Compile Include="CodeGeneration\TypeFormattingOptions.cs" />
     <Compile Include="Configuration\ConfigurationExtensions.cs" />
     <Compile Include="Core\IGrainInvokeInterceptor.cs" />
     <Compile Include="Core\InterceptedMethodInvoker.cs" />
-    <Compile Include="Core\InvocationMethodInfoMap.cs" />
+    <Compile Include="Core\InterceptedMethodInvokerCache.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
-    <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
+    <Compile Include="Runtime\RingRange.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
     <Compile Include="Core\Exceptions.cs" />
     <Compile Include="Core\GrainStateStorageBridge.cs" />
     <Compile Include="Core\IGrainIdentity.cs" />
+    <Compile Include="MultiCluster\MultiClusterConfiguration.cs" />
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistrationStrategy.cs" />
@@ -130,6 +138,7 @@
     <Compile Include="Runtime\IGrainRuntime.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
     <Compile Include="Streams\PersistentStreams\IStreamQueueCheckpointer.cs" />
@@ -154,6 +163,9 @@
     <Compile Include="Telemetry\ITraceTelemetryConsumer.cs" />
     <Compile Include="Telemetry\Severity.cs" />
     <Compile Include="Telemetry\TraceParserUtils.cs" />
+    <Compile Include="Cancellation\GrainCancellationTokenSource.cs" />
+    <Compile Include="SystemTargetInterfaces\IMultiClusterGossipService.cs" />
+    <Compile Include="Cancellation\ICancellationSourcesExtension.cs" />
     <Compile Include="Timers\IReminderRegistry.cs" />
     <Compile Include="Runtime\IRuntimeClient.cs" />
     <Compile Include="Runtime\IGrainExtension.cs" />
@@ -410,8 +422,8 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for bootstrap" Importance="high" />
     <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
-    <MSBuild Projects="$(SolutionDir)\OrleansCodeGenerator\OrleansCodeGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
-    <MSBuild Projects="$(SolutionDir)\ClientGenerator\ClientGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <MSBuild Projects="$(ProjectDir)\..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <MSBuild Projects="$(ProjectDir)\..\ClientGenerator\ClientGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
     <!-- Finally invoke code generator on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>

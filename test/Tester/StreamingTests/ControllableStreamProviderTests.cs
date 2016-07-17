@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Extensions;
 using Tester.TestStreamProviders.Controllable;
 using Tester;
 using UnitTests.Tester;
@@ -17,40 +16,29 @@ namespace UnitTests.StreamingTests
 {
     public class ControllableStreamProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamProviderTests.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = "ControllableTestStreamProvider";
             public readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
+                var options = new TestClusterOptions(2);
+                var settings = new Dictionary<string, string>
                     {
-                        var settings = new Dictionary<string, string>
-                            {
-                                {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE,StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString()},
-                                {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
-                            };
-                        config.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-                        // Make sure a node config exist for each silo in the cluster.
-                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                        config.GetOrCreateNodeConfigurationForSilo("Primary");
-                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                    }
-                });
+                        {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE,StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString()},
+                        {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
+                    };
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
+                return new TestCluster(options);
             }
         }
+
         private Fixture fixture;
-        private TestingSiloHost HostedCluster;
 
         public ControllableStreamProviderTests(Fixture fixture)
         {
             this.fixture = fixture;
-            this.HostedCluster = fixture.HostedCluster;
         }        
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
@@ -75,12 +63,12 @@ namespace UnitTests.StreamingTests
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(this.fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
-            Assert.AreEqual(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)
             {
-                Assert.AreEqual(command, echo.Item1, "command");
-                Assert.AreEqual(echoArg, echo.Item2, "echo");
+                Assert.Equal(command, echo.Item1);
+                Assert.Equal(echoArg, echo.Item2);
             }
         }
     }

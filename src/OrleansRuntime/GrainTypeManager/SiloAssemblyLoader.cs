@@ -14,36 +14,45 @@ namespace Orleans.Runtime
 {
     internal class SiloAssemblyLoader
     {
-        private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
+        private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
         private List<string> discoveredAssemblyLocations;
+        private Dictionary<string, SearchOption> directories;
 
-        public SiloAssemblyLoader()
-        {
-            LoadApplicationAssemblies();
-        }
-
-        private void LoadApplicationAssemblies()
+        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories)
         {
             var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
             var cwd = Directory.GetCurrentDirectory();
-            var directories = new Dictionary<string, SearchOption>
+
+            directories = new Dictionary<string, SearchOption>
                     {
                         { exeRoot, SearchOption.TopDirectoryOnly },
                         { appRoot, SearchOption.AllDirectories }
                     };
+
+            foreach (var kvp in additionalDirectories)
+            {
+                // Make sure the path is clean (get rid of ..\'s)
+                directories[new DirectoryInfo(kvp.Key).FullName] = kvp.Value;
+            }
+
 
             if (!directories.ContainsKey(cwd))
             {
                 directories.Add(cwd, SearchOption.TopDirectoryOnly);
             }
 
+            LoadApplicationAssemblies();
+        }
+
+        private void LoadApplicationAssemblies()
+        {
             AssemblyLoaderPathNameCriterion[] excludeCriteria =
                 {
                     AssemblyLoaderCriteria.ExcludeResourceAssemblies,
                     AssemblyLoaderCriteria.ExcludeSystemBinaries()
                 };
-            AssemblyLoaderReflectionCriterion[] loadCriteria = 
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
                 {
                     AssemblyLoaderReflectionCriterion.NewCriterion(
                         TypeUtils.IsConcreteGrainClass,
@@ -68,18 +77,19 @@ namespace Orleans.Runtime
                 if (result.ContainsKey(className))
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));
-                
+
                 Type grainStateType = null;
 
                 // check if grainType derives from Grain<T> where T is a concrete class
-                
-                var parentType = grainType.BaseType;
-                while (parentType != typeof (Grain) && parentType != typeof(object))
+
+                var parentType = grainType.GetTypeInfo().BaseType;
+                while (parentType != typeof(Grain) && parentType != typeof(object))
                 {
-                    if (parentType.GetTypeInfo().IsGenericType)
+                    TypeInfo parentTypeInfo = parentType.GetTypeInfo();
+                    if (parentTypeInfo.IsGenericType)
                     {
-                        var definition = parentType.GetGenericTypeDefinition();
-                        if (definition == typeof (Grain<>))
+                        var definition = parentTypeInfo.GetGenericTypeDefinition();
+                        if (definition == typeof(Grain<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
                             if (stateArg.GetTypeInfo().IsClass)
@@ -90,7 +100,7 @@ namespace Orleans.Runtime
                         }
                     }
 
-                    parentType = parentType.BaseType;
+                    parentType = parentTypeInfo.BaseType;
                 }
 
                 GrainTypeData typeData = GetTypeData(grainType, grainStateType);
@@ -110,12 +120,12 @@ namespace Orleans.Runtime
 
             foreach (var type in types)
             {
-                var attrib = (MethodInvokerAttribute)type.GetCustomAttributes(typeof(MethodInvokerAttribute), true).Single();
+                var attrib = type.GetTypeInfo().GetCustomAttribute<MethodInvokerAttribute>(true);
                 int ifaceId = attrib.InterfaceId;
 
                 if (result.ContainsKey(ifaceId))
                     throw new InvalidOperationException(string.Format("Grain method invoker classes {0} and {1} use the same interface id {2}", result[ifaceId].FullName, type.FullName, ifaceId));
-                
+
                 result[ifaceId] = type;
             }
             return result;
@@ -126,12 +136,12 @@ namespace Orleans.Runtime
         /// </summary>
         private static GrainTypeData GetTypeData(Type grainType, Type stateObjectType)
         {
-            return grainType.GetTypeInfo().IsGenericTypeDefinition ? 
-                new GenericGrainTypeData(grainType, stateObjectType) : 
+            return grainType.GetTypeInfo().IsGenericTypeDefinition ?
+                new GenericGrainTypeData(grainType, stateObjectType) :
                 new GrainTypeData(grainType, stateObjectType);
         }
 
-        private static void LogGrainTypesFound(TraceLogger logger, Dictionary<string, GrainTypeData> grainTypeData)
+        private static void LogGrainTypesFound(LoggerImpl logger, Dictionary<string, GrainTypeData> grainTypeData)
         {
             var sb = new StringBuilder();
             sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));
@@ -139,7 +149,7 @@ namespace Orleans.Runtime
             foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.FullName))
             {
                 // Skip system targets and Orleans grains
-                var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
+                var assemblyName = grainType.Type.GetTypeInfo().Assembly.FullName.Split(',')[0];
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
                     int grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainType.Type);
@@ -155,7 +165,7 @@ namespace Orleans.Runtime
                     {
                         if (!first)
                             sb.Append(", ");
-                        
+
                         sb.Append(iface.Namespace).Append(".").Append(TypeUtils.GetTemplatedName(iface));
 
                         if (CodeGeneration.GrainInterfaceUtils.IsGrainType(iface))

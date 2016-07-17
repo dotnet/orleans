@@ -21,7 +21,7 @@ namespace UnitTests.StorageTests
             {
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 ClientConfiguration cfg = ClientConfiguration.StandardLoad();
-                TraceLogger.Initialize(cfg);
+                LogManager.Initialize(cfg);
                 LocalDataStoreInstance.LocalDataStore = null;
             }
 

@@ -106,6 +106,7 @@
     <Compile Include="ConcreteGrainsWithGenericInterfaces.cs" />
     <Compile Include="SampleStreamingGrain.cs" />
     <Compile Include="SimpleDIGrain.cs" />
+    <Compile Include="MultipleConstructorsSimpleGrain.cs" />
     <Compile Include="SQLAdapter\CustomerGrain.cs" />
     <Compile Include="SQLAdapter\DeviceGrain.cs" />
     <Compile Include="SQLAdapter\ICustomerState.cs" />
@@ -121,6 +122,7 @@
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
     <Compile Include="StreamCheckpoint.cs" />
+    <Compile Include="StreamInterceptionGrain.cs" />
     <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>

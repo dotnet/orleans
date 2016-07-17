@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -11,24 +13,17 @@ namespace UnitTests.General
 {
     public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    AdjustConfig = config =>
-                    {
-                        config.AddAzureTableStorageProvider("AzureStore", StorageTestConstants.DataConnectionString);
-                    }
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
+                return new TestCluster(options);
             }
         }
 
-        [Fact(Skip = "Ignored"), TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
-        //This test currently fails, because the name of the interface is too long
+        [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]
         public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
         {
             var grain = GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureTableStorage<int>>(Guid.NewGuid());

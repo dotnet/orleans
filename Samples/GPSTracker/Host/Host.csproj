@@ -82,36 +82,36 @@
       <HintPath>..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Orleans, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.1.0\lib\net451\Orleans.dll</HintPath>
+    <Reference Include="Orleans, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.2.0\lib\net451\Orleans.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansAzureUtils, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.1.0\lib\net451\OrleansAzureUtils.dll</HintPath>
+    <Reference Include="OrleansAzureUtils, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.2.0\lib\net451\OrleansAzureUtils.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansCodeGenerator, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.0\lib\net451\OrleansCodeGenerator.dll</HintPath>
+    <Reference Include="OrleansCodeGenerator, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.2.0\lib\net451\OrleansCodeGenerator.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansCounterControl, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.1.0\lib\net451\OrleansCounterControl.exe</HintPath>
+    <Reference Include="OrleansCounterControl, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.2.0\lib\net451\OrleansCounterControl.exe</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansDependencyInjection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.1.0\lib\net451\OrleansDependencyInjection.dll</HintPath>
+    <Reference Include="OrleansDependencyInjection, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansDependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansHost, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.1.0\lib\net451\OrleansHost.exe</HintPath>
+    <Reference Include="OrleansHost, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.2.0\lib\net451\OrleansHost.exe</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansProviders, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.1.0\lib\net451\OrleansProviders.dll</HintPath>
+    <Reference Include="OrleansProviders, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.2.0\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansRuntime, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.1.0\lib\net451\OrleansRuntime.dll</HintPath>
+    <Reference Include="OrleansRuntime, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansRuntime.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -143,20 +143,13 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="DevTestClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\GPSTracker.Common\GPSTracker.Common.csproj">
+      <Project>{cafe7fbb-a2e1-43e2-ba7d-725af8873558}</Project>
+      <Name>GPSTracker.Common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\GPSTracker.GrainImplementation\GPSTracker.GrainImplementation.csproj">
       <Project>{43f6056b-cb24-4a1d-bbe2-5543fc00131d}</Project>
       <Name>GPSTracker.GrainImplementation</Name>

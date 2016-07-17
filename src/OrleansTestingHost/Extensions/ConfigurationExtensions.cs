@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.Configuration
 {
+    /// <summary>
+    /// Silo configuration extensions.
+    /// </summary>
     public static class ConfigurationExtensions
     {
         /// <summary>

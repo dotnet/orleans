@@ -118,7 +118,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception ex)
             {
-                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, TraceLogger.PrintException(ex));
+                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, LogFormatter.PrintException(ex));
                 Trace.TraceError(msg);
                 throw new AggregateException(msg, ex);
             }
@@ -196,7 +196,7 @@ namespace Orleans.Runtime.Host
             OrleansException err;
             err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}. Last exception={1}",
                 deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}.", deploymentId));
-            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, TraceLogger.PrintException(err));
+            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
 

@@ -91,7 +91,13 @@ namespace UnitTests.Grains
             await ClearStateAsync();
         }
     }
-
+        
+    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
+    public class PersistenceTestGenericGrain<T> : PersistenceTestGrain, IPersistenceTestGenericGrain<T>
+    {
+        //...
+    }
+    
     [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
     public class PersistenceProviderErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceProviderErrorGrain
     {
@@ -368,6 +374,11 @@ namespace UnitTests.Grains
         {
             await ReadStateAsync(); // Re-read state from store
             return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync();
         }
 
         [Serializable]
@@ -802,7 +813,7 @@ namespace UnitTests.Grains
                     _id, CaptureRuntimeEnvironment(), callStack);
                 logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 OrleansTaskScheduler.Instance.DumpSchedulerStatus();
-                TraceLogger.Flush();
+                LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
             }

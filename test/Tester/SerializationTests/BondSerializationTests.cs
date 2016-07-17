@@ -1,5 +1,4 @@
 using Bond;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -20,8 +19,8 @@ namespace UnitTests.Serialization
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
             var output = SerializationManager.RoundTripSerializationForTesting(schema);
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue, output.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object
+            Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -29,8 +28,8 @@ namespace UnitTests.Serialization
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
             var output = SerializationManager.RoundTripSerializationForTesting(schema);
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue, output.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object
+            Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -48,9 +47,9 @@ namespace UnitTests.Serialization
             };
 
             var output = SerializationManager.RoundTripSerializationForTesting(schema);
-            Assert.IsNotNull(output);
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue.SomeValue.SomeValue, output.SomeValue.SomeValue.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotNull(output);
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object
+            Assert.Equal(schema.SomeValue.SomeValue.SomeValue, output.SomeValue.SomeValue.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -58,8 +57,8 @@ namespace UnitTests.Serialization
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
             var output = SerializationManager.DeepCopy(schema) as SimpleBondSchema;
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue, output.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object");
+            Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -67,8 +66,8 @@ namespace UnitTests.Serialization
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
             var output = SerializationManager.DeepCopy(schema) as SimpleGenericSchema<int>;
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue, output.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object
+            Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
@@ -86,9 +85,9 @@ namespace UnitTests.Serialization
             };
 
             var output = SerializationManager.DeepCopy(schema) as SimpleGenericSchema<SimpleGenericSchema<SimpleBondSchema>>;
-            Assert.IsNotNull(output);
-            Assert.AreNotSame(output, schema, "The serializer returned an instance of the same object");
-            Assert.AreEqual(schema.SomeValue.SomeValue.SomeValue, output.SomeValue.SomeValue.SomeValue, "The serialization didn't preserve the proper value");
+            Assert.NotNull(output);
+            Assert.NotSame(output, schema); //The serializer returned an instance of the same object
+            Assert.Equal(schema.SomeValue.SomeValue.SomeValue, output.SomeValue.SomeValue.SomeValue); //The serialization didn't preserve the proper value
         }
 
         [Schema]

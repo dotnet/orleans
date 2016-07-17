@@ -81,6 +81,29 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
+        /// Configuration for Gossip Channels
+        /// </summary>
+        public enum GossipChannelType
+        {
+            /// <summary>Default value to allow discrimination of override values.</summary>
+            NotSpecified,
+
+            /// <summary>An Azure Table serving as a channel. </summary>
+            AzureTable,
+        }
+
+        /// <summary>
+        /// Gossip channel configuration.
+        /// </summary>
+        [Serializable]
+        public class GossipChannelConfiguration
+        {
+            public GossipChannelType ChannelType { get; set; }
+
+            public string ConnectionString { get; set; }
+        }
+  
+        /// <summary>
         /// Configuration type that controls the type of the grain directory caching algorithm that silo use.
         /// </summary>
         public enum DirectoryCachingStrategyType
@@ -170,15 +193,61 @@ namespace Orleans.Runtime.Configuration
         /// Whether to use the gossip optimization to speed up spreading liveness information.
         /// </summary>
         public bool UseLivenessGossip { get; set; }
+        /// <summary>
+        /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
+        /// </summary>
+        public bool ValidateInitialConnectivity { get; set; }
 
         /// <summary>
         /// Service Id.
         /// </summary>
         public Guid ServiceId { get; set; }
+
         /// <summary>
         /// Deployment Id.
         /// </summary>
         public string DeploymentId { get; set; }
+
+        #region MultiClusterNetwork
+
+        /// <summary>
+        /// Whether this cluster is configured to be part of a multicluster network
+        /// </summary>
+        public bool HasMultiClusterNetwork
+        {
+            get
+            {
+                return !(string.IsNullOrEmpty(ClusterId));
+            }
+        }
+
+        /// <summary>
+        /// Cluster id (one per deployment, unique across all the deployments/clusters)
+        /// </summary>
+        public string ClusterId { get; set; }
+
+        /// <summary>
+        ///A list of cluster ids, to be used if no multicluster configuration is found in gossip channels.
+        /// </summary>
+        public IReadOnlyList<string> DefaultMultiCluster { get; set; }
+
+        /// <summary>
+        /// The maximum number of silos per cluster should be designated to serve as gateways.
+        /// </summary>
+        public int MaxMultiClusterGateways { get; set; }
+
+        /// <summary>
+        /// The number of seconds between background gossips.
+        /// </summary>
+        public TimeSpan BackgroundGossipInterval { get; set; }
+
+        /// <summary>
+        /// A list of connection strings for gossip channels.
+        /// </summary>
+        public IReadOnlyList<GossipChannelConfiguration> GossipChannels { get; set; }
+
+        #endregion
+
         /// <summary>
         /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.
         /// In order to override this value for reminders set <see cref="DataConnectionStringForReminders"/>
@@ -389,6 +458,9 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
         private const int DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT = 2;
         private const bool DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP = true;
+        private const bool DEFAULT_VALIDATE_INITIAL_CONNECTIVITY = true;
+        private const int DEFAULT_MAX_MULTICLUSTER_GATEWAYS = 10;
+        private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
         private const int DEFAULT_CACHE_SIZE = 1000000;
         private static readonly TimeSpan DEFAULT_INITIAL_CACHE_TTL = TimeSpan.FromSeconds(30);
@@ -428,7 +500,10 @@ namespace Orleans.Runtime.Configuration
             NumVotesForDeathDeclaration = DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION;
             NumMissedTableIAmAliveLimit = DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
             UseLivenessGossip = DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
+            ValidateInitialConnectivity = DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
             MaxJoinAttemptTime = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
+            MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
+            BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
             ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
             ServiceId = Guid.Empty;
             DeploymentId = Environment.UserName;
@@ -491,10 +566,26 @@ namespace Orleans.Runtime.Configuration
             sb.AppendFormat("      NumProbedSilos: {0}", NumProbedSilos).AppendLine();
             sb.AppendFormat("      NumVotesForDeathDeclaration: {0}", NumVotesForDeathDeclaration).AppendLine();
             sb.AppendFormat("      UseLivenessGossip: {0}", UseLivenessGossip).AppendLine();
+            sb.AppendFormat("      ValidateInitialConnectivity: {0}", ValidateInitialConnectivity).AppendLine();
             sb.AppendFormat("      IAmAliveTablePublishTimeout: {0}", IAmAliveTablePublishTimeout).AppendLine();
             sb.AppendFormat("      NumMissedTableIAmAliveLimit: {0}", NumMissedTableIAmAliveLimit).AppendLine();
             sb.AppendFormat("      MaxJoinAttemptTime: {0}", MaxJoinAttemptTime).AppendLine();
             sb.AppendFormat("      ExpectedClusterSize: {0}", ExpectedClusterSize).AppendLine();
+
+            if (HasMultiClusterNetwork)
+            {
+                sb.AppendLine("   MultiClusterNetwork:");
+                sb.AppendFormat("      ClusterId: {0}", ClusterId ?? "").AppendLine();
+                sb.AppendFormat("      DefaultMultiCluster: {0}", DefaultMultiCluster != null ? string.Join(",", DefaultMultiCluster) : "null").AppendLine();
+                sb.AppendFormat("      MaxMultiClusterGateways: {0}", MaxMultiClusterGateways).AppendLine();
+                sb.AppendFormat("      BackgroundGossipInterval: {0}", BackgroundGossipInterval).AppendLine();
+                sb.AppendFormat("      GossipChannels: {0}", string.Join(",", GossipChannels.Select(conf => conf.ChannelType.ToString() + ":" + conf.ConnectionString))).AppendLine();
+            }
+            else
+            {
+                sb.AppendLine("   MultiClusterNetwork: N/A");
+            }
+
             sb.AppendFormat("   SystemStore:").AppendLine();
             // Don't print connection credentials in log files, so pass it through redactment filter
             string connectionStringForLog = ConfigUtilities.RedactConnectionStringInfo(DataConnectionString);
@@ -532,7 +623,7 @@ namespace Orleans.Runtime.Configuration
 
         internal override void Load(XmlElement root)
         {
-            var logger = TraceLogger.GetLogger("OrleansConfiguration", TraceLogger.LoggerType.Runtime);
+            var logger = LogManager.GetLogger("OrleansConfiguration", LoggerType.Runtime);
             SeedNodes = new List<IPEndPoint>();
 
             XmlElement child;
@@ -593,6 +684,11 @@ namespace Orleans.Runtime.Configuration
                         {
                             UseLivenessGossip = ConfigUtilities.ParseBool(child.GetAttribute("UseLivenessGossip"),
                                 "Invalid boolean value for the UseLivenessGossip attribute on the Liveness element");
+                        }
+                        if (child.HasAttribute("ValidateInitialConnectivity"))
+                        {
+                            ValidateInitialConnectivity = ConfigUtilities.ParseBool(child.GetAttribute("ValidateInitialConnectivity"),
+                                "Invalid boolean value for the ValidateInitialConnectivity attribute on the Liveness element");
                         }
                         if (child.HasAttribute("IAmAliveTablePublishTimeout"))
                         {
@@ -712,7 +808,58 @@ namespace Orleans.Runtime.Configuration
                             UseMockReminderTable = true;
                         }
                         break;
+                    case "MultiClusterNetwork":
+                        ClusterId = child.GetAttribute("ClusterId");
 
+                        // we always trim cluster ids to avoid surprises when parsing comma-separated lists
+                        if (ClusterId != null) 
+                            ClusterId = ClusterId.Trim(); 
+
+                        if (string.IsNullOrEmpty(ClusterId))
+                            throw new FormatException("MultiClusterNetwork.ClusterId cannot be blank");
+                        if (ClusterId.Contains(","))
+                            throw new FormatException("MultiClusterNetwork.ClusterId cannot contain commas: " + ClusterId);
+
+                        if (child.HasAttribute("DefaultMultiCluster"))
+                        {
+                            var toparse = child.GetAttribute("DefaultMultiCluster").Trim();
+                            if (string.IsNullOrEmpty(toparse))
+                            {
+                                DefaultMultiCluster = new List<string>(); // empty cluster
+                            }
+                            else
+                            {
+                                DefaultMultiCluster = toparse.Split(',').Select(id => id.Trim()).ToList();
+                                foreach (var id in DefaultMultiCluster)
+                                    if (string.IsNullOrEmpty(id))
+                                        throw new FormatException("MultiClusterNetwork.DefaultMultiCluster cannot contain blank cluster ids: " + toparse);
+                            }
+                        }
+                        if (child.HasAttribute("BackgroundGossipInterval"))
+                        {
+                            BackgroundGossipInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("BackgroundGossipInterval"),
+                                "Invalid time value for the BackgroundGossipInterval attribute on the MultiClusterNetwork element");
+                        }
+                        if (child.HasAttribute("MaxMultiClusterGateways"))
+                        {
+                            MaxMultiClusterGateways = ConfigUtilities.ParseInt(child.GetAttribute("MaxMultiClusterGateways"),
+                                "Invalid time value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
+                        }
+                        var channels = new List<GossipChannelConfiguration>();
+                        foreach (XmlNode childchild in child.ChildNodes)
+                        {
+                            var channelspec = childchild as XmlElement;
+                            if (channelspec == null || channelspec.LocalName != "GossipChannel")
+                                continue;
+                            channels.Add(new GossipChannelConfiguration()
+                            {
+                                ChannelType = (GlobalConfiguration.GossipChannelType)
+                                   Enum.Parse(typeof(GlobalConfiguration.GossipChannelType), channelspec.GetAttribute("Type")),
+                                ConnectionString = channelspec.GetAttribute("ConnectionString")
+                            });
+                        }
+                        GossipChannels = channels;
+                        break;
                     case "SeedNode":
                         SeedNodes.Add(ConfigUtilities.ParseIPEndPoint(child, Subnet).GetResult());
                         break;
@@ -804,10 +951,11 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to bootstrap provider upon initialization</param>
         public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
         {
-            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            Type providerType = typeof(T);
+            var providerTypeInfo = providerType.GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(IBootstrapProvider).IsAssignableFrom(providerTypeInfo))
+                !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
@@ -833,11 +981,10 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {            
             Type providerType = typeof(T);
-
             var providerTypeInfo = providerType.GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).GetTypeInfo().IsAssignableFrom(providerType))
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
@@ -862,10 +1009,11 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to storage provider upon initialization</param>
         public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
         {
-            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            Type providerType = typeof(T);
+            var providerTypeInfo = providerType.GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(IStorageProvider).IsAssignableFrom(providerTypeInfo))
+                !typeof(IStorageProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);

@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 using Orleans.TestingHost;
 using System.Reflection;
 using System.Globalization;
-using UnitTests.Tester;
 using Orleans.Runtime.Configuration;
 using System.Net;
 using Orleans;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Assert = Xunit.Assert;
 using Tester;
 
 namespace Tests.GeoClusterTests
@@ -23,6 +22,8 @@ namespace Tests.GeoClusterTests
     {
         protected readonly Dictionary<string, ClusterInfo> Clusters;
         private TestingSiloHost siloHost;
+
+        private TimeSpan gossipStabilizationTime;
 
         public TestingClusterHost() : base()
         {
@@ -42,6 +43,45 @@ namespace Tests.GeoClusterTests
             Console.WriteLine(format, args);
         }
 
+        /// <summary>
+        /// Wait for the multicluster-gossip sub-system to stabilize.
+        /// </summary>
+        public async Task WaitForMultiClusterGossipToStabilizeAsync(bool account_for_lost_messages)
+        {
+            TimeSpan stabilizationTime = account_for_lost_messages ? gossipStabilizationTime : TimeSpan.FromSeconds(1);
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForMultiClusterGossipToStabilizeAsync is about to sleep for {0}", stabilizationTime);
+            await Task.Delay(stabilizationTime);
+            WriteLog("WaitForMultiClusterGossipToStabilizeAsync is done sleeping");
+        }
+
+        public Task WaitForLivenessToStabilizeAsync()
+        {
+            return this.siloHost.WaitForLivenessToStabilizeAsync();
+        }
+
+        private static TimeSpan GetGossipStabilizationTime(GlobalConfiguration global)
+        {
+            TimeSpan stabilizationTime = TimeSpan.Zero;
+
+            stabilizationTime += TimeSpan.FromMilliseconds(global.BackgroundGossipInterval.TotalMilliseconds * 1.05 + 50);
+
+            return stabilizationTime;
+        }
+
+        public void StopSilo(SiloHandle instance)
+        {
+            siloHost.StopSilo(instance);
+        }
+        public void KillSilo(SiloHandle instance)
+        {
+            siloHost.KillSilo(instance);
+        }
+
+        public void StopAllSilos()
+        {
+            siloHost.StopAllSilos();
+        }
+
         #region Default Cluster and Client Configuration
 
         private static int GetPortBase(int clusternumber)
@@ -59,17 +99,41 @@ namespace Tests.GeoClusterTests
      
         #endregion
 
-
         #region Cluster Creation
 
-        public void NewCluster(string clusterid, int numSilos, Action<ClusterConfiguration> customizer = null)
+        public void NewGeoCluster(Guid globalServiceId, string clusterId, int numSilos, Action<ClusterConfiguration> customizer = null)
+        {
+            Action<ClusterConfiguration> extendedcustomizer = config =>
+                {
+                    // configure multi-cluster network
+                    config.Globals.ServiceId = globalServiceId;
+                    config.Globals.ClusterId = clusterId;
+                    config.Globals.MaxMultiClusterGateways = 2;
+                    config.Globals.DefaultMultiCluster = null;
+
+                    config.Globals.GossipChannels = new List<GlobalConfiguration.GossipChannelConfiguration>(1) { 
+                          new GlobalConfiguration.GossipChannelConfiguration()
+                          {
+                              ChannelType = GlobalConfiguration.GossipChannelType.AzureTable,
+                              ConnectionString = StorageTestConstants.DataConnectionString
+                          }};
+
+                    if (customizer != null)
+                        customizer(config);
+                };
+
+            NewCluster(clusterId, numSilos, extendedcustomizer);
+        }
+
+
+        public void NewCluster(string clusterId, int numSilos, Action<ClusterConfiguration> customizer = null)
         {
             lock (Clusters)
             {
-                WriteLog("Starting Cluster {0}...", clusterid);
+                WriteLog("Starting Cluster {0}...", clusterId);
 
-                var mycount = Clusters.Count;
-                if (mycount == 0)
+                var myCount = Clusters.Count;
+                if (myCount == 0)
                 {
                     TestingSiloHost.StopAllSilosIfRunning();
                     this.siloHost = TestingSiloHost.CreateUninitialized();
@@ -81,8 +145,8 @@ namespace Tests.GeoClusterTests
                 {
                     StartClient = false,
                     AdjustConfig = customizer,
-                    BasePort = GetPortBase(mycount),
-                    ProxyBasePort = GetProxyBase(mycount)
+                    BasePort = GetPortBase(myCount),
+                    ProxyBasePort = GetProxyBase(myCount)
                 };
                 silohandles[0] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Primary, options, 0);
 
@@ -91,13 +155,16 @@ namespace Tests.GeoClusterTests
                     silohandles[i] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, i);
                 });
 
-                Clusters[clusterid] = new ClusterInfo
+                Clusters[clusterId] = new ClusterInfo
                 {
                     Silos = silohandles.ToList(),
-                    SequenceNumber = mycount
+                    SequenceNumber = myCount
                 };
 
-                WriteLog("Cluster {0} started.", clusterid);
+                if (myCount == 0)
+                    gossipStabilizationTime = GetGossipStabilizationTime(silohandles[0].Silo.GlobalConfig);
+
+                WriteLog("Cluster {0} started.", clusterId);
             }
         }
 
@@ -165,7 +232,7 @@ namespace Tests.GeoClusterTests
 
                 if (config == null)
                 {
-                    Assert.Fail("Error loading client configuration file");
+                    Assert.True(false, "Error loading client configuration file");
                 }
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
                 config.Gateways.Clear();
@@ -222,9 +289,6 @@ namespace Tests.GeoClusterTests
 
         #endregion
 
-         
-
-
         public void BlockAllClusterCommunication(string from, string to)
         {
             foreach (var silo in Clusters[from].Silos)
@@ -237,13 +301,11 @@ namespace Tests.GeoClusterTests
             foreach (var silo in Clusters[from].Silos)
                     silo.Silo.TestHook.UnblockSiloCommunication();
         }
-
   
         private SiloHandle GetActiveSiloInClusterByName(string clusterId, string siloName)
         {
             if (Clusters[clusterId].Silos == null) return null;
             return Clusters[clusterId].Silos.Find(s => s.Name == siloName);
         }
-        
     }
 }

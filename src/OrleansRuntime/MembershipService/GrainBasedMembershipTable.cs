@@ -11,11 +11,11 @@ namespace Orleans.Runtime.MembershipService
     internal class GrainBasedMembershipTable : Grain, IMembershipTableGrain
     {
         private InMemoryMembershipTable table;
-        private TraceLogger logger;
+        private Logger logger;
 
         public override Task OnActivateAsync()
         {
-            logger = TraceLogger.GetLogger("GrainBasedMembershipTable", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("GrainBasedMembershipTable", LoggerType.Runtime);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
             table = new InMemoryMembershipTable();
             return TaskDone.Done;
@@ -27,7 +27,7 @@ namespace Orleans.Runtime.MembershipService
             return TaskDone.Done;
         }
 
-        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, TraceLogger traceLogger)
+        public Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitTableVersion, Logger traceLogger)
         {
             logger.Info("InitializeMembershipTable {0}.", tryInitTableVersion);
             return TaskDone.Done;

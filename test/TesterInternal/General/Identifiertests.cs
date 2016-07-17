@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -141,7 +142,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void GrainId_ToFromPrintableString()
         {
             Guid guid = Guid.NewGuid();

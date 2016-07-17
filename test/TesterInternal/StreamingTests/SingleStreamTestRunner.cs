@@ -5,7 +5,9 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Tester;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
 
@@ -14,6 +16,7 @@ namespace UnitTests.StreamingTests
     public class SingleStreamTestRunner
     {
         public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA = "SMSProviderDoNotOptimizeForImmutableData";
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
@@ -21,7 +24,7 @@ namespace UnitTests.StreamingTests
         private ConsumerProxy consumer;
         private const int Many = 3;
         private const int ItemCount = 10;
-        private TraceLogger logger;
+        private Logger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
@@ -30,7 +33,7 @@ namespace UnitTests.StreamingTests
         public SingleStreamTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.streamProviderName = streamProvider;
-            this.logger = TraceLogger.GetLogger("SingleStreamTestRunner", TraceLogger.LoggerType.Application);
+            this.logger = LogManager.GetLogger("SingleStreamTestRunner", LoggerType.Application);
             this.testNumber = testNum;
             this.runFullTest = fullTest;
             this.random = TestConstants.random;
@@ -369,6 +372,56 @@ namespace UnitTests.StreamingTests
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
             await StopProxies();
+        }
+
+        public async Task StreamTest_22_TestImmutabilityDuringStreaming()
+        {
+            Heading("StreamTest_22_TestImmutabilityDuringStreaming");
+
+            IStreamingImmutabilityTestGrain itemProducer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+            string producerSilo = await itemProducer.GetSiloIdentifier();
+
+            // Obtain consumer in silo of item producer
+            IStreamingImmutabilityTestGrain consumerSameSilo = null;
+            do
+            {
+                var itemConsumer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+                var consumerSilo = await itemConsumer.GetSiloIdentifier();
+
+                if (consumerSilo == producerSilo)
+                    consumerSameSilo = itemConsumer;
+            } while (consumerSameSilo == null);
+
+            // Test behavior if immutability is enabled
+            await consumerSameSilo.SubscribeToStream(itemProducer.GetPrimaryKey(), SMS_STREAM_PROVIDER_NAME);
+
+            await itemProducer.SetTestObjectStringProperty("VALUE_IN_IMMUTABLE_STREAM");
+            await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME);
+
+            Assert.AreEqual("VALUE_IN_IMMUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+
+            // Now violate immutability by updating the property in the consumer.
+            await consumerSameSilo.SetTestObjectStringProperty("ILLEGAL_CHANGE");
+            Assert.AreEqual("ILLEGAL_CHANGE", await itemProducer.GetTestObjectStringProperty());
+
+            await consumerSameSilo.UnsubscribeFromStream();
+
+            // Test behavior if immutability is disabled
+            itemProducer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+
+            await consumerSameSilo.SubscribeToStream(itemProducer.GetPrimaryKey(), SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
+
+            await itemProducer.SetTestObjectStringProperty("VALUE_IN_MUTABLE_STREAM");
+            await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
+
+            Assert.AreEqual("VALUE_IN_MUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+
+            // Modify the items property and check it has no impact
+            await consumerSameSilo.SetTestObjectStringProperty("ALLOWED_CHANGE");
+            Assert.AreEqual("ALLOWED_CHANGE", await consumerSameSilo.GetTestObjectStringProperty());
+            Assert.AreEqual("VALUE_IN_MUTABLE_STREAM", await itemProducer.GetTestObjectStringProperty());
+
+            await consumerSameSilo.UnsubscribeFromStream();
         }
 
         //-----------------------------------------------------------------------------//

@@ -88,7 +88,7 @@ namespace Orleans.Runtime.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public string ExecutingEntityIdentity()
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Providers
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
-            return new EquallyDevidedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
+            return new EquallyDividedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
         }
 
         public bool InSilo { get { return true; } }

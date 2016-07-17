@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         private readonly object nextTicketLock;
         private DateTime nextTicket;
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public ActivationCollector(ClusterConfiguration config)
         {
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = TraceLogger.GetLogger("ActivationCollector", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationCollector", LoggerType.Runtime);
         }
 
         public TimeSpan Quantum { get { return quantum; } }
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
                                 "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
                                 "For now going to defer it's collection. Activation: {1}",
-                                TraceLogger.PrintDate(now),
+                                LogFormatter.PrintDate(now),
                                 activation.ToDetailedString());
                             ScheduleCollection(activation);
                         }

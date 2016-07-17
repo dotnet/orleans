@@ -10,13 +10,13 @@ namespace Orleans.Runtime
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private readonly TraceLogger logger ;
+        private readonly Logger logger ;
 
         internal ClientStatisticsManager(IStatisticsConfiguration config)
         {
             runtimeStats = new RuntimeStatisticsGroup();
             logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
-            logger = TraceLogger.GetLogger(GetType().Name);
+            logger = LogManager.GetLogger(GetType().Name);
         }
 
         internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)

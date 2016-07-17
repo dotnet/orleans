@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using UnitTests.StreamingTests;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -59,9 +58,9 @@ namespace UnitTests.OrleansRuntime.Streams
                 return myToken.CompareTo(token);
             }
 
-            public int Compare(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
-                return cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+                return cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid)==0;
             }
         }
 
@@ -70,11 +69,13 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public Action<IDisposable> PurgeAction { private get; set; }
 
-            public void QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage)
+            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
             {
-                cachedMessage.StreamGuid = queueMessage.StreamGuid;
+                StreamPosition streamPosition = GetStreamPosition(queueMessage);
+                cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
                 cachedMessage.SequenceNumber = queueMessage.SequenceToken.SequenceNumber;
                 cachedMessage.EventIndex = queueMessage.SequenceToken.EventIndex;
+                return streamPosition;
             }
 
             public IBatchContainer GetBatchContainer(ref TestCachedMessage cachedMessage)
@@ -89,6 +90,13 @@ namespace UnitTests.OrleansRuntime.Streams
             public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
             {
                 return new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+            }
+
+            public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
+            {
+                IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, null);
+                StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
+                return new StreamPosition(streamIdentity, sequenceToken);
             }
 
             public bool IsInStream(ref TestCachedMessage cachedMessage, Guid streamGuid, string streamNamespace)
@@ -106,7 +114,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public CachedMessageBlock<TestCachedMessage> Allocate()
             {
-                return new CachedMessageBlock<TestCachedMessage>(this, TestBlockSize);
+                return new CachedMessageBlock<TestCachedMessage>(TestBlockSize){Pool = this};
             }
 
             public void Free(CachedMessageBlock<TestCachedMessage> resource)
@@ -189,7 +197,7 @@ namespace UnitTests.OrleansRuntime.Streams
             int last = 0;
             int sequenceNumber = 0;
             // define 2 streams
-            var streams = new[] { new TestStreamIdentity { Guid = Guid.NewGuid() }, new TestStreamIdentity { Guid = Guid.NewGuid() } };
+            var streams = new[] { new StreamIdentity(Guid.NewGuid(), null), new StreamIdentity(Guid.NewGuid(), null) };
 
             // add both streams interleaved, until lock is full
             while (block.HasCapacity)
@@ -255,7 +263,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.AreEqual(last, block.NewestMessageIndex);
             Assert.IsTrue(block.HasCapacity);
 
-            block.Add(message, dataAdapter);
+            block.Add(message, DateTime.UtcNow, dataAdapter);
             last++;
 
             Assert.AreEqual(first > last, block.IsEmpty);

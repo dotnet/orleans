@@ -66,7 +66,7 @@ namespace Orleans.CodeGenerator
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
                     .ToArray();
-            var logger = TraceLogger.GetLogger("CodeGenerator");
+            var logger = LogManager.GetLogger("CodeGenerator");
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);

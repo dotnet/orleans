@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Messaging;
-using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -17,7 +17,8 @@ using Orleans.TestingHost.Utils;
 namespace Orleans.TestingHost
 {
     /// <summary>
-    /// A host class for local testing with Orleans using in-process silos. 
+    /// Important note: <see cref="TestingSiloHost"/> will be eventually deprectated. It is recommended that you use <see cref="TestCluster"/> instead.
+    /// A host class for local testing with Orleans using in-process silos.
     /// 
     /// Runs a Primary and Secondary silo in seperate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process if required for particular test cases.
@@ -149,7 +150,7 @@ namespace Orleans.TestingHost
                 // More details: http://dobrzanski.net/2010/09/20/mstest-unit-test-adapter-threw-exception-type-is-not-resolved-for-member/
                 throw new Exception(
                     string.Format("Exception during test initialization: {0}",
-                        TraceLogger.PrintException(baseExc)));
+                        LogFormatter.PrintException(baseExc)));
             }
         }
 
@@ -510,14 +511,30 @@ namespace Orleans.TestingHost
             {
                 WriteLog("Initializing Grain Client");
                 ClientConfiguration clientConfig;
-                if (clientOptions.ClientConfigFile != null)
+
+                try
                 {
-                    clientConfig = ClientConfiguration.LoadFromFile(clientOptions.ClientConfigFile.FullName);
+                    if (clientOptions.ClientConfigFile != null)
+                    {
+                        clientConfig = ClientConfiguration.LoadFromFile(clientOptions.ClientConfigFile.FullName);
+                    }
+                    else
+                    {
+                        clientConfig = ClientConfiguration.StandardLoad();
+                    }
                 }
-                else
+                catch (FileNotFoundException)
                 {
-                    clientConfig = ClientConfiguration.StandardLoad();
+                    if (clientOptions.ClientConfigFile != null
+                        && !string.Equals(clientOptions.ClientConfigFile.Name, TestingClientOptions.DEFAULT_CLIENT_CONFIG_FILE, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        // if the user is not using the defaults, then throw because the file was legitimally not found
+                        throw;
+                    }
+
+                    clientConfig = ClientConfiguration.LocalhostSilo();
                 }
+
                 if (clientOptions.ProxiedGateway && clientOptions.Gateways != null)
                 {
                     clientConfig.Gateways = clientOptions.Gateways;
@@ -584,6 +601,7 @@ namespace Orleans.TestingHost
                     this.ClientConfig = runningInstance.ClientConfig;
                     this.DeploymentId = runningInstance.DeploymentId;
                     this.DeploymentIdPrefix = runningInstance.DeploymentIdPrefix;
+                    this.GrainFactory = runningInstance.GrainFactory;
                     this.additionalSilos.AddRange(runningInstance.additionalSilos);
                     foreach (var additionalAssembly in runningInstance.additionalAssemblies)
                     {
@@ -660,13 +678,29 @@ namespace Orleans.TestingHost
 
             // Load initial config settings, then apply some overrides below.
             ClusterConfiguration config = new ClusterConfiguration();
-            if (options.SiloConfigFile == null)
+            try
             {
-                config.StandardLoad();
+                if (options.SiloConfigFile == null)
+                {
+                    config.StandardLoad();
+                }
+                else
+                {
+                    config.LoadFromFile(options.SiloConfigFile.FullName);
+                }
             }
-            else
+            catch (FileNotFoundException)
             {
-                config.LoadFromFile(options.SiloConfigFile.FullName);
+                if (options.SiloConfigFile != null
+                    && !string.Equals(options.SiloConfigFile.Name, TestingSiloOptions.DEFAULT_SILO_CONFIG_FILE, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // if the user is not using the defaults, then throw because the file was legitimally not found
+                    throw;
+                }
+
+                config = ClusterConfiguration.LocalhostPrimarySilo();
+                config.AddMemoryStorageProvider("Default");
+                config.AddMemoryStorageProvider("MemoryStore");
             }
 
             int basePort = options.BasePort < 0 ? BasePort : options.BasePort;

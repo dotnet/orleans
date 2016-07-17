@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
+using Xunit;
 
 namespace UnitTests.Tester
 {
@@ -45,14 +45,11 @@ namespace UnitTests.Tester
             foreach (var pair in statuses)
             {
                 logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                Assert.AreEqual(
+                Assert.Equal(
                     SiloStatus.Active,
-                    pair.Value,
-                    "Failed to confirm start of {0} silos ({1} confirmed).",
-                    pair.Value,
-                    SiloStatus.Active);
+                    pair.Value);
             }
-            Assert.AreEqual(expected, statuses.Count);
+            Assert.Equal(expected, statuses.Count);
         }
     }
 }

@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private readonly RuntimeStatisticsGroup runtimeStats;
 
         private AsyncTaskSafeTimer reportTimer;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ClientTableStatistics", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ClientTableStatistics", LoggerType.Runtime);
 
         internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime)
         {

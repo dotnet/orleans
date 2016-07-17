@@ -14,7 +14,7 @@ namespace UnitTests
     public class AssemblyLoaderTests 
     {
         const string ExpectedFileName = "OrleansProviders.dll";
-        private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
+        private readonly Logger logger = LogManager.GetLogger("AssemblyLoaderTests", LoggerType.Application);
         
         public AssemblyLoaderTests()
         {

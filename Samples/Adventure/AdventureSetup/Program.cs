@@ -2,6 +2,7 @@ using Orleans;
 using System;
 using System.IO;
 using System.Reflection;
+using Orleans.Runtime.Configuration;
 
 namespace AdventureSetup
 {
@@ -39,7 +40,8 @@ namespace AdventureSetup
                 AppDomainInitializerArguments = args,
             });
 
-            GrainClient.Initialize("ClientConfiguration.xml");
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             Console.WriteLine("Map file name is '{0}'.", mapFileName);
             Console.WriteLine("Setting up Adventure, please wait ...");

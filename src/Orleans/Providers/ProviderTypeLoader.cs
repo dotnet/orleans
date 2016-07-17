@@ -15,7 +15,7 @@ namespace Orleans.Providers
 
         private static readonly List<ProviderTypeLoader> managers;
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ProviderTypeLoader", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
 
         static ProviderTypeLoader()
         {
@@ -58,9 +58,9 @@ namespace Orleans.Providers
             }
         }
 
-        private void ProcessType(Type type)
+        private void ProcessType(TypeInfo typeInfo)
         {
-            var typeInfo = type.GetTypeInfo();
+            var type = typeInfo.AsType();
             if (alreadyProcessed.Contains(type) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(type)) return;
 
             alreadyProcessed.Add(type);

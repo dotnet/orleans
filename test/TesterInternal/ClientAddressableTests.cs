@@ -73,14 +73,14 @@ namespace UnitTests
         {
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             const string expected = "o hai!";
             await proxy.SetTarget(myRef);
             var actual = await proxy.HappyPath(expected);
             Assert.AreEqual(expected, actual);
 
-            await GrainReference.DeleteObjectReference(myRef);
+            RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -90,7 +90,7 @@ namespace UnitTests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
 
@@ -98,7 +98,7 @@ namespace UnitTests
                 proxy.SadPath(message)
             );
 
-            await GrainReference.DeleteObjectReference(myRef);
+            RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -106,7 +106,7 @@ namespace UnitTests
         {
             var myOb = new MyProducer();
             this.anchor = myOb;
-            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestProducer>(myOb);
+            var myRef = ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestProducer>(myOb);
             var rendez = GrainClient.GrainFactory.GetGrain<IClientAddressableTestRendezvousGrain>(0);
             var consumer = GrainClient.GrainFactory.GetGrain<IClientAddressableTestConsumer>(0);
 
@@ -115,7 +115,7 @@ namespace UnitTests
             var n = await consumer.PollProducer();
             Assert.AreEqual(1, n);
 
-            await GrainReference.DeleteObjectReference(myRef);
+            RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -125,12 +125,12 @@ namespace UnitTests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
             await proxy.MicroSerialStressTest(iterationCount);
 
-            await GrainReference.DeleteObjectReference(myRef);
+            RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
         [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
@@ -140,12 +140,12 @@ namespace UnitTests
 
             var myOb = new MyPseudoGrain();
             this.anchor = myOb;
-            var myRef = await ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
+            var myRef = ((GrainFactory)GrainClient.GrainFactory).CreateObjectReference<IClientAddressableTestClientObject>(myOb);
             var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
             await proxy.MicroParallelStressTest(iterationCount);
 
-            await GrainReference.DeleteObjectReference(myRef);
+            RuntimeClient.Current.DeleteObjectReference(myRef);
 
             myOb.VerifyNumbers(iterationCount);
         }

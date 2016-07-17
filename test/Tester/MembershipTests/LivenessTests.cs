@@ -12,13 +12,12 @@ using UnitTests.Tester;
 using Orleans.SqlUtils;
 using Tester;
 using UnitTests.General;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
-    public class LivenessTestsBase : HostedTestClusterPerTest
+    public class LivenessTestsBase : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
         private const int numAdditionalSilos = 1;
@@ -41,9 +40,9 @@ namespace UnitTests.MembershipTests
             foreach (var pair in statuses)
             {
                 output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                Assert.AreEqual(SiloStatus.Active, pair.Value);
+                Assert.Equal(SiloStatus.Active, pair.Value);
             }
-            Assert.AreEqual(3, statuses.Count);
+            Assert.Equal(3, statuses.Count);
 
             IPEndPoint address = silo3.Endpoint;
             output.WriteLine("About to stop {0}", address);
@@ -60,22 +59,21 @@ namespace UnitTests.MembershipTests
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
-                    Assert.IsTrue(pair.Value.Equals(SiloStatus.ShuttingDown)
+                    Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
                         || pair.Value.Equals(SiloStatus.Stopping)
                         || pair.Value.Equals(SiloStatus.Dead),
-                        "SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}",
-                        silo, pair.Value);
+                        string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else
                 {
-                    Assert.AreEqual(SiloStatus.Active, pair.Value, "SiloStatus for {0}", silo);
+                    Assert.Equal(SiloStatus.Active, pair.Value);
                 }
             }
         }
 
         protected async Task Do_Liveness_OracleTest_2(int silo2Kill, bool restart = true, bool startTimers = false)
         {
-            List<SiloHandle> moreSilos = this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
+            this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             for (int i = 0; i < numGrains; i++)
@@ -86,10 +84,8 @@ namespace UnitTests.MembershipTests
             SiloHandle silo2KillHandle;
             if (silo2Kill == 0)
                 silo2KillHandle = this.HostedCluster.Primary;
-            else if (silo2Kill == 1)
-                silo2KillHandle = this.HostedCluster.Secondary;
             else
-                silo2KillHandle = moreSilos[silo2Kill - 2];
+                silo2KillHandle = this.HostedCluster.SecondarySilos[silo2Kill - 1];
 
             logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.Endpoint);
 
@@ -123,13 +119,13 @@ namespace UnitTests.MembershipTests
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to stop a first silo.\n\n\n");
-            TestingSiloOptions secondarySiloOptions = this.HostedCluster.Secondary.Options;
-            this.HostedCluster.StopSilo(this.HostedCluster.Secondary);
+            var siloToStop = this.HostedCluster.SecondarySilos[0];
+            this.HostedCluster.StopSilo(siloToStop);
 
             await TestTraffic();
 
             logger.Info("\n\n\n\nAbout to re-start a first silo.\n\n\n");
-            this.HostedCluster.StartSecondarySilo(secondarySiloOptions, 1);
+            this.HostedCluster.RestartStoppedSecondarySilo(siloToStop.Name);
 
             await TestTraffic();
 
@@ -161,8 +157,8 @@ namespace UnitTests.MembershipTests
             try
             {
                 ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
-                Assert.AreEqual(key, grain.GetPrimaryKeyLong());
-                Assert.AreEqual(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
+                Assert.Equal(key, grain.GetPrimaryKeyLong());
+                Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);
                 if (startTimers)
                 {
@@ -191,57 +187,32 @@ namespace UnitTests.MembershipTests
         {
         }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = true,
-                LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            var clientOptions = new TestingClientOptions
-            {
-                ProxiedGateway = true,
-                Gateways = new List<IPEndPoint>(new[]
-                    {
-                        new IPEndPoint(IPAddress.Loopback, TestingSiloHost.ProxyBasePort),
-                        new IPEndPoint(IPAddress.Loopback, TestingSiloHost.ProxyBasePort + 1)
-                    }),
-                PreferedGatewayIndex = 1
-            };
-
-            return new TestingSiloHost(siloOptions, clientOptions);
-        }
-        
-		[Fact, TestCategory("Functional"), TestCategory("Liveness")]
-        public void Silo_Config_MembershipGrain()
-        {
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, this.HostedCluster.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, this.HostedCluster.Globals.ReminderServiceType, "ReminderServiceType");
+            var options = new TestClusterOptions(2);
+            options.ClientConfiguration.PreferedGatewayIndex = 1;
+            return new TestCluster(options);
         }
 
-        //[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("Gabi")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_2_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_3_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership")]
         public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -258,31 +229,17 @@ namespace UnitTests.MembershipTests
     {
         public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)
         {
-        }
-
-        public override TestingSiloHost CreateSiloHost()
-        {
             TestUtils.CheckForAzureStorage();
-
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = true,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
-                LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            return new TestingSiloHost(siloOptions);
         }
 
-
-        [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Azure")]
-        public void Silo_Config_AzureTable()
+        public override TestCluster CreateTestCluster()
         {
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, this.HostedCluster.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, this.HostedCluster.Globals.ReminderServiceType, "ReminderServiceType");
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
@@ -291,7 +248,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
@@ -309,7 +266,7 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(2);
         }
 
-        // [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
         public async Task Liveness_Azure_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -322,48 +279,41 @@ namespace UnitTests.MembershipTests
         {
         }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            TestUtils.CheckForAzureStorage();
-
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = true,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
-                LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            return new TestingSiloHost(siloOptions);
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
         }
 
-        //[Fact,  TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
+        [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
         public async Task Liveness_ZooKeeper_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
@@ -376,62 +326,92 @@ namespace UnitTests.MembershipTests
         public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
         {
         }
-
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            //output.WriteLine("Initializing relational databases...");
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
-
-            var siloOptions = new TestingSiloOptions
-            {
-                StartFreshOrleans = true,
-                StartPrimary = true,
-                StartSecondary = true,
-                DataConnectionString = relationalStorage.CurrentConnectionString,
-                LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer,
-                ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-            };
-
-            //output.WriteLine("TestContext.DeploymentDirectory={0}", context.DeploymentDirectory);
-            //output.WriteLine("TestContext=");
-            //output.WriteLine(TestUtils.DumpTestContext(context));
-
-            return new TestingSiloHost(siloOptions);
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
         }
 
-		[Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("SqlServer")]
-        public void Silo_Config_SqlServer()
-        {
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, this.HostedCluster.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, this.HostedCluster.Globals.ReminderServiceType, "ReminderServiceType");
-        }
-		
-        //[Fact, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Liveness_Sql_1()
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Liveness_SqlServer_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Liveness_Sql_2_Restart_Primary()
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Liveness_SqlServer_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Liveness_Sql_3_Restartl_GW()
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Liveness_SqlServer_3_Restartl_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Liveness_Sql_4_Restart_Silo_1()
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Liveness_SqlServer_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        //[Fact, TestCategory("Membership"), TestCategory("SqlServer")]
-        public async Task Liveness_Sql_5_Kill_Silo_1_With_Timers()
+        [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
+        public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
+        {
+            await Do_Liveness_OracleTest_2(2, false, true);
+        }
+    }
+
+    public class LivenessTests_MySql : LivenessTestsBase
+    {
+        public const string TestDatabaseName = "OrleansTest";
+        public LivenessTests_MySql(ITestOutputHelper output) : base(output)
+        {
+        }
+        public override TestCluster CreateTestCluster()
+        {
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task Liveness_MySql_1()
+        {
+            await Do_Liveness_OracleTest_1();
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task Liveness_MySql_2_Restart_Primary()
+        {
+            await Do_Liveness_OracleTest_2(0);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task Liveness_MySql_3_Restartl_GW()
+        {
+            await Do_Liveness_OracleTest_2(1);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task Liveness_MySql_4_Restart_Silo_1()
+        {
+            await Do_Liveness_OracleTest_2(2);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("MySql")]
+        public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);
         }

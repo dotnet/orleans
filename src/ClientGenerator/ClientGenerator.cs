@@ -15,6 +15,8 @@ namespace Orleans.CodeGeneration
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
+        private static readonly RoslynCodeGenerator CodeGenerator = new RoslynCodeGenerator();
+
         [Serializable]
         internal class CodeGenOptions
         {
@@ -31,7 +33,6 @@ namespace Orleans.CodeGeneration
             public string SourcesDir;
         }
 
-
         [Serializable]
         internal class GrainClientGeneratorFlags
         {
@@ -39,7 +40,6 @@ namespace Orleans.CodeGeneration
 
             internal static bool FailOnPathNotFound = false;
         }
-
 
         private static readonly int[] suppressCompilerWarnings =
         {
@@ -115,13 +115,12 @@ namespace Orleans.CodeGeneration
                 Path.GetFileNameWithoutExtension(options.InputLib.Name) + ".codegen.cs");
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
-            var codeGenerator = RoslynCodeGenerator.Instance;
             SerializationManager.RegisterBuiltInSerializers();
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
                 DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine(codeGenerator.GenerateSourceForAssembly(grainAssembly));
+                sourceWriter.WriteLine(CodeGenerator.GenerateSourceForAssembly(grainAssembly));
                 RestoreWarnings(sourceWriter, suppressCompilerWarnings);
                 sourceWriter.WriteLine("#endif");
             }
@@ -383,7 +382,7 @@ namespace Orleans.CodeGeneration
             catch (Exception ex)
             {
                 File.WriteAllText("error.txt", ex.Message + Environment.NewLine + ex.StackTrace);
-                Console.WriteLine("-- Code-gen FAILED -- \n{0}", TraceLogger.PrintException(ex));
+                Console.WriteLine("-- Code-gen FAILED -- \n{0}", LogFormatter.PrintException(ex));
                 return 3;
             }
         }

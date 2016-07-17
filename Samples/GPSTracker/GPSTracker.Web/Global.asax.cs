@@ -3,6 +3,8 @@ using Orleans;
 using Orleans.Runtime.Host;
 using System.Web.Mvc;
 using System.Web.Routing;
+using GPSTracker.Common;
+using Orleans.Runtime.Configuration;
 
 namespace GPSTracker.Web
 {
@@ -10,16 +12,21 @@ namespace GPSTracker.Web
     {
         protected void Application_Start()
         {
-            if (RoleEnvironment.IsAvailable)
+            
+
+            if (AzureEnvironment.IsInAzure)
             {
                 // running in Azure
-                AzureClient.Initialize(Server.MapPath(@"~/AzureConfiguration.xml"));
+                var config = AzureClient.DefaultConfiguration();
+                AzureClient.Initialize(config);
             }
             else
             {
                 // not running in Azure
-                GrainClient.Initialize(Server.MapPath(@"~/LocalConfiguration.xml"));
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
             }
+
             AreaRegistration.RegisterAllAreas();
             FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
             RouteConfig.RegisterRoutes(RouteTable.Routes);

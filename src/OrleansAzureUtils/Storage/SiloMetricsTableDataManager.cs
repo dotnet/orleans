@@ -71,13 +71,13 @@ namespace Orleans.AzureUtils
         private string myHostName;
         private readonly SiloMetricsData metricsDataObject = new SiloMetricsData();
         private AzureTableDataManager<SiloMetricsData> storage;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public SiloMetricsTableDataManager()
         {
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             
         }
 

@@ -3,7 +3,10 @@ using System;
 
 namespace Orleans.ServiceBus.Providers
 {
-    internal static class SegmentBuilder
+    /// <summary>
+    /// Utility class for encoding data into an ArraySegment.
+    /// </summary>
+    public static class SegmentBuilder
     {
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
@@ -80,7 +83,7 @@ namespace Orleans.ServiceBus.Providers
             else
             {
                 var bytes = new byte[str.Length * sizeof(char)];
-                Array.Copy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
+                Buffer.BlockCopy(str.ToCharArray(), 0, bytes, 0, bytes.Length);
                 Append(segment, ref writerOffset, bytes);
             }
         }
@@ -123,7 +126,7 @@ namespace Orleans.ServiceBus.Providers
                 return string.Empty;
             }
             var chars = new char[size / sizeof(char)];
-            Array.Copy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
+            Buffer.BlockCopy(segment.Array, segment.Offset + readerOffset, chars, 0, size);
             readerOffset += size;
             return new string(chars);
         }

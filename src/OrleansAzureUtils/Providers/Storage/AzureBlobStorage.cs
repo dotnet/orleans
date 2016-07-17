@@ -156,6 +156,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
                     string.Format("Error reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                     ex);
+
+                throw;
             }
         }
 
@@ -216,6 +218,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
                     string.Format("Error writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                     ex);
+
+                throw;
             }
         }
 
@@ -243,6 +247,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
                   string.Format("Error clearing: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                   ex);
+
+                throw;
             }
         }
     }

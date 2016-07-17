@@ -1,48 +1,39 @@
 ﻿
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester.TestStreamProviders;
 using UnitTests.Tester;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
-    public class AQClientStreamTests : HostedTestClusterPerTest
+    public class AQClientStreamTests : TestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
-        private ClientStreamTestRunner runner;
+        private readonly ITestOutputHelper output;
+        private readonly ClientStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public AQClientStreamTests(ITestOutputHelper output)
         {
-            var siloHost = new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
-                    {
-                        config.AddMemoryStorageProvider("PubSubStore");
-                        config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName);
-                        config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                    }
-                }, new TestingClientOptions
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.RegisterStreamProvider<AzureQueueStreamProvider>(AQStreamProviderName,
-                            new Dictionary<string, string>());
-                        config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 40001));
-                    }
-                });
+            this.output = output;
+            runner = new ClientStreamTestRunner(this.HostedCluster);
+        }
 
-            runner = new ClientStreamTestRunner(siloHost);
-            return siloHost;
+        public override TestCluster CreateTestCluster()
+        {
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
+            return new TestCluster(options);
         }
 
         public override void Dispose()
@@ -51,6 +42,7 @@ namespace Tester.StreamingTests
             base.Dispose();
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, deploymentId,
                 StorageTestConstants.DataConnectionString).Wait();
+            TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
@@ -58,6 +50,14 @@ namespace Tester.StreamingTests
         {
             logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
+        }
+
+        [Fact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQStreamConsumerOnDroppedClientTest()
+        {
+            logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");
+            await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Orleans.AzureUtils
 
         #region Implementation of IGatewayListProvider
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration conf, TraceLogger traceLogger)
+        public async Task InitializeGatewayListProvider(ClientConfiguration conf, Logger logger)
         {
             config = conf;
             siloInstanceManager = await OrleansSiloInstanceManager.GetManager(conf.DeploymentId, conf.DataConnectionString);

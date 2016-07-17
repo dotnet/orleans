@@ -19,7 +19,7 @@ namespace UnitTests
     public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
-        private readonly TraceLogger Logger = TraceLogger.GetLogger("AssemblyLoaderTests", TraceLogger.LoggerType.Application);
+        private readonly Logger Logger = LogManager.GetLogger("AssemblyLoaderTests", Orleans.Runtime.LoggerType.Application);
         private readonly ITestOutputHelper output;
 
         public ErrorGrainTest(ITestOutputHelper output)

@@ -18,6 +18,35 @@ namespace Orleans.Runtime.Configuration
     /// </summary>
     public static class ConfigUtilities
     {
+        internal static void ParseAdditionalAssemblyDirectories(IDictionary<string, SearchOption> directories, XmlElement root)
+        {
+            foreach(var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                
+                if(grandchild == null)
+                {
+                    continue;
+                }
+                else
+                {
+                    if(!grandchild.HasAttribute("Path"))
+                        throw new FormatException("Missing 'Path' attribute on Directory element.");
+
+                    // default to recursive
+                    var recursive = true;
+
+                    if(grandchild.HasAttribute("IncludeSubFolders"))
+                    {
+                        if(!bool.TryParse(grandchild.Attributes["IncludeSubFolders"].Value, out recursive))
+                            throw new FormatException("Attribute 'IncludeSubFolders' has invalid value.");
+
+                        directories[grandchild.Attributes["Path"].Value] = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                    }
+                }
+            }
+        }
+
         internal static void ParseTelemetry(XmlElement root)
         {
             foreach (var node in root.ChildNodes)
@@ -54,7 +83,7 @@ namespace Orleans.Runtime.Configuration
                         
                         if (plugin is ITelemetryConsumer)
                         {
-                            Logger.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
+                            LogManager.TelemetryConsumers.Add(plugin as ITelemetryConsumer);
                         }
                         else
                         {
@@ -136,7 +165,7 @@ namespace Orleans.Runtime.Configuration
 
                         if (plugin is ILogConsumer)
                         {
-                            TraceLogger.LogConsumers.Add(plugin as ILogConsumer);
+                            LogManager.LogConsumers.Add(plugin as ILogConsumer);
                         }
                         else
                         {
@@ -325,7 +354,7 @@ namespace Orleans.Runtime.Configuration
             return returnValue;
         }
 
-        internal static void ValidateSerializationProvider(Type type)
+        internal static void ValidateSerializationProvider(TypeInfo type)
         {
             if (type.IsClass == false)
             {
@@ -342,7 +371,7 @@ namespace Orleans.Runtime.Configuration
                 throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
             }
 
-            if (type.IsGenericType && type.IsConstructedGenericType == false)
+            if (type.IsGenericType && type.IsConstructedGenericType() == false)
             {
                 throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
             }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Presence.GrainInterfaces;
 
 namespace LoadGenerator
@@ -16,7 +17,8 @@ namespace LoadGenerator
         {
             try
             {
-                GrainClient.Initialize("DevTestClientConfiguration.xml");
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
 
                 int nGames = 10; // number of games to simulate
                 int nPlayersPerGame = 4; // number of players in each game

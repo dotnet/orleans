@@ -17,6 +17,7 @@
     <tns:Scheduler MaxActiveThreads="5" />
     <tns:Placement MaxRunQueueLength="5" NewActivationRate="0.0" LocalPlacementRate="0.05" />
     <tns:Tracing DefaultTraceLevel="Verbose" />
+    <tns:Startup Type="UnitTests.General.TestStartup,Tester" />
     <!-- A comment -->
   </tns:Defaults>
   <tns:Override Node="Node1">

@@ -149,7 +149,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    grainState.State = ConvertFromStorageFormat(entity);
+                    var loadedState = ConvertFromStorageFormat(entity);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
                     grainState.ETag = record.ETag;
                 }
             }
@@ -485,7 +486,7 @@ namespace Orleans.Storage
                 {
                     if (AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
-                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, TraceLogger.PrintException(exc));
+                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, LogFormatter.PrintException(exc));
                         return null;  // No data
                     }
                     throw;

@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -258,8 +257,7 @@ namespace UnitTests.Grains
 
         private void TryInitStream(Guid streamId, string providerName)
         {
-            Assert.IsNotNull(streamId, "Can't have null stream id");
-            Assert.IsNotNull(providerName, "Can't have null stream provider name");
+            if (providerName == null) throw new ArgumentNullException(nameof(providerName));
 
             State.StreamProviderName = providerName;
 

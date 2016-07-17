@@ -401,7 +401,7 @@ namespace Orleans.Runtime.Configuration
             var sb = new StringBuilder();
             sb.Append("Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
             sb.Append("Host: ").AppendLine(Dns.GetHostName());
-            sb.Append("Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());

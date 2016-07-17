@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
@@ -38,16 +39,13 @@ namespace UnitTests.StreamingTests
 
         private readonly SubscriptionMultiplicityTestRunner runner;
 
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = AdjustClusterConfiguration
-                });
+                var options = new TestClusterOptions(2);
+                AdjustClusterConfiguration(options.ClusterConfiguration);
+                return new TestCluster(options);
             }
 
             public override void Dispose()
@@ -55,7 +53,7 @@ namespace UnitTests.StreamingTests
                 base.Dispose();
                 var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
-                dataManager.DeleteTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
@@ -72,11 +70,6 @@ namespace UnitTests.StreamingTests
                 // register stream provider
                 config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, settings);
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-
-                // Make sure a node config exist for each silo in the cluster.
-                // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                config.GetOrCreateNodeConfigurationForSilo("Primary");
-                config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
             }
         }
 

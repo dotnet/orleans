@@ -17,6 +17,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Counters;
+using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
@@ -28,6 +29,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
 {
@@ -37,11 +39,17 @@ namespace Orleans.Runtime
     /// </summary>
     public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
     {
+        /// <summary> Standard name for Primary silo. </summary>
+        public const string PrimarySiloName = "Primary";
+
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
+            /// <summary> No silo type specified. </summary>
             None = 0,
+            /// <summary> Primary silo. </summary>
             Primary,
+            /// <summary> Secondary silo. </summary>
             Secondary,
         }
 
@@ -60,12 +68,13 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingAgent;
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly GrainTypeManager typeManager;
         private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloType siloType;
         private readonly SiloStatisticsManager siloStatistics;
         private readonly MembershipFactory membershipFactory;
+        private readonly MultiClusterOracleFactory multiClusterFactory;
         private StorageProviderManager storageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
         private BootstrapProviderManager bootstrapProviderManager;
@@ -73,6 +82,7 @@ namespace Orleans.Runtime
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private IMembershipOracle membershipOracle;
+        private IMultiClusterOracle multiClusterOracle;
         private ClientObserverRegistrar clientRegistrar;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
@@ -83,8 +93,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
-        private readonly IServiceProvider services;
-        
+
         internal readonly string Name;
         internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; private set; }
@@ -95,6 +104,7 @@ namespace Orleans.Runtime
         internal GrainTypeManager LocalTypeManager { get { return typeManager; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
+        internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
@@ -106,8 +116,15 @@ namespace Orleans.Runtime
             get { return allSiloProviders.AsReadOnly();  }
         }
 
-        internal IServiceProvider Services { get { return services; } }
+        internal IServiceProvider Services { get; }
 
+        /// <summary> Get the id of the cluster this silo is part of. </summary>
+        public string ClusterId
+        {
+            get { return globalConfig.HasMultiClusterNetwork ? globalConfig.ClusterId : null; } 
+        }
+
+     
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress { get { return messageCenter.MyAddress; } }
 
@@ -129,7 +146,9 @@ namespace Orleans.Runtime
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
             : this(name, siloType, config, null)
-        {}
+        {
+            
+        }
 
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -157,10 +176,10 @@ namespace Orleans.Runtime
             globalConfig = config.Globals;
             config.OnConfigChange("Defaults", () => nodeConfig = config.GetOrCreateNodeConfigurationForSilo(name));
 
-            if (!TraceLogger.IsInitialized)
-                TraceLogger.Initialize(nodeConfig);
+            if (!LogManager.IsInitialized)
+                LogManager.Initialize(nodeConfig);
 
-            config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
+            config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(nodeConfig, true), false);
             MultiClusterRegistrationStrategy.Initialize();
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
@@ -180,8 +199,8 @@ namespace Orleans.Runtime
                 generation = SiloAddress.AllocateNewGeneration();
                 nodeConfig.Generation = generation;
             }
-            TraceLogger.MyIPEndPoint = here;
-            logger = TraceLogger.GetLogger("Silo", TraceLogger.LoggerType.Runtime);
+            LogManager.MyIPEndPoint = here;
+            logger = LogManager.GetLogger("Silo", LoggerType.Runtime);
 
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC || !GCSettings.LatencyMode.Equals(GCLatencyMode.Batch))
@@ -201,24 +220,9 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            services = new DefaultServiceProvider();
-            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
-            if (startupBuilder != null)
-            {
-                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
-                try
-                {
-                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
-                }
-                catch (FileNotFoundException exc)
-                {
-                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
-                }
-            }
-            else
-            {
-                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
-            }
+            // Configure DI using Startup type
+            bool usingCustomServiceProvider;
+            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -231,7 +235,10 @@ namespace Orleans.Runtime
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
             grainFactory = new GrainFactory();
-            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
+            typeManager = new GrainTypeManager(
+                here.Address.Equals(IPAddress.Loopback),
+                grainFactory, 
+                new SiloAssemblyLoader(OrleansConfig.Defaults.AdditionalAssemblyDirectories));
 
             // Performance metrics
             siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);
@@ -276,8 +283,12 @@ namespace Orleans.Runtime
                 (IConsistentRingProvider) new VirtualBucketsRingProvider(SiloAddress, GlobalConfig.NumVirtualBucketsConsistentRing)
                 : new ConsistentRingProvider(SiloAddress);
 
+            // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
+            // service provider, meaning that he is explicitly opting into it.
+            var grainCreator = new GrainCreator(grainRuntime, usingCustomServiceProvider ? Services : null);
+
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 
@@ -307,12 +318,13 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, dispatcher);
 
             membershipFactory = new MembershipFactory();
+            multiClusterFactory = new MultiClusterOracleFactory();
             reminderFactory = new LocalReminderServiceFactory();
             
             SystemStatus.Current = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
-                () => TraceLogger.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
+                () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
             TestHook = new TestHooks(this);
 
@@ -334,12 +346,18 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
+            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalGrainDirectory, LocalScheduler, OrleansConfig);
             RegisterSystemTarget(clientRegistrar);
             RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
             RegisterSystemTarget((SystemTarget) membershipOracle);
+
+            if (multiClusterOracle != null)
+            {
+                logger.Verbose("Creating {0} System Target", "MultiClusterOracle");
+                RegisterSystemTarget((SystemTarget)multiClusterOracle);
+            }
 
             logger.Verbose("Finished creating System Targets for this silo.");
         }
@@ -443,6 +461,7 @@ namespace Orleans.Runtime
 
             IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
             membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
+            multiClusterOracle = multiClusterFactory.CreateGossipOracle(this).WaitForResultWithThrow(initTimeout);
             
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
@@ -485,7 +504,7 @@ namespace Orleans.Runtime
                 scheduler.QueueTask(() => membershipFactory.WaitForTableToInit(membershipTable), statusOracleContext)
                         .WaitWithThrow(initTimeout);
             }
-            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
+            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(GlobalConfig, true, LogManager.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
                 .WaitWithThrow(initTimeout);
           
             scheduler.QueueTask(() => LocalSiloStatusOracle.Start(), statusOracleContext)
@@ -494,6 +513,18 @@ namespace Orleans.Runtime
             scheduler.QueueTask(LocalSiloStatusOracle.BecomeActive, statusOracleContext)
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
+
+            //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
+            if (GlobalConfig.HasMultiClusterNetwork) 
+            {
+                logger.Info("Creating multicluster oracle with my ServiceId={0} and ClusterId={1}.",
+                    GlobalConfig.ServiceId, GlobalConfig.ClusterId);
+
+                ISchedulingContext clusterStatusContext = ((SystemTarget) multiClusterOracle).SchedulingContext;
+                scheduler.QueueTask(() => multiClusterOracle.Start(LocalSiloStatusOracle), clusterStatusContext)
+                                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("multicluster oracle created successfully."); }
+            }
 
             try
             {
@@ -544,10 +575,6 @@ namespace Orleans.Runtime
                     mc.StartGateway(clientRegistrar);
                 }
                 if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
-
-                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
 
                 SystemStatus.Current = SystemStatus.Running;
             }
@@ -786,7 +813,7 @@ namespace Orleans.Runtime
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
             SafeExecute(() => SystemStatus.Current = SystemStatus.Terminated);
-            SafeExecute(TraceLogger.Close);
+            SafeExecute(LogManager.Close);
 
             // Setting the event should be the last thing we do.
             // Do nothijng after that!
@@ -802,7 +829,7 @@ namespace Orleans.Runtime
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            TraceLogger.Flush();
+            LogManager.Flush();
 
             try
             {
@@ -820,7 +847,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                TraceLogger.Close();
+                LogManager.Close();
             }
         }
 
@@ -837,9 +864,9 @@ namespace Orleans.Runtime
                 get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
             }
             
-            public bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
+            internal bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
 
-            public object StatisticsProvider
+            internal object StatisticsProvider
             {
                 get
                 {
@@ -905,6 +932,11 @@ namespace Orleans.Runtime
             internal void SuppressFastKillInHandleProcessExit()
             {
                 ExecuteFastKillInProcessExit = false;
+            }
+ 
+            internal void InjectMultiClusterConfiguration(MultiClusterConfiguration config)
+            {
+                silo.LocalMultiClusterOracle.InjectMultiClusterConfiguration(config).Wait();
             }
 
             // store silos for which we simulate faulty communication

@@ -345,8 +345,8 @@ namespace Orleans.Runtime.Configuration
                     var types = typeNames.Select(t => ConfigUtilities.ParseFullyQualifiedType(t, "The type specification for the 'type' attribute of the Provider element could not be loaded"));
                     foreach (var type in types)
                     {
-                        ConfigUtilities.ValidateSerializationProvider(type);
                         var typeinfo = type.GetTypeInfo();
+                        ConfigUtilities.ValidateSerializationProvider(typeinfo);
                         if (SerializationProviders.Contains(typeinfo) == false)
                         {
                             SerializationProviders.Add(typeinfo);

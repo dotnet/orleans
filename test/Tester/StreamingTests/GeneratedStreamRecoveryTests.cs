@@ -1,12 +1,10 @@
-﻿
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
@@ -20,7 +18,7 @@ namespace UnitTests.StreamingTests
 {
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 
@@ -29,33 +27,25 @@ namespace UnitTests.StreamingTests
                 TotalQueueCount = 4,
             };
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = config =>
-                    {
-                        var settings = new Dictionary<string, string>();
-                        // get initial settings from configs
-                        AdapterConfig.WriteProperties(settings);
+                var options = new TestClusterOptions(2);
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+                var settings = new Dictionary<string, string>();
+                // get initial settings from configs
+                AdapterConfig.WriteProperties(settings);
 
-                        // add queue balancer setting
-                        settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+                // add queue balancer setting
+                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
 
-                        // add pub/sub settting
-                        settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+                // add pub/sub settting
+                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
-                        // register stream provider
-                        config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
+                // register stream provider
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
-                        // Make sure a node config exist for each silo in the cluster.
-                        // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                        config.GetOrCreateNodeConfigurationForSilo("Primary");
-                        config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
-                    }
-                });
+                return new TestCluster(options);
             }
         }
 
@@ -70,7 +60,7 @@ namespace UnitTests.StreamingTests
                 Fixture.StreamProviderName);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
@@ -80,7 +70,7 @@ namespace UnitTests.StreamingTests
                 100);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
             logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
@@ -100,11 +90,11 @@ namespace UnitTests.StreamingTests
 
             var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-            Assert.AreEqual(2, results.Length, "expected responses");
+            Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)
             {
-                Assert.AreEqual(true, result, "Control command result");
+                Assert.True(result, "Control command result");
             }
         }
     }
