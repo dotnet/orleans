@@ -330,14 +330,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    int hash = 17;
-                    unchecked
-                    {
-                        hash = hash * 23 + InterfaceName.GetHashCode();
-                        hash = hash * 23 + InterfaceId;
-                        hash = hash * 23 + request.MethodId;
-                    }
-
+                    var hash = InterfaceId ^ request.MethodId;
                     if (!debugContexts.TryGetValue(hash, out debugContext))
                     {
                         debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
