@@ -4,6 +4,39 @@ title: What's new in Orleans
 ---
 {% include JB/setup %}
 
+## [v1.2.3](https://github.com/dotnet/orleans/releases/tag/v1.2.3) July 11th 2016
+
+### Release notes
+
+- Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable [#1888](https://github.com/dotnet/orleans/pull/1888) [#1864](https://github.com/dotnet/orleans/pull/1864) [#1855](https://github.com/dotnet/orleans/pull/1855)
+- Troubleshooting improvements:
+  - Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) [#1879](https://github.com/dotnet/orleans/pull/1879) [#1808](https://github.com/dotnet/orleans/pull/1808)
+  - Better messaging when silo fails to join due to initial connectivity problems [#1866](https://github.com/dotnet/orleans/pull/1866) [#1933](https://github.com/dotnet/orleans/pull/1933)
+  - Throw meaningful exception if grain timer is created outside grain context [#1858](https://github.com/dotnet/orleans/pull/1858)
+- Bug fixes:
+  - Do not deactivate Stateless Workers upon grain directory partition shutdown [#1838](https://github.com/dotnet/orleans/pull/1838)
+  - interception works with Streams and grain extensions [#1874](https://github.com/dotnet/orleans/pull/1874)
+  - Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. [#1885](https://github.com/dotnet/orleans/pull/1885)
+  - Other minor bug fixes [#1884](https://github.com/dotnet/orleans/pull/1884) [#1823](https://github.com/dotnet/orleans/pull/1823)
+
+## [v1.2.2](https://github.com/dotnet/orleans/releases/tag/v1.2.2) June 15th 2016
+
+### Release notes
+
+* Bugfix: Remote stacktrace is once again being included in the exception that bubbles up to the caller (bug introduced in 1.2.0). [#1808](https://github.com/dotnet/orleans/pull/1808)
+* Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. [#1804](https://github.com/dotnet/orleans/pull/1804)
+* Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). [#1720](https://github.com/dotnet/orleans/pull/1720)
+* Added GrainCreator abstraction to enable some unit testing scenarios. [#1802](https://github.com/dotnet/orleans/pull/1802/) & [#1792](https://github.com/dotnet/orleans/pull/1792/)
+* ServiceBus package dependency upgraded to 3.2.2 [#1758](https://github.com/dotnet/orleans/pull/1758/)
+
+## [v1.2.1](https://github.com/dotnet/orleans/releases/tag/v1.2.1) May 19th 2016
+
+### Release notes
+
+* SupressDuplicateDeads: Use SiloAddress.Endpoint instead of InstanceName. [1728](https://github.com/dotnet/orleans/pull/1728)
+* Added support for complex generic grain parameters. [#1732](https://github.com/dotnet/orleans/pull/1732)
+* Fix race condition bugs in LocalReminderService. [#1757](https://github.com/dotnet/orleans/pull/1757)
+
 ## [v1.2.0](https://github.com/dotnet/orleans/releases/tag/v1.2.0) May 4th 2016
 
 ### Release notes
