@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Messaging
                     lock (targetActivation)
                     {
                         var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.State.Equals(ActivationState.Valid))
+                        if (target.State == ActivationState.Valid)
                         {
                             var overloadException = target.CheckOverloaded(Log);
                             if (overloadException != null)
