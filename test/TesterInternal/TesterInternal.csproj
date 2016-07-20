@@ -228,6 +228,7 @@
     <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
     <Compile Include="StreamingTests\AzureQueueAdapterTests.cs" />
+    <Compile Include="StreamingTests\DynamicStreamProviderConfigurationTests.cs" />
     <Compile Include="StreamingTests\HaloStreamSubscribeTests.cs" />
     <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
     <Compile Include="StreamingTests\SingleStreamTestRunner.cs" />

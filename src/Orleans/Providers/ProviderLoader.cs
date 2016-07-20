@@ -47,13 +47,37 @@ namespace Orleans.Providers
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
             foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
-                ((ProviderConfiguration)providerConfig).SetProviderManager(providerManager);
+            {
+                ((ProviderConfiguration) providerConfig).SetProviderManager(providerManager);
+            }
 
             // Load providers
             ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
+
             ValidateProviders();
         }
 
+        // Close providers and then remove them from the list
+        public async Task RemoveProviders(IList<string> providerNames)
+        {
+            List<Task> tasks = new List<Task>();
+            int count = providers.Count;
+            TProvider provider;
+
+            if (providerConfigs != null) count = providerConfigs.Count;
+            foreach (string providerName in providerNames)
+            {
+                if (providerConfigs.ContainsKey(providerName)) providerConfigs.Remove(providerName);
+
+                if (providers.ContainsKey(providerName))
+                {
+                    tasks.Add(providers[providerName].Close());
+                    providers.Remove(providerName);
+                }
+            }
+            
+            await Task.WhenAll(tasks);
+        }
 
         private void ValidateProviders()
         {
@@ -95,8 +119,9 @@ namespace Orleans.Providers
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.Provider_ErrorFromInit, string.Format("Exception initializing provider Name={0} Type={1}", name, provider), exc);
-                    throw;
+                    string exceptionMsg = string.Format("Exception initializing provider Name={0} Type={1}", name, provider);
+                    logger.Error(ErrorCode.Provider_ErrorFromInit, exceptionMsg, exc);
+                    throw new ProviderInitializationException(exceptionMsg, exc);
                 }
             }
         }
@@ -178,6 +203,12 @@ namespace Orleans.Providers
         {
             // First, figure out the provider type name
             var typeName = TypeUtils.GetFullName(t);
+            IList<String> providerNames;
+
+            lock (providers)
+            {
+                providerNames = providers.Keys.ToList();
+            }
 
             // Now see if we have any config entries for that type 
             // If there's no config entry, then we don't load the type
@@ -185,6 +216,9 @@ namespace Orleans.Providers
             foreach (var entry in providerConfigs.Values)
             {
                 var fullConfig = (ProviderConfiguration) entry;
+
+                // Check if provider is already initialized. Skip loading it if so.
+                if (providerNames.Contains(fullConfig.Name)) continue;
 
                 if (fullConfig.Type != typeName) continue;
                 

@@ -227,6 +227,7 @@
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
+    <Compile Include="TestStreamProviders\FailureInjectionStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="TestUtils.cs" />
   </ItemGroup>
