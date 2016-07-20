@@ -17,6 +17,7 @@ Currently, the main scenario that we know of that uses client side pre-call inte
 ## Server side interceptors
 
 There are two methods for performing method interception on the server-side:
+
 1. Silo-level interceptors
 2. Grain-level interceptors
 
@@ -46,6 +47,7 @@ public delegate Task<object> InvokeInterceptor(MethodInfo targetMethod, InvokeMe
 ```
 
 In this delegate:
+
 * `targetMethod` is the `MethodInfo` of the method being called on the grain implementation, not the interface.
 * `request.Arguments` is an `object[]` containing the arguments to the method, if any.
 * `target` is the grain implementation instance being called.
@@ -71,7 +73,7 @@ public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, I
     var isAdminMethod = methodInfo.GetCustomAttribute<AdminOnlyAttribute>();
     if (isAdminMethod && !(bool)RequestContext.Get("isAdmin"))
     {
-      throw new AccessDeniedException($"Only admins can access {method.Name}!");
+      throw new AccessDeniedException($"Only admins can access {methodInfo.Name}!");
     }
     
     return invoker.Invoke(this, request);
