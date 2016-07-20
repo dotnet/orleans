@@ -231,7 +231,7 @@ If a grain type has state, at activation time the state will be loaded from stor
 
 ## Handling failures using persistence
 
-Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent. There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed. In this case reading from storage can return your state to the last correct state. Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy.
+Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent. There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed. In this case reading from storage can return your state to the last correct state. Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy. However deactivation is usually an unnecessary step and usually you don't need to do that and by just resetting the state and even calling `OnActivateAsync` by hand you can make the operation less expensive by not deactivating and reactivating the grain.
 
 ## Next
 

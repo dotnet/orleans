@@ -27,9 +27,9 @@ Part of the recovery job is automatic in Orleans and if a grain is not accessibl
 After you see a grain operation failed you can do one or some  of the following.
 
 - Simply retry your action specially if it doesn't involve any state changes which might be half done.
-- Try to fix the partially changed state which is not stored in storage by calling `DeactivateOnIdle` to kill the activation. It will load the correct state from storage at next call.
-- Kill all related activations as well to ensure a clean state for all of them.
-- Due multi-grain state manipulations using a [Process Manager](https://msdn.microsoft.com/en-us/library/jj591569.aspx) or database transaction to make sure it's either done completely or nothing is changed to avoid the state being messed up,.
+- Try to fix/reset the partially changed state by calling a method which resets the state to the last known correct state or just reads it from storage by calling `ReadStateAsync`.
+- Reset the state of all related activations as well to ensure a clean state for all of them.
+- Due multi-grain state manipulations using a [Process Manager](https://msdn.microsoft.com/en-us/library/jj591569.aspx) or database transaction to make sure it's either done completely or nothing is changed to avoid the state being partially updated.
 
 Depending on your application the retry logic might follow a simple or complex pattern and you might have to do other stuff like notifying external systems and other things but generally you either have to retry your action, restart the grain/grains involved or stop responding until something which is not available becomes available. 
 
@@ -41,9 +41,28 @@ As described in the section above, choosing a strategy is application and contex
 
 ## A note about supervision trees
 
-Developers used to Erlang/Akka/Akka.Net might be surprised to see that there is no supervision tree in Orleans and wonder how they can recover from failures. The point is that in Orleans since actors are reactivated automatically and you don't handle their life-cycle, you usually only deal with killing actors (deactivating them) and not their creation. If you need to store relations between grains, you can simply do it and it is a widely done practice so if my `GameManager`grain fails, all games belong to it should fail as well and the manager can do this for them by calling `Deactivate OnIdle` 
+Developers used to Erlang/Akka/Akka.Net might be surprised to see that there is no supervision tree in Orleans and wonder how they can recover from failures. The point is that in Orleans since actors are reactivated automatically and you don't handle their life-cycle, you usually only deal with making sure that actor state is correct. If you need to store relations between grains, you can simply do it and it is a widely done practice. 
 
-The difference is, if one of the games receive a call, it will be reactivated automatically so if you need the manager to manage the game grains then all calls to the game should go through the `GameManager` so be careful to honor your hierarchies just like what you do in Erlang/Akka/Akka.Net. If you are making workers for a supervisor process then only the superwiser should communicate with the workers and no one else. In other words if something needs supervision, you need to do the supervision by some grain and Orleans doesn't solve it automagically for you.
+As an example let's say we have a `GameManager` grain which starts and stops `Game` grains and adds `Player` grains to the games.  if my `GameManager`grain fails to do its action regarding starting a game, the related game belonging to it should fail to do its `Start()` as well and the manager can do this for the game by doing orchestration. In Erlang the point of killing an actor (process) is to clean its state and reset it and also to manage memory. Managing memory in Orleans is automatic and the system deals with it, you only need to make sure that the game starts only and only if manager can do its `Start()` as well. You can do this by either calling the related methods in a sequencial manner or doing them in parallel and reset the state of all involved grains if any of them fails.
+
+The difference is, if one of the games receive a call, it will be reactivated automatically so if you need the manager to manage the game grains then all calls to the game which are related to management should go through the `GameManager` so be careful to honor your hierarchies just like what you do in Erlang/Akka/Akka.Net. If you need orchestration between actors, Orleans doesn't solve it automagically for you and you need to do your orchestration but the fact that you are not dealing with creating/destroying actors means you don't need to worry about resource management. You don't need to answer any of these
+
+- Where should I create my supervision tree
+- which actors should I register to be addressable by name?
+- Is actor X alive so I can send it a message?
+- ...
+
+So the game start example can be summarized like this:
+
+- `GameManager` asks the `Game` grain to start
+- `Game` grain adds the `Player` grains to itself
+- `Game` asks `Player` grains to add game to themselves
+- `Game` sets its state to be started.
+- `GameManager` adds the game to its list of games.
+
+Now if say a player fails to add the game to itself, you don't need to kill all players and the game and start from scratch, you simply reset the state of other players which added the game to themselves and reset the state of the `Game` and `GameManager` if required and redo your work or declare failure. If you can deal with adding the game to the player later on, you can continue and retry doing that again in a reminder or at some other game call like `Finish()` method of the game.
+
+This is faster since you are not recreating any actors and state resets can be very fast and easy if you do them in memory, even if you read it from storage you are at least saving the time which is spent on killing and recreating the actors.
 
 All this said, It is possible to create supervisors and even other OTP concepts for Orleans if you use a unified interface and messages to communicate like how its done in [Orleankka](https://github.com/OrleansContrib/Orleankka) and also server side interseptors can be used to implement some of them even without unified interfaces. It comes to your preference of the model to use.
 
