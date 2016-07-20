@@ -166,7 +166,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
+                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
             }
             
         }
@@ -185,7 +185,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
+                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
             }
         }
 
@@ -203,7 +203,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                AssertIsInvalidOperationException(exc, "Application-OnActivateAsync");
+                AssertIsNotInvalidOperationException(exc, "Application-OnActivateAsync");
             }
         }
 
@@ -226,7 +226,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             catch (Exception exc)
             {
-                AssertIsInvalidOperationException(exc, "Constructor");
+                AssertIsNotInvalidOperationException(exc, "Constructor");
             }
         }
 
@@ -313,7 +313,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        private static void AssertIsInvalidOperationException(Exception thrownException, string expectedMessageSubstring)
+        private static void AssertIsNotInvalidOperationException(Exception thrownException, string expectedMessageSubstring)
         {
             Console.WriteLine("Received exception: " + thrownException);
             Exception e = thrownException.GetBaseException();
@@ -321,7 +321,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             Console.WriteLine("Nested exception message: " + e.Message);
 
             Assert.IsAssignableFrom<Exception>(e);
-            Assert.IsNotType<InvalidOperationException>(e);
+            Assert.False(e is InvalidOperationException);
             Assert.True(e.Message.Contains(expectedMessageSubstring), "Did not get expected exception message returned: " + e.Message);
 
         }

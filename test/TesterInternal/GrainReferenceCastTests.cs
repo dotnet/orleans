@@ -268,7 +268,7 @@ namespace UnitTests
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
             
             // Cross-cast outside the inheritance hierarchy should not work
-            Assert.IsNotType<IGeneratorTestDerivedGrain1>(cast);
+            Assert.False(cast is IGeneratorTestDerivedGrain1);
 
             // Grandparent
             cast = (GrainReference) grain.AsReference<IGeneratorTestGrain>();
@@ -276,7 +276,7 @@ namespace UnitTests
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
 
             // Cross-cast outside the inheritance hierarchy should not work
-            Assert.IsNotType<IGeneratorTestDerivedGrain1>(cast);
+            Assert.False(cast is IGeneratorTestDerivedGrain1);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
@@ -289,7 +289,7 @@ namespace UnitTests
             Assert.IsAssignableFrom<IGeneratorTestDerivedDerivedGrain>(cast);
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain2>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
-            Assert.IsNotType<IGeneratorTestDerivedGrain1>(cast);
+            Assert.False(cast is IGeneratorTestDerivedGrain1);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]

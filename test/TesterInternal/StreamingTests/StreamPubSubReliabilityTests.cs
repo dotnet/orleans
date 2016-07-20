@@ -114,7 +114,7 @@ namespace UnitTests.StreamingTests
 
         }
 
-        private void tSetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
+        private void SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)

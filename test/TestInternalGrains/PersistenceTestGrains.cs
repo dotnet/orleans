@@ -665,12 +665,11 @@ namespace UnitTests.Grains
 
             var context = RuntimeContext.Current.ActivationContext;
             var scheduler = TaskScheduler.Current;
-            var callStack = new StackTrace();
 
             executing = true;
             Assert.Equal(_scheduler, scheduler);
-            Assert.NotNull(context);
             Assert.Equal(_context, context);
+            Assert.NotNull(context);
             executing = false;
         }
     }
