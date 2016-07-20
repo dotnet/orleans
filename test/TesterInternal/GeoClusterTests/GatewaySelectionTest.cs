@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Net;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using UpdateFaultCombo = Orleans.Runtime.MembershipService.MembershipOracleData.UpdateFaultCombo;
 using Xunit;
-using Assert = Xunit.Assert;
 using System.Collections.Generic;
 
 namespace UnitTests.GeoClusterTests
@@ -13,7 +12,6 @@ namespace UnitTests.GeoClusterTests
     /// <summary>
     /// Test selection algorithm for multi-cluster gateways
     /// </summary>
-    [TestClass]
     public class GatewaySelectionTests
     {
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]

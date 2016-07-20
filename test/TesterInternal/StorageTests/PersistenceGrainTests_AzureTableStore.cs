@@ -1,6 +1,6 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Storage;
@@ -140,8 +140,8 @@ namespace UnitTests.StorageTests
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
             convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
-            Assert.IsNotNull(convertedState, "Converted state");
-            Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
+            Assert.NotNull(convertedState); // Converted state
+            Assert.Equal(initialState.Grain,  convertedState.Grain);  // "Grain"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
@@ -165,16 +165,16 @@ namespace UnitTests.StorageTests
             storage.InitLogger(logger);
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
-            Assert.IsNotNull(convertedState, "Converted state");
-            Assert.AreEqual(initialState.GrainList.Count, convertedState.GrainList.Count, "GrainList size");
-            Assert.AreEqual(initialState.GrainDict.Count, convertedState.GrainDict.Count, "GrainDict size");
+            Assert.NotNull(convertedState);
+            Assert.Equal(initialState.GrainList.Count,  convertedState.GrainList.Count);  // "GrainList size"
+            Assert.Equal(initialState.GrainDict.Count,  convertedState.GrainDict.Count);  // "GrainDict size"
             for (int i = 0; i < grains.Length; i++)
             {
                 string iStr = ids[i].ToString();
-                Assert.AreEqual(initialState.GrainList[i], convertedState.GrainList[i], "GrainList #{0}", i);
-                Assert.AreEqual(initialState.GrainDict[iStr], convertedState.GrainDict[iStr], "GrainDict #{0}", i);
+                Assert.Equal(initialState.GrainList[i],  convertedState.GrainList[i]);  // "GrainList #{0}", i
+                Assert.Equal(initialState.GrainDict[iStr],  convertedState.GrainDict[iStr]);  // "GrainDict #{0}", i
             }
-            Assert.AreEqual(initialState.Grain, convertedState.Grain, "Grain");
+            Assert.Equal(initialState.Grain,  convertedState.Grain);  // "Grain"
         }
     }
 }

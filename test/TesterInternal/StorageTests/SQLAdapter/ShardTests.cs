@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.SqlDatabase.ElasticScale.ShardManagement;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+
 using Orleans.Runtime;
 using Orleans.SqlUtils.StorageProvider.GrainClasses;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
@@ -151,7 +151,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                     stopwatch.Stop();
                     output.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
 
-                    Assert.IsNull(state); 
+                   Assert.Null(state); 
                 }
             }).Wait();
         }
@@ -178,7 +178,7 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
                     var state2 = await dataManager.ReadStateAsync(grainIdentity);
                     stopwatch.Stop();
                     output.WriteLine(" Read elapsed: {0}", stopwatch.Elapsed);
-                    Assert.AreEqual(state, state2);
+                    Assert.Equal(state, state2);
                 }
             }).Wait();
         }
@@ -191,19 +191,19 @@ namespace Orleans.SqlUtils.StorageProvider.Tests
             Range<int> range1 = new Range<int>(int.MinValue, 0);
             Range<int> range2 = new Range<int>(0);
 
-            Assert.IsTrue(func(range1, int.MinValue));
-            Assert.IsTrue(func(range1, int.MinValue + 1));
-            Assert.IsTrue(func(range1, -1));
-            Assert.IsFalse(func(range1, 0));
-            Assert.IsFalse(func(range1, 1));
-            Assert.IsFalse(func(range1, int.MaxValue));
+            Assert.True(func(range1, int.MinValue));
+            Assert.True(func(range1, int.MinValue + 1));
+            Assert.True(func(range1, -1));
+            Assert.False(func(range1, 0));
+            Assert.False(func(range1, 1));
+            Assert.False(func(range1, int.MaxValue));
 
-            Assert.IsFalse(func(range2, int.MinValue));
-            Assert.IsFalse(func(range2, int.MinValue + 1));
-            Assert.IsFalse(func(range2, -1));
-            Assert.IsTrue(func(range2, 0));
-            Assert.IsTrue(func(range2, 1));
-            Assert.IsTrue(func(range2, int.MaxValue));
+            Assert.False(func(range2, int.MinValue));
+            Assert.False(func(range2, int.MinValue + 1));
+            Assert.False(func(range2, -1));
+            Assert.True(func(range2, 0));
+            Assert.True(func(range2, 1));
+            Assert.True(func(range2, int.MaxValue));
         }
 
         private readonly Random _random = new Random();
