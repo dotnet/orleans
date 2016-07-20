@@ -56,7 +56,7 @@ With these two interfaces as our starting point, the implementation classes are 
 Here's what it looks like:
 
 ``` csharp
-public class Employee : Grain, Interfaces.IEmployee
+public class Employee : Grain, IEmployee
 {
     public Task<int> GetLevel()
     {
@@ -125,7 +125,7 @@ In the client _(Program.cs)_, we can add a few lines to create a couple of emplo
 
 ``` csharp
 // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
-var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
+var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
 GrainClient.Initialize(config);
 
 var grainFactory = GrainClient.GrainFactory;
