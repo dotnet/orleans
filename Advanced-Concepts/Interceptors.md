@@ -24,7 +24,8 @@ As their names suggest, they operate on all grain calls, and an individual grain
 
 ### Silo-level Interceptors
 Silo-level interceptors are called for all grain calls within a silo. They can be installed using `IProviderRuntime.SetInvokeInterceptor(interceptor)`, typically from within a [Bootstrap Provider](https://dotnet.github.io/orleans/Advanced-Concepts/Application-Bootstrap-within-a-Silo)'s `Init` method, like so:
-```C#
+
+``` csharp
 providerRuntime.SetInvokeInterceptor(async (method, request, grain, invoker) =>
 {
     log.LogInfo($"{grain.GetType()}.{method.Name}(...) called");
@@ -39,9 +40,11 @@ providerRuntime.SetInvokeInterceptor(async (method, request, grain, invoker) =>
 Note how the interceptor wraps the call to the grain. This allows the user to inspect the return value of each method as well as handle any exceptions which are thrown.
 
 `SetInvokeInterceptor` takes a single parameter, a delegate of type `InvokeInterceptor` with the following signature:
-```C#
+
+``` csharp
 public delegate Task<object> InvokeInterceptor(MethodInfo targetMethod, InvokeMethodRequest request, IGrain target, IGrainMethodInvoker invoker);
 ```
+
 In this delegate:
 * `targetMethod` is the `MethodInfo` of the method being called on the grain implementation, not the interface.
 * `request.Arguments` is an `object[]` containing the arguments to the method, if any.
@@ -51,14 +54,17 @@ In this delegate:
 ### Grain-level interceptors
 
 Grain-level interceptors intercept calls for individual grains only. Grain-level interceptors are enabled by implementing `IGrainInvokeInterceptor` in a grain class:
-```C#
+
+``` csharp
 public interface IGrainInvokeInterceptor
 {
     Task<object> Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker);
 }
 ```
+
 For example:
-```C#
+
+``` csharp
 public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)
 {
     // Check access conditions.
@@ -71,4 +77,5 @@ public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, I
     return invoker.Invoke(this, request);
 }
 ```
+
 If a silo-level interceptor is also present, the grain-level interceptor is invoked inside of silo-level interceptors, during the call to `invoker.Invoke(...)`. Grain-level interceptors will also be invoked for grain extensions (implementations of `IGrainExtension`), not only for method in the current class.
