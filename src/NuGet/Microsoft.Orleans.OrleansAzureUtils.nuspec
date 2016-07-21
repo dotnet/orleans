@@ -22,7 +22,7 @@
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
 
-      <dependency id="WindowsAzure.Storage" version="5.0.2" />
+      <dependency id="WindowsAzure.Storage" version="7.0.0" />
     </dependencies>
   </metadata>
   <files>
