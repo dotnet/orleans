@@ -70,6 +70,8 @@
     href: Advanced-Concepts/External-Tasks-and-Grains.md
   - name: Deployment and Versioning of Dependencies
     href: Advanced-Concepts/Deployment-and-Versioning-of-Dependencies.md
+  - name: Troubleshooting Deployments
+    href: Advanced-Concepts/Troubleshooting-Deployments.md    
 
 - name: Runtime Implementation Details
   items:

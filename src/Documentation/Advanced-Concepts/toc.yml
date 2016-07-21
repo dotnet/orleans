@@ -30,3 +30,5 @@
   href: External-Tasks-and-Grains.md
 - name: Deployment and Versioning of Dependencies
   href: Deployment-and-Versioning-of-Dependencies.md
+- name: Troubleshooting Deployments
+  href: Troubleshooting-Deployments.md
