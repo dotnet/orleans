@@ -73,31 +73,97 @@
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Relational-Storage.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1></h1>
-              <p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="../Orleans-Configuration-Guide/index.html">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
-<p>To make Orleans code function with a given relational database backend, two things are needed:</p>
+              <p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
+<p>To make Orleans code function with a given relational database backend, the following is required:</p>
 <ol>
-<li>Appropriate ADO.NET libraries need to be loaded to the process. This should be defined as usual, e.g. via <a href="https://msdn.microsoft.com/en-us/library/dd0w4a2z(v=vs.110).aspx">DbProviderFactories</a> element in application configuration.</li>
-<li>Orleans should know about which libraries to use (multiple can exist in GAC or otherwise). The ADO.NET invariant is provided via <code>AdoInvariant</code> attribute in the element defining the connection string, by default it is <code>System.Data.SqlClient</code></li>
-<li>The database needs to exist so that it is compatible with the code. This is most conveniently done by creating a vendor specific database creation script. Currently there is database script defined for SQL Server for versions 2000 and newer (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_SqlServer.sql</a>). If you need other ones, open an issue or please, stop by at <a href="https://gitter.im/dotnet/orleans?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge">Orleans Gitter</a>.</li>
+<li>Appropriate ADO.NET library must be loaded to the process (multiple can exist in GAC or otherwise). This should be defined as usual, e.g. via <a href="https://msdn.microsoft.com/en-us/library/dd0w4a2z(v=vs.110).aspx">DbProviderFactories</a> element in application configuration.</li>
+<li>Configure the ADO.NET invariant via <code>AdoInvariant</code> attribute in the element defining the connection string, by default it is <code>System.Data.SqlClient</code></li>
+<li>The database needs to exist and be compatible with the code. This is done by running a vendor specific database creation script. The scripts are found in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansSqlUtils">OrleansSqlUtils</a> NuGet package and are published with every Orleans release. Currently there are two database scripts:</li>
+<li>SQL Server - <code>CreateOrleansTables_SqlServer.sql</code>. AdoInvariant is <code>System.Data.SqlClient</code>.</li>
+<li>MySQL - <code>CreateOrleansTables_MySql.sql</code>. AdoInvariant is <code>MySql.Data.MySqlClient</code>.</li>
 </ol>
-<p>Orleans uses a fixed set of queries defined in a well-known table <code>OrleansQuery</code>. These are the only queries used by Orleans. The queries are loaded when silo starts using the given connection string. All the queries are also parameterized, i.e. Orleans does not use techniques such as string formatting to run queries. From the perspective of Orleans database code, the code will technically work with any given database structure as long as the following are defined (this is the interface contract between Orleans and relational storage):</p>
+<p>If you need setup scripts for other ADO.NET supported databases, open an issue or please, stop by at <a href="https://gitter.im/dotnet/orleans?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge">Orleans Gitter</a>.</p>
+<h2 id="goals-of-the-design">Goals of the design</h2>
+<h4 id="1-allow-use-of-any-backend-that-has-a-ado-net-provider-">1. <strong>Allow use of any backend that has a ADO.NET provider</strong></h4>
+<p>This should cover the broadest possible set of backends available for .NET, which is a factor in on-premises installations. Some providers are listed at <a href="https://msdn.microsoft.com/en-us/library/dd363565.aspx">ADO.NET Data Providers MSDN page</a>,
+but for the sake of a remark, not all are listed, such as <a href="https://downloads.teradata.com/download/connectivity/net-data-provider-for-teradata">Teradata</a>.</p>
+<h4 id="2-maintain-the-potential-to-tune-queries-and-database-structure-as-appropriate-even-while-a-deployment-is-running-">2. <strong>Maintain the potential to tune queries and database structure as appropriate, even while a deployment is running</strong></h4>
+<p>In many cases, the servers and databases are hosted by a third party in contractual relation with the client. It is not an unusual
+situation the hosting environment is virtualized and performance fluctuates due to unforeseen factors, such as noisy neighbors or faulty hardware. It may
+not be possible to alter and re-deploy either Orleans binaries (contractual reasons) or even application binaries, but usually it is possible to tweak the
+database deployment. Altering <em>standard components</em>, such as Orleans binaries, requires a lenghtier procedure as to what is afforded in a given situation.</p>
+<h4 id="3-allow-one-to-make-use-of-vendor-and-version-specific-abilities-">3. <strong>Allow one to make use of vendor and version specific abilities</strong></h4>
+<p>Vendors have implemented different extensions and features within their products. It is sensible to make use of these features when they are available.
+These features are such as <a href="https://www.postgresql.org/about/news/1636/">native UPSERT</a> or <a href="https://www.pipelinedb.com/">PipelineDB</a> in PostgreSQL,
+<a href="https://msdn.microsoft.com/en-us/library/mt163689.aspx">PolyBase</a> or <a href="https://msdn.microsoft.com/en-us/library/dn249342.aspx">natively compiled tables and stored procedures</a> in SQL Server
+&ndash; and myriads of other features.</p>
+<h4 id="4-make-it-possible-to-optimize-hardware-resources-">4. <strong>Make it possible to optimize hardware resources</strong></h4>
+<p>When designing an application, it is often possible to anticipate which data needs to be inserted faster than other data and
+which data could be more likely put into <em>cold storage</em> which is cheaper (e.g. splitting data between SSD and HDD). As for an example,
+further considerations are that the physical location of some data could be more expensive (e.g. SSD RAID viz HDD RAID), more secured
+or some other decision attribute used. Related to <em>point 3.</em> Some databases offer special partitioning schemes, such as SQL Server <a href="https://msdn.microsoft.com/en-us/library/ms190787.aspx">Partitioned Tables and Indexes</a>.</p>
+<p>This principle applies also throughout the application life-cycle. Considering one of the principles of Orleans itself is a high-availability system,
+it should be possible to adjust storage system without interruption to Orleans deployment or that it should be possible to adjust the queries according
+to data and other application parameters. One example of changes is in Brian Harry&#39;s <a href="https://blogs.msdn.microsoft.com/bharry/2016/02/06/a-bit-more-on-the-feb-3-and-4-incidents/">blog post</a></p>
+<blockquote><p>When a table is small, it almost doesn’t matter what the query plan is. When it’s medium an OK query plan is fine. When it&#39;s huge (millions upon millions or billions of rows) a tiny, slight variation in query plan can kill you. So, we hint our sensitive queries heavily.</p>
+</blockquote>
+<p>This is true in general.</p>
+<h4 id="5-no-assumptions-on-what-tools-libraries-or-deployment-processes-are-used-in-organizations-">5. <strong>No assumptions on what tools, libraries or deployment processes are used in organizations</strong></h4>
+<p>Many organizations have familiarity with a certain set of database tools, examples being <a href="https://msdn.microsoft.com/en-us/library/ee210546.aspx">Dacpac</a>
+or <a href="https://www.red-gate.com/">Red Gate</a>. It may be so that deploying a database requires either a permission or a person, such as someone
+in a DBA role, to do it. Usually this means also having the target database layout and a rough sketch of the queries the application will
+produce to the database to be used estimate the load. There might be processes, perhaps influenced by industry standards, which mandate script based deployment.
+Having the queries and database structures in an external script makes this possible.</p>
+<h4 id="6-use-the-minimum-set-needed-of-interface-functionality-to-load-the-ado-net-libraries-and-functionality-">6. <strong>Use the minimum set needed of interface functionality to load the ADO.NET libraries and functionality</strong></h4>
+<p>This is both fast and has less surface to be exposed to ADO.NET library implementation discrepancies.</p>
+<h4 id="7-make-the-design-shardable-">7. <strong>Make the design shardable</strong></h4>
+<p>When it makes sense, for instance in relational storage provider, make the design readily shardable. This means for instance no database dependent
+data (e.g. <code>IDENTITY</code>) and basically it means the information that distinguishes row data should build on only data from the actual parameters.</p>
+<h4 id="8-make-the-design-easy-to-test-">8. <strong>Make the design easy to test</strong></h4>
+<p>Creating a new backend should be ideally as easy as translating one of the deployment scripts and adding a new connection string to tests assuming default
+parameters, check if a given database is installed and then run the tests against it.</p>
+<h4 id="9-taking-into-account-the-previous-points-make-both-porting-scripts-for-new-backends-and-modifying-already-deployed-backend-scripts-as-transparent-as-possible-">9. <strong>Taking into account the previous points, make both porting scripts for new backends and modifying already deployed backend scripts as transparent as possible</strong></h4>
+<h2 id="realization-of-the-goals">Realization of the goals</h2>
+<p>Orleans framework does not have knowledge of deployment specific hardware (which may change during active deployment), the change of data during the deployment life-cycle and some vendor specific features are usable in only some situations. For this reason, the interface between relational database and Orleans should adhere a minimum set of abstractions and rules to meet the goals but to make it also robust against misuse and easy to test if needed.
+<a href="Runtime-Tables.html">Runtime Tables</a>, <a href="Cluster-Management.html">Cluster Management</a> and the concrete <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs">membership protocol implementation</a>. Also, the SQL Server implementation contains SQL Server edition specific tuning.
+The interface contract between the database and Orleans is defined as follows:</p>
 <ol>
-<li>The names of the queries defined in <code>OrleansQuery</code> are defined as Orleans expects them. The keys are hardcoded in Orleans database code.</li>
-<li>The column names and types are what Orleans expects when Orleans issues a <code>SELECT</code> query.</li>
-<li>The parameter names and types are what Orleans expects when Orleans issues other than <code>SELECT</code> query.</li>
+<li>The general idea is that data is read and written through Orleans specific queries.
+Orleans operates on column names and types when reading and on parameter names and types when writing.</li>
+<li>The implementations <strong>must</strong> preserve input and output names and types. Orleans uses these parameters to reads query results by name and type.
+Vendor and deployment specific tuning is allowed and contributions are encouraged as long as the interface contract is maintained.     </li>
+<li>The implementation across vendor specific scripts <strong>should</strong> preserve the constraint names.
+This simplifies troubleshooting by virtue of uniform naming across concrete implementations.</li>
+<li><strong>Version</strong> &ndash; or <strong>ETag</strong> in application code &ndash; for Orleans represents a unique version.
+The type of its actual implementation is not important as long as it represents a unique version. In the implementation Orleans code excepts a signed 32-bit integer.</li>
+<li>For the sake of being explicit and removing ambiguity, Orleans expects some queries to return either <strong>TRUE as &gt; 0</strong> value
+or <strong>FALSE as = 0</strong> value. That is, affected rows or such does not matter. If an error is raised or an exception is thrown
+the query <strong>must</strong> ensure the entire transaction is rolled back and may either return FALSE or propagate the exception.</li>
+<li>Currently all but one query are single row inserts or updates (note, one could replace <code>UPDATE</code> queries with <code>INSERT</code> ones provided the associated
+<code>SELECT</code> queries would provide the last write) except for statistic inserts. Statistic insert, as defined by <code>InsertOrleansStatisticsKey</code> writes the statistics in batches of predefined maximum size using <code>UNION ALL</code> for all databases except for Oracle, for which a <code>UNION ALL FROM DUAL</code> construct is used. <code>InsertOrleansStatisticsKey</code> is the only query that defines a kind of a template parameters of which Orleans multiplies as many times as there are parameters with differing values.</li>
 </ol>
-<p>Specifically from the aforementioned three rules it follows that table names and layout, indexing and so forth can be defined and tuned without code changes as long as the used names and types are retained. The interface contract is written in more detail in <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/SQLServer/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_SqlServer.sql</a>, which contains a throughout description of the table structure and how it related to the
-<a href="Runtime-Tables.html">Runtime Tables</a>, <a href="Cluster-Management.html">Cluster Management</a> and the concrete <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs">membership protocol implementation</a>. Also, the SQL Server implementation contains SQL Server edition specific tuning.</p>
-<p>Currently all but one query are single row inserts or updates (note, one could replace <code>UPDATE</code> queries with <code>INSERT</code> ones provided the associated <code>SELECT</code> queries would provide the last write) except for statistic inserts. Statistic insert, as defined by <code>InsertOrleansStatisticsKey</code> writes the statistics in batches of predefined maximum size (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/SqlStatisticsPublisher.cs#L206">currently 200 rows</a>) using <code>UNION ALL</code> for all databases except for Oracle, for which a <code>UNION ALL FROM DUAL</code> construct is used. <code>InsertOrleansStatisticsKey</code> is the only query that defines a kind of a template parameters of which Orleans multiplies as many times as there are parameters with differing values.</p>
-<h2 id="known-issues">Known issues</h2>
-<p>Currently there is a database script only for SQL Server. Closely related to this is that the current implementation is only tested with SQL Server. To add a new backend and test it with the current set, the following needs to be done:</p>
+<p>Database engines support in-database programming, this is is similar to an idea of loading an executable script and invoke it to execute database operations. In pseudocode it could be depicted as</p>
+<pre><code class="lang-csharp">const int Param1 = 1;
+const DateTime Param2 = DateTime.UtcNow;
+const string queryFromOrleansQueryTableWithSomeKey = &quot;SELECT column1, column2 FROM &lt;some Orleans table&gt; where column1 = @param1 AND column2 = @param2;&quot;;
+TExpected queryResult = SpecificQuery12InOrleans&lt;TExpected&gt;(query, Param1, Param2);
+</code></pre>
+<p>These principles are also <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/">included in the database scripts</a>.</p>
+<h2 id="some-ideas-on-applying-customized-scripts">Some ideas on applying customized scripts</h2>
 <ol>
-<li>Add a new script to create the database.</li>
-<li>Add the vendor invariant name (e.g. <em>System.Data.SqlClient</em>) to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/AdoNetInvariants.cs#L34">AdoNetInvariants</a>. This is used to select the correct statistics insert mode (i.e. the <code>UNION ALL</code> with or without <code>FROM DUAL</code>) and in automatic testing.</li>
-<li>Add some other ADO.NET provider specific data to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/QueryConstantsBag.cs#L43">QueryConstantsBag</a>. These are (potentially) used in some query operations.</li>
-<li>Patch the test runner so it accepts the invariant name as a parameter, see at <a href="https://github.com/dotnet/orleans/blob/master/src/Tester/RelationalUtilities/SqlTestsEnvironment.cs#L38">SqlTestsEnvironment</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/Tester/MembershipTests/LivenessTests.cs#L423">LivenessTests_SqlServer</a>. The relational setup testing code is a good candinate for refactoring. For instance one could detect if a database is installed in listening to connections when it has a script defined and if so, run the storage tests on it.</li>
+<li>Alter scripts in <code>OrleansQuery</code> for <a href="http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Grain-Persistence">grain persistence</a> with <code>IF ELSE</code>
+so that some state is saved using the default <code>INSERT</code> while some grain state uses, for instance, <a href="https://msdn.microsoft.com/en-us/library/dn133165.aspx">memory optimized tables</a>.
+The <code>SELECT</code> queries need to be altered accordingly.</li>
+<li>The idea in <code>1.</code> can be used to take advantage of other deployment or vendor specific aspects. Such as splitting data between <code>SSD</code> or <code>HDD</code>, putting some data on encrypted tables,
+or perhaps inserting statistics data via SQL Server to Hadoop or even <a href="https://msdn.microsoft.com/en-us/library/ms188279.aspx">linked servers</a>.</li>
 </ol>
-<p>Currently there is no automatic storage tests to detect correct metrics or statistics operations</p>
+<p>The altered scripts can be tested running the Orleans test suite or straight in the database using, for instance, <a href="https://msdn.microsoft.com/en-us/library/jj851212.aspx">SQL Server Unit Test Project</a>.</p>
+<h2 id="guidelines-for-adding-new-ado-net-providers">Guidelines for adding new ADO.NET providers</h2>
+<ol>
+<li>Add a new database setup script according to the <a href="#realization-of-the-goals">Realization of the goals</a> section above.</li>
+<li>Add the vendor ADO invariant name to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/AdoNetInvariants.cs#L34">AdoNetInvariants</a> and ADO.NET provider specific data to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/DbConstantsStore.cs">DbConstantsStore</a>. These are (potentially) used in some query operations. e.g. to select the correct statistics insert mode (i.e. the <code>UNION ALL</code> with or without <code>FROM DUAL</code>).</li>
+<li>Orleans has comprehensive tests for all system stores: membership, reminders and statistics. Adding tests for the new database script is done by copy-pasting existing test classes and changing the ADO invariant name. Also, derive from <a href="https://github.com/dotnet/orleans/blob/master/test/Tester/RelationalUtilities/RelationalStorageForTesting.cs">RelationalStorageForTesting</a> in order to define test functionality for the ADO invariant.</li>
+</ol>
 
             </article>
           </div>

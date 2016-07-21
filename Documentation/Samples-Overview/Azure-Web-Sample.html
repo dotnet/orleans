@@ -77,9 +77,11 @@
 <p><strong>Important note</strong>: Worker and web role instances are not automatically removed or disabled, even when they go unused for a long time. To avoid a nasty surprise when your Azure bill comes, make sure to delete the instances after you have finished testing the application!</p>
 <p>This sample is essentially the same as the <a href="Hello-World.html">Hello World</a> sample, except that it hosts the grains in an Azure Worker Role instead of in the client process itself.</p>
 <p>While the communication interface and grain implementation are identical, three projects replace the client:</p>
-<p><strong>OrleansAzureSample</strong>, which is the Azure configuration project.
-<strong>OrleansAzureSilos</strong>, the Worker Role integration logic that hosts the Orleans silo in the cloud.
-<strong>WebRole</strong>, which provides a simple HTML UI for the Orleans backend.</p>
+<ul>
+<li><strong>OrleansAzureSample</strong>, which is the Azure configuration project.</li>
+<li><strong>OrleansAzureSilos</strong>, the Worker Role integration logic that hosts the Orleans silo in the cloud.</li>
+<li><strong>WebRole</strong>, which provides a simple HTML UI for the Orleans backend.</li>
+</ul>
 <h2 id="run-azurewebsample-locally">Run AzureWebSample Locally</h2>
 <p>The sample is configured to run inside of the Azure Compute Emulator on your desktop by default, so make sure that <strong>OrleansAzureSample</strong> is set as the <strong>Startup Project</strong> in this solution and just press F5 to build and run the sample locally.</p>
 <p>You do not need to start Visual Studio with administrative privileges to run this sample in the emulator - it is designed to use both <strong>IIS Express</strong> and <strong>Express Emulator</strong>, so make sure these options are selected in OrleansAzureSample-&gt;Properties-&gt;Web.
@@ -93,7 +95,7 @@ You may also need to select the &quot;Use IIS Express for web sites and projects
 <img src="AzureSample%203.png" alt=""></p>
 <p>This means that the site and its backend are ready. Start a web browser and navigate to the link that VS displayed (or just click on it). You will be greeted by this screen:</p>
 <p><img src="AzureSample%201.png" alt=""></p>
-<p> Enter a greeting and wait for the response. The first time you interact with the site, it may take a few seconds, since the whole system need to warm up. After that first greeting, it should go quickly.</p>
+<p>Click on &quot;Ask Orleans it&#39;s details&quot; and wait for the response. The first time you interact with the site, it may take a few seconds, since the whole system need to warm up. After that first message, it should go quickly.</p>
 <p><img src="AzureSample%202.png" alt=""></p>
 
             </article>

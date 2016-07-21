@@ -27,7 +27,7 @@ Typically, you will run one silo per machine, but it sometimes make sense to run
 
 ## Getting Started
 
-After starting either Visual Studio 2012 or 2013, go to create a new project.
+After starting Visual Studio, go to create a new project.
 Under "Visual C#," you should see the following:
 
 ![](../Images/New DevTest 1.PNG)
@@ -55,7 +55,9 @@ static void Main(string[] args)
         AppDomainInitializerArguments = args,
     });
 
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
+    // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
+    GrainClient.Initialize(config);
 
     // TODO: once the previous call returns, the silo is up and running.
     //       This is the place your custom logic, for example calling client logic

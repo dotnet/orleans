@@ -90,7 +90,7 @@ They are .NET interfaces extending a particular base interface.</p>
 <p>Silos are containers of grains, potentially millions of grains in a single silo.
 Typically, you will run one silo per machine, but it sometimes make sense to run more than one on a single machine, when testing, for example.</p>
 <h2 id="getting-started">Getting Started</h2>
-<p>After starting either Visual Studio 2012 or 2013, go to create a new project.
+<p>After starting Visual Studio, go to create a new project.
 Under &quot;Visual C#,&quot; you should see the following:</p>
 <p><img src="../Images/New%20DevTest%201.PNG" alt=""></p>
 <p>Choose the &quot;Orleans Dev/Test Host&quot; project type, create a directory for the solution, and create the project:</p>
@@ -109,7 +109,9 @@ Under &quot;Visual C#,&quot; you should see the following:</p>
         AppDomainInitializerArguments = args,
     });
 
-    Orleans.GrainClient.Initialize(&quot;DevTestClientConfiguration.xml&quot;);
+    // Orleans comes with a rich XML and programmatic configuration. Here we&#39;re just going to set up with basic programmatic config
+    var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo();
+    GrainClient.Initialize(config);
 
     // TODO: once the previous call returns, the silo is up and running.
     //       This is the place your custom logic, for example calling client logic

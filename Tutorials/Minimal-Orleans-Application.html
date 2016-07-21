@@ -77,12 +77,13 @@
 <p>This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.</p>
 <ul>
 <li>It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.</li>
-<li>Tested in both Visual Studio 2013 and 2015 using Orleans 1.0.9.</li>
+<li>Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.</li>
 <li>Has no reliance on SQL or Azure</li>
 </ul>
 <p>Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
+<p>You can find the final source code in <code>Samples\Tutorial.Minimal</code> folder (<a href="https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal">see latest version online</a>).</p>
 <h2 id="project-setup">Project Setup</h2>
-<p>For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (Called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.</p>
+<p>For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.</p>
 <p>The Solution will eventually look like this.  (Missing files will be added in sections below)</p>
 <p><img src="../Images/MinimalOrleansApplication1.png" alt=""></p>
 <h4 id="within-visual-studio">Within Visual Studio</h4>
@@ -100,9 +101,9 @@
 </ol>
 <h4 id="add-the-following-references">Add the following References</h4>
 <ol>
-<li>GrainCollection References GrainInterfaces</li>
-<li>Host References GrainInterfaces</li>
-<li>Host References GrainCollection</li>
+<li>GrainCollection references GrainInterfaces</li>
+<li>Host references GrainInterfaces</li>
+<li>Host references GrainCollection</li>
 </ol>
 <h2 id="adding-orleans">Adding Orleans</h2>
 <p>Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide the autocode generation for us our Grains and Interfaces, and the Runtime which is used for hosting.</p>
@@ -113,7 +114,7 @@
 <li>Add Microsoft.Orleans.OrleansRuntime to Host</li>
 </ol>
 <h2 id="creating-our-grain-interface">Creating our Grain Interface</h2>
-<p>In GrainInterfaces Create an interface IHello.cs</p>
+<p>In GrainInterfaces create an interface IHello.cs</p>
 <pre><code class="lang-csharp">
 public interface IHello : Orleans.IGrainWithIntegerKey
 {
@@ -199,11 +200,9 @@ class Program
 
     static void DoSomeClientWork()
     {
-        // Orleans comes with a rich XML configuration but we&#39;re just going to setup a basic config
-        var clientconfig = new Orleans.Runtime.Configuration.ClientConfiguration();
-        clientconfig.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000));
-
-        GrainClient.Initialize(clientconfig);
+        // Orleans comes with a rich XML and programmatic configuration. Here we&#39;re just going to set up with basic programmatic config
+        var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+        GrainClient.Initialize(config);
 
         var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
         var result = friend.SayHello(&quot;Goodbye&quot;).Result;
@@ -241,16 +240,13 @@ class Program
 <p><img src="../Images/MinimalOrleansApplication2.png" alt=""></p>
 <p>Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.</p>
 <h2 id="further-reading">Further Reading</h2>
-<p>List of Orleans Packages
-<a href="http://dotnet.github.io/orleans/NuGets">http://dotnet.github.io/orleans/NuGets</a></p>
-<p>Orleans Configuration Guide
-<a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">http://dotnet.github.io/orleans/Orleans-Configuration-Guide/</a></p>
-<p>Orleans Best Practices
-<a href="http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf">http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf</a></p>
-<p>Running in a Stand Alone Silo
-<a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo">http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo</a></p>
-<p>Azure Web Sample
-<a href="http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample">http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample</a></p>
+<ul>
+<li><a href="http://dotnet.github.io/orleans/NuGets">List of Orleans Packages</a></li>
+<li><a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide</a></li>
+<li><a href="http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf">Orleans Best Practices</a></li>
+<li><a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo">Running in a Stand Alone Silo</a></li>
+<li><a href="http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample">Azure Web Sample</a></li>
+</ul>
 
             </article>
           </div>

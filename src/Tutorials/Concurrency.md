@@ -15,7 +15,7 @@ First create a class in the interface project which we'll use to send the greeti
 ``` csharp
 public class GreetingData
 {
-    public long From { get; set; }
+    public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }
@@ -44,7 +44,7 @@ public async Task Greeting(GreetingData data)
     // send a message back to the sender
     var fromGrain = GrainFactory.GetGrain<IEmployee>(data.From);
     await fromGrain.Greeting(new GreetingData {
-        From = this.GetPrimaryKeyLong(),
+        From = this.GetPrimaryKey(),
         Message = "Thanks!",
         Count = data.Count + 1 });
 }
@@ -58,7 +58,7 @@ public async Task AddDirectReport(IEmployee employee)
     _reports.Add(employee);
     await employee.SetManager(this);
     await employee.Greeting(new GreetingData {
-        From = this.GetPrimaryKeyLong(),
+        From = this.GetPrimaryKey(),
         Message = "Welcome to my team!" });
 }
 ```
@@ -69,17 +69,17 @@ Let's add some simple client code to add a direct report to a manager:
 
 
 ``` csharp
-var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(0);
-var m1 = GrainClient.GrainFactory.GetGrain<IManager>(1);
-m1.AddDirectReport(e0);
+var e0 = GrainClient.GrainFactory.GetGrain<IEmployee>(Guid.NewGuid());
+var m1 = GrainClient.GrainFactory.GetGrain<IManager>(Guid.NewGuid());
+m1.AddDirectReport(e0).Wait();
 ```
 
 When we run this code, the first "Thanks!" greeting is received.
-However, when this message is responded to this we get a 30 second pause, then warnings appear in the log and we're told the grain is about to break it's promise.
+However, when this message is responded to this we get a 30 second pause (or 10 minutes when the debugger is attached), then warnings appear in the log and we're told the grain is about to break it's promise.
 
 ```
-1 said: Welcome to my team!
-0 said: Thanks!
+    7b66f830-8d81-49fc-b8fc-279af6924bd3 said: Welcome to my team!
+    ce14310a-8500-4b2f-a21b-b4b23eb48d0d said: Thanks!    
 [2014-03-12 15:25:37.398 GMT    31      WARNING 100157  CallbackData    127.0.0.1:11111]        Response did
 not arrive on time in 00:00:30 for message: Request
 S127.0.0.1:11111:132333898*grn/906ECA4C/00000001@68e2b3ab->S127.0.0.1:11111:132333898*grn/D9BB797F/00000000@c24c4187 #13: MyGrainInterfaces1.IEmployee:Greeting(). Target History is: <S127.0.0.1:11111:132333898:*grn/D9BB797F/00000000:@c24c4187>.
@@ -95,14 +95,14 @@ Grain 0 sends a message to grain 1.
 In that call grain 1 sends a message back to grain 0.
 However, grain 0 can't process it because it's awaiting the first message, so it gets queued.
 The await can't complete until the second message is returned, so we've entered a state that we can't escape from.
-Orleans waits for 30 seconds, then kills the request.
+Orleans waits for 30 seconds (10 minutes with the debugger), then kills the request.
 
 Orleans offers us a way to deal with this, by marking the grain `[Reentrant]`, which means that additional calls may be made while the grain is waiting for a task to complete, resulting in interleaved execution.
 
 
 ``` csharp
 [Reentrant]
-public class Employee : Orleans.Grain, Interfaces.IEmployee
+public class Employee : Grain, IEmployee
 {
     ...
 }
@@ -111,10 +111,10 @@ public class Employee : Orleans.Grain, Interfaces.IEmployee
 We see that the sample works, and Orleans is able to interleave the grain calls:
 
  ```
- 1 said: Welcome to my team!
- 0 said: Thanks!
- 1 said: Thanks!
- 0 said: Thanks!
+ aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Welcome to my team!
+ 63e4d07c-ac50-4012-ba50-5b5cf54e4e45 said: Thanks!
+ aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Thanks!
+ 63e4d07c-ac50-4012-ba50-5b5cf54e4e45 said: Thanks!
  ```
 
 ## Messages
@@ -139,7 +139,7 @@ Immutability is indicated with a the `[Immutable]` attribute on the class:
 [Immutable]
 public class GreetingData
 {
-    public long From { get; set; }
+    public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }

@@ -109,7 +109,7 @@ In this case, we&#39;re choosing to not rely on inheritance when defining the <c
 The reason for this will be explained when we discuss Orleans&#39; support for <a href="Declarative-Persistence.html">Declarative Persistence</a>.
 With these two interfaces as our starting point, the implementation classes are straight-forward to implement, as the interfaces are simple.</p>
 <p>Here&#39;s what it looks like:</p>
-<pre><code class="lang-csharp">public class Employee : Grain, Interfaces.IEmployee
+<pre><code class="lang-csharp">public class Employee : Grain, IEmployee
 {
     public Task&lt;int&gt; GetLevel()
     {
@@ -170,7 +170,9 @@ With these two interfaces as our starting point, the implementation classes are 
 <p>A manager is expressed as an employee through composition: the manager grain has a reference to an grain representing its &quot;employeeness.&quot;
 The role of <code>OnActivateAsync()</code> will be explained later on; for now, you may consider it a constructor.</p>
 <p>In the client <em>(Program.cs)</em>, we can add a few lines to create a couple of employees and their manager:</p>
-<pre><code class="lang-csharp">Orleans.GrainClient.Initialize(&quot;DevTestClientConfiguration.xml&quot;);
+<pre><code class="lang-csharp">// Orleans comes with a rich XML and programmatic configuration. Here we&#39;re just going to set up with basic programmatic config
+var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+GrainClient.Initialize(config);
 
 var grainFactory = GrainClient.GrainFactory;
 var e0 = grainFactory.GetGrain&lt;IEmployee&gt;(Guid.NewGuid());
@@ -232,7 +234,7 @@ This ability is essential in making the programming model a smooth transition fr
 </code></pre>
 <p>Executing it, you should see something like this:</p>
 <p><img src="../Images/Multiple%20Actors1.PNG" alt=""></p>
-<p>The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise.</p>
+<p>The use of a GUID to represent the name of a person leaves something for you to fix, as an exercise. If you want to do this exercise, please keep the rule for always using asynchronous code inside grains. The Result of a Task will block execution if the task hasn’t completed. This should be avoided in Orleans grains; tasks should always be awaited before Result is read.</p>
 <p><code>TaskDone.Done</code>, used in the code above, is a convenience object defined by Orleans to allow code to succinctly return an already completed <code>Task</code>.</p>
 <h3 id="asynchrony-bites-us-">Asynchrony Bites Us!</h3>
 <p>In the image above, you may notice that the last message comes out after the request to press Enter -- why is that?

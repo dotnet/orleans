@@ -108,7 +108,7 @@ namespace Tests
         public static void ClassCleanup()
         {
             // Optional.
-            // By default, the next test class which uses TestignSiloHost will
+            // By default, the next test class which uses TestingSiloHost will
             // cause a fresh Orleans silo environment to be created.
             StopAllSilos();
         }
@@ -133,7 +133,8 @@ namespace Tests
     }
 }
 </code></pre>
-<p>As you can see having <code>ClassCleanup()</code> is optional but it&#39;s good to have it around.
+<p>Since this test method is asynchronous and leverages the <code>await</code> keyword, be sure the method is defined as <code>async</code> and returns a <code>Task</code>.
+As you can see having <code>ClassCleanup()</code> is optional but it&#39;s good to have it around.
 Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.</p>
 <p>So writing tests for Orleans is not much different from a normal test project.
 You just need to reference the two NuGet packages and derive your class from <code>TestingSiloHost</code>.</p>
@@ -142,7 +143,7 @@ You just need to reference the two NuGet packages and derive your class from <co
 <li>Keep in mind that the silo will not be restarted after each test method so if your methods need a fully clean grain then make sure that they&#39;ll use different grain IDs.</li>
 <li>The <code>TestingSiloHost</code> class has multiple utility methods for starting and stopping silos which can be used for programmatic simulation of some failure situations.</li>
 <li>Starting and stopping the silo for each test case takes time and is not a good idea unless you really need it for a test.</li>
-<li>The two created silos will be named &quot;Primary&quot; and &quot;Secondary&quot;. It is importnat to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special <code>MembershipTableGrain</code> system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.</li>
+<li>The two created silos will be named &quot;Primary&quot; and &quot;Secondary&quot;. It is important to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special <code>MembershipTableGrain</code> system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.</li>
 <li>Configurations of the environment are based on <code>TestSiloOptions</code> and <code>TestClientOptions</code> objects which can be passed to the constructor of the base class.</li>
 </ul>
 

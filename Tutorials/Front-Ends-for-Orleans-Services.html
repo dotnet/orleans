@@ -82,7 +82,6 @@ Let&#39;s extend the Employee/Manager scenario from the  <a href="Declarative-Pe
 <p>First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.</p>
 <h2 id="initializing-orleans">Initializing Orleans</h2>
 <p>Next, add a reference to the <em>Orleans.dll</em> file in the project references.</p>
-<p>Now add the <em>ClientConfiguration.xml</em> file used in the Orleans Host application to the root of the ASP.NET project.</p>
 <p>As with the Orleans host we created earlier, we need to initialize Orleans.
 This is best done in the <em>Global.asax.cs</em> file like this:</p>
 <pre><code class="lang-csharp">namespace WebApplication1
@@ -91,7 +90,32 @@ This is best done in the <em>Global.asax.cs</em> file like this:</p>
     {
         protected void Application_Start()
         {
-            Orleans.GrainClient.Initialize(Server.MapPath(&quot;~/ClientConfiguration.xml&quot;));
+            ...
+            var config = ClientConfiguration.LocalhostSilo();
+
+           // Attempt to connect a few times to overcome transient failures and to give the silo enough 
+            // time to start up when starting at the same time as the client (useful when deploying or during development).
+            const int initializeAttemptsBeforeFailing = 5;
+
+            int attempt = 0;
+            while (true)
+            {
+                try
+                {
+                    GrainClient.Initialize(config);
+                    break;
+                }
+                catch (SiloUnavailableException e)
+                {
+                    attempt++;
+                    if (attempt &gt;= initializeAttemptsBeforeFailing)
+                    {
+                         throw;
+                    }
+                    Thread.Sleep(TimeSpan.FromSeconds(2));
+                }
+            }
+
               ...
 </code></pre>
 <p>Now when the ASP.NET application starts, it will initialize the Orleans Client.</p>
@@ -103,22 +127,21 @@ This is best done in the <em>Global.asax.cs</em> file like this:</p>
 <p>We can add a <code>Get</code> method to the controller, which we&#39;ll use to return the level of an Employee.</p>
 <pre><code class="lang-csharp">public class EmployeeController : ApiController
 {
-    public Task&lt;int&gt; Get(long id)
+    public Task&lt;int&gt; Get(Guid id)
     {
         var employee = GrainClient.GrainFactory.GetGrain&lt;IEmployee&gt;(id);
-        return employee.Level;
+        return employee.GetLevel();
     }
 }
 </code></pre>
 <p>Note that the controller is asynchronous, and we can just pass back the <code>Task</code> which the grain returns.</p>
 <h2 id="running-the-application">Running the Application</h2>
 <p>Now let&#39;s test the application.</p>
-<p>Build the project, and start the local silo.</p>
-<p>Set the ASP.NET application as the startup project, and run the project.</p>
+<p>Build the project. Set the ASP.NET application and the silo host project as the startup projects, and run them.</p>
 <p>If you navigate to the API URL (the number may be different on your project)...</p>
-<pre><code>http://localhost:6858/api/employee/3
+<pre><code>http://localhost:6858/api/employee/42783519-d64e-44c9-9c29-399e3afaa625
 </code></pre><p> ...you should see the result returned from the grain:</p>
-<pre><code class="lang-xml">&lt;int xmlns=&quot;http://schemas.microsoft.com/2003/10/Serialization/&quot;&gt;42&lt;/int&gt;
+<pre><code class="lang-xml">    42
 </code></pre>
 <p>That&#39;s the basics in place, the rest of the API can be completed by adding the rest of the HTTP verbs.</p>
 <h2 id="next">Next</h2>

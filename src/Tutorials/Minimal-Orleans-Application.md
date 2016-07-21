@@ -9,16 +9,17 @@ This tutorial provides step by step instructions for creating a basic functionin
 
 
 - It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.
-- Tested in both Visual Studio 2013 and 2015 using Orleans 1.0.9.
+- Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.
 - Has no reliance on SQL or Azure
 
 Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.
 
+You can find the final source code in `Samples\Tutorial.Minimal` folder ([see latest version online](https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal)).
 
 ## Project Setup
 
 
-For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (Called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.
+For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.
 
 The Solution will eventually look like this.  (Missing files will be added in sections below)
 
@@ -43,9 +44,9 @@ We use just the default project types in c#.
 
 #### Add the following References
 
-1. GrainCollection References GrainInterfaces
-2. Host References GrainInterfaces
-3. Host References GrainCollection
+1. GrainCollection references GrainInterfaces
+2. Host references GrainInterfaces
+3. Host references GrainCollection
 
 
 ## Adding Orleans
@@ -60,7 +61,7 @@ Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Co
 
 ## Creating our Grain Interface
 
-In GrainInterfaces Create an interface IHello.cs
+In GrainInterfaces create an interface IHello.cs
 
 
 ``` csharp
@@ -172,11 +173,9 @@ class Program
 
     static void DoSomeClientWork()
     {
-        // Orleans comes with a rich XML configuration but we're just going to setup a basic config
-        var clientconfig = new Orleans.Runtime.Configuration.ClientConfiguration();
-        clientconfig.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000));
-
-        GrainClient.Initialize(clientconfig);
+        // Orleans comes with a rich XML and programmatic configuration. Here we're just going to set up with basic programmatic config
+        var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
+        GrainClient.Initialize(config);
 
         var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
         var result = friend.SayHello("Goodbye").Result;
@@ -222,17 +221,8 @@ Within the appropriate bin directory (Debug/Release) there will be a number of l
 
 ## Further Reading
 
-List of Orleans Packages
-http://dotnet.github.io/orleans/NuGets
-
-Orleans Configuration Guide
-http://dotnet.github.io/orleans/Orleans-Configuration-Guide/
-
-Orleans Best Practices
-http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf
-
-Running in a Stand Alone Silo
-http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo
-
-Azure Web Sample
-http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample
+ - [List of Orleans Packages](http://dotnet.github.io/orleans/NuGets)
+ - [Orleans Configuration Guide](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/)
+ - [Orleans Best Practices](http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf)
+ - [Running in a Stand Alone Silo](http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo)
+ - [Azure Web Sample](http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample)

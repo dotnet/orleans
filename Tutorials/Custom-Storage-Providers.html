@@ -89,21 +89,26 @@ To move it there on build will require adding a bit of post-build event code.</p
 Once the project is created, let&#39;s also rename the file <em>Class1.cs</em> to <em>FileStorageProvider.cs</em>.
 That should also prompt VS to rename the class we find inside.
 Next, we must add references to <a href="https://www.nuget.org/packages/Microsoft.Orleans.Core/">Microsoft.Orleans.Core NuGet package</a>.</p>
-<p>Assuming, of course, that your project is called <code>StorageProviders</code>, make you silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.</p>
+<p>Assuming, of course, that your project is called <code>StorageProviders</code>, make your silo host project reference it, so that StorageProviders.dll gets copied to the silo folder.</p>
 <p>Our storage provider should implement the interface <code>Orleans.Storage.IStorageProvider</code>.
 With a little bit of massaging of the code, it should look something like this:</p>
 <pre><code class="lang-csharp">using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 using Orleans;
 using Orleans.Storage;
-using Orleans.RuntimeCore;
+using Orleans.Runtime;
+using Newtonsoft.Json;
+using Orleans.Serialization;
 
 namespace StorageProviders
 {
     public class FileStorageProvider : IStorageProvider
     {
-        public OrleansLogger Log { get; set; }
+        private JsonSerializerSettings _jsonSettings;
+
+        public Logger Log { get; set; }
 
         public string Name { get; set; }
 
@@ -119,21 +124,21 @@ namespace StorageProviders
         }
 
         public Task ReadStateAsync(string grainType,
-                                   Orleans.GrainReference grainRef,
+                                   GrainReference grainRef,
                                    IGrainState grainState)
         {
             throw new NotImplementedException();
         }
 
         public Task WriteStateAsync(string grainType,
-                                    Orleans.GrainReference grainRef,
+                                    GrainReference grainRef,
                                     IGrainState grainState)
         {
              throw new NotImplementedException();
         }
 
         public Task ClearStateAsync(string grainType,
-                                    Orleans.GrainReference grainRef,
+                                    GrainReference grainRef,
                                     IGrainState grainState)
         {
             throw new NotImplementedException();
@@ -141,11 +146,11 @@ namespace StorageProviders
     }
 }
 </code></pre>
-<p>The first thing we have to figure out is what data we need to provider through configuration.
+<p>The first thing we have to figure out is what data we need to provide through configuration. 
 The name is a required property, but we will also need the path to the root directory for our file store.
 That is, in fact, the only piece of information we need, so we&#39;ll add a <code>RootDirectory</code> string property and edit the configuration file as in the previous section.
 In doing so, it&#39;s critical to pay attention to the namespace and class name of the provider.
-Add this to the <code>&lt;StorageProviders&gt;</code> element in the <code>DevTestServerConfiguration.xml</code> configuration file of your silo host project where you will be testing the provider:</p>
+Add this to the <code>&lt;StorageProviders&gt;</code> element in the <code>OrleansConfiguration.xml</code> configuration file of your silo host project where you will be testing the provider:</p>
 <pre><code> &lt;Provider Type=&quot;StorageProviders.FileStorageProvider&quot;
           Name=&quot;FileStore&quot;
           RootDirectory=&quot;.\Storage&quot;/&gt;
@@ -160,6 +165,8 @@ In our case, we&#39;ll want to set the properties and create the root directory 
                  Orleans.Providers.IProviderRuntime providerRuntime,
                  Orleans.Providers.IProviderConfiguration config)
 {
+     _jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+
     this.Name = name;
     if (string.IsNullOrWhiteSpace(config.Properties[&quot;RootDirectory&quot;]))
         throw new ArgumentException(&quot;RootDirectory property not set&quot;);
@@ -193,26 +200,19 @@ if (!fileInfo.Exists)
 </code></pre>
 <p>We also need to decide how the data will be stored.
 To make it easy to inspect the data outside of the application, we&#39;re going to use JSON.
-A more space-conscious design may use a binary serialization format, instead, it&#39;s entirely a choice of the provider designer&#39;s.
-The JSON serializer is found in the <code>System.Web.Extensions</code> assembly, which you now need to add to the project&#39;s references.
-Also, add a using clause to the top of the file: <code>using System.Web.Script.Serialization;</code></p>
+A more space-conscious design may use a binary serialization format, instead, it&#39;s entirely a choice of the provider designer&#39;s.</p>
 <pre><code class="lang-csharp">using (var stream = fileInfo.OpenText())
 {
     var storedData = await stream.ReadToEndAsync();
 
-    JavaScriptSerializer deserializer = new JavaScriptSerializer();
-    object data = deserializer.Deserialize(storedData, grainState.GetType());
-    var dict = ((IGrainState)data).AsDictionary();
-    grainState.SetAll(dict);
+    grainState.State = JsonConvert.DeserializeObject(storedData, grainState.State.GetType(), _jsonSettings);
 }
 </code></pre>
 <h2 id="writing-state">Writing State</h2>
 <p>The format decisions have already been made, so coding up the <code>WriteStateAsync</code> method should be straight-forward: serialize as JSON, construct the file name, then write to the file:</p>
-<pre><code class="lang-csharp">public async Task WriteStateAsync(string grainType, Orleans.GrainReference grainRef, IGrainState grainState)
+<pre><code class="lang-csharp">public async Task WriteStateAsync(string grainType, GrainReference grainRef, IGrainState grainState)
 {
-    Dictionary&lt;string, object&gt; dataValues = grainState.AsDictionary();
-    JavaScriptSerializer serializer = new JavaScriptSerializer();
-    var storedData = serializer.Serialize(dataValues);
+    var storedData = JsonConvert.SerializeObject(grainState.State, _jsonSettings);
 
     var collectionName = grainState.GetType().Name;
     var key = grainRef.ToKeyString();

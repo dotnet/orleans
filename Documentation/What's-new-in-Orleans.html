@@ -74,8 +74,42 @@
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/What's-new-in-Orleans.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="what-s-new-in-orleans-">What&#39;s new in Orleans?</h1>
               
-<h2 id="-v1-2-0-https-github-com-dotnet-orleans-releases-tag-v1-2-0-may-4th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0">v1.2.0</a> May 4th 2016</h2>
+<h2 id="-v1-2-3-https-github-com-dotnet-orleans-releases-tag-v1-2-3-july-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.3">v1.2.3</a> July 11th 2016</h2>
 <h3 id="release-notes">Release notes</h3>
+<ul>
+<li>Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable <a href="https://github.com/dotnet/orleans/pull/1888">#1888</a> <a href="https://github.com/dotnet/orleans/pull/1864">#1864</a> <a href="https://github.com/dotnet/orleans/pull/1855">#1855</a></li>
+<li>Troubleshooting improvements:<ul>
+<li>Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) <a href="https://github.com/dotnet/orleans/pull/1879">#1879</a> <a href="https://github.com/dotnet/orleans/pull/1808">#1808</a></li>
+<li>Better messaging when silo fails to join due to initial connectivity problems <a href="https://github.com/dotnet/orleans/pull/1866">#1866</a> <a href="https://github.com/dotnet/orleans/pull/1933">#1933</a></li>
+<li>Throw meaningful exception if grain timer is created outside grain context <a href="https://github.com/dotnet/orleans/pull/1858">#1858</a></li>
+</ul>
+</li>
+<li>Bug fixes:<ul>
+<li>Do not deactivate Stateless Workers upon grain directory partition shutdown <a href="https://github.com/dotnet/orleans/pull/1838">#1838</a></li>
+<li>interception works with Streams and grain extensions <a href="https://github.com/dotnet/orleans/pull/1874">#1874</a></li>
+<li>Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. <a href="https://github.com/dotnet/orleans/pull/1885">#1885</a></li>
+<li>Other minor bug fixes <a href="https://github.com/dotnet/orleans/pull/1884">#1884</a> <a href="https://github.com/dotnet/orleans/pull/1823">#1823</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="-v1-2-2-https-github-com-dotnet-orleans-releases-tag-v1-2-2-june-15th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.2">v1.2.2</a> June 15th 2016</h2>
+<h3 id="release-notes-0">Release notes</h3>
+<ul>
+<li>Bugfix: Remote stacktrace is once again being included in the exception that bubbles up to the caller (bug introduced in 1.2.0). <a href="https://github.com/dotnet/orleans/pull/1808">#1808</a></li>
+<li>Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. <a href="https://github.com/dotnet/orleans/pull/1804">#1804</a></li>
+<li>Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). <a href="https://github.com/dotnet/orleans/pull/1720">#1720</a></li>
+<li>Added GrainCreator abstraction to enable some unit testing scenarios. <a href="https://github.com/dotnet/orleans/pull/1802/">#1802</a> &amp; <a href="https://github.com/dotnet/orleans/pull/1792/">#1792</a></li>
+<li>ServiceBus package dependency upgraded to 3.2.2 <a href="https://github.com/dotnet/orleans/pull/1758/">#1758</a></li>
+</ul>
+<h2 id="-v1-2-1-https-github-com-dotnet-orleans-releases-tag-v1-2-1-may-19th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.1">v1.2.1</a> May 19th 2016</h2>
+<h3 id="release-notes-1">Release notes</h3>
+<ul>
+<li>SupressDuplicateDeads: Use SiloAddress.Endpoint instead of InstanceName. <a href="https://github.com/dotnet/orleans/pull/1728">1728</a></li>
+<li>Added support for complex generic grain parameters. <a href="https://github.com/dotnet/orleans/pull/1732">#1732</a></li>
+<li>Fix race condition bugs in LocalReminderService. <a href="https://github.com/dotnet/orleans/pull/1757">#1757</a></li>
+</ul>
+<h2 id="-v1-2-0-https-github-com-dotnet-orleans-releases-tag-v1-2-0-may-4th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0">v1.2.0</a> May 4th 2016</h2>
+<h3 id="release-notes-2">Release notes</h3>
 <p>In addition to all the changes in 1.2.0-beta.</p>
 <ul>
 <li><a href="https://github.com/dotnet/orleans/pull/1704">Azure storage 7.0 compatibility</a>.</li>
@@ -83,7 +117,7 @@
 <li><a href="https://github.com/dotnet/orleans/pull/1711">Added ability to throw exceptions that occur when starting silo</a>.</li>
 </ul>
 <h2 id="-v1-2-0-beta-https-github-com-dotnet-orleans-releases-tag-v1-2-0-beta-april-18th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0-beta">v1.2.0-beta</a> April 18th 2016</h2>
-<h3 id="release-notes-0">Release notes</h3>
+<h3 id="release-notes-3">Release notes</h3>
 <ul>
 <li><p>Major improvements</p>
 <ul>
@@ -130,7 +164,7 @@
 </li>
 </ul>
 <h2 id="-v1-1-3-https-github-com-dotnet-orleans-releases-tag-v1-1-3-march-9th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.3">v1.1.3</a> March 9th 2016</h2>
-<h3 id="release-notes-1">Release notes</h3>
+<h3 id="release-notes-4">Release notes</h3>
 <p>A patch release with a set of bug fixes.</p>
 <ul>
 <li><a href="https://github.com/dotnet/orleans/pull/1345">Initialize SerializationManager before CodeGeneratorManager</a></li>
@@ -156,7 +190,7 @@ February 11th 2016</p>
 <p><a href="https://www.youtube.com/watch?v=4BiCyhvSOs4">Orleans core team present the roadmap</a>
 January 21st 2016</p>
 <h2 id="-v1-1-2-https-github-com-dotnet-orleans-releases-tag-v1-1-2-january-20th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.2">v1.1.2</a> January 20th 2016</h2>
-<h3 id="release-notes-2">Release notes</h3>
+<h3 id="release-notes-5">Release notes</h3>
 <p>A patch release with bug fixes, primarily for codegen and serializer corner cases.</p>
 <ul>
 <li><a href="https://github.com/dotnet/orleans/pull/1137">Add support for generic type constraints in codegen</a></li>
@@ -172,7 +206,7 @@ January 21st 2016</p>
 <li><a href="https://github.com/dotnet/orleans/pull/1270">Make Namespace access modifier public in ImplicitStreamSubscriptionAttribute. Add Provider property.</a></li>
 </ul>
 <h2 id="-v1-1-1-https-github-com-dotnet-orleans-releases-tag-v1-1-1-january-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.1">v1.1.1</a> January 11th 2016</h2>
-<h3 id="release-notes-3">Release notes</h3>
+<h3 id="release-notes-6">Release notes</h3>
 <p>A patch release for two bug fixes</p>
 <ul>
 <li><a href="https://github.com/dotnet/orleans/pull/1134">Missing argument to trace format in TraceLogger.Initialize</a></li>
@@ -182,7 +216,7 @@ January 21st 2016</p>
 <p>Christmas Special - <a href="https://github.com/yevhen">Yevhen Bobrov</a> on <a href="https://github.com/yevhen/Orleankka">Orleankka</a>
 December 17th 2015</p>
 <h2 id="-v1-1-0-https-github-com-dotnet-orleans-releases-tag-v1-1-0-december-14nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.0">v1.1.0</a> December 14nd 2015</h2>
-<h3 id="release-notes-4">Release notes</h3>
+<h3 id="release-notes-7">Release notes</h3>
 <ul>
 <li>New Roslyn-based codegen, compile time and run time</li>
 <li>Public APIs:<ul>
@@ -220,7 +254,7 @@ December 17th 2015</p>
 <p><a href="https://www.youtube.com/watch?v=fOl8ophHtug">MSR PhDs on Geo Distributed Orleansp</a>
 October 23rd 2015</p>
 <h2 id="-v1-0-10-https-github-com-dotnet-orleans-releases-tag-v1-0-10-september-22nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.10">v1.0.10</a> September 22nd 2015</h2>
-<h3 id="release-notes-5">Release notes</h3>
+<h3 id="release-notes-8">Release notes</h3>
 <h4 id="general-">General:</h4>
 <ul>
 <li>No SDK msi anymore, only NuGets from now on</li>
@@ -256,7 +290,7 @@ October 23rd 2015</p>
 <p>If your projects still reference those binaries directly from the SDK folder, you need to switch to using <a href="Installation/NuGets.html">NuGet packages</a> instead. If you are already consuming Orleans via NuGet, you are good.</p>
 <p><strong>4. Local Silo test environment has been removed from the Orleans SDK</strong></p>
 <p>If you were using the Local Silo environment from the SDK folder for testing your grains, you need to add a silo host project to your solution using the &quot;Orleans Dev/Test Host&quot; Visual Studio project template. Before you do that, make sure you install the <a href="https://github.com/dotnet/orleans/releases/download/v1.0.9/orleans_setup.msi">v1.0.9 version of the SDK</a>. Refer to <a href="https://github.com/dotnet/orleans/tree/master/Samples">samples</a> for examples of how that is done.</p>
-<h3 id="release-notes-6">Release notes</h3>
+<h3 id="release-notes-9">Release notes</h3>
 <ul>
 <li>Graceful shutdown of a silo with deactivation of all grains hosted in it.</li>
 <li>Support for Dependency Injection and better testability of grains:<ul>
@@ -279,7 +313,7 @@ October 23rd 2015</p>
 <li>Numerous bug fixes and other improvements.</li>
 </ul>
 <h2 id="-v1-0-8-https-github-com-dotnet-orleans-releases-tag-v1-0-8-may-26th-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.8">v1.0.8</a> May 26th  2015</h2>
-<h3 id="release-notes-7">Release notes</h3>
+<h3 id="release-notes-10">Release notes</h3>
 <ul>
 <li>Fixed versions of references Orleans NuGet packages to match the current one.</li>
 <li>Switched message header keys from strings to enums for performance.</li>
@@ -293,7 +327,7 @@ October 23rd 2015</p>
 <p><a href="https://github.com/gabikliot">Gabriel Kliot</a> on the new Orleans Streaming API
 May 22nd 2015</p>
 <h2 id="-v1-0-7-https-github-com-dotnet-orleans-releases-tag-v1-0-7-may-15th-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.7">v1.0.7</a> May 15th  2015</h2>
-<h3 id="release-notes-8">Release notes</h3>
+<h3 id="release-notes-11">Release notes</h3>
 <ul>
 <li>Major refactoring of the stream adapter API.</li>
 <li>Improvements to the streaming API to support subscription multiplicity.</li>
@@ -308,7 +342,7 @@ May 22nd 2015</p>
 <p><a href="https://github.com/ReubenBond">Reuben Bond</a> on using Orleans at FreeBay
 April 15th 2015</p>
 <h2 id="-v1-0-5-https-github-com-dotnet-orleans-releases-tag-v1-0-5-march-30th-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.5">v1.0.5</a> March 30th  2015</h2>
-<h3 id="release-notes-9">Release notes</h3>
+<h3 id="release-notes-12">Release notes</h3>
 <ul>
 <li>Major reorganization of NuGet packages and project templates.</li>
 <li>Fixes to reflection-only assembly inspection and loading for side-by-side versioning.</li>

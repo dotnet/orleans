@@ -77,7 +77,7 @@
 <p>In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that&#39;s that. Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
 <p>There are three projects involved -- one for declaring the communication interfaces, one for the grain implementations, and one for the client, which also hosts the Orleans silo that loads the grain when activated.</p>
 <p>There&#39;s only one communication interface, in IHello.cs:</p>
-<pre><code class="lang-csharp">public interface IHello : Orleans.IGrain
+<pre><code class="lang-csharp">public interface IHello : Orleans.IGrainWithIntegerKey
 {
    Task&lt;string&gt; SayHello(string greeting);
 }
@@ -94,7 +94,7 @@
 <p>The class inherits from an Orleans-defined base class, and implements the communication interface defined earlier. Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
 <p> The client, which orchestrates the grain code and is found in Program.cs, looks like this:</p>
 <pre><code class="lang-csharp">Orleans.GrainClient.Initialize(&quot;DevTestClientConfiguration.xml&quot;);
-var friend = HelloWorldInterfaces.HelloFactory.GetGrain(0);
+var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
 Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello(&quot;Good morning!&quot;).Result);
 </code></pre>
 <p>There&#39;s other code in the method, too, but that is unrelated to the client logic, it&#39;s hosting the Orleans silo.</p>

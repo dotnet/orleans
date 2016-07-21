@@ -95,7 +95,8 @@
 <pre><code class="lang-csharp">public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
      // Post data directly into device&#39;s stream.
-     IAsyncStream&lt;DeviceEventData&gt; deviceStream = GetStream&lt;DeviceEventData&gt;(deviceEvent.DeviceId);
+     IStreamProvider streamProvider = GrainClient.GetStreamProvider(&quot;myStreamProvider&quot;);
+     IAsyncStream&lt;DeviceEventData&gt; deviceStream = streamProvider.GetStream&lt;DeviceEventData&gt;(deviceEvent.DeviceId);
      await chatStream.OnNextAsync(deviceEvent.Data);
 }
 </code></pre>
@@ -104,7 +105,8 @@
 {
     public async Task JoinChat(string chatGroupName)
     {
-       IAsyncStream&lt;string&gt; chatStream = GetStream&lt;string&gt;(chatGroupName);
+       IStreamProvider streamProvider = base.GetStreamProvider(&quot;myStreamProvider&quot;);
+       IAsyncStream&lt;string&gt; chatStream = streamProvider.GetStream&lt;string&gt;(chatGroupName);
        await chatStream.SubscribeAsync((string chatEvent) =&gt; Console.Out.Write(chatEvent));
     }
 }
@@ -130,7 +132,7 @@ Event order also depends on a particular stream provider. In SMS streams, the pr
 <h2 id="streams-extensibility">Streams Extensibility</h2>
 <p>The <a href="Streams-Extensibility.html">Orleans Streams Extensibility</a> describes how to extend streams with new functionality.</p>
 <h2 id="code-samples">Code Samples</h2>
-<p>More examples of how to use streaming APIs within a grain can be found <a href="https://github.com/dotnet/orleans/blob/master/src/TestGrains/SampleStreamingGrain.cs">here</a>. We plan to create more samples in the future.</p>
+<p>More examples of how to use streaming APIs within a grain can be found <a href="https://github.com/dotnet/orleans/blob/master/test/TestGrains/SampleStreamingGrain.cs">here</a>. We plan to create more samples in the future.</p>
 <h2 id="more-material">More Material</h2>
 <ul>
 <li><a href="https://plus.google.com/events/crdjm977pqubv81lgdhqruoqal4">Orleans Virtual Meetup about Streams</a></li>

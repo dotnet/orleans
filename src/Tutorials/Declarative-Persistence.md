@@ -26,8 +26,6 @@ The modified `Main` program looks like this:
 static void Main(string[] args)
 {
      ...
-    Orleans.GrainClient.Initialize("DevTestClientConfiguration.xml");
-
     var ids = new string[] {
         "42783519-d64e-44c9-9c29-399e3afaa625",
         "d694a4e0-1bc3-4c3f-a1ad-ba95103622bc",
@@ -53,31 +51,32 @@ static void Main(string[] args)
 ```
 
 Next, we'll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
-The silo host project includes a configuration file _DevTestServerConfiguration.xml_ which is where we find the following section:
+The silo host project includes a file _OrleansHostWrapper.cs_ which is where we find the following section:
 
-```xml
-<OrleansConfiguration xmlns="urn:orleans">
-    <Globals>
-        <StorageProviders>
-        <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
-        <!-- To use Azure storage, uncomment one of the following elements: -->
-        <!--
-        <Provider Type="Orleans.Storage.AzureTableStorage"
-                        Name="AzureStore"
-                        DataConnectionString="UseDevelopmentStorage=true" />
-        -->
-        <!--
-        <Provider Type="Orleans.Storage.AzureBlobStorage"
-                        Name="AzureStore"
-                        DataConnectionString="[removed for brevity]" />
-        -->
-    </StorageProviders>
+```csharp
+var config = ClusterConfiguration.LocalhostPrimarySilo();
+config.AddMemoryStorageProvider();
+
+// Add this line to use the Azure storage emulator
+// config.AddAzureBlobStorageProvider("AzureStore", "UseDevelopmentStorage=true");
+// Add this line to use an Azure storage account
+// config.AddAzureBlobStorageProvider("AzureStore", "[insert data connection string]");
+
+siloHost = new SiloHost(siloName, config);
 ```
+
+If this is hosted in Azure Cloud Services, then one can use:
+
+```csharp
+config.AddAzureBlobStorageProvider("AzureStore");
+```
+
+and it will pick up the same connection string used in `config.Globals.DataConnectionString`.
 
 The `MemoryStorage` provider is fairly uninteresting, since it doesn't actually provide any permanent storage; it's intended for debugging persistent grains while having no access to a persistent store.
 In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.
 
-Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should uncomment one of the other two declarations, but not both.
+Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should add one of the other two lines, but not both. You can use either the `AddAzureTableStorageProvider()` function or the `AddAzureBlobStorageProvider()` function depending on how you want to store information.
 
 In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK.
 In the case of the latter, you will have to create a Azure storage account and enter the name and keys in the configuration file.
@@ -96,12 +95,12 @@ Identifying that a grain should use persistent state takes three steps:
 2. changing the grain base class, and
 3. identifying the storage provider.
 
-The first step, declaring a state class, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
+The first step, declaring a state class in the grain implementations project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.
 
 For employees, we want to persist all the state:
 
 ``` csharp
-public class  EmployeeState : GrainState
+public class  EmployeeState
 {
     public int Level { get; set; }
     public IManager Manager { get; set; }
@@ -111,13 +110,13 @@ public class  EmployeeState : GrainState
 and for managers, we must store the direct reports, but the `_me` reference may continue to be created during activation.
 
 ``` csharp
-public class ManagerState : GrainState
+public class ManagerState
 {
     public List<IEmployee> Reports { get; set; }
 }
 ```
 
-Then, we change the grain class declaration to identify the state interface and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class.
+Then, we change the grain class declaration to identify the state interface (e.g., from `Orleans.Grain` to `Orleans.Grain<EmployeeState>`) and remove the variables that we want persisted. Make sure to remove `level`, and `manager` from the `Employee` class and `_reports` from the `Manager` class. In addition, we must update the other functions to reflect these removals.
 
  We also add an attribute to identify the storage provider:
 
@@ -180,10 +179,14 @@ It should look like this:
 ``` csharp
 public async Task AddDirectReport(IEmployee employee)
 {
+    if (State.Reports == null)
+    {
+        State.Reports = new List<IEmployee>();
+    }
     State.Reports.Add(employee);
     await employee.SetManager(this);
-    var data = await employee.Greeting(
-        new GreetingData { From = _me, Message = "Welcome to my team!" });
+    var data = new GreetingData { From = this.GetPrimaryKey(), Message = "Welcome to my team!" };
+    await employee.Greeting(data);
     Console.WriteLine("{0} said: {1}",
                         data.From.ToString(),
                         data.Message);
@@ -225,6 +228,13 @@ For example, a stack of elements may be externally represented as a `List<T>`, b
 
 In the case of our `Manager` class, the `_me` field is simply a cached value, something we don't even need to keep as a field in the first place, it can be created any time we need it, but since it's going to be a commonly used value, it's worth keeping it around in a transient field.
 
+## Automatic loading of state
+
+If a grain type has state, at activation time the state will be loaded from storage and then `OnActivateAsync` is called so you can be sure that the state is loaded when initializing your grain. This is the only case that Orleans calls `ReadStateAsync` automatically. If you want to write the state or read it in some other place, you should do it on your own. Normally you should not need to call `ReadStateAsync` yourself unless you are doing something specific regarding handling corrupted state or something else.
+
+## Handling failures using persistence
+
+Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent. There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed. In this case reading from storage can return your state to the last correct state. Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy.
 
 ## Next
 

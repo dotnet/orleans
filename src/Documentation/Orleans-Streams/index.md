@@ -37,7 +37,8 @@ In a typical example below a device generates some data, which is sent as an HTT
 public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
      // Post data directly into device's stream.
-     IAsyncStream<DeviceEventData> deviceStream = GetStream<DeviceEventData>(deviceEvent.DeviceId);
+     IStreamProvider streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
+     IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId);
      await chatStream.OnNextAsync(deviceEvent.Data);
 }
 ```
@@ -49,7 +50,8 @@ public class ChatUser: Grain
 {
     public async Task JoinChat(string chatGroupName)
     {
-       IAsyncStream<string> chatStream = GetStream<string>(chatGroupName);
+       IStreamProvider streamProvider = base.GetStreamProvider("myStreamProvider");
+       IAsyncStream<string> chatStream = streamProvider.GetStream<string>(chatGroupName);
        await chatStream.SubscribeAsync((string chatEvent) => Console.Out.Write(chatEvent));
     }
 }
@@ -93,7 +95,7 @@ The [Orleans Streams Extensibility](Streams-Extensibility.md) describes how to e
 
 ## Code Samples
 
-More examples of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/master/src/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
+More examples of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/master/test/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
 
 
 ## More Material
