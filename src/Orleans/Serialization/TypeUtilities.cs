@@ -82,7 +82,7 @@ namespace Orleans.Serialization
 
         private static bool IsTypeFieldsShallowCopyable(TypeInfo typeInfo)
         {
-            return typeInfo.GetFields().All(f => !(f.FieldType == typeInfo) && IsOrleansShallowCopyable(f.FieldType));
+            return typeInfo.GetFields().All(f => !(f.FieldType.IsEquivalentTo(typeInfo)) && IsOrleansShallowCopyable(f.FieldType));
         }
 
         internal static bool IsSpecializationOf(this Type t, Type match)
