@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Relational-Storage.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
+              <h1 id="relational-storage">Relational Storage</h1>
+              
+<p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
 <p>To make Orleans code function with a given relational database backend, the following is required:</p>
 <ol>
 <li>Appropriate ADO.NET library must be loaded to the process (multiple can exist in GAC or otherwise). This should be defined as usual, e.g. via <a href="https://msdn.microsoft.com/en-us/library/dd0w4a2z(v=vs.110).aspx">DbProviderFactories</a> element in application configuration.</li>

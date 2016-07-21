@@ -3,6 +3,8 @@ layout: page
 title: Using Consul as a Membership Provider
 ---
 
+# Using Consul as a Membership Provider
+
 ## Introduction to Consul
 [Consul](https://www.consul.io) is a distributed, highly available and datacenter-aware service discovery platform which includes simple service registration, health checking, failure detection and key/value storage.  It is built on the premise that every node in the datacenter is running a Consul agent which is either acting as a server or client which communicate via a scalable gossip protocol.
 

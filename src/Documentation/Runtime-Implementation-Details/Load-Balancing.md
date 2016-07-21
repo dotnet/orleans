@@ -1,10 +1,13 @@
 ---
 layout: page
-title: Load balancing in Orleans
+title: Load Balancing
 ---
+
+# Load Balancing
+
 **Load balancing, in a broad sense, is one of the pillars of the Orleans runtime**. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:
 
-1.	**Default actor placement strategy is random** - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios. 
+1.	**Default actor placement strategy is random** - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios.
 
 2.	A more advanced **ActivationCountPlacement** tries to equalize the number of activations on all silos, which results in a more even distribution of activations across silos. This is especially important for elasticity.
 

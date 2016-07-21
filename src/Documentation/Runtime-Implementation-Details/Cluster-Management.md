@@ -3,6 +3,7 @@ layout: page
 title: Cluster Management in Orleans
 ---
 
+# Cluster Management in Orleans
 
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as **Silo Membership**. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 
@@ -172,5 +173,3 @@ A natural question that might be asked is why not to rely completely on [Apache 
 
 We would to acknowledge the contribution of [Alex Kogan](https://www.linkedin.com/pub/alex-kogan/4/b52/3a2) to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
 The implementation of ZooKeeper based `MembershipTable` was done by [Shay Hazor](https://github.com/shayhatsor), the implementation of SQL `MembershipTable` was done by [Veikko Eeva](https://github.com/veikkoeeva), and the implementation of Consul based `MembershipTable` was done by [Paul North](https://github.com/PaulNorth).
-
-

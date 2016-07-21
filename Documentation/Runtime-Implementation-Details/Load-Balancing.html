@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Load balancing in Orleans | Microsoft Orleans Website </title>
+    <title>Load Balancing | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Load balancing in Orleans | Microsoft Orleans Website ">
+    <meta name="title" content="Load Balancing | Microsoft Orleans Website ">
     <meta name="generator" content="docfx 2.0.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="../../styles/docfx.css">
     <link rel="stylesheet" href="../../styles/main.css">
     <meta property="docfx:navrel" content="../../toc.html">
-    <meta property="docfx:tocrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
     <meta property="docfx:rel" content="../../">
   </head>
   <body data-spy="scroll" data-target="#affix">
@@ -72,10 +72,11 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Load-Balancing.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
+              <h1 id="load-balancing">Load Balancing</h1>
+              
+<p><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
 <ol>
-<li><p><strong>Default actor placement strategy is random</strong> - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios. </p>
+<li><p><strong>Default actor placement strategy is random</strong> - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios.</p>
 </li>
 <li><p>A more advanced <strong>ActivationCountPlacement</strong> tries to equalize the number of activations on all silos, which results in a more even distribution of activations across silos. This is especially important for elasticity.</p>
 </li>

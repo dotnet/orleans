@@ -70,6 +70,22 @@
     href: Advanced-Concepts/External-Tasks-and-Grains.md
   - name: Deployment and Versioning of Dependencies
     href: Advanced-Concepts/Deployment-and-Versioning-of-Dependencies.md
+
+- name: Runtime Implementation Details
+  items:
+    - name: Messaging Delivery Guarantees
+      href: Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md
+    - name: Relational Storage
+      href: Runtime-Implementation-Details/Relational-Storage.md
+    - name: Runtime Tables
+      href: Runtime-Implementation-Details/Runtime-Tables.md
+    - name: Cluster Management
+      href: Runtime-Implementation-Details/Cluster-Management.md
+    - name: Consul Deployment
+      href: Runtime-Implementation-Details/Consul-Deployment.md
+    - name: Load Balancing
+      href: Runtime-Implementation-Details/Load-Balancing.md
+
 - name: Streams
   href: Orleans-Streams/index.md
   homepage: Orleans-Streams/index.md
@@ -96,3 +112,26 @@
     href: Orleans-Configuration-Guide/Server-Configuration.md
   - name: Typical Configurations
     href: Orleans-Configuration-Guide/Typical-Configurations.md
+
+- name: Samples Overview
+  homepage: Samples-Overview/index.md
+  href: Samples-Overview/index.md
+  items:
+    - name: Hello World
+      href: Samples-Overview/Hello-World.md
+    - name: Azure Web Sample
+      href: Samples-Overview/Azure-Web-Sample.md
+    - name: Adventure
+      href: Samples-Overview/Adventure.md
+    - name: Presence Service
+      href: Samples-Overview/Presence-Service.md
+    - name: Tic-Tac-Toe
+      href: Samples-Overview/Tic-Tac-Toe.md
+    - name: Chirper
+      href: Samples-Overview/Chirper.md
+    - name: Twitter Sentiment
+      href: Samples-Overview/Twitter-Sentiment.md
+    - name: GPS Tracker
+      href: Samples-Overview/GPS-Tracker.md
+    - name: Storage Providers
+      href: Samples-Overview/Storage-Providers.md
