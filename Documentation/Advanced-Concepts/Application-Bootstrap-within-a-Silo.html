@@ -72,12 +72,13 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online. </p>
-<p>Some examples include, but are not limited to: </p>
+              <h1 id="application-bootstrapping-within-a-silo">Application Bootstrapping within a Silo</h1>
+              
+<p>There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online.</p>
+<p>Some examples include, but are not limited to:</p>
 <ul>
-<li>Starting background timers to perform periodic housekeeping tasks </li>
-<li>Pre-loading some cache grains with data downloaded from external backing storage. </li>
+<li>Starting background timers to perform periodic housekeeping tasks</li>
+<li>Pre-loading some cache grains with data downloaded from external backing storage.</li>
 </ul>
 <p>We have now added support for this auto-run functionality through configuring &quot;bootstrap providers&quot; for Orleans silos. For example:</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
@@ -98,11 +99,11 @@ public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&
 <p>These bootstrap providers are C# classes that implement the <code>Orleans.Providers.IBootstrapProvider</code> interface.</p>
 <p>When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.</p>
 <pre><code class="lang-csharp">Task Init(
-    string name, 
-    IProviderRuntime providerRuntime, 
+    string name,
+    IProviderRuntime providerRuntime,
     IProviderConfiguration config)
 </code></pre>
-<p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted. </p>
+<p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
 <p>This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.</p>
 
             </article>

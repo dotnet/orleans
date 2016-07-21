@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Interceptors.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path. We currectly support only client side pre-call inteceptors. </p>
+              <h1 id="interceptors">Interceptors</h1>
+              
+<p>Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path. We currectly support only client side pre-call inteceptors.</p>
 <h2 id="client-side-interceptors">Client side interceptors</h2>
 <p>If client side interceptor is defined, any grain call made from Orleans client will invoke this interceptor before the call is dispatched remotely. The interceptor is invoked synchronously in the same thread where the call is made after call arguments were deep copied. Since the interceptor is invoked synchronously it should return promptly and do a minimum work, to avoid blocking calling thread or impacting throughput. The interceptor is allowed to mutate the call arguments and also mutate the <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Request-Context"><code>Orleans.RequestContext</code></a>. Any changes made by the interceptor to <code>Orleans.RequestContext</code> will be picked up as part of the call dispatch logic that occurs after the interceptor. If the interceptor logic throws an exception, the remote call will not be made and the client calling code will throw promptly.</p>
 <p>The interceptor can be set by setting <code>GrainClient.ClientInvokeCallback</code>, which is a property of type <code>Action&lt;InvokeMethodRequest, IGrain&gt;</code>. The first argument is the invocation request that includes varios details about the invoked call, such as InterfaceId and MethodId, as well as deep-copied arguments. The second argument is the target grain reference to which this call is made.</p>

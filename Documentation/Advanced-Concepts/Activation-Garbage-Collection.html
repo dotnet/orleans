@@ -72,40 +72,41 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Activation-Garbage-Collection.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>The Orleans Team often uses the phrase “Activation Garbage Collection” but that is probably a somewhat misleading term as it might imply it works the same way that .NET garbage collection does, based solely on memory-pressure triggers.</p>
-<p> In the past, we experimented with Activation-GC based on memory usage triggers, but we abandoned that approach due to the unreliable memory usage metrics we could use. </p>
+              <h1 id="activation-garbage-collection">Activation Garbage Collection</h1>
+              
+<p>The Orleans Team often uses the phrase “Activation Garbage Collection” but that is probably a somewhat misleading term as it might imply it works the same way that .NET garbage collection does, based solely on memory-pressure triggers.</p>
+<p> In the past, we experimented with Activation-GC based on memory usage triggers, but we abandoned that approach due to the unreliable memory usage metrics we could use.</p>
 <p> We ended up implementing a simple time-based approach to Activation-GC, which seems to be working well during various high traffic stress test runs.</p>
-<p> This approach requires calculating a balance between </p>
+<p> This approach requires calculating a balance between</p>
 <ul>
-<li>Request-per-second </li>
+<li>Request-per-second</li>
 <li>Memory-per-grain</li>
 <li>Available memory</li>
 </ul>
 <p>in order to set the age-out limits.</p>
 <h2 id="how-activation-gc-works">How Activation-GC Works</h2>
-<p>The most common approach is to configure the silo to periodically scan for activations that have not been used at all for some period of time (CollectionAgeLimit). The silo then proactively ages-out those non-active activations by calling the grain’s Deactivate method and remove them from the silo memory. </p>
+<p>The most common approach is to configure the silo to periodically scan for activations that have not been used at all for some period of time (CollectionAgeLimit). The silo then proactively ages-out those non-active activations by calling the grain’s Deactivate method and remove them from the silo memory.</p>
 <p><strong>What counts as “being active” for the purpose of grain activation collection</strong></p>
 <ul>
-<li>receiving a call </li>
+<li>receiving a call</li>
 <li>receiving a reminder</li>
 </ul>
 <p><strong>What does NOT count as “being active” for the purpose of grain activation collection</strong></p>
 <ul>
 <li>performing a call (to another grain or to an Orleans client)</li>
-<li>timer events </li>
+<li>timer events</li>
 <li>arbitrary IO operations or external calls not involving Orleans framework</li>
 </ul>
 <p><strong>Collection Age Limit</strong></p>
-<p>Activations that haven&#39;t been used within a period of time are deactivated automatically by the runtime. This period of time is called the collection age limit. </p>
-<p> The runtime&#39;s default collection age limit is 2 hours. </p>
+<p>Activations that haven&#39;t been used within a period of time are deactivated automatically by the runtime. This period of time is called the collection age limit.</p>
+<p> The runtime&#39;s default collection age limit is 2 hours.</p>
 <h2 id="configuration">Configuration</h2>
 <p>Any length of time in the configuration XML file may use a suffix that specifies a unit of time:</p>
 <table>
 <thead>
 <tr>
 <th>Suffix</th>
-<th>Unit </th>
+<th>Unit</th>
 </tr>
 </thead>
 <tbody>
@@ -132,7 +133,7 @@
 </tbody>
 </table>
 <h2 id="specifying-the-default-global-age-limit">Specifying the Default (Global) Age Limit</h2>
-<p>The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file. 
+<p>The default collection age limit that applies to all grain types can be customized by adding the OrleansConfiguation/Globals/Application/Defaults/Deactivation element to the OrleansConfiguration.xml file.
 The minimal allowed age limit is 1 minute.</p>
 <p>The following example specifies that all activations that have been idle for 10 minutes or more should be considered eligible for deactivation.</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;

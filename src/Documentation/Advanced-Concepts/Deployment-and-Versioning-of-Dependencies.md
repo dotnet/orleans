@@ -3,7 +3,7 @@ layout: page
 title: Deployment and Versioning of Dependencies
 ---
 
-
+# Deployment and Versioning of Dependencies
 
 ## Orleans Dependencies ##
 
@@ -51,4 +51,4 @@ For example, if your code depends on a library that is incompatible with, say, A
 
 ## Grain assemblies deployed to main folder ##
 
-If for some reason deploying grain assemblies into a subfolder is not an option, and you have to deploy grain assemblies into the main folder, you are obviously limited to just one set of dependency assemblies. So you need to choose a set of versions that are compatible with both the Orleans runtime and your grain code. If necessary, you can specified assembly binding redirects as in the example above. 
+If for some reason deploying grain assemblies into a subfolder is not an option, and you have to deploy grain assemblies into the main folder, you are obviously limited to just one set of dependency assemblies. So you need to choose a set of versions that are compatible with both the Orleans runtime and your grain code. If necessary, you can specified assembly binding redirects as in the example above.

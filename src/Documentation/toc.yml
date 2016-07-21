@@ -37,8 +37,6 @@
   - name: Debugging
     href: Getting-Started-With-Orleans/Debugging.md
 - name: Advanced Concepts
-  href: Advanced-Concepts/index.md
-  homepage: Advanced-Concepts/index.md
   items:
   - name: Interceptors
     href: Advanced-Concepts/Interceptors.md
@@ -54,8 +52,6 @@
     href: Advanced-Concepts/Silo-Error-Code-Monitoring.md
   - name: Timers and Reminders
     href: Advanced-Concepts/Timers-and-Reminders.md
-  - name: Two Way Client Observers (old)
-    href: Advanced-Concepts/Two-Way-Client-Observers-old.md
   - name: Using Azure Web Apps
     href: Advanced-Concepts/Using-Azure-Web-Apps.md
   - name: Using Immutable to Optimize Copying
@@ -90,7 +86,7 @@
       href: Orleans-Streams/Streams-Implementation.md
     - name: Streams Extensibility
       href: Orleans-Streams/Streams-Extensibility.md
-- name: Orleans Configuration Guide
+- name: Configuration Guide
   homepage: Orleans-Configuration-Guide/index.md
   href: Orleans-Configuration-Guide/index.md
   items:

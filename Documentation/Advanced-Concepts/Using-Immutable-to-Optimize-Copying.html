@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>Orleans has a feature that can be used to avoid some of the overhead associated with serializing request messages. This note starts with a general description of how serialization works, and then explains how to use the new feature.</p>
+              <h1 id="using-immutable-t-to-optimize-copying">Using Immutable<t> to Optimize Copying</t></h1>
+              
+<p>Orleans has a feature that can be used to avoid some of the overhead associated with serializing request messages. This note starts with a general description of how serialization works, and then explains how to use the new feature.</p>
 <h2 id="serialization-in-orleans">Serialization in Orleans</h2>
 <p>When a grain method is invoked, the Orleans runtime makes a deep copy of the method arguments and forms the request out of the copies. This protects against the calling code modifying the argument objects before the data is passed to the called grain.</p>
 <p>If the called grain is on a different silo, then the copies are eventually serialized into a byte stream and sent over the network to the target silo, where they are deserialized back into objects. If the called grain is on the same silo, then the copies are handed directly to the called method.</p>
@@ -102,7 +103,7 @@
 <pre><code class="lang-csharp">byte[] buffer = immutable.GetCopy();
 </code></pre>
 <p><strong>What Is Immutable?</strong></p>
-<p>For the purposes of the Immutable&lt;&gt; class, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item&#39;s semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability. </p>
+<p>For the purposes of the Immutable&lt;&gt; class, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item&#39;s semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability.</p>
 <p>In some cases it is safe to relax this to logical immutability, but care must be taken to ensure that the mutating code is properly thread-safe; because dealing with multithreading is complex, and uncommon in an Orleans context, we strongly recommend against this approach and recommend sticking to bitwise immutability.</p>
 </t></t></t></t></t></t>
             </article>

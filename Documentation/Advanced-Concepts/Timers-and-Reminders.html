@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Timers-and-Reminders.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
+              <h1 id="timers-and-reminders">Timers and Reminders</h1>
+              
+<p>The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
 <h1 id="timers">Timers</h1>
 <h2 id="description">Description</h2>
 <p><strong>Timers</strong> are used to create periodic grain behavior that isn&#39;t required to span multiple activations (instantiations of the grain). It is essentially identical to the standard .<strong>NET System.Threading.Timer</strong> class. In addition, it is subject to single threaded execution guarantees within the grain activation that it operates.</p>

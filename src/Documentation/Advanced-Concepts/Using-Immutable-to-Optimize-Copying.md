@@ -3,6 +3,7 @@ layout: page
 title: Using Immutable<T> to Optimize Copying
 ---
 
+# Using Immutable<T> to Optimize Copying
 
 Orleans has a feature that can be used to avoid some of the overhead associated with serializing request messages. This note starts with a general description of how serialization works, and then explains how to use the new feature.
 
@@ -60,6 +61,6 @@ byte[] buffer = immutable.GetCopy();
 
 **What Is Immutable?**
 
-For the purposes of the Immutable<> class, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item's semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability. 
+For the purposes of the Immutable<> class, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item's semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability.
 
 In some cases it is safe to relax this to logical immutability, but care must be taken to ensure that the mutating code is properly thread-safe; because dealing with multithreading is complex, and uncommon in an Orleans context, we strongly recommend against this approach and recommend sticking to bitwise immutability.

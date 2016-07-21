@@ -72,12 +72,13 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/External-Tasks-and-Grains.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>By design, any sub-Tasks spawned from grain code (for example, by using <code>await</code> or <code>ContinueWith</code> or <code>Task.Factory.StartNew</code>) will be dispatched on the same per-activation <a href="https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx">TPL Task Scheduler</a> as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of <a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency">grain turn based concurency</a>.</p>
+              <h1 id="external-tasks-and-grains">External Tasks and Grains</h1>
+              
+<p>By design, any sub-Tasks spawned from grain code (for example, by using <code>await</code> or <code>ContinueWith</code> or <code>Task.Factory.StartNew</code>) will be dispatched on the same per-activation <a href="https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx">TPL Task Scheduler</a> as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of <a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency">grain turn based concurency</a>.</p>
 <p>In some cases grain code might need to “break out” of the Orleans task scheduling model and “do something special”, such as explicitly pointing a <code>Task</code> to a different task scheduler or using the .NET Thread pool. Example of such cases may be when the grain code has to execute a synchronous remote blocking call (such as remote IO). Doing that in the grain context will block the grain as well as one of the Orleans threads and thus should never be made. Instead, the grain code can execute this piece of blocking code on the thread pool thread and join (<code>await</code>) the completion of that execution and proceed in the grain context. We expect that escaping from Orleans scheduler will be a very advanced and seldom required usage scenario beyond the “normal” usage patterns.</p>
 <h3 id="task-based-apis-">Task based APIs:</h3>
 <p>1) <code>await</code>, <code>Task.Factory.StartNew</code>, <code>Task.ContinuewWith</code>, <code>Task.WhenAny</code>, <code>Task.WhenAll</code>, <code>Task.Delay</code> all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.</p>
-<p>2) Both <code>Task.Run</code> and the <code>endMethod</code> delegate of <code>Task.Factory.FromAsync</code> do NOT respect the current task Scheduler. They both use the <code>TaskScheduler.Default</code> scheduler, which is the .NET thread pool task Scheduler. Therefore, the code inside <code>Task.Run</code> and the <code>endMethod</code> will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, <a href="http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx">as detailed here</a>. However, any code after the <code>await Task.Run</code> or <code>await Task.Factory.FromAsync</code> will run back under the scheduler at the point the task was created, which is the grain scheduler. </p>
+<p>2) Both <code>Task.Run</code> and the <code>endMethod</code> delegate of <code>Task.Factory.FromAsync</code> do NOT respect the current task Scheduler. They both use the <code>TaskScheduler.Default</code> scheduler, which is the .NET thread pool task Scheduler. Therefore, the code inside <code>Task.Run</code> and the <code>endMethod</code> will ALWAYS run on .NET thread pool outside of the single-threaded execution model for Orleans grains, <a href="http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx">as detailed here</a>. However, any code after the <code>await Task.Run</code> or <code>await Task.Factory.FromAsync</code> will run back under the scheduler at the point the task was created, which is the grain scheduler.</p>
 <p>3) <code>configureAwait(false)</code> is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the <code>TaskScheduler.Default</code> scheduler, which is the .NET thread pool and will thus break the single-threaded execution of Orleans grain. You should in general <strong>never ever use <code>configureAwait(false)</code> directly in the grain code.</strong></p>
 <p>4) Methods with signature <code>async void</code> should not be used with grains, they are intended for graphical user interface event handlers.</p>
 <h3 id="example-">Example:</h3>
@@ -85,44 +86,44 @@
 <pre><code class="lang-csharp">   public async Task MyGrainMethod()
    {
         // Grab the Orleans task scheduler
-        var orleansTs = TaskScheduler.Current; 
+        var orleansTs = TaskScheduler.Current;
         await TaskDelay(10000);
         // Current task scheduler did not change, the code after await is still running in the same task scheduler.
-        Assert.AreEqual(orleansTs, TaskScheduler.Current); 
+        Assert.AreEqual(orleansTs, TaskScheduler.Current);
 
-        Task t1 = Task.Run( () =&gt; 
-        { 
+        Task t1 = Task.Run( () =&gt;
+        {
              // This code runs on the thread pool scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
-             Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current); 
+             Assert.AreEqual(TaskScheduler.Default, TaskScheduler.Current);
         } );
         await t1;
         // We are back to Orleans task scheduler, since await was executed in Orleans task scheduler context we are now back to that context.
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
 
         // Example of using ask.Factory.StartNew with a custom scheduler to escape Orleans scheduler
         Task t2 = Task.Factory.StartNew(() =&gt;
         {
              // This code runs on MyCustomSchedulerThatIWroteMyself scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
-             Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current); 
+             Assert.AreEqual(MyCustomSchedulerThatIWroteMyself, TaskScheduler.Current);
         },
         CancellationToken.None, TaskCreationOptions.None,
         scheduler: MyCustomSchedulerThatIWroteMyself);
         await t2;
         // We are back to Orleans task scheduler.
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
    }
 </code></pre>
 <h3 id="advanced-example-making-grain-call-from-a-code-that-runs-on-thread-pool">Advanced Example - making grain call from a code that runs on thread pool</h3>
-<p>There is sometimes an even more advanced scenario of a piece of grain code that needs to “break out” of the Orleans task scheduling model and run on a thread pool (or some other, non-Orleans context) but still needs an ability to make a grain call to another grain. If you will just try to make a grain call not from within Orleans context, you will get an exception telling you that you are &quot;trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext)&quot;. </p>
+<p>There is sometimes an even more advanced scenario of a piece of grain code that needs to “break out” of the Orleans task scheduling model and run on a thread pool (or some other, non-Orleans context) but still needs an ability to make a grain call to another grain. If you will just try to make a grain call not from within Orleans context, you will get an exception telling you that you are &quot;trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext)&quot;.</p>
 <p>Below is a code that demonstrates how a grain call can be made from a piece of code that runs inside a grain but not in the grain context.</p>
 <pre><code class="lang-csharp">   public async Task MyGrainMethod()
    {
         // Grab the Orleans task scheduler
-        var orleansTs = TaskScheduler.Current; 
-        Task&lt;int&gt; t1 = Task.Run(async () =&gt; 
-        { 
+        var orleansTs = TaskScheduler.Current;
+        Task&lt;int&gt; t1 = Task.Run(async () =&gt;
+        {
              // This code runs on the thread pool scheduler, not on Orleans task scheduler
              Assert.AreNotEqual(orleansTS, TaskScheduler.Current);
              // You can do what ever you need to do here. Now lets say you need to make a grain call.
@@ -141,7 +142,7 @@
 
         int result = await t1;
         // We are back to Orleans task scheduler, since await was executed in Orleans task scheduler context we are now back to that context.
-        Assert.AreEqual(orleansTS, TaskScheduler.Current); 
+        Assert.AreEqual(orleansTS, TaskScheduler.Current);
    }
 </code></pre>
 <h3 id="dealing-with-libraries">Dealing with libraries</h3>
@@ -152,7 +153,7 @@
 <thead>
 <tr>
 <th>What are you trying to do?</th>
-<th>How to do it </th>
+<th>How to do it</th>
 </tr>
 </thead>
 <tbody>
@@ -162,7 +163,7 @@
 </tr>
 <tr>
 <td>Grain interface call</td>
-<td>Method return types = <code>Task</code> or <code>Task&lt;T&gt;</code> </td>
+<td>Method return types = <code>Task</code> or <code>Task&lt;T&gt;</code></td>
 </tr>
 <tr>
 <td>Run worker task from grain code with Orleans turn-based concurrency guarantees.</td>
@@ -170,7 +171,7 @@
 </tr>
 <tr>
 <td>Timeouts for executing work items</td>
-<td><code>Task.Delay</code> + <code>Task.WhenAny</code> </td>
+<td><code>Task.Delay</code> + <code>Task.WhenAny</code></td>
 </tr>
 <tr>
 <td>Use with <code>async</code>/<code>await</code></td>

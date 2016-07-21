@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Azure-Web-Apps.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>If you would like to connect to an Azure Silo from an <a href="http://azure.microsoft.com/en-gb/services/app-service/web/">Azure Web App</a> rather than a Web Role hosted within the same cloud service you can.</p>
+              <h1 id="getting-started-using-azure-web-apps">Getting Started using Azure Web Apps</h1>
+              
+<p>If you would like to connect to an Azure Silo from an <a href="http://azure.microsoft.com/en-gb/services/app-service/web/">Azure Web App</a> rather than a Web Role hosted within the same cloud service you can.</p>
 <p>For this to work securely you will need to assign both the Azure Web App and the Worker Role hosting the Silo to an <a href="http://azure.microsoft.com/en-gb/services/virtual-network/">Azure Virtual Network</a>.</p>
 <p>First we&#39;ll setup the Azure Web App, you can follow <a href="https://azure.microsoft.com/en-us/blog/azure-websites-virtual-network-integration/">this guide</a> which will create the virtual network and assign it to the Azure Web App.</p>
 <p>Now we can assign the cloud service to the virtual network by modifying the <code>ServiceConfiguration</code> file.</p>

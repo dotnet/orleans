@@ -3,14 +3,13 @@ layout: page
 title: Serialization and Writing Custom Serializers
 ---
 
-
-# Orleans Serialization
+# Serialization and Writing Custom Serializers
 
 Orleans has an advanced and extensible serialization framework. Orleans serializes data types passed in grain request and response messages as well as grain persistent state objects. As part of this framework, Orleans automatically generates serialization code for those data types. Orleans serialization is compatible with the standard .NET binary serialization but is more efficient and provides more compact representation. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable, Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. The framework also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, strings, primitives, arrays, etc.
 
 There are 2 important features of Orleans's serializer that set it apart from a lot of other third party serialization frameworks: dynamic types/arbitrary polymorphism and object identity.
 
-1. **Dynamic types and arbitrary polymorphism** - Orleans does not put any restrictions on the types that can be passed in grain calls and maintains the dynamic nature of the actual data type. That means, for example, that if the method in the grain interfaces is declared to accept `IDictionary` but at runtime the sender passes `SortedDictionary`, the receiver will indeed get `SortedDictionary` (although the "static contract"/grain interface did not specify this behaviour). 
+1. **Dynamic types and arbitrary polymorphism** - Orleans does not put any restrictions on the types that can be passed in grain calls and maintains the dynamic nature of the actual data type. That means, for example, that if the method in the grain interfaces is declared to accept `IDictionary` but at runtime the sender passes `SortedDictionary`, the receiver will indeed get `SortedDictionary` (although the "static contract"/grain interface did not specify this behaviour).
 
 2. **Maintaining Object identity** - if the same object is passed multiple types in the arguments of a grain call or is indirectly pointed more than once from the arguments, Orleans will serialize it only once. At the receiver side Orleans will restore all references correctly, so that two pointers to the same object still point to the same object after deserialization as well. Object identity is important to preserve in scenarios like the following. Imagine actor A is sending a dictionary with 100 entries to actor B, and 10 of the keys in the dictionary point to the same object, obj, on A's side. Without preserving object identity, B would receive a dictionary of 100 entries with those 10 keys pointing to 10 different clones of obj. With object identity preserved, the dictionary on B's side looks exactly like on A's side with those 10 keys pointing to a single object obj.
 
@@ -34,7 +33,7 @@ In addition to automatic serialization generation, application code can provide 
 
 There are 2 ways how application can customize serialization:
 
-1) Add 3 serialization methods to your type and mark them with appropriate attributes (`CopierMethod`, `SerializerMethod`, `DeserializerMethod`). This method is preferable for types that your application owns, that is, the types that you can add new methods to. 
+1) Add 3 serialization methods to your type and mark them with appropriate attributes (`CopierMethod`, `SerializerMethod`, `DeserializerMethod`). This method is preferable for types that your application owns, that is, the types that you can add new methods to.
 
 2) Write a separate class annotated with an attribute `RegisterSerializerAttribute` with the 3 serialization methods in it. This method is useful for types that the application does not own, for example, types defined in other libraries your application has no control over.
 
@@ -46,14 +45,14 @@ As described in [Using Immutable<T> to Optimize Copying](http://dotnet.github.io
 
  The copier for a type stands alone, while the serializer and deserializer are a pair that work together. You can provide just a custom copier, or just a custom serializer and a custom deserializer, or you can provide custom implementations of all three.
 
- Serializers are registered for each supported data type at silo start-up and whenever an assembly is loaded. Registration is necessary for custom serializer routines for a type to be used. Serializer selection is based on the dynamic type of the object to be copied or serialized. For this reason, there is no need to create serializers for abstract classes or interfaces, because they will never be used. 
+ Serializers are registered for each supported data type at silo start-up and whenever an assembly is loaded. Registration is necessary for custom serializer routines for a type to be used. Serializer selection is based on the dynamic type of the object to be copied or serialized. For this reason, there is no need to create serializers for abstract classes or interfaces, because they will never be used.
 
 ## When to Consider Writing a Custom Serializer
 It is rare that a hand-crafted serializer routine will perform meaningfully better than the generated versions. If you are tempted to do so, you should first consider the following options:
 
- If there are fields or properties within your data types that don't have to be serialized or copied, you can mark them with the `NonSerialized` attribute. This will cause the generated code to skip these fields when copying and serializing. 
- Use Immutable<T> where possible to avoid copying immutable data. See [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Advanced-Concepts/Using-Immutable-to-Optimize-Copying) for details. 
- If you're avoiding using the standard generic collection types, don't. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special "abbreviated" representations in the serialized byte stream, resulting in even more performance advantages. For instance, a `Dictionary<string, string>` will be faster than a `List<Tuple<string, string>>`. 
+ If there are fields or properties within your data types that don't have to be serialized or copied, you can mark them with the `NonSerialized` attribute. This will cause the generated code to skip these fields when copying and serializing.
+ Use Immutable<T> where possible to avoid copying immutable data. See [Using Immutable<T> to Optimize Copying](http://dotnet.github.io/orleans/Advanced-Concepts/Using-Immutable-to-Optimize-Copying) for details.
+ If you're avoiding using the standard generic collection types, don't. The Orleans runtime contains custom serializers for the generic collections that use the semantics of the collections to optimize copying, serializing, and deserializing. These collections also have special "abbreviated" representations in the serialized byte stream, resulting in even more performance advantages. For instance, a `Dictionary<string, string>` will be faster than a `List<Tuple<string, string>>`.
 
  The most common case where a custom serializer can provide a noticeable performance gain is when there is significant semantic information encoded in the data type that is not available by simply copying field values. For instance, arrays that are sparsely populated may often be more efficiently serialized by treating the array as a collection of index/value pairs, even if the application keeps the data as a fully realized array for speed of operation.
 
@@ -134,7 +133,7 @@ SerializationManager.SerializeInner(foo, stream, typeof(FooType));
 
 If there is no particular expected type for foo, then you can pass null for the expected type.
 
-The BinaryTokenStreamWriter class provides a wide variety of methods for writing data to the byte stream. See the class for documentation. 
+The BinaryTokenStreamWriter class provides a wide variety of methods for writing data to the byte stream. See the class for documentation.
 
 **Maintaining Object Identity**
 
@@ -183,7 +182,7 @@ var foo = SerializationManager.DeserializeInner<FooType>(stream);
 
 If there is no particular expected type for foo, use the first call pattern and pass null for the expected type.
 
-The BinaryTokenStreamReader class provides a wide variety of methods for reading data from the byte stream. See the class for documentation. 
+The BinaryTokenStreamReader class provides a wide variety of methods for reading data from the byte stream. See the class for documentation.
 
 **Maintaining Object Identity**
 
@@ -205,7 +204,7 @@ else
 
  If you use DeserializeInner for sub-objects, then object identity is handled for you.
 
-## Method 2: Writing a Special Serialization Class 
+## Method 2: Writing a Special Serialization Class
 
 In this method you write a new class annotated with an attribute `RegisterSerializerAttribute` and put the 3 serialization routines in it. The rules for how to write those routines are identical to method 1. The only difference is how they are hooked up with the rest of Orleans serialization framework. Below is an example for such a class:
 
@@ -247,4 +246,3 @@ Often the simplest way to write a serializer/deserializer pair is to serialize b
 Another approach, which is the approach the Orleans runtime takes for collections such as dictionaries, works well for classes with significant and complex internal structure: use instance methods to access the semantic content of the object, serialize that content, and deserialize by setting the semantic contents rather than the complex internal state. In this approach, inner objects are written using SerializeInner and read using DeserializeInner. In this case, it is common to write a custom copier, as well.
 
 If you write a custom serializer, and it winds up looking like a sequence of calls to SerializeInner for each field in the class, you don't need a custom serializer for that class.
-

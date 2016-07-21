@@ -3,8 +3,9 @@ layout: page
 title: Interceptors
 ---
 
+# Interceptors
 
-Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path. We currectly support only client side pre-call inteceptors. 
+Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path. We currectly support only client side pre-call inteceptors.
 
 ## Client side interceptors
 
@@ -17,5 +18,3 @@ Currently, the main scenario that we know of that uses client side pre-call inte
 ## Server side interceptors
 
 We currently do not have an implemention of server side interceptors (pre and post grain side interceptors). Talk to us if you think you have a scenario where this would be usefull. We also envision client side post-call interceptor.
-
-

@@ -3,8 +3,7 @@ layout: page
 title: SQL Tables
 ---
 
-
-### SQL System Storage
+# SQL System Storage
 
 Any reliable production-style Orleans deployment requires using persistent storage to keep system state, specifically Orleans cluster status and the data used for the reminders functionality. In addition to out of the box support for Azure storage Orleans also provides an option to store this information in SQL server.
 
@@ -15,8 +14,8 @@ The server configuration should look like this:
 ``` xml
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
-      <SystemStore SystemStoreType ="SqlServer" 
-                 DeploymentId="OrleansTest" 
+      <SystemStore SystemStoreType ="SqlServer"
+                 DeploymentId="OrleansTest"
                  DataConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" AdoInvariant="System.Data.SqlClient" />
   </Globals>
 </OrleansConfiguration>
@@ -26,8 +25,8 @@ The client configuration should look like this:
 
 ``` xml
 <ClientConfiguration xmlns="urn:orleans">
-      <SystemStore SystemStoreType ="SqlServer" 
-                 DeploymentId="OrleansTest" 
+      <SystemStore SystemStoreType ="SqlServer"
+                 DeploymentId="OrleansTest"
                  DataConnectionString="Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True" AdoInvariant="System.Data.SqlClient" />
 </ClientConfiguration>
 ```

@@ -3,12 +3,13 @@ layout: page
 title: Application Bootstrapping within a Silo
 ---
 
+# Application Bootstrapping within a Silo
 
-There are several scenarios where application want to run some "auto-exec" functions when a silo comes online. 
+There are several scenarios where application want to run some "auto-exec" functions when a silo comes online.
 
-Some examples include, but are not limited to: 
-* Starting background timers to perform periodic housekeeping tasks 
-* Pre-loading some cache grains with data downloaded from external backing storage. 
+Some examples include, but are not limited to:
+* Starting background timers to perform periodic housekeeping tasks
+* Pre-loading some cache grains with data downloaded from external backing storage.
 
 We have now added support for this auto-run functionality through configuring "bootstrap providers" for Orleans silos. For example:
 
@@ -28,7 +29,7 @@ It is also possible to register Bootstrap provider programaticaly, via calling o
 ``` csharp
 public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
 
-public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider 
+public void RegisterBootstrapProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
 ```
 on the [`Orleans.Runtime.Configuration.GlobalConfiguration`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs) class.
 
@@ -38,11 +39,11 @@ When each silo starts up, the Orleans runtime will instantiate each of the liste
 
 ``` csharp
 Task Init(
-    string name, 
-    IProviderRuntime providerRuntime, 
+    string name,
+    IProviderRuntime providerRuntime,
     IProviderConfiguration config)
 ```
 
-Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted. 
+Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.
 
 This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.

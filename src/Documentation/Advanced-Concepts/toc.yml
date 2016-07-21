@@ -12,8 +12,6 @@
   href: Silo-Error-Code-Monitoring.md
 - name: Timers and Reminders
   href: Timers-and-Reminders.md
-- name: Two Way Client Observers (old)
-  href: Two-Way-Client-Observers-old.md
 - name: Using Azure Web Apps
   href: Using-Azure-Web-Apps.md
 - name: Using Immutable to Optimize Copying
@@ -32,4 +30,3 @@
   href: External-Tasks-and-Grains.md
 - name: Deployment and Versioning of Dependencies
   href: Deployment-and-Versioning-of-Dependencies.md
-  

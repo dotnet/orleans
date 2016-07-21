@@ -72,10 +72,11 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Request-Context.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.</p>
+              <h1 id="request-context">Request Context</h1>
+              
+<p>RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.</p>
 <p> The feature is implemented by a public static class, RequestContext, in the Orleans namespace. This class exposes two simple methods:</p>
-<p><strong>void Set(string key, object value)</strong> is used to store a value in the request context. The value can be any Serializable type. <strong>Object Get(string key)</strong> is used to retrieve a value from the current request context. </p>
+<p><strong>void Set(string key, object value)</strong> is used to store a value in the request context. The value can be any Serializable type. <strong>Object Get(string key)</strong> is used to retrieve a value from the current request context.</p>
 <p> The backing storage for RequestContext is thread-static. When a thread (whether client-side or within Orleans) sends a request, the contents of the sending thread’s RequestContext is included with the Orleans message for the request; when the grain code receives the request, that metadata is accessible from the local RequestContext. If the grain code does not modify the RequestContext, then any grain it makes a request of will receive the same metadata, and so on.</p>
 <p> Application metadata also is maintained when you schedule a future computation using StartNew or ContinueWith; in both cases, the continuation will execute with the same metadata as the scheduling code had at the moment the computation was scheduled (that is, the system makes a copy of the current metadata and passes that to the continuation, so changes after the call to StartNew or ContinueWith will not be seen by the continuation).</p>
 <p> Note that application metadata does not flow back with responses; that is, code that runs as a result of a response being received, either within a ContinueWith continuation or after a call to Wait or GetValue, will still run within the current context that was set by the original request.</p>

@@ -72,23 +72,23 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Configuring-SQL-Tables.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h3 id="sql-system-storage">SQL System Storage</h3>
+              <h1 id="sql-system-storage">SQL System Storage</h1>
               
 <p>Any reliable production-style Orleans deployment requires using persistent storage to keep system state, specifically Orleans cluster status and the data used for the reminders functionality. In addition to out of the box support for Azure storage Orleans also provides an option to store this information in SQL server.</p>
 <p>In order to use SQL server for the system store, one needs to adjust server-side and client-side configurations.</p>
 <p>The server configuration should look like this:</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
-      &lt;SystemStore SystemStoreType =&quot;SqlServer&quot; 
-                 DeploymentId=&quot;OrleansTest&quot; 
+      &lt;SystemStore SystemStoreType =&quot;SqlServer&quot;
+                 DeploymentId=&quot;OrleansTest&quot;
                  DataConnectionString=&quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot; AdoInvariant=&quot;System.Data.SqlClient&quot; /&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
 </code></pre>
 <p>The client configuration should look like this:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-      &lt;SystemStore SystemStoreType =&quot;SqlServer&quot; 
-                 DeploymentId=&quot;OrleansTest&quot; 
+      &lt;SystemStore SystemStoreType =&quot;SqlServer&quot;
+                 DeploymentId=&quot;OrleansTest&quot;
                  DataConnectionString=&quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot; AdoInvariant=&quot;System.Data.SqlClient&quot; /&gt;
 &lt;/ClientConfiguration&gt;
 </code></pre>

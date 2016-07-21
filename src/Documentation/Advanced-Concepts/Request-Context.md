@@ -2,13 +2,14 @@
 layout: page
 title: Request Context
 ---
-    
+
+# Request Context
 
 RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.
 
  The feature is implemented by a public static class, RequestContext, in the Orleans namespace. This class exposes two simple methods:
 
-**void Set(string key, object value)** is used to store a value in the request context. The value can be any Serializable type. **Object Get(string key)** is used to retrieve a value from the current request context. 
+**void Set(string key, object value)** is used to store a value in the request context. The value can be any Serializable type. **Object Get(string key)** is used to retrieve a value from the current request context.
 
  The backing storage for RequestContext is thread-static. When a thread (whether client-side or within Orleans) sends a request, the contents of the sending thread’s RequestContext is included with the Orleans message for the request; when the grain code receives the request, that metadata is accessible from the local RequestContext. If the grain code does not modify the RequestContext, then any grain it makes a request of will receive the same metadata, and so on.
 

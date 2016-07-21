@@ -72,8 +72,9 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
-              <p>For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found if to set gcServer=true and gcConcurrent=false. The are easy to set via the application config file in case a silo runs as a standalone process. You can use OrleansHost.exe.config included in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/">Microsoft.Orleans.OrleansHost</a> NuGet package as an example.</p>
+              <h1 id="configuring-net-garbage-collection">Configuring .NET Garbage Collection</h1>
+              
+<p>For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found if to set gcServer=true and gcConcurrent=false. The are easy to set via the application config file in case a silo runs as a standalone process. You can use OrleansHost.exe.config included in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/">Microsoft.Orleans.OrleansHost</a> NuGet package as an example.</p>
 <pre><code class="lang-xml">&lt;configuration&gt;
   &lt;runtime&gt;
     &lt;gcServer enabled=&quot;true&quot;/&gt;
@@ -82,8 +83,8 @@
 &lt;/configuration&gt;
 </code></pre>
 <p>However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  <a href="http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx">http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx</a></p>
-<p><em>** </em><em>IMPORTANT NOTE</em>* ***
-<a href="https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx">Server garbage collection is available only on multiprocessor computers</a>. Therefore, 
+<p><strong>IMPORTANT NOTE</strong></p>
+<p><a href="https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx">Server garbage collection is available only on multiprocessor computers</a>. Therefore,
 even if you configure the Garbage Collection either via Application Configuration file (app.config or web.config) or via the scripts on the referred blog post, if the silo is running on a (virtual) machine with a single core, you will not get the benefits of <code>gcServer=true</code>.</p>
 
             </article>
