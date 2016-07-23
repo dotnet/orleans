@@ -71,13 +71,18 @@ namespace Orleans.Serialization
 
             if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
             {
-                result = typeInfo.GetFields().All(f => !(f.FieldType == t) && IsOrleansShallowCopyable(f.FieldType));
+                result = IsTypeFieldsShallowCopyable(typeInfo);
                 shallowCopyableTypes[t] = result;
                 return result;
             }
 
             shallowCopyableTypes[t] = false;
             return false;
+        }
+
+        private static bool IsTypeFieldsShallowCopyable(TypeInfo typeInfo)
+        {
+            return typeInfo.GetFields().All(f => !(f.FieldType.IsEquivalentTo(typeInfo)) && IsOrleansShallowCopyable(f.FieldType));
         }
 
         internal static bool IsSpecializationOf(this Type t, Type match)
