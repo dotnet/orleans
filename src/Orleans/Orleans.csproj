@@ -152,6 +152,7 @@
     <Compile Include="Streams\QueueAdapters\AggregatedQueueFlowController.cs" />
     <Compile Include="Telemetry\Consumers\ConsoleTelemetryConsumer.cs" />
     <Compile Include="Telemetry\Consumers\FileTelemetryConsumer.cs" />
+    <Compile Include="Telemetry\Consumers\OrleansLegacyConsumer.cs" />
     <Compile Include="Telemetry\Consumers\TraceTelemetryConsumer.cs" />
     <Compile Include="Telemetry\IDependencyTelemetryConsumer.cs" />
     <Compile Include="Telemetry\IEventTelemetryConsumer.cs" />

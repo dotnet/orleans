@@ -555,7 +555,7 @@ namespace Orleans.Runtime
             message.SetTargetPlacement(placementResult);
             if (placementResult.IsNewPlacement)
             {
-                CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
+                logger.IncrementMetric(StatisticNames.DISPATCHER_NEW_PLACEMENT.Name);                
             }
             if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
        }
