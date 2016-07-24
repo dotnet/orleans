@@ -10,7 +10,7 @@
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
     <summary>
-      Tool for regitering performance counters of Microsoft Orleans - CounterControl.exe.
+      Tool for registering performance counters of Microsoft Orleans - OrleansCounterControl.exe.
     </summary>
     <description>
       Tool that registers performance counter categories for performance counters published
@@ -19,12 +19,15 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="1.0.0.0" />
-      <dependency id="Microsoft.Orleans.OrleansRuntime" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>
-    <file src="CounterControl.exe" target="lib\net45" />
-    <file src="CounterControl.exe.config" target="lib\net45" />
+    <file src="OrleansCounterControl.exe" target="lib\net451" />
+    <file src="OrleansCounterControl.pdb" target="lib\net451" />
+    <file src="OrleansCounterControl.exe.config" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansCounterControl\**\*.cs" target="src" />
   </files>
 </package>

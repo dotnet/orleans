@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -32,7 +9,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [DebuggerDisplay("WorkItemGroup State={state} PendingContinuations={pendingContinuationCount} Context={_schedulingContext.Name}")]
+    [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
     internal class WorkItemGroup : IWorkItem
     {
         private enum WorkGroupStatus
@@ -43,8 +20,8 @@ namespace Orleans.Runtime.Scheduler
             Shutdown = 3
         }
 
-        private static readonly TraceLogger appLogger = TraceLogger.GetLogger("Scheduler.WorkItemGroup", TraceLogger.LoggerType.Runtime);
-        private readonly TraceLogger log;
+        private static readonly Logger appLogger = LogManager.GetLogger("Scheduler.WorkItemGroup", LoggerType.Runtime);
+        private readonly Logger log;
         private readonly OrleansTaskScheduler masterScheduler;
         private WorkGroupStatus state;
         private readonly Object lockable;
@@ -68,7 +45,12 @@ namespace Orleans.Runtime.Scheduler
 
         public ISchedulingContext SchedulingContext { get; set; }
 
-        public bool IsSystem
+        public bool IsSystemPriority
+        {
+            get { return SchedulingUtils.IsSystemPriorityContext(SchedulingContext); }
+        }
+
+        internal bool IsSystemGroup
         {
             get { return SchedulingUtils.IsSystemContext(SchedulingContext); }
         }
@@ -146,8 +128,7 @@ namespace Orleans.Runtime.Scheduler
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
         //private static readonly int MaxWaitingThreads = 500;
-        // This is the maximum number of pending work items for a single activation before we write a warning log.
-        private static LimitValue MaxPendingItemsLimit;
+
 
         internal WorkItemGroup(OrleansTaskScheduler sched, ISchedulingContext schedulingContext)
         {
@@ -161,8 +142,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            MaxPendingItemsLimit = LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS);
-            log = IsSystem ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
+            log = IsSystemPriority ? LogManager.GetLogger("Scheduler." + Name + ".WorkItemGroup", LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
             {
@@ -204,9 +184,11 @@ namespace Orleans.Runtime.Scheduler
 
                 if (state == WorkGroupStatus.Shutdown)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it.", task),
+                    ReportWorkGroupProblem(
+                        String.Format("Enqueuing task {0} to a stopped work item group. Going to ignore and not execute it. "
+                        + "The likely reason is that the task is not being 'awaited' properly.", task),
                         ErrorCode.SchedulerNotEnqueuWorkWhenShutdown);
+                    task.Ignore(); // Ignore this Task, so in case it is faulted it will not cause UnobservedException.
                     return;
                 }
 
@@ -220,7 +202,7 @@ namespace Orleans.Runtime.Scheduler
                     SchedulerStatisticsGroup.OnWorkItemEnqueue();
 #endif
                 workItems.Enqueue(task);
-                int maxPendingItemsLimit = MaxPendingItemsLimit.SoftLimitThreshold;
+                int maxPendingItemsLimit = masterScheduler.MaxPendingItemsLimit.SoftLimitThreshold;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     log.Warn(ErrorCode.SchedulerTooManyPendingItems, String.Format("{0} pending work items for group {1}, exceeding the warning threshold of {2}",
@@ -246,9 +228,10 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (IsActive)
                 {
-                    ReportWorkGroupProblemWithBacktrace(
-                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}", WorkItemCount),
-                        ErrorCode.SchedulerWorkGroupStopping); // Throws InvalidOperationException
+                    ReportWorkGroupProblem(
+                        String.Format("WorkItemGroup is being stoped while still active. workItemCount = {0}." 
+                        + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
+                        ErrorCode.SchedulerWorkGroupStopping);
                 }
 
                 if (state == WorkGroupStatus.Shutdown)
@@ -267,7 +250,12 @@ namespace Orleans.Runtime.Scheduler
 
                 if (StatisticsCollector.CollectShedulerQueuesStats)
                     queueTracking.OnStopExecution();
-                
+
+                foreach (Task task in workItems)
+                {
+                    // Ignore all queued Tasks, so in case they are faulted they will not cause UnobservedException.
+                    task.Ignore();
+                }
                 workItems.Clear();
             }
         }
@@ -420,8 +408,8 @@ namespace Orleans.Runtime.Scheduler
 
         public override string ToString()
         {
-            return String.Format("{0}WorkItemGroup:Name={1},State={2}",
-                IsSystem ? "System*" : "",
+            return String.Format("{0}WorkItemGroup:Name={1},WorkGroupStatus={2}",
+                IsSystemGroup ? "System*" : "",
                 Name,
                 state);
         }
@@ -434,14 +422,21 @@ namespace Orleans.Runtime.Scheduler
                 sb.Append(this);
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
-                if (AverageQueueLenght != 0)
+         
+                if (AverageQueueLenght > 0)
                 {
                     sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
-                    if (!totalQueuingDelay.Equals(TimeSpan.Zero))
+                    if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)
+                    {
                         sb.AppendFormat("average queue delay: {0}ms; ", totalQueuingDelay.Divide(totalItemsProcessed).TotalMilliseconds);
+                    }
                 }
+                
                 sb.AppendFormat("TaskRunner={0}; ", TaskRunner);
-                sb.AppendFormat("SchedulingContext={0}", SchedulingContext);
+                if (SchedulingContext != null)
+                {
+                    sb.AppendFormat("Detailed SchedulingContext=<{0}>", SchedulingContext.DetailedStatus());
+                }
                 return sb.ToString();
             }
         }
@@ -451,6 +446,12 @@ namespace Orleans.Runtime.Scheduler
             var st = new StackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
             log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
+        }
+
+        private void ReportWorkGroupProblem(string what, ErrorCode errorCode)
+        {
+            var msg = string.Format("{0} {1}", what, DumpStatus());
+            log.Warn(errorCode, msg);
         }
     }
 }

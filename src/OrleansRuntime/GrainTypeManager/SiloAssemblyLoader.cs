@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,39 +7,52 @@ using System.Text;
 
 using Orleans.Providers;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
 {
     internal class SiloAssemblyLoader
     {
-        private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
+        private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
+        private List<string> discoveredAssemblyLocations;
+        private Dictionary<string, SearchOption> directories;
 
-        public SiloAssemblyLoader()
+        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories)
         {
-            LoadApplicationAssemblies();
-        }
-
-        public IDictionary<string, GrainTypeData> GrainClassTypeData { get { return GetGrainClassTypes(); } }
-
-        public IEnumerable<KeyValuePair<int, Type>> GrainMethodInvokerTypes { get { return GetGrainMethodInvokerTypes(); } }
-
-        private void LoadApplicationAssemblies()
-        {
-            var exeRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
-            var directories = new Dictionary<string, SearchOption>
+            var cwd = Directory.GetCurrentDirectory();
+
+            directories = new Dictionary<string, SearchOption>
                     {
                         { exeRoot, SearchOption.TopDirectoryOnly },
                         { appRoot, SearchOption.AllDirectories }
                     };
 
+            foreach (var kvp in additionalDirectories)
+            {
+                // Make sure the path is clean (get rid of ..\'s)
+                directories[new DirectoryInfo(kvp.Key).FullName] = kvp.Value;
+            }
+
+
+            if (!directories.ContainsKey(cwd))
+            {
+                directories.Add(cwd, SearchOption.TopDirectoryOnly);
+            }
+
+            LoadApplicationAssemblies();
+        }
+
+        private void LoadApplicationAssemblies()
+        {
             AssemblyLoaderPathNameCriterion[] excludeCriteria =
                 {
                     AssemblyLoaderCriteria.ExcludeResourceAssemblies,
                     AssemblyLoaderCriteria.ExcludeSystemBinaries()
                 };
-            AssemblyLoaderReflectionCriterion[] loadCriteria = 
+            AssemblyLoaderReflectionCriterion[] loadCriteria =
                 {
                     AssemblyLoaderReflectionCriterion.NewCriterion(
                         TypeUtils.IsConcreteGrainClass,
@@ -71,14 +61,15 @@ namespace Orleans.Runtime
                         typeof(IProvider))
                 };
 
-            AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
+            discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
         }
 
-        private IDictionary<string, GrainTypeData> GetGrainClassTypes()
+        public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
         {
             var result = new Dictionary<string, GrainTypeData>();
-            IDictionary<string, Type> grainStateTypes = GetGrainStateTypes();
-            Type[] grainTypes = TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass).ToArray();
+            Type[] grainTypes = strict
+                ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass, logger).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass, logger).ToArray();
 
             foreach (var grainType in grainTypes)
             {
@@ -86,10 +77,32 @@ namespace Orleans.Runtime
                 if (result.ContainsKey(className))
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));
-                
-                var parameterizedName = grainType.Namespace + "." + TypeUtils.GetParameterizedTemplateName(grainType);
-                Type grainStateType;
-                grainStateTypes.TryGetValue(parameterizedName, out grainStateType);
+
+                Type grainStateType = null;
+
+                // check if grainType derives from Grain<T> where T is a concrete class
+
+                var parentType = grainType.GetTypeInfo().BaseType;
+                while (parentType != typeof(Grain) && parentType != typeof(object))
+                {
+                    TypeInfo parentTypeInfo = parentType.GetTypeInfo();
+                    if (parentTypeInfo.IsGenericType)
+                    {
+                        var definition = parentTypeInfo.GetGenericTypeDefinition();
+                        if (definition == typeof(Grain<>))
+                        {
+                            var stateArg = parentType.GetGenericArguments()[0];
+                            if (stateArg.GetTypeInfo().IsClass)
+                            {
+                                grainStateType = stateArg;
+                                break;
+                            }
+                        }
+                    }
+
+                    parentType = parentTypeInfo.BaseType;
+                }
+
                 GrainTypeData typeData = GetTypeData(grainType, grainStateType);
                 result.Add(className, typeData);
             }
@@ -98,36 +111,21 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private static IDictionary<string, Type> GetGrainStateTypes()
-        {
-            var result = new Dictionary<string, Type>();
-            Type[] types = TypeUtils.GetTypes(TypeUtils.IsGrainStateType).ToArray();
-
-            foreach (var type in types)
-            {
-                var attr = (GrainStateAttribute)type.GetCustomAttributes(typeof(GrainStateAttribute), true).Single();
-                if (result.ContainsKey(attr.ForGrainType))
-                    throw new InvalidOperationException(
-                        string.Format("Grain class {0} is already associated with grain state object type {1}", attr.ForGrainType, type.FullName));
-            
-                result.Add(attr.ForGrainType, type);
-            }
-            return result;
-        }
-
-        private IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes()
+        public IEnumerable<KeyValuePair<int, Type>> GetGrainMethodInvokerTypes(bool strict)
         {
             var result = new Dictionary<int, Type>();
-            Type[] types = TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType).ToArray();
+            Type[] types = strict
+                ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType, logger).ToArray()
+                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
 
             foreach (var type in types)
             {
-                var attrib = (MethodInvokerAttribute)type.GetCustomAttributes(typeof(MethodInvokerAttribute), true).Single();
+                var attrib = type.GetTypeInfo().GetCustomAttribute<MethodInvokerAttribute>(true);
                 int ifaceId = attrib.InterfaceId;
 
                 if (result.ContainsKey(ifaceId))
                     throw new InvalidOperationException(string.Format("Grain method invoker classes {0} and {1} use the same interface id {2}", result[ifaceId].FullName, type.FullName, ifaceId));
-                
+
                 result[ifaceId] = type;
             }
             return result;
@@ -138,24 +136,25 @@ namespace Orleans.Runtime
         /// </summary>
         private static GrainTypeData GetTypeData(Type grainType, Type stateObjectType)
         {
-            return grainType.IsGenericTypeDefinition ? 
-                new GenericGrainTypeData(grainType, stateObjectType) : 
+            return grainType.GetTypeInfo().IsGenericTypeDefinition ?
+                new GenericGrainTypeData(grainType, stateObjectType) :
                 new GrainTypeData(grainType, stateObjectType);
         }
 
-        private static void LogGrainTypesFound(TraceLogger logger, Dictionary<string, GrainTypeData> grainTypeData)
+        private static void LogGrainTypesFound(LoggerImpl logger, Dictionary<string, GrainTypeData> grainTypeData)
         {
             var sb = new StringBuilder();
             sb.AppendLine(String.Format("Loaded grain type summary for {0} types: ", grainTypeData.Count));
 
-            foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.Name))
+            foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.FullName))
             {
                 // Skip system targets and Orleans grains
-                var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
+                var assemblyName = grainType.Type.GetTypeInfo().Assembly.FullName.Split(',')[0];
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
-                    int grainClassTypeCode = CodeGeneration.GrainInterfaceData.GetGrainClassTypeCode(grainType.Type);
-                    sb.AppendFormat("Grain class {0} [{1} (0x{2})] from {3}.dll implementing interfaces: ", 
+                    int grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainType.Type);
+                    sb.AppendFormat("Grain class {0}.{1} [{2} (0x{3})] from {4}.dll implementing interfaces: ",
+                        grainType.Type.Namespace,
                         TypeUtils.GetTemplatedName(grainType.Type),
                         grainClassTypeCode,
                         grainClassTypeCode.ToString("X"),
@@ -166,12 +165,12 @@ namespace Orleans.Runtime
                     {
                         if (!first)
                             sb.Append(", ");
-                        
+
                         sb.Append(iface.Namespace).Append(".").Append(TypeUtils.GetTemplatedName(iface));
 
-                        if (CodeGeneration.GrainInterfaceData.IsGrainType(iface))
+                        if (CodeGeneration.GrainInterfaceUtils.IsGrainType(iface))
                         {
-                            int ifaceTypeCode = CodeGeneration.GrainInterfaceData.GetGrainInterfaceId(iface);
+                            int ifaceTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainInterfaceId(iface);
                             sb.AppendFormat(" [{0} (0x{1})]", ifaceTypeCode, ifaceTypeCode.ToString("X"));
                         }
                         first = false;
@@ -180,7 +179,7 @@ namespace Orleans.Runtime
                 }
             }
             var report = sb.ToString();
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.Loader_GrainTypeFullList, report);
+            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.Loader_GrainTypeFullList, report);
         }
     }
 }

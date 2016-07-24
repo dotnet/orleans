@@ -1,4 +1,5 @@
-﻿using Orleans;
+using System.Threading.Tasks;
+using Orleans;
 
 namespace $safeprojectname$
 {

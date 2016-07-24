@@ -1,19 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using System.Threading.Tasks;
 using TwitterGrainInterfaces;
 
@@ -23,21 +7,20 @@ using Orleans.Concurrency;
 
 namespace TwitterGrains
 {
-
     /// <summary>
     /// interface defining the persistent state for the counter grain
     /// </summary>
-    public interface ICounterState : IGrainState
+    public class CounterState : GrainState
     {
         /// <summary>
         /// total number of hashtag grain activations
         /// </summary>
-        int Counter { get; set; }
+        public int Counter { get; set; }
     }
 
     [StorageProvider(ProviderName = "store1")]
     [Reentrant]
-    public class CounterGrain : Orleans.Grain<ICounterState>, ICounter
+    public class CounterGrain : Grain<CounterState>, ICounter
     {
         /// <summary>
         /// Add one to the activation count
@@ -48,7 +31,7 @@ namespace TwitterGrains
             this.State.Counter += 1;
 
             // as an optimisation, only write out the state for every 100 increments 
-            if (this.State.Counter % 100 == 0) await State.WriteStateAsync();
+            if (this.State.Counter % 100 == 0) await WriteStateAsync();
         }
 
         /// <summary>
@@ -58,7 +41,7 @@ namespace TwitterGrains
         public async Task ResetCounter()
         {
             this.State.Counter = 0;
-            await this.State.WriteStateAsync();
+            await this.WriteStateAsync();
         }
 
         /// <summary>

@@ -1,52 +1,32 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 ﻿#define LOG_MEMORY_PERF_COUNTERS
 using System;
 using System.Diagnostics;
 using System.Management;
 
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
     internal class RuntimeStatisticsGroup
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("RuntimeStatisticsGroup", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("RuntimeStatisticsGroup", LoggerType.Runtime);
+        private const float KB = 1024f;
 
-        private PerformanceCounter cpuCounter;
-        private PerformanceCounter availableMemoryCounter;
+        private PerformanceCounter cpuCounterPF;
+        private PerformanceCounter availableMemoryCounterPF;
 #if LOG_MEMORY_PERF_COUNTERS
-        private PerformanceCounter timeInGC;
-        private PerformanceCounter[] genSizes;
-        private PerformanceCounter allocatedBytesPerSec;
-        private PerformanceCounter promotedMemoryFromGen1;
-        private PerformanceCounter numberOfInducedGCs;
-        private PerformanceCounter largeObjectHeapSize;
-        private PerformanceCounter promotedFinalizationMemoryFromGen0;
+        private PerformanceCounter timeInGCPF;
+        private PerformanceCounter[] genSizesPF;
+        private PerformanceCounter allocatedBytesPerSecPF;
+        private PerformanceCounter promotedMemoryFromGen1PF;
+        private PerformanceCounter numberOfInducedGCsPF;
+        private PerformanceCounter largeObjectHeapSizePF;
+        private PerformanceCounter promotedFinalizationMemoryFromGen0PF;
 #endif
         private SafeTimer cpuUsageTimer;
         private readonly TimeSpan CPU_CHECK_PERIOD = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan INITIALIZATION_TIMEOUT = TimeSpan.FromMinutes(1);
         private bool countersAvailable;
 
 
@@ -60,8 +40,7 @@ namespace Orleans.Runtime
         ///
         /// <summary>Amount of memory available to processes running on the machine</summary>
         /// 
-        public long AvailableMemory { get { return availableMemoryCounter != null ? Convert.ToInt64(availableMemoryCounter.NextValue()) : 0; } }
-
+        public long AvailableMemory { get { return availableMemoryCounterPF != null ? Convert.ToInt64(availableMemoryCounterPF.NextValue()) : 0; } }
 
         public float CpuUsage { get; private set; }
 
@@ -78,13 +57,25 @@ namespace Orleans.Runtime
         {
             get
             {
-                return String.Format("gen0={0:0.00}, gen1={1:0.00}, gen2={2:0.00}", genSizes[0].NextValue() / 1024f, genSizes[1].NextValue() / 1024f, genSizes[2].NextValue() / 1024f);
+                if (genSizesPF == null) return String.Empty;
+                return String.Format("gen0={0:0.00}, gen1={1:0.00}, gen2={2:0.00}", genSizesPF[0].NextValue() / KB, genSizesPF[1].NextValue() / KB, genSizesPF[2].NextValue() / KB);
             }
         }
 #endif
         internal RuntimeStatisticsGroup()
         {
-            InitCpuMemoryCounters();
+            try
+            {
+                Task.Run(() =>
+                {
+                    InitCpuMemoryCounters();
+                }).WaitWithThrow(INITIALIZATION_TIMEOUT);  
+            }
+            catch (TimeoutException)
+            {
+                logger.Warn(ErrorCode.PerfCounterConnectError,
+                    "Timeout occurred during initialization of CPU & Memory perf counters");
+            }          
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -92,24 +83,25 @@ namespace Orleans.Runtime
         {
             try
             {
-                cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total", true);
-                availableMemoryCounter = new PerformanceCounter("Memory", "Available Bytes", true); 
+                cpuCounterPF = new PerformanceCounter("Processor", "% Processor Time", "_Total", true);
+                availableMemoryCounterPF = new PerformanceCounter("Memory", "Available Bytes", true); 
 #if LOG_MEMORY_PERF_COUNTERS
                 string thisProcess = Process.GetCurrentProcess().ProcessName;
-                timeInGC = new PerformanceCounter(".NET CLR Memory", "% Time in GC", thisProcess, true);
-                genSizes = new PerformanceCounter[] { 
+                timeInGCPF = new PerformanceCounter(".NET CLR Memory", "% Time in GC", thisProcess, true);
+                genSizesPF = new PerformanceCounter[] { 
                     new PerformanceCounter(".NET CLR Memory", "Gen 0 heap size", thisProcess, true), 
                     new PerformanceCounter(".NET CLR Memory", "Gen 1 heap size", thisProcess, true), 
                     new PerformanceCounter(".NET CLR Memory", "Gen 2 heap size", thisProcess, true)
                 };
-                allocatedBytesPerSec = new PerformanceCounter(".NET CLR Memory", "Allocated Bytes/sec", thisProcess, true);
-                promotedMemoryFromGen1 = new PerformanceCounter(".NET CLR Memory", "Promoted Memory from Gen 1", thisProcess, true);
-                numberOfInducedGCs = new PerformanceCounter(".NET CLR Memory", "# Induced GC", thisProcess, true);
-                largeObjectHeapSize = new PerformanceCounter(".NET CLR Memory", "Large Object Heap size", thisProcess, true);
-                promotedFinalizationMemoryFromGen0 = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
+                allocatedBytesPerSecPF = new PerformanceCounter(".NET CLR Memory", "Allocated Bytes/sec", thisProcess, true);
+                promotedMemoryFromGen1PF = new PerformanceCounter(".NET CLR Memory", "Promoted Memory from Gen 1", thisProcess, true);
+                numberOfInducedGCsPF = new PerformanceCounter(".NET CLR Memory", "# Induced GC", thisProcess, true);
+                largeObjectHeapSizePF = new PerformanceCounter(".NET CLR Memory", "Large Object Heap size", thisProcess, true);
+                promotedFinalizationMemoryFromGen0PF = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
 #endif
-
-                // For Mono one could use PerformanceCounter("Mono Memory", "Total Physical Memory");
+                
+#if !(DNXCORE50 || __MonoCS__)
+                //.NET on Windows without mono
                 const string Query = "SELECT Capacity FROM Win32_PhysicalMemory";
                 var searcher = new ManagementObjectSearcher(Query);
                 long Capacity = 0;
@@ -120,6 +112,13 @@ namespace Orleans.Runtime
                     throw new Exception("No physical ram installed on machine?");
 
                 TotalPhysicalMemory = Capacity;
+#elif __MonoCS__
+                //Cross platform mono
+                var totalPhysicalMemory = new PerformanceCounter("Mono Memory", "Total Physical Memory");
+                TotalPhysicalMemory = Convert.ToInt64(totalPhysicalMemory.NextValue());
+#elif DNXCORE50
+                //Cross platform CoreCLR
+#endif
                 countersAvailable = true;
             }
             catch (Exception)
@@ -135,14 +134,18 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.PerfCounterNotRegistered,
                     "CPU & Memory perf counters did not initialize correctly - try repairing Windows perf counter config on this machine with 'lodctr /r' command");
-                return;
             }
 
-            cpuUsageTimer = new SafeTimer(CheckCpuUsage, null, CPU_CHECK_PERIOD, CPU_CHECK_PERIOD);
+            if (cpuCounterPF != null) {
+                cpuUsageTimer = new SafeTimer(CheckCpuUsage, null, CPU_CHECK_PERIOD, CPU_CHECK_PERIOD);
+            }
             try
             {
-                // Read initial value of CPU Usage counter
-                CpuUsage = cpuCounter.NextValue();
+                if (cpuCounterPF != null)
+                {
+                    // Read initial value of CPU Usage counter
+                    CpuUsage = cpuCounterPF.NextValue();
+                }
             }
             catch (InvalidOperationException)
             {
@@ -151,16 +154,39 @@ namespace Orleans.Runtime
             }
 
             FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_CPUUSAGE, () => CpuUsage);
-            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (MemoryUsage + 1023) / 1024); // Round up
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_TOTALMEMORYKB, () => (long)((MemoryUsage + KB-1.0) / KB)); // Round up
 #if LOG_MEMORY_PERF_COUNTERS    // print GC stats in the silo log file.
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_GENCOLLECTIONCOUNT, () => GCGenCollectionCount);
             StringValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_GENSIZESKB, () => GCGenSizes);
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PERCENTOFTIMEINGC, () => timeInGC.NextValue());
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_ALLOCATEDBYTESINKBPERSEC, () => allocatedBytesPerSec.NextValue() / 1024f);
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN1KB, () => promotedMemoryFromGen1.NextValue() / 1024f);
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSize.NextValue() / 11024f);
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0.NextValue() / 1024f);
-            FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_NUMBEROFINDUCEDGCS, () => numberOfInducedGCs.NextValue());
+            if (timeInGCPF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PERCENTOFTIMEINGC, () => timeInGCPF.NextValue());
+            }
+            if (allocatedBytesPerSecPF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_ALLOCATEDBYTESINKBPERSEC, () => allocatedBytesPerSecPF.NextValue() / KB);
+            }
+            if (promotedMemoryFromGen1PF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN1KB, () => promotedMemoryFromGen1PF.NextValue() / KB);
+            }
+            if (largeObjectHeapSizePF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_LARGEOBJECTHEAPSIZEKB, () => largeObjectHeapSizePF.NextValue() / KB);
+            }
+            if (promotedFinalizationMemoryFromGen0PF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB, () => promotedFinalizationMemoryFromGen0PF.NextValue() / KB);
+            }
+            if (numberOfInducedGCsPF != null)
+            {
+                FloatValueStatistic.FindOrCreate(StatisticNames.RUNTIME_GC_NUMBEROFINDUCEDGCS, () => numberOfInducedGCsPF.NextValue());
+            }
+            IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB, () => (long)((TotalPhysicalMemory / KB) / KB));
+            if (availableMemoryCounterPF != null)
+            {
+                IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_MEMORY_AVAILABLEMEMORYMB, () => (long)((AvailableMemory/ KB) / KB)); // Round up
+            }
 #endif
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
             {
@@ -189,9 +215,15 @@ namespace Orleans.Runtime
 
         private void CheckCpuUsage(object m)
         {
-            var currentUsage = cpuCounter.NextValue();
-            // We calculate a decaying average for CPU utilization
-            CpuUsage = (CpuUsage + 2 * currentUsage) / 3;
+            if (cpuCounterPF != null)
+            {
+                var currentUsage = cpuCounterPF.NextValue();
+                // We calculate a decaying average for CPU utilization
+                CpuUsage = (CpuUsage + 2 * currentUsage) / 3;
+            }else
+            {
+                CpuUsage = 0;
+            }
         }
 
         public void Stop()

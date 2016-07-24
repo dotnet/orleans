@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System;
 
@@ -38,6 +15,18 @@ namespace Orleans.Runtime
         public const string DEFAULT_STORAGE_PROVIDER_NAME = "Default";
         public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
+        public const string ADO_INVARIANT_NAME = "AdoInvariant";
+        public const string DATA_CONNECTION_FOR_REMINDERS_STRING_NAME = "DataConnectionStringForReminders";
+        public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
+        
+        public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
+
+        public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
+        public const string INVARIANT_NAME_SQL_SERVER = "System.Data.SqlClient";
+
+        public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
+
+        public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
         public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
@@ -49,7 +38,9 @@ namespace Orleans.Runtime
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId ProviderManagerSystemTargetId = GrainId.GetSystemTargetGrainId(19);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
-       
+        public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
+        public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
+
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
@@ -78,7 +69,7 @@ namespace Orleans.Runtime
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 
-        public static readonly bool USE_BLOCKING_COLLECTION = true;
+        public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
 
         private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
         {
@@ -88,10 +79,11 @@ namespace Orleans.Runtime
             {ClientObserverRegistrarId,"ClientObserverRegistrar"},
             {CatalogId,"Catalog"},
             {MembershipOracleId,"MembershipOracle"},
+            {MultiClusterOracleId,"MultiClusterOracle"},
             {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},
-            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarge"},
+            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},
         };
 
         private static readonly Dictionary<int, string> nonSingletonSystemTargetNames = new Dictionary<int, string>

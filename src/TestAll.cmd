@@ -1,19 +1,16 @@
-@REM NOTE: This script must be run from a Visual Studio command prompt window
+@setlocal
+@ECHO off
 
-@ECHO on
+SET CMDHOME=%~dp0
+@REM Remove trailing backslash \
+set CMDHOME=%CMDHOME:~0,-1%
 
-SET CMDHOME=%~dp0.
-if "%FrameworkDir%" == "" set FrameworkDir=%WINDIR%\Microsoft.NET\Framework
-if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
+@REM Due to more of Windows .cmd script parameter passing quirks, we can't pass this value as cmdline argument, 
+@REM  so we need to pass it in through the back door as environment variable, scoped by setlocal
+set TEST_FILTERS=-trait "Category=BVT" -trait "Category=SlowBVT" -trait "Category=Functional"
 
-SET MSTESTEXEDIR=%VS120COMNTOOLS%..\IDE
-SET MSTESTEXE=%MSTESTEXEDIR%\MSTest.exe
+@REM Note: We transfer _complete_ control to the Test.cmd script here because we don't use CALL.
 
-SET CONFIGURATION=Release
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
+"%CMDHOME%\Test.cmd"
 
-cd "%CMDHOME%"
-
-set TEST_ARGS= /testcontainer:%OutDir%\Tester.dll /testcontainer:%OutDir%\TesterInternal.dll 
-
-"%MSTESTEXE%" %TEST_ARGS% /category:"BVT|Nightly"
+@REM Note: Execution will NOT return here, and the exit code returned to the caller will be whatever the other script returned.

@@ -1,27 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,7 +14,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainTimer", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
         private readonly ActivationData activationData;
 
@@ -46,14 +24,14 @@ namespace Orleans.Runtime
 
         private GrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.Current.ActivationContext;
+            var ctxt = RuntimeContext.CurrentActivationContext;
+            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
             activationData = (ActivationData) RuntimeClient.Current.CurrentActivationData;
 
             this.Name = name;
             this.asyncCallback = asyncCallback;
             timer = new AsyncTaskSafeTimer( 
-                stateObj => TimerAlreadyStopped ? TaskDone.Done : 
-                    RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(stateObj), ctxt),
+                stateObj => TimerTick(stateObj, ctxt),
                 state);
             this.dueTime = dueTime;
             timerFrequency = period;
@@ -104,6 +82,23 @@ namespace Orleans.Runtime
             asyncCallback = null;
         }
 
+        private async Task TimerTick(object state, ISchedulingContext context)
+        {
+            if (TimerAlreadyStopped)
+                return;
+            try
+            {
+                await RuntimeClient.Current.ExecAsync(() => ForwardToAsyncCallback(state), context, Name);
+            }
+            catch (InvalidSchedulingContextException exc)
+            {
+                logger.Error(ErrorCode.Timer_InvalidContext,
+                    string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
+                        GetFullName(), context), exc);
+                DisposeTimer();
+            }
+        }
+
         private async Task ForwardToAsyncCallback(object state)
         {
             // AsyncSafeTimer ensures that calls to this method are serialized.
@@ -115,7 +110,8 @@ namespace Orleans.Runtime
                 logger.Verbose3(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
-            { 
+            {
+                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
                 currentlyExecutingTickTask = asyncCallback(state);
                 await currentlyExecutingTickTask;
                 
@@ -149,10 +145,24 @@ namespace Orleans.Runtime
 
         private string GetFullName()
         {
-            return String.Format("GrainTimer.{0} TimerCallbackHandler:{1}->{2}",
-               Name == null ? "" : Name + ".",
-               (asyncCallback != null && asyncCallback.Target != null) ? asyncCallback.Target.ToString() : "",
-               (asyncCallback != null && asyncCallback.Method != null) ? asyncCallback.Method.ToString() : "");
+            var callbackTarget = string.Empty;
+            var callbackMethodInfo = string.Empty;
+            if (asyncCallback != null)
+            {
+                if (asyncCallback.Target != null)
+                {
+                    callbackTarget = asyncCallback.Target.ToString();
+                }
+
+                var methodInfo = asyncCallback.GetMethodInfo();
+                if (methodInfo != null)
+                {
+                    callbackMethodInfo = methodInfo.ToString();
+                }
+            }
+
+            return string.Format("GrainTimer.{0} TimerCallbackHandler:{1}->{2}",
+                Name == null ? "" : Name + ".", callbackTarget, callbackMethodInfo);
         }
 
         internal int GetNumTicks()

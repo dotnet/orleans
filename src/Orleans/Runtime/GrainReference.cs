@@ -1,31 +1,11 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Async;
 using Orleans.Serialization;
 using Orleans.CodeGeneration;
 
@@ -41,7 +21,10 @@ namespace Orleans.Runtime
         private readonly GuidId observerId;
         
         [NonSerialized]
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainReference", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainReference", LoggerType.Runtime);
+
+        [NonSerialized]
+        private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
 
         [NonSerialized] private const bool USE_DEBUG_CONTEXT = true;
 
@@ -52,9 +35,10 @@ namespace Orleans.Runtime
 
         internal bool IsSystemTarget { get { return GrainId.IsSystemTarget; } }
 
-        private bool IsClientAddressableObject { get { return GrainId.IsClientAddressableObject && UseObserverId; } }
-        private static bool UseObserverId { get { return false; } } // for now disable, untill we switch to actualy use NewObserverGrainReference creater.
+        internal bool IsObserverReference { get { return GrainId.IsClient; } }
 
+        internal GuidId ObserverId { get { return observerId; } }
+        
         private bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
         internal GrainId GrainId { get; private set; }
@@ -78,48 +62,53 @@ namespace Orleans.Runtime
         /// Constructs a reference to the grain with the specified Id.
         /// </summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
-        private GrainReference(GrainId grainId, string genericArgument = null, SiloAddress systemTargetSilo = null)
+        private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
-            this.genericArguments = genericArgument;
+            genericArguments = genericArgument;
             SystemTargetSilo = systemTargetSilo;
+            this.observerId = observerId;
             if (String.IsNullOrEmpty(genericArgument))
             {
-                this.genericArguments = null; // always keep it null instead of empty.
+                genericArguments = null; // always keep it null instead of empty.
             }
+
+            // SystemTarget checks
             if (grainId.IsSystemTarget && systemTargetSilo==null)
             {
                 throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));
             }
-            if (!grainId.IsSystemTarget && systemTargetSilo != null)
-            {
-                throw new ArgumentException("systemTargetSilo", String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo));
-            }
             if (grainId.IsSystemTarget && genericArguments != null)
             {
-                throw new ArgumentException("genericArguments",
-                    String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
             }
-            isUnordered = GetUnordered();
-        }
+            if (grainId.IsSystemTarget && observerId != null)
+            {
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId), "genericArgument");
+            }
+            if (!grainId.IsSystemTarget && systemTargetSilo != null)
+            {
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "systemTargetSilo");
+            }
 
-        private GrainReference(GrainId grainId, GuidId observerId)
-        {
-            GrainId = grainId;
-            if (UseObserverId && !grainId.IsClientAddressableObject)
+            // ObserverId checks
+            if (grainId.IsClient && observerId == null)
             {
-                throw new ArgumentException("grainId", String.Format("Trying to create a GrainReference for Observer with grain id {0}, but passing non ClientAddressableObject grainId.", grainId));
+                throw new ArgumentNullException("observerId", String.Format("Trying to create a GrainReference for Observer with Client grain id {0}, but passing null observerId.", grainId));
             }
-            if (UseObserverId && observerId == null)
+            if (grainId.IsClient && genericArguments != null)
             {
-                throw new ArgumentNullException("observerId", String.Format("Trying to create a GrainReference for Observer with grain id {0}, but passing null observerId.", grainId));
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
             }
-            this.observerId = observerId;
+            if (grainId.IsClient && systemTargetSilo != null)
+            {
+                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "genericArgument");
+            }
+            if (!grainId.IsClient && observerId != null)
+            {
+                throw new ArgumentException(String.Format("Trying to create a GrainReference with non null Observer {0}, but non Client grain id {1}.", observerId, grainId), "observerId");
+            }
 
-            if (grainId.IsSystemTarget)
-            {
-                throw new ArgumentException("systemTargetSilo", String.Format("Trying to create an Observer GrainReference for SystemTarget grain id {0}", grainId));
-            }
             isUnordered = GetUnordered();
         }
 
@@ -128,7 +117,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo) { }
+            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId) { }
 
         #endregion
 
@@ -140,28 +129,12 @@ namespace Orleans.Runtime
         /// <param name="grainId">The ID of the grain to refer to.</param>
         internal static GrainReference FromGrainId(GrainId grainId, string genericArguments = null, SiloAddress systemTargetSilo = null)
         {
-            return new GrainReference(grainId, genericArguments, systemTargetSilo);
+            return new GrainReference(grainId, genericArguments, systemTargetSilo, null);
         }
 
         internal static GrainReference NewObserverGrainReference(GrainId grainId, GuidId observerId)
         {
-            return new GrainReference(grainId, observerId);
-        }
-
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        public static Task<GrainReference> CreateObjectReference(IAddressable o, IGrainMethodInvoker invoker)
-        {
-            return RuntimeClient.Current.CreateObjectReference(o, invoker);
-        }
-
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        public static Task DeleteObjectReference(IAddressable observer)
-        {
-            return RuntimeClient.Current.DeleteObjectReference(observer);
+            return new GrainReference(grainId, null, null, observerId);
         }
 
         #endregion
@@ -192,7 +165,7 @@ namespace Orleans.Runtime
             {
                 return Equals(SystemTargetSilo, other.SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return observerId.Equals(other.observerId);
             }
@@ -207,7 +180,7 @@ namespace Orleans.Runtime
             {
                 hash = hash ^ SystemTargetSilo.GetHashCode();
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 hash = hash ^ observerId.GetHashCode();
             }
@@ -277,7 +250,7 @@ namespace Orleans.Runtime
         /// Return the name of the interface for this GrainReference. 
         /// Implemented in Orleans generated code.
         /// </summary>
-        protected virtual string InterfaceName
+        public virtual string InterfaceName
         {
             get
             {
@@ -311,11 +284,16 @@ namespace Orleans.Runtime
         /// <summary>
         /// Called from generated code.
         /// </summary>
-        protected async Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
+        protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
-            CheckForGrainArguments(arguments);
-
-            var argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
+            object[] argsDeepCopy = null;
+            if (arguments != null)
+            {
+                CheckForGrainArguments(arguments);
+                SetGrainCancellationTokensTarget(arguments, this);
+                argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
+            }
+            
             var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
 
             if (IsUnordered)
@@ -325,11 +303,17 @@ namespace Orleans.Runtime
 
             if (resultTask == null)
             {
-                return default(T);
+                if (typeof(T) == typeof(object))
+                {
+                    // optimize for most common case when using one way calls.
+                    return PublicOrleansTaskExtensions.CompletedTask as Task<T>;
+                }
+
+                return Task.FromResult(default(T));
             }
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
-            return (T) await resultTask;
+            return resultTask.Unbox<T>();
         }
 
         #endregion
@@ -340,7 +324,19 @@ namespace Orleans.Runtime
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
-                debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                if (USE_DEBUG_CONTEXT_PARAMS)
+                {
+                    debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                }
+                else
+                {
+                    var hash = InterfaceId ^ request.MethodId;
+                    if (!debugContexts.TryGetValue(hash, out debugContext))
+                    {
+                        debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+                        debugContexts[hash] = debugContext;
+                    }
+                }
             }
 
             // Call any registered client pre-call interceptor function.
@@ -405,11 +401,15 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
                     
                     default:
-                        if (String.IsNullOrEmpty(message.RejectionInfo))
+                        rejection = message.BodyObject as OrleansException;
+                        if (rejection == null)
                         {
-                            message.RejectionInfo = "Unable to send request - no rejection info available";
+                            if (string.IsNullOrEmpty(message.RejectionInfo))
+                            {
+                                message.RejectionInfo = "Unable to send request - no rejection info available";
+                            } 
+                            rejection = new OrleansException(message.RejectionInfo);
                         }
-                        rejection = new OrleansException(message.RejectionInfo);
                         break;
                 }
                 response = Response.ExceptionResponse(rejection);
@@ -461,7 +461,7 @@ namespace Orleans.Runtime
             else if (typeof(Grain).IsAssignableFrom(sourceType))
             {
                 Grain grainClassRef = (Grain)grainRef;
-                GrainReference g = FromGrainId(grainClassRef.Identity);
+                GrainReference g = FromGrainId(grainClassRef.Data.Identity);
                 grainRef = g;
             }
             else if (!typeof(GrainReference).IsAssignableFrom(sourceType))
@@ -506,35 +506,20 @@ namespace Orleans.Runtime
         {
             foreach (var argument in arguments)
                 if (argument is Grain)
-                    throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference() instead.", argument.GetType().FullName));
+                    throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", argument.GetType().FullName));
         }
 
-        private static readonly Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>> typedReferenceCache =
-            new Dictionary<GrainId, Dictionary<SiloAddress, ISystemTarget>>();
-
-        internal static T GetSystemTarget<T>(GrainId grainId, SiloAddress destination, Func<IAddressable, T> cast)
-            where T : ISystemTarget
+        /// <summary>
+        /// Sets target grain to the found instances of type GrainCancellationToken
+        /// </summary>
+        /// <param name="arguments"> Grain method arguments list</param>
+        /// <param name="target"> Target grain reference</param>
+        private static void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
         {
-            Dictionary<SiloAddress, ISystemTarget> cache;
-
-            lock (typedReferenceCache)
+            if (arguments == null) return;
+            foreach (var argument in arguments)
             {
-                if (typedReferenceCache.ContainsKey(grainId))
-                    cache = typedReferenceCache[grainId];
-                else
-                {
-                    cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    typedReferenceCache[grainId] = cache;
-                }
-            }
-            lock (cache)
-            {
-                if (cache.ContainsKey(destination))
-                    return (T)cache[destination];
-
-                var reference = cast(FromGrainId(grainId, null, destination));
-                cache[destination] = reference;
-                return reference;
+                (argument as GrainCancellationToken)?.AddGrainReference(target);
             }
         }
 
@@ -555,7 +540,7 @@ namespace Orleans.Runtime
                 stream.Write((byte)0);
             }
 
-            if (input.IsClientAddressableObject)
+            if (input.IsObserverReference)
             {
                 input.observerId.SerializeToStream(stream);
             }
@@ -580,7 +565,7 @@ namespace Orleans.Runtime
             {
                 silo = stream.ReadSiloAddress();
             }
-            bool expectObserverId = id.IsClientAddressableObject && UseObserverId;
+            bool expectObserverId = id.IsClient;
             if (expectObserverId)
             {
                 observerId = GuidId.DeserializeFromStream(stream);
@@ -617,7 +602,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId, SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId, observerId);
             }
@@ -631,7 +616,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId.ToDetailedString(), SystemTargetSilo);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId.ToDetailedString(), observerId.ToDetailedString());
             }
@@ -643,7 +628,7 @@ namespace Orleans.Runtime
         /// <summary> Get the key value for this grain, as a string. </summary>
         public string ToKeyString()
         {
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), OBSERVER_ID_STR, observerId.ToParsableString());
             }
@@ -672,7 +657,7 @@ namespace Orleans.Runtime
 
             if (genericIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, genericIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, genericIndex - grainIdIndex).Trim();
                 string genericStr = trimmed.Substring(genericIndex + (GENERIC_ARGUMENTS_STR + "=").Length);
                 if (String.IsNullOrEmpty(genericStr))
                 {
@@ -682,14 +667,14 @@ namespace Orleans.Runtime
             }
             else if (observerIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, observerIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, observerIndex - grainIdIndex).Trim();
                 string observerIdStr = trimmed.Substring(observerIndex + (OBSERVER_ID_STR + "=").Length);
                 GuidId observerId = GuidId.FromParsableString(observerIdStr);
                 return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId);
             }
             else if (systemTargetIndex >= 0)
             {
-                grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex);
+                grainIdStr = trimmed.Substring(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 string systemTargetStr = trimmed.Substring(systemTargetIndex + (SYSTEM_TARGET_STR + "=").Length);
                 SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), null, siloAddress);
@@ -713,7 +698,7 @@ namespace Orleans.Runtime
             {
                 info.AddValue("SystemTargetSilo", SystemTargetSilo.ToParsableString(), typeof(string));
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 info.AddValue(OBSERVER_ID_STR, observerId.ToParsableString(), typeof(string));
             }
@@ -734,7 +719,7 @@ namespace Orleans.Runtime
                 var siloAddressStr = info.GetString("SystemTargetSilo");
                 SystemTargetSilo = SiloAddress.FromParsableString(siloAddressStr);
             }
-            if (IsClientAddressableObject)
+            if (IsObserverReference)
             {
                 var observerIdStr = info.GetString(OBSERVER_ID_STR);
                 observerId = GuidId.FromParsableString(observerIdStr);

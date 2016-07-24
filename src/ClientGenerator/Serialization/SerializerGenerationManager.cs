@@ -1,33 +1,9 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
-
-using Orleans.Serialization;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.CodeGeneration.Serialization
 {
@@ -75,7 +51,7 @@ namespace Orleans.CodeGeneration.Serialization
                     processedTypes.Contains(def) || typeof (IAddressable).IsAssignableFrom(def)) return;
 
                 if (def.Namespace.Equals("System") || def.Namespace.StartsWith("System."))
-                    ConsoleText.WriteError("System type " + def.Name + " requires a serializer.");
+                    ConsoleText.WriteWarning("System type " + def.Name + " requires a serializer.");
                 else
                     typesToProcess.Add(def);
 
@@ -85,10 +61,11 @@ namespace Orleans.CodeGeneration.Serialization
             if (t.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
                 typeof (IAddressable).IsAssignableFrom(t)) return;
 
-            if (t.Namespace.Equals("System") || t.Namespace.StartsWith("System."))
+            bool isSystemType = t.Namespace != null && (t.Namespace.Equals("System") || t.Namespace.StartsWith("System."));
+            if (isSystemType)
             {
-                ConsoleText.WriteError("System type " + t.Name + " may require a custom serializer for optimal performance.");
-                ConsoleText.WriteError("If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.");
+                ConsoleText.WriteWarning("System type " + t.Name + " may require a custom serializer for optimal performance. " +
+                    "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.");
                 return;
             }
 
@@ -135,22 +112,29 @@ namespace Orleans.CodeGeneration.Serialization
             return true;
         }
 
-        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, GrainClientGenerator.Language language)
+        internal static void GenerateSerializers(Assembly grainAssembly, Dictionary<string, NamespaceGenerator> namespaceDictionary, string outputAssemblyName, Language language)
         {
             Type toGen;
             NamespaceGenerator extraNamespace = null;
-            ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes");
+            var first = true;
             while (GetNextTypeToProcess(out toGen))
             {
-                ConsoleText.WriteStatus("\ttype " + toGen.FullName + " in namespace " + toGen.Namespace);
+                if (first)
+                {
+                    ConsoleText.WriteStatus("ClientGenerator - Generating serializer classes for types:");
+                    first = false;
+                }
+
+                ConsoleText.WriteStatus("\ttype " + toGen.FullName + " in namespace " + toGen.Namespace + " defined in Assembly " + toGen.Assembly.GetName());
                 NamespaceGenerator typeNamespace;
 
-                if (!namespaceDictionary.TryGetValue(toGen.Namespace, out typeNamespace))
+                string nspace = toGen.Namespace ?? string.Empty;
+                if (!namespaceDictionary.TryGetValue(nspace, out typeNamespace))
                 {
                     if (extraNamespace == null)
                     {
                         // Calculate a unique namespace name based on the output assembly name
-                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers");
+                        extraNamespace = new NamespaceGenerator(grainAssembly, outputAssemblyName + "Serializers", language);
                         namespaceDictionary.Add("OrleansSerializers", extraNamespace);
                     }
 
@@ -165,7 +149,7 @@ namespace Orleans.CodeGeneration.Serialization
                     }
                 }
 
-                SerializationGenerator.GenerateSerializationForClass(toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
+                SerializationGenerator.GenerateSerializationForClass(grainAssembly, toGen, typeNamespace.ReferencedNamespace, typeNamespace.ReferencedNamespaces, language);
             }
         }
     }

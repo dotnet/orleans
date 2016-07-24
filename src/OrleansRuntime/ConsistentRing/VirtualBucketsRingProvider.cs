@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -40,7 +17,7 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly List<IRingRangeListener> statusListeners;
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap;
         private List<Tuple<uint, SiloAddress>> sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
         private readonly object lockable;
@@ -52,7 +29,7 @@ namespace Orleans.Runtime.ConsistentRing
             if (nBucketsPerSilo <= 0 )
                 throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + nBucketsPerSilo);
 
-            logger = TraceLogger.GetLogger(typeof(VirtualBucketsRingProvider).Name);
+            logger = LogManager.GetLogger(typeof(VirtualBucketsRingProvider).Name);
                         
             statusListeners = new List<IRingRangeListener>();
             bucketsMap = new SortedDictionary<uint, SiloAddress>();
@@ -244,14 +221,14 @@ namespace Orleans.Runtime.ConsistentRing
             // This silo's status has changed
             if (updatedSilo.Equals(myAddress))
             {
-                if (status == SiloStatus.Dead || status.Equals(SiloStatus.ShuttingDown) || status == SiloStatus.Stopping)
+                if (status.IsTerminating())
                 {
                     Stop();
                 }
             }
             else // Status change for some other silo
             {
-                if (status.Equals(SiloStatus.Dead) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping))
+                if (status.IsTerminating())
                 {
                     RemoveServer(updatedSilo);
                 }

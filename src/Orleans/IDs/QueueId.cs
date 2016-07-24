@@ -1,27 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 
@@ -50,15 +27,45 @@ namespace Orleans.Streams
             uniformHashCache = hash;
         }
 
-        public static QueueId GetQueueId(string queuePrefix, uint id, uint hash)
+        public static QueueId GetQueueId(string queueName)
         {
-            return FindOrCreateQueueId(queuePrefix, id, hash);
+            return FindOrCreateQueueId(queueName, 0, 0);
+        }
+
+        public static QueueId GetQueueId(uint queueId)
+        {
+            return FindOrCreateQueueId(null, queueId, 0);
+        }
+
+        public static QueueId GetQueueId(string queueName, uint queueId)
+        {
+            return FindOrCreateQueueId(queueName, queueId, 0);
+        }
+
+        public static QueueId GetQueueId(string queueName, uint queueId, uint hash)
+        {
+            return FindOrCreateQueueId(queueName, queueId, hash);
         }
 
         private static QueueId FindOrCreateQueueId(string queuePrefix, uint id, uint hash)
         {
             var key = new QueueId(queuePrefix, id, hash);
             return queueIdInternCache.Value.FindOrCreate(key, () => key);
+        }
+
+        public string GetStringNamePrefix()
+        {
+            return queueNamePrefix;
+        }
+
+        public uint GetNumericId()
+        {
+            return queueId;
+        }
+
+        public uint GetUniformHashCode()
+        {
+            return uniformHashCache;
         }
 
         #region IComparable<QueueId> Members
@@ -69,9 +76,9 @@ namespace Orleans.Streams
             if (cmp != 0) return cmp;
 
             cmp = String.Compare(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal);
-            if (cmp == 0) cmp = uniformHashCache.CompareTo(other.uniformHashCache);
-            
-            return cmp;
+            if (cmp != 0) return cmp;
+                
+            return uniformHashCache.CompareTo(other.uniformHashCache);
         }
 
         #endregion
@@ -80,7 +87,10 @@ namespace Orleans.Streams
 
         public virtual bool Equals(QueueId other)
         {
-            return other != null && queueId == other.queueId && queueNamePrefix.Equals(other.queueNamePrefix) && uniformHashCache == other.uniformHashCache;
+            return other != null 
+                && queueId == other.queueId 
+                && String.Equals(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal) 
+                && uniformHashCache == other.uniformHashCache;
         }
 
         #endregion
@@ -92,17 +102,12 @@ namespace Orleans.Streams
 
         public override int GetHashCode()
         {
-            return (int)queueId ^ queueNamePrefix.GetHashCode() ^ (int)uniformHashCache;
-        }
-
-        public uint GetUniformHashCode()
-        {
-            return uniformHashCache;
+            return (int)queueId ^ (queueNamePrefix !=null ? queueNamePrefix.GetHashCode() : 0) ^ (int)uniformHashCache;
         }
 
         public override string ToString()
         {
-            return String.Format("{0}-{1}", queueNamePrefix.ToLower(), queueId.ToString());
+            return String.Format("{0}-{1}", (queueNamePrefix !=null ? queueNamePrefix.ToLower() : String.Empty), queueId.ToString());
         }
 
         public string ToStringWithHashCode()

@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -36,6 +13,7 @@ namespace Orleans.Runtime
         private readonly CounterStatistic checkedOutBufferCounter;
         private readonly CounterStatistic checkedInBufferCounter;
         private readonly CounterStatistic droppedBufferCounter;
+        private readonly CounterStatistic droppedTooLargeBufferCounter;
 
         public static BufferPool GlobalPool;
 
@@ -76,7 +54,8 @@ namespace Orleans.Runtime
             allocatedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_ALLOCATED_BUFFERS);
             checkedOutBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_OUT_BUFFERS);
             checkedInBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_IN_BUFFERS);
-            droppedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_CHECKED_IN_DROPPED_BUFFERS);
+            droppedBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_DROPPED_BUFFERS);
+            droppedTooLargeBufferCounter = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_DROPPED_TOO_LARGE_BUFFERS);
 
             // Those 2 counters should be equal. If not, it means we don't release all buffers.
             IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_INUSE_CHECKED_OUT_NOT_CHECKED_IN_BUFFERS,
@@ -135,7 +114,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                droppedBufferCounter.Increment();
+                droppedTooLargeBufferCounter.Increment();
             }
         }
 

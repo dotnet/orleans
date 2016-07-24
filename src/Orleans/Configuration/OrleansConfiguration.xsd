@@ -23,6 +23,8 @@
       <xs:enumeration value="None" />
       <xs:enumeration value="SqlServer" />
       <xs:enumeration value="AzureTable" />
+      <xs:enumeration value="ZooKeeper" />
+      <xs:enumeration value="Custom" />
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="LivenessType">
@@ -77,6 +79,41 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="Telemetry">
+    <xs:annotation>
+      <xs:documentation>
+        Defines the types that implement the telemetry interfaces.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="TelemetryConsumer" minOccurs="1" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>
+            Defines the type and assembly that implements one of the telemetry consumer interfaces:
+              IDependencyTelemetryConsumer, IEventTelemetryConsumer, IExceptionTelemetryConsumer, 
+              IMetricTelemetryConsumer, IRequestTelemetryConsumer, or ITraceTelemetryConsumer.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="Type">
+            <xs:annotation>
+              <xs:documentation>
+                The type that implements one or more of the telemetry consumer interfaces.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="Assembly">
+            <xs:annotation>
+              <xs:documentation>
+                The assembly name containing the type that implements one or more of the
+                telemetry consumer interfaces.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
   </xs:complexType>
   <xs:complexType name="SpecificTypeControlInfo">
     <xs:all>
@@ -183,10 +220,47 @@
         Specifies global messaging configuration.
       </xs:documentation>
     </xs:annotation>
+    <xs:sequence>
+      <xs:element name="SerializationProviders" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            A collection of serialization providers that implement the Orleans.Serialization.IExternalSerializer interface.
+            IMPORTANT: The silo and client configurations must match.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Provider" minOccurs="1" maxOccurs="unbounded">
+              <xs:annotation>
+                <xs:documentation>
+                  A member of the provider collection.
+                </xs:documentation>
+              </xs:annotation>
+              <xs:complexType>
+                <xs:attribute name="type" type="xs:string">
+                  <xs:annotation>
+                    <xs:documentation>
+                      The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+                    </xs:documentation>
+                  </xs:annotation>
+                </xs:attribute>         
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>
           The ResponseTimeout attribute specifies the default timeout, in seconds, before a request is assumed to have failed.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+	<xs:attribute name="ResendOnTimeout" type="xs:boolean" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          The ResendOnTimeout attribute specifies the behavior to redeliver a message if a response is not received within the ResponseTimeout limit.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -273,8 +347,22 @@
           Specifies a unique identifier of this deployment.
           If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime,
           accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config.
-          So if the silos are run as Azure roles this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
+          So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
           If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="MembershipTableAssembly" type="xs:string" use="optional">
+    <xs:annotation>
+      <xs:documentation>
+        Fully qualified assembly to use for custom MembershipTable implementation. SystemStoreType must be 'Custom'.
+      </xs:documentation>
+    </xs:annotation>
+  </xs:attribute>
+    <xs:attribute name="ReminderTableAssembly" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Fully qualified assembly to use for custom RemindersTable implementation. SystemStoreType must be 'Custom'.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -286,8 +374,31 @@
           In such a case it is taken from there and passed to the silo automatically by the role via config.
           So if the silos are run as Azure roles and this config is specified via RoleEnvironment, 
           this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
-          If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConmfiguration.xml file.
+          If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConfiguration.xml file.
           If not set at all, DevelopmentStorageAccount will be used.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="DataConnectionStringForReminders" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Overrides the data connection string for reminders storage if differs from DataConnectionString
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="AdoInvariant" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+           When using ADO, identifies the underlying data provider for liveness and reminders. This three-part naming syntax is also used
+           when creating a new factory and for identifying the provider in an application configuration file so that the provider name,
+           along with its associated connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="AdoInvariantForReminders" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Overrides the AdoInvariant for reminders storage if differs
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -367,6 +478,13 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="ValidateInitialConnectivity" type="xs:boolean" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos before being allowed to join the cluster.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="IAmAliveTablePublishTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>
@@ -411,6 +529,23 @@
     </xs:attribute>
   </xs:complexType>
 
+  <xs:complexType name="AdditionalAssemblyDirectoriesConfig">
+    <xs:annotation>
+      <xs:documentation> 
+        Additional directories for orleans to scan to load DLLs.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Directory" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>
+            Directory to search.  If attribute 'IncludeSubFolders' is true, then all subfolders will be scanned
+          </xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  
   <xs:complexType name="TracingConfiguration">
     <xs:annotation>
       <xs:documentation>
@@ -496,16 +631,6 @@
         <xs:documentation>
           The MetricWritePeriod attribute specifies how frequently metric data should be written to the console.
           If this attribute does not appear, or if the value is zero or negative, then no metrics will be written.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="WriteMessagingTraces" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The WriteMessagingTraces attribute specifies whether or not message traces will be collected and reported.
-          Message traces are written when the message is completed (that is, when the response promise is resolved).
-          Traces are written at Verbose level.
-          The default is to not collect and write message traces, as trace collection is moderately expensive.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -689,6 +814,7 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
       <xs:element name="Application" minOccurs="0" maxOccurs="1">
         <xs:complexType>
           <xs:annotation>
@@ -802,6 +928,51 @@
       <xs:element minOccurs="0" maxOccurs="1" name="Caching" type="tns:CachingConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="Liveness" type="tns:LivenessConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="ReminderService" type="tns:ReminderServiceConfiguration" />
+      <xs:element name="MultiClusterNetwork" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            The optional MultiClusterNetwork element contains information relating to how this cluster is participating in a multi-cluster network.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>
+                Any number of gossip channels to bootstrap the gossip network.
+              </xs:documentation>
+            </xs:annotation>
+            <xs:element name="GossipChannel" type="tns:GossipChannelConfig" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+          <xs:attribute name="ClusterId" type="xs:string" use="required">
+            <xs:annotation>
+              <xs:documentation>
+                A string that uniquely identifies this cluster with the global service.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="MaxMultiClusterGateways" type="xs:positiveInteger" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The maximum number of silos per cluster should be designated to serve as gateways..
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="BackgroundGossipInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between periodic background gossips.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="DefaultMultiCluster" type="xs:string" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                A comma-separated list of cluster ids, to be used if no multicluster configuration is found in gossip channels.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
       <xs:element minOccurs="0" maxOccurs="1" name="Directory">
         <xs:annotation>
           <xs:documentation>
@@ -919,6 +1090,8 @@
       </xs:element>
       <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
       <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
+      <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
+      <xs:element name="AdditionalAssemblyDirectories" minOccurs="0" maxOccurs="1" type="tns:AdditionalAssemblyDirectoriesConfig" />
     </xs:sequence>
   </xs:complexType>
   <xs:element name="OrleansConfiguration">
@@ -991,7 +1164,7 @@
         <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
         <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
         <xs:element name="Messaging" minOccurs="0" type="tns:MessagingConfiguration" />
-        
+        <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
         <xs:element name="LocalAddress" minOccurs="0">
           <xs:complexType>
             <xs:annotation>
@@ -1021,6 +1194,7 @@
             </xs:attribute>
           </xs:complexType>
         </xs:element>
+        <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
       </xs:sequence>
     </xs:complexType>
   </xs:element>
@@ -1052,4 +1226,36 @@
       </xs:annotation>
     </xs:anyAttribute>
   </xs:complexType>
+  <xs:complexType name="StreamProvidersConfig">
+    <xs:annotation>
+      <xs:documentation>
+        The optional StreamProviders element contains information relating to stream provider instances used for streaming.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GossipChannelConfig">
+    <xs:annotation>
+      <xs:documentation>
+        Initialization info for one gossip channel.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Type" use="required" type="xs:string">
+      <xs:annotation>
+        <xs:documentation>
+          The type of this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ConnectionString" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>
+          A connection string for connecting to this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+
 </xs:schema>

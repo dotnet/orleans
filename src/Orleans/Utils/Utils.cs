@@ -1,40 +1,17 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿﻿using System;
-﻿using System.Collections;
-﻿using System.Collections.Generic;
-﻿using System.Linq;
-﻿using System.Reflection;
-﻿using System.Security.Cryptography;
-﻿using System.Text;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.
     /// </summary>
-    internal static class Utils
+    public static class Utils
     {
         /// <summary>
         /// Returns a human-readable text string that describes an IEnumerable collection of objects.
@@ -192,20 +169,7 @@ namespace Orleans.Runtime
             return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", address.Endpoint.Address, address.Endpoint.Port, address.Generation));
         }
 
-        /// <summary>
-        /// Represent a silo instance entry in the gateway URI format.
-        /// </summary>
-        /// <param name="address">The input silo instance</param>
-        /// <returns></returns>
-        internal static Uri ToGatewayUri(this AzureUtils.SiloInstanceTableEntry gateway)
-        {
-            int proxyPort = 0;
-            if (!string.IsNullOrEmpty(gateway.ProxyPort))
-                int.TryParse(gateway.ProxyPort, out proxyPort);
-
-            return new Uri(string.Format("gwy.tcp://{0}:{1}/{2}", gateway.Address, proxyPort, gateway.Generation));
-        }
-
+        
         /// <summary>
         /// Calculates an integer hash value based on the consistent identity hash of a string.
         /// </summary>
@@ -213,7 +177,7 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         public static int CalculateIdHash(string text)
         {
-            SHA256 sha = new SHA256CryptoServiceProvider(); // This is one implementation of the abstract class SHA1.
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
             int hash = 0;
             try
             {
@@ -230,6 +194,32 @@ namespace Orleans.Runtime
                 sha.Dispose();
             }
             return hash;
+        }
+
+        /// <summary>
+        /// Calculates a Guid hash value based on the consistent identity a string.
+        /// </summary>
+        /// <param name="text">The string to hash.</param>
+        /// <returns>An integer hash for the string.</returns>
+        internal static Guid CalculateGuidHash(string text)
+        {
+            SHA256 sha = SHA256.Create(); // This is one implementation of the abstract class SHA1.
+            byte[] hash = new byte[16];
+            try
+            {
+                byte[] data = Encoding.Unicode.GetBytes(text);
+                byte[] result = sha.ComputeHash(data);
+                for (int i = 0; i < result.Length; i ++)
+                {
+                    byte tmp =  (byte)(hash[i % 16] ^ result[i]);
+                    hash[i%16] = tmp;
+                }
+            }
+            finally
+            {
+                sha.Dispose();
+            }
+            return new Guid(hash);
         }
 
         public static bool TryFindException(Exception original, Type targetType, out Exception target)
@@ -264,7 +254,7 @@ namespace Orleans.Runtime
             return false;
         }
 
-        public static void SafeExecute(Action action, TraceLogger logger = null, string caller = null)
+        public static void SafeExecute(Action action, Logger logger = null, string caller = null)
         {
             SafeExecute(action, logger, caller==null ? (Func<string>)null : () => caller);
         }
@@ -272,7 +262,7 @@ namespace Orleans.Runtime
         // a function to safely execute an action without any exception being thrown.
         // callerGetter function is called only in faulty case (now string is generated in the success case).
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public static void SafeExecute(Action action, TraceLogger logger, Func<string> callerGetter)
+        public static void SafeExecute(Action action, Logger logger, Func<string> callerGetter)
         {
             try
             {
@@ -287,11 +277,15 @@ namespace Orleans.Runtime
                         string caller = null;
                         if (callerGetter != null)
                         {
-                            caller = callerGetter();
+                            try
+                            {
+                                caller = callerGetter();
+                            }catch (Exception) { }
                         }
                         foreach (var e in exc.FlattenAggregate())
                         {
-                            logger.Warn(ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
+                            logger.Warn(ErrorCode.Runtime_Error_100325,
+                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.", exc);
                         }
                     }
                 }
@@ -318,31 +312,6 @@ namespace Orleans.Runtime
             return DateTime.UtcNow.Subtract(start);
         }
 
-        public static List<T> ObjectToList<T>(object data)
-        {
-            if (data is List<T>) return (List<T>) data;
-
-            T[] dataArray;
-            if (data is ArrayList)
-            {
-                dataArray = (T[]) (data as ArrayList).ToArray(typeof(T));
-            }
-            else if (data is ICollection<T>)
-            {
-                dataArray = (data as ICollection<T>).ToArray();
-            }
-            else
-            {
-                throw new InvalidCastException(string.Format(
-                    "Connet convert type {0} to type List<{1}>", 
-                    TypeUtils.GetFullName(data.GetType()),
-                    TypeUtils.GetFullName(typeof(T))));
-            }
-            var list = new List<T>();
-            list.AddRange(dataArray);
-            return list;
-        }
-
         public static List<Exception> FlattenAggregate(this Exception exc)
         {
             var result = new List<Exception>();
@@ -359,7 +328,28 @@ namespace Orleans.Runtime
             // LoaderExceptions property in order to make it meaningful.
             var all = new List<Exception> { rtle };
             all.AddRange(rtle.LoaderExceptions);
-            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenence.", all);
+            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenience.", all);
+        }
+
+        /// <summary>
+        /// </summary>
+        public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
+        {
+            var batch = new List<T>(batchSize);
+            foreach (var item in sequence)
+            {
+                batch.Add(item);
+                // when we've accumulated enough in the batch, send it out  
+                if (batch.Count >= batchSize)
+                {
+                    yield return batch; // batch.ToArray();
+                    batch = new List<T>(batchSize);
+                }
+            }
+            if (batch.Count > 0)
+            {
+                yield return batch; //batch.ToArray();
+            }
         }
     }
 }

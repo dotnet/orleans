@@ -1,73 +1,54 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     internal class Message : IOutgoingMessage
     {
-        public static class Header
+        // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
+        // This means we can't have over byte.MaxValue of them.
+        public enum Header
         {
-            public const string ALWAYS_INTERLEAVE = "#AI";
-            public const string CACHE_INVALIDATION_HEADER = "#CIH";
-            public const string CATEGORY = "#MT";
-            public const string CORRELATION_ID = "#ID";
-            public const string DEBUG_CONTEXT = "#CTX";
-            public const string DIRECTION = "#ST";
-            public const string EXPIRATION = "#EX";
-            public const string FORWARD_COUNT = "#FC";
-            public const string INTERFACE_ID = "#IID";
-            public const string METHOD_ID = "#MID";
-            public const string NEW_GRAIN_TYPE = "#NT";
-            public const string GENERIC_GRAIN_TYPE = "#GGT";
-            public const string RESULT = "#R";
-            public const string REJECTION_INFO = "#RJI";
-            public const string REJECTION_TYPE = "#RJT";
-            public const string READ_ONLY = "#RO";
-            public const string RESEND_COUNT = "#RS";
-            public const string SENDING_ACTIVATION = "#SA";
-            public const string SENDING_GRAIN = "#SG";
-            public const string SENDING_SILO = "#SS";
-            public const string IS_NEW_PLACEMENT = "#NP";
+            ALWAYS_INTERLEAVE = 1,
+            CACHE_INVALIDATION_HEADER,
+            CATEGORY,
+            CORRELATION_ID,
+            DEBUG_CONTEXT,
+            DIRECTION,
+            EXPIRATION,
+            FORWARD_COUNT,
+            INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+            METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+            NEW_GRAIN_TYPE,
+            GENERIC_GRAIN_TYPE,
+            RESULT,
+            REJECTION_INFO,
+            REJECTION_TYPE,
+            READ_ONLY,
+            RESEND_COUNT,
+            SENDING_ACTIVATION,
+            SENDING_GRAIN,
+            SENDING_SILO,
+            IS_NEW_PLACEMENT,
 
-            public const string TARGET_ACTIVATION = "#TA";
-            public const string TARGET_GRAIN = "#TG";
-            public const string TARGET_SILO = "#TS";
-            public const string TIMESTAMPS = "Times";
-            public const string IS_UNORDERED = "#UO";
+            TARGET_ACTIVATION,
+            TARGET_GRAIN,
+            TARGET_SILO,
+            TARGET_OBSERVER,
+            TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
+            IS_UNORDERED,
 
-            public const char APPLICATION_HEADER_FLAG = '!';
-            public const string PING_APPLICATION_HEADER = "Ping";
-            public const string PRIOR_MESSAGE_ID = "#PMI";
-            public const string PRIOR_MESSAGE_TIMES = "#PMT";
+            PRIOR_MESSAGE_ID,
+            PRIOR_MESSAGE_TIMES,
+
+            REQUEST_CONTEXT,
+            // Do not add over byte.MaxValue of these.
         }
 
         public static class Metadata
@@ -83,7 +64,7 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        private readonly Dictionary<string, object> headers;
+        private readonly Dictionary<Header, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
@@ -99,15 +80,11 @@ namespace Orleans.Runtime
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
-        private static readonly TraceLogger logger;
-        private static readonly Dictionary<string, TransitionStats[,]> lifecycleStatistics;
-
-        internal static bool WriteMessagingTraces { get; set; }
+        private static readonly Logger logger;
         
         static Message()
         {
-            lifecycleStatistics = new Dictionary<string, TransitionStats[,]>();
-            logger = TraceLogger.GetLogger("Message", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Message", LoggerType.Runtime);
         }
 
         public enum Categories
@@ -234,6 +211,16 @@ namespace Orleans.Runtime
             }
         }
 
+        public GuidId TargetObserverId
+        {
+            get { return GetSimpleHeader<GuidId>(Header.TARGET_OBSERVER); }
+            set
+            {
+                SetHeader(Header.TARGET_OBSERVER, value);
+                targetAddress = null;
+            }
+        }
+
         public SiloAddress SendingSilo
         {
             get { return (SiloAddress)GetHeader(Header.SENDING_SILO); }
@@ -354,18 +341,6 @@ namespace Orleans.Runtime
             return ForwardCount < config.MaxForwardCount;
         }
 
-        public int MethodId
-        {
-            get { return GetScalarHeader<int>(Header.METHOD_ID); }
-            set { SetHeader(Header.METHOD_ID, value); }
-        }
-
-        public int InterfaceId
-        {
-            get { return GetScalarHeader<int>(Header.INTERFACE_ID); }
-            set { SetHeader(Header.INTERFACE_ID, value); }
-        }
-
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
         /// so that receiver knows desired grain type
@@ -397,6 +372,11 @@ namespace Orleans.Runtime
             set { SetHeader(Header.REJECTION_INFO, value); }
         }
 
+        public Dictionary<string, object> RequestContextData
+        {
+            get { return GetScalarHeader<Dictionary<string, object>>(Header.REQUEST_CONTEXT); }
+            set { SetHeader(Header.REQUEST_CONTEXT, value); }
+        }
 
         public object BodyObject
         {
@@ -406,24 +386,17 @@ namespace Orleans.Runtime
                 {
                     return bodyObject;
                 }
-                if (bodyBytes == null)
-                {
-                    return null;
-                }
                 try
                 {
-                    var stream = new BinaryTokenStreamReader(bodyBytes);
-                    bodyObject = SerializationManager.Deserialize(stream);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
-                    throw;
+                    bodyObject = DeserializeBody(bodyBytes);
                 }
                 finally
                 {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    bodyBytes = null;
+                    if (bodyBytes != null)
+                    {
+                        BufferPool.GlobalPool.Release(bodyBytes);
+                        bodyBytes = null;
+                    }
                 }
                 return bodyObject;
             }
@@ -437,39 +410,82 @@ namespace Orleans.Runtime
             }
         }
 
+        private static object DeserializeBody(List<ArraySegment<byte>> bytes)
+        {
+            if (bytes == null)
+            {
+                return null;
+            }
+            try
+            {
+                var stream = new BinaryTokenStreamReader(bytes);
+                return SerializationManager.Deserialize(stream);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
+                throw;
+            }
+        }
+
         public Message()
         {
-            headers = new Dictionary<string, object>();
+            // average headers items count is 14 items, and while the Header enum contains 18 entries
+            // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
+            // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
+            headers = new Dictionary<Header, object>(17);
             metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
         }
 
-        public Message(Categories type, Directions subtype)
+        private Message(Categories type, Directions subtype)
             : this()
         {
             Category = type;
             Direction = subtype;
         }
 
-        internal Message(byte[] header, byte[] body)
-            : this(new List<ArraySegment<byte>> { new ArraySegment<byte>(header) },
-                new List<ArraySegment<byte>> { new ArraySegment<byte>(body) })
+        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
+            var message = new Message(
+                Categories.Application,
+                (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
+            {
+                Id = CorrelationId.GetNext(),
+                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
+                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
+                BodyObject = request
+            };
+
+            if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
+                message.IsAlwaysInterleave = true;
+
+            var contextData = RequestContext.Export();
+            if (contextData != null)
+            {
+                message.RequestContextData = contextData;
+            }
+            return message;
         }
 
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body)
+        // Initializes body and header but does not take ownership of byte.
+        // Caller must clean up bytes
+        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            BufferPool.GlobalPool.Release(header);
-
-            bodyBytes = body;
-            bodyObject = null;
-            headerBytes = null;
+            if (deserializeBody)
+            {
+                bodyObject = DeserializeBody(body);
+            }
+            else
+            {
+                bodyBytes = body;
+            }
         }
 
         public Message CreateResponseMessage()
@@ -505,10 +521,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (this.ContainsHeader(Header.TIMESTAMPS))
-            {
-                response.SetHeader(Header.TIMESTAMPS, this.GetHeader(Header.TIMESTAMPS));
-            }
             if (this.ContainsHeader(Header.DEBUG_CONTEXT))
             {
                 response.SetHeader(Header.DEBUG_CONTEXT, this.GetHeader(Header.DEBUG_CONTEXT));
@@ -521,29 +533,41 @@ namespace Orleans.Runtime
             {
                 response.SetHeader(Header.EXPIRATION, this.GetHeader(Header.EXPIRATION));
             }
-            if (Message.WriteMessagingTraces) response.AddTimestamp(LifecycleTag.CreateResponse);
 
-            RequestContext.ExportToMessage(response);
-
+            var contextData = RequestContext.Export();
+            if (contextData != null)
+            {
+                response.RequestContextData = contextData;
+            }
             return response;
         }
 
-        public Message CreateRejectionResponse(RejectionTypes type, string info)
+        public Message CreateRejectionResponse(RejectionTypes type, string info, OrleansException ex = null)
         {
             var response = CreateResponseMessage();
             response.Result = ResponseTypes.Rejection;
             response.RejectionType = type;
             response.RejectionInfo = info;
+            response.BodyObject = ex;
             if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
             return response;
         }
 
-        public bool ContainsHeader(string tag)
+        public Message CreatePromptExceptionResponse(Exception exception)
+        {
+            return new Message(Category, Directions.Response)
+            {
+                Result = ResponseTypes.Error,
+                BodyObject = Response.ExceptionResponse(exception)
+            };
+        }
+
+        public bool ContainsHeader(Header tag)
         {
             return headers.ContainsKey(tag);
         }
 
-        public void RemoveHeader(string tag)
+        public void RemoveHeader(Header tag)
         {
             lock (headers)
             {
@@ -553,7 +577,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void SetHeader(string tag, object value)
+        public void SetHeader(Header tag, object value)
         {
             lock (headers)
             {
@@ -561,7 +585,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public object GetHeader(string tag)
+        public object GetHeader(Header tag)
         {
             object val;
             bool flag;
@@ -572,7 +596,7 @@ namespace Orleans.Runtime
             return flag ? val : null;
         }
 
-        public string GetStringHeader(string tag)
+        public string GetStringHeader(Header tag)
         {
             object val;
             if (!headers.TryGetValue(tag, out val)) return String.Empty;
@@ -581,7 +605,7 @@ namespace Orleans.Runtime
             return s ?? String.Empty;
         }
 
-        public T GetScalarHeader<T>(string tag)
+        public T GetScalarHeader<T>(Header tag)
         {
             object val;
             if (headers.TryGetValue(tag, out val))
@@ -591,55 +615,12 @@ namespace Orleans.Runtime
             return default(T);
         }
 
-        public T GetSimpleHeader<T>(string tag)
+        public T GetSimpleHeader<T>(Header tag)
         {
             object val;
             if (!headers.TryGetValue(tag, out val) || val == null) return default(T);
 
             return val is T ? (T) val : default(T);
-        }
-
-        internal void SetApplicationHeaders(Dictionary<string, object> data)
-        {
-            lock (headers)
-            {
-                foreach (var item in data)
-                {
-                    string key = Header.APPLICATION_HEADER_FLAG + item.Key;
-                    headers[key] = SerializationManager.DeepCopy(item.Value);
-                }
-            }
-        }
-
-        internal void GetApplicationHeaders(Dictionary<string, object> dict)
-        {
-            TryGetApplicationHeaders(ref dict);
-        }
-
-        private void TryGetApplicationHeaders(ref Dictionary<string, object> dict)
-        {
-            lock (headers)
-            {
-                foreach (var pair in headers)
-                {
-                    if (pair.Key[0] != Header.APPLICATION_HEADER_FLAG) continue;
-
-                    if (dict == null)
-                    {
-                        dict = new Dictionary<string, object>();
-                    }
-                    dict[pair.Key.Substring(1)] = pair.Value;
-                }
-            }
-        }
-
-        public object GetApplicationHeader(string headerName)
-        {
-            lock (headers)
-            {
-                object obj;
-                return headers.TryGetValue(Header.APPLICATION_HEADER_FLAG + headerName, out obj) ? obj : null;
-            }
         }
 
         public bool ContainsMetadata(string tag)
@@ -681,214 +662,15 @@ namespace Orleans.Runtime
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
 
-        #region Message timestamping
-
-        private class TransitionStats
-        {
-            ulong count;
-            TimeSpan totalTime;
-            TimeSpan maxTime;
-
-            public TransitionStats()
-            {
-                count = 0;
-                totalTime = TimeSpan.Zero;
-                maxTime = TimeSpan.Zero;
-            }
-
-            public void RecordTransition(TimeSpan time)
-            {
-                lock (this)
-                {
-                    count++;
-                    totalTime += time;
-                    if (time > maxTime)
-                    {
-                        maxTime = time;
-                    }
-                }
-            }
-
-            public override string ToString()
-            {
-                var sb = new StringBuilder();
-
-                if (count > 0)
-                {
-                    sb.AppendFormat("{0}\t{1}\t{2}", count, totalTime.Divide(count), maxTime);
-                }
-
-                return sb.ToString();
-            }
-        }
-
-        public void AddTimestamp(LifecycleTag tag)
-        {
-            if (logger.IsVerbose2)
-            {
-                if (LogVerbose(tag))
-                    logger.Verbose("Message {0} {1}", tag, this);
-                else if (logger.IsVerbose2)
-                    logger.Verbose2("Message {0} {1}", tag, this);
-            }
-
-            if (WriteMessagingTraces)
-            {
-                var now = DateTime.UtcNow;
-                var timestamp = new List<object> {tag, now};
-
-                object val;
-                List<object> list = null;
-                if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-                {
-                    list = val as List<object>;
-                }
-                if (list == null)
-                {
-                    list = new List<object>();
-                    lock (headers)
-                    {
-                        headers[Header.TIMESTAMPS] = list;
-                    }
-                }
-                else if (list.Count > 0)
-                {
-                    var last = list[list.Count - 1] as List<object>;
-                    if (last != null)
-                    {
-                        var context = DebugContext;
-                        if (String.IsNullOrEmpty(context))
-                        {
-                            context = "Unspecified";
-                        }
-                        TransitionStats[,] entry;
-                        bool found;
-                        lock (lifecycleStatistics)
-                        {
-                            found = lifecycleStatistics.TryGetValue(context, out entry);
-                        }
-                        if (!found)
-                        {
-                            var newEntry = new TransitionStats[32, 32];
-                            for (int i = 0; i < 32; i++) for (int j = 0; j < 32; j++) newEntry[i, j] = new TransitionStats();
-                            lock (lifecycleStatistics)
-                            {
-                                if (!lifecycleStatistics.TryGetValue(context, out entry))
-                                {
-                                    entry = newEntry;
-                                    lifecycleStatistics.Add(context, entry);
-                                }
-                            }
-                        }
-                        int from = (int)(LifecycleTag)(last[0]);
-                        int to = (int)tag;
-                        entry[from, to].RecordTransition(now.Subtract((DateTime)last[1]));
-                    }
-                }
-                list.Add(timestamp);
-            }
-            if (OnTrace != null)
-                OnTrace(this, tag);
-        }
-
-        private static bool LogVerbose(LifecycleTag tag)
-        {
-            return tag == LifecycleTag.EnqueueOutgoing ||
-                   tag == LifecycleTag.CreateNewPlacement ||
-                   tag == LifecycleTag.EnqueueIncoming ||
-                   tag == LifecycleTag.InvokeIncoming;
-        }
-
-        public List<Tuple<string, DateTime>> GetTimestamps()
-        {
-            var result = new List<Tuple<string, DateTime>>();
-
-            object val;
-            List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-            {
-                list = val as List<object>;
-            }
-            if (list == null) return result;
-
-            foreach (object item in list)
-            {
-                var stamp = item as List<object>;
-                if ((stamp != null) && (stamp.Count == 2) && (stamp[0] is string) && (stamp[1] is DateTime))
-                {
-                    result.Add(new Tuple<string, DateTime>(stamp[0] as string, (DateTime)stamp[1]));
-                }
-            }
-            return result;
-        }
-
-        public string GetTimestampString(bool singleLine = true, bool includeTimes = true, int indent = 0)
-        {
-            var sb = new StringBuilder();
-
-            object val;
-            List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
-            {
-                list = val as List<object>;
-            }
-            if (list == null) return sb.ToString();
-
-            bool firstItem = true;
-            var indentString = new string(' ', indent);
-            foreach (object item in list)
-            {
-                var stamp = item as List<object>;
-                if ((stamp == null) || (stamp.Count != 2) || (!(stamp[0] is string)) || (!(stamp[1] is DateTime)))
-                    continue;
-
-                if (!firstItem && singleLine)
-                {
-                    sb.Append(", ");
-                }
-                else if (!singleLine && (indent > 0))
-                {
-                    sb.Append(indentString);
-                }
-                sb.Append(stamp[0]);
-                if (includeTimes)
-                {
-                    sb.Append(" ==> ");
-                    var when = (DateTime)stamp[1];
-                    sb.Append(when.ToString("HH:mm:ss.ffffff"));
-                }
-                if (!singleLine)
-                {
-                    sb.AppendLine();
-                }
-                firstItem = false;
-            }
-            return sb.ToString();
-        }
-
-        #endregion
-
         #region Serialization
-
-        internal List<ArraySegment<byte>> Serialize()
-        {
-            int dummy1;
-            int dummy2;
-            return Serialize_Impl(false, out dummy1, out dummy2);
-        }
 
         public List<ArraySegment<byte>> Serialize(out int headerLength)
         {
             int dummy;
-            return Serialize_Impl(false, out headerLength, out dummy);
+            return Serialize_Impl(out headerLength, out dummy);
         }
 
-        public List<ArraySegment<byte>> SerializeForBatching(out int headerLength, out int bodyLength)
-        {
-            return Serialize_Impl(true, out headerLength, out bodyLength);
-        }
-
-        private List<ArraySegment<byte>> Serialize_Impl(bool batching, out int headerLengthOut, out int bodyLengthOut)
+        private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
             var headerStream = new BinaryTokenStreamWriter();
             lock (headers) // Guard against any attempts to modify message headers while we are serializing them
@@ -916,11 +698,9 @@ namespace Orleans.Runtime
             int bodyLength = bodyBytes.Sum(ab => ab.Count);
 
             var bytes = new List<ArraySegment<byte>>();
-            if (!batching)
-            {
-                bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-                bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-            }
+            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
+            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
+           
             bytes.AddRange(headerBytes);
             bytes.AddRange(bodyBytes);
 
@@ -1001,57 +781,24 @@ namespace Orleans.Runtime
                     case ResponseTypes.Rejection:
                         response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
                         break;
+
+                    default:
+                        break;
                 }
             }
-            string times = this.GetStringHeader(Header.TIMESTAMPS);
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}{10}: {11}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
                 response,  //3
                 Direction, //4
-                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5  //SendingAddress.ToString() - this may throw
-                String.Format("{0}{1}{2}", TargetSilo, TargetGrain, TargetActivation), //6  //TargetAddress.ToString() - this may throw 
+                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
+                String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
                 Id, //7
                 ResendCount > 0 ? "[ResendCount=" + ResendCount + "]" : "", //8
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //9
-                string.IsNullOrEmpty(times) ? "" : "[" + times + "]", //10
-                DebugContext); //11
+                DebugContext); //10
         }
-
-        /// <summary>
-        /// Tags used to identify points in the message processing lifecycle for logging.
-        /// Should be fewer than 32 since bit flags are used for filtering events.
-        /// </summary>
-        public enum LifecycleTag
-        {
-            Create = 0,
-            EnqueueOutgoing,
-            StartRouting,
-            AsyncRouting,
-            DoneRouting,
-            SendOutgoing,
-            ReceiveIncoming,
-            RerouteIncoming,
-            EnqueueForRerouting,
-            EnqueueForForwarding,
-            EnqueueIncoming,
-            DequeueIncoming,
-            CreateNewPlacement,
-            TaskIncoming,
-            TaskRedirect,
-            EnqueueWaiting,
-            EnqueueReady,
-            EnqueueWorkItem,
-            DequeueWorkItem,
-            InvokeIncoming,
-            CreateResponse,
-        }
-
-        /// <summary>
-        /// Global function that is set to monitor message lifecycle events
-        /// </summary>
-        internal static Action<Message, LifecycleTag> OnTrace { private get; set; }
 
         internal void SetTargetPlacement(PlacementResult value)
         {
@@ -1077,15 +824,15 @@ namespace Orleans.Runtime
         {
             var history = new StringBuilder();
             history.Append("<");
-            if (ContainsHeader(Message.Header.TARGET_SILO))
+            if (ContainsHeader(Header.TARGET_SILO))
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_GRAIN))
+            if (ContainsHeader(Header.TARGET_GRAIN))
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_ACTIVATION))
+            if (ContainsHeader(Header.TARGET_ACTIVATION))
             {
                 history.Append(TargetActivation);
             }

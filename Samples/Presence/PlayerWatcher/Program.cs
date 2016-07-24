@@ -1,26 +1,7 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Presence.GrainInterfaces;
 
 namespace PlayerWatcher
@@ -35,11 +16,12 @@ namespace PlayerWatcher
         {
             try
             {
-                GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
 
                 // Hardcoded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
-                IPlayerGrain player = PlayerGrainFactory.GetGrain(playerId);
+                IPlayerGrain player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerId);
                 IGameGrain game = null;
 
                 while (game == null)
@@ -65,7 +47,7 @@ namespace PlayerWatcher
 
                 // Subscribe for updates
                 var watcher = new GameObserver();
-                game.SubscribeForGameUpdates(GameObserverFactory.CreateObjectReference(watcher).Result).Wait();
+                game.SubscribeForGameUpdates(GrainClient.GrainFactory.CreateObjectReference<IGameObserver>(watcher).Result).Wait();
 
                 // Block main thread so that the process doesn't exit. Updates arrive on thread pool threads.
                 Console.WriteLine("Subscribed successfully. Press <Enter> to stop.");

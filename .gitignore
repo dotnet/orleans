@@ -3,6 +3,9 @@
 
 # Orleans code-gen files
 orleans.codegen.cs
+orleans.codegen.fs
+orleans.codegen.vb
+src/SDK/VSIX/
 
 # User-specific files
 *.suo
@@ -164,6 +167,7 @@ ClientBin/
 *.pfx
 *.publishsettings
 node_modules/
+patch.diff
 
 # RIA/Silverlight projects
 Generated_Code/
@@ -187,3 +191,9 @@ UpgradeLog*.htm
 
 # Microsoft Fakes
 FakesAssemblies/
+
+# Temporary working files
+**/pingme.txt
+.vs/
+**/project.lock.json
+src/SetupTestScriptOutput.txt

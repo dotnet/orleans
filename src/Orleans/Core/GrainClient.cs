@@ -1,44 +1,23 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 
 namespace Orleans
 {
     /// <summary>
     /// Client runtime for connecting to Orleans system
     /// </summary>
+    /// TODO: Make this class non-static and inject it where it is needed.
     public static class GrainClient
     {
         /// <summary>
@@ -55,6 +34,58 @@ namespace Orleans
         private static OutsideRuntimeClient outsideRuntimeClient;
 
         private static readonly object initLock = new Object();
+
+        private static GrainFactory grainFactory;
+
+        // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
+        // That means we are running in side a silo.
+        private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+
+        //TODO: prevent client code from using this from inside a Grain or provider
+        public static IGrainFactory GrainFactory
+        {
+            get
+            {
+                if (IsRunningInsideSilo)
+                {
+                    // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
+                    bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
+                        && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
+                    if (runningInsideGrain)
+                    {
+                        throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                                 "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+
+                    }
+                    else // running inside provider or else where
+                    {
+                        throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
+                                "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
+                    }
+                }
+
+                if (!IsInitialized)
+                {
+               
+                    throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
+                }
+
+                return grainFactory;
+            }
+        }
+
+        internal static GrainFactory InternalGrainFactory
+        {
+            get
+            {
+                if (!IsInitialized)
+                {
+                    throw new OrleansException("You must initialize the Grain Client before accessing the InternalGrainFactory");
+                }
+
+                return grainFactory;
+            }
+        }
 
         /// <summary>
         /// Initializes the client runtime from the standard client configuration file.
@@ -173,9 +204,24 @@ namespace Orleans
                     tcs.SetException(exc); // Break promise
                 }
             };
+
             // Queue Init call to thread pool thread
             ThreadPool.QueueUserWorkItem(doInit, null);
-            CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            try
+            {
+                CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            }
+            catch (AggregateException ae)
+            {
+                // Flatten the aggregate exception, which can be deeply nested.
+                ae = ae.Flatten();
+
+                // If there is just one exception in the aggregate exception, throw that, otherwise throw the entire
+                // flattened aggregate exception.
+                var innerExceptions = ae.InnerExceptions;
+                var exceptionToThrow = innerExceptions.Count == 1 ? innerExceptions[0] : ae;
+                ExceptionDispatchInfo.Capture(exceptionToThrow).Throw();
+            }
         }
 
         /// <summary>
@@ -195,18 +241,15 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
-
-                        ClientProviderRuntime.InitializeSingleton();
+                        grainFactory = new GrainFactory();
 
                         if (runtimeClient == null)
                         {
-                            runtimeClient = new OutsideRuntimeClient(config);
+                            runtimeClient = new OutsideRuntimeClient(config, grainFactory);
                         }
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
-
-                        LimitManager.Initialize(config);
-
+         
                         // this needs to be the last successful step inside the lock so 
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;
@@ -234,11 +277,22 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Test hook to uninitialize client without cleanup
+        /// </summary>
+        public static void HardKill()
+        {
+            lock (initLock)
+            {
+                InternalUninitialize(false);
+            }
+        }
+
+        /// <summary>
         /// This is the lock free version of uninitilize so we can share 
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>
-        private static void InternalUninitialize()
+        private static void InternalUninitialize(bool cleanup = true)
         {
             // Update this first so IsInitialized immediately begins returning
             // false.  Since this method should be protected externally by 
@@ -246,26 +300,18 @@ namespace Orleans
             // before the next init attempt.
             isFullyInitialized = false;
 
-            LimitManager.UnInitialize();
-            
             if (RuntimeClient.Current != null)
             {
                 try
                 {
-                    RuntimeClient.Current.Reset();
+                    RuntimeClient.Current.Reset(cleanup);
                 }
                 catch (Exception) { }
 
                 RuntimeClient.Current = null;
-
-                try
-                {
-                    ClientProviderRuntime.UninitializeSingleton();
-                }
-                catch (Exception) { }
             }
             outsideRuntimeClient = null;
-
+            grainFactory = null;
         }
 
         /// <summary>
@@ -329,6 +375,11 @@ namespace Orleans
             return RuntimeClient.Current.CurrentStreamProviderManager.GetStreamProviders();
         }
 
+        internal static IStreamProviderRuntime CurrentStreamProviderRuntime
+        {
+            get { return RuntimeClient.Current.CurrentStreamProviderRuntime; }
+        }
+
         public static Streams.IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -336,51 +387,13 @@ namespace Orleans
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
 
-        internal static List<Uri> Gateways
+        internal static IList<Uri> Gateways
         {
             get
             {
                 CheckInitialized();
                 return outsideRuntimeClient.Gateways;
             }
-        }
-
-        internal static MethodInfo GetStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes)
-        {
-            var asm = Assembly.Load(assemblyName);
-            if (asm == null) 
-                throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) 
-                throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            MethodInfo method;
-            method = argumentTypes == null 
-                ? cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) 
-                : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
-            
-            if (method == null) 
-                throw new InvalidOperationException(string.Format("Cannot find static method {0} of class {1} in assembly {2}", methodName, className, assemblyName));
-
-            return method;
-        }
-
-        internal static object InvokeStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes, object[] arguments)
-        {
-            var method = GetStaticMethodThroughReflection(assemblyName, className, methodName, argumentTypes);
-            return method.Invoke(null, arguments);
-        }
-
-        internal static Type LoadTypeThroughReflection(string assemblyName, string className)
-        {
-            var asm = Assembly.Load(assemblyName);
-            if (asm == null) throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            return cl;
         }
     }
 }

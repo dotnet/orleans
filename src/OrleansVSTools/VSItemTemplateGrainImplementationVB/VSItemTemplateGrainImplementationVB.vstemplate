@@ -8,7 +8,7 @@
     <SortOrder>1000</SortOrder>
     <DefaultName>MyGrain.vb</DefaultName>
     <ProjectType>VisualBasic</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
   </TemplateData>
   <TemplateContent>

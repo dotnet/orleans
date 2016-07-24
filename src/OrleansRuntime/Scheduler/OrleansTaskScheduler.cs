@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -36,13 +13,15 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("OrleansTaskScheduler RunQueue={RunQueue.Length}")]
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
-        private readonly TraceLogger logger = TraceLogger.GetLogger("Scheduler.OrleansTaskScheduler", TraceLogger.LoggerType.Runtime);
+        private readonly LoggerImpl logger = LogManager.GetLogger("Scheduler.OrleansTaskScheduler", LoggerType.Runtime);
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         
         internal WorkQueue RunQueue { get; private set; }
         internal WorkerPool Pool { get; private set; }
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
+        // This is the maximum number of pending work items for a single activation before we write a warning log.
+        internal LimitValue MaxPendingItemsLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
         public static OrleansTaskScheduler Instance { get; private set; }
@@ -51,25 +30,26 @@ namespace Orleans.Runtime.Scheduler
         
 
         public OrleansTaskScheduler(int maxActiveThreads)
-            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), 
-            NodeConfiguration.INJECT_MORE_WORKER_THREADS)
+            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100),
+            NodeConfiguration.INJECT_MORE_WORKER_THREADS, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
         public OrleansTaskScheduler(GlobalConfiguration globalConfig, NodeConfiguration config)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads)
+                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads)
+            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit)
         {
             Instance = this;
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
             applicationTurnsStopped = false;
+            MaxPendingItemsLimit = maxPendingItemsLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
             RunQueue = new WorkQueue();
             logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 1 system thread.", maxActiveThreads);
@@ -156,11 +136,12 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsVerbose) logger.Verbose("StopApplicationTurns");
 #endif
-            RunQueue.RunDownApplication();
+            // Do not RunDown the application run queue, since it is still used by low priority system targets.
+
             applicationTurnsStopped = true;
             foreach (var group in workgroupDirectory.Values)
             {
-                if (!group.IsSystem)
+                if (!group.IsSystemGroup)
                     group.Stop();
             }
         }
@@ -184,10 +165,10 @@ namespace Orleans.Runtime.Scheduler
 #endif
             var context = contextObj as ISchedulingContext;
             var workItemGroup = GetWorkItemGroup(context);
-            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystem)
+            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped, string.Format("Dropping Task {0} because applicaiton turns are stopped", task));
+                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_2, string.Format("Dropping Task {0} because application turns are stopped", task));
                 return;
             }
 
@@ -222,11 +203,11 @@ namespace Orleans.Runtime.Scheduler
             }
 
             var workItemGroup = GetWorkItemGroup(context);
-            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystem)
+            if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                var msg = string.Format("Dropping work item {0} because applicaiton turns are stopped", workItem);
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped, msg);
+                var msg = string.Format("Dropping work item {0} because application turns are stopped", workItem);
+                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
 
@@ -270,11 +251,28 @@ namespace Orleans.Runtime.Scheduler
         // public for testing only -- should be private, otherwise
         public WorkItemGroup GetWorkItemGroup(ISchedulingContext context)
         {
-            WorkItemGroup workGroup = null;
-            if (context != null)
-                workgroupDirectory.TryGetValue(context, out workGroup);
-            
-            return workGroup;
+            if (context == null)
+                return null;
+           
+            WorkItemGroup workGroup;
+            if(workgroupDirectory.TryGetValue(context, out workGroup))
+                return workGroup;
+
+            var error = String.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
+            logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
+            throw new InvalidSchedulingContextException(error);
+        }
+
+        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        {
+            if (context == null)
+            {
+                throw new InvalidSchedulingContextException(
+                    "CheckSchedulingContextValidity was called on a null SchedulingContext."
+                     + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
+                     + "which will be the case if you create it inside Task.Run.");
+            }
+            GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
         }
 
         public TaskScheduler GetTaskScheduler(ISchedulingContext context)
@@ -382,7 +380,7 @@ namespace Orleans.Runtime.Scheduler
 
             var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
             if (stats.Length > 0)
-                logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatistics, 
+                logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatistics, 
                     "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
                     RunQueue.Length, WorkItemGroupCount, stats);
         }
@@ -409,7 +407,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (var workgroup in workgroupDirectory.Values)
                 sb.AppendLine(workgroup.DumpStatus());
             
-            logger.LogWithoutBulkingAndTruncating(Logger.Severity.Info, ErrorCode.SchedulerStatus, sb.ToString());
+            logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.SchedulerStatus, sb.ToString());
         }
     }
 }

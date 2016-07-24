@@ -1,18 +1,3 @@
-﻿//*********************************************************
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
 using System;
 using System.Threading.Tasks;
 
@@ -21,7 +6,6 @@ using Orleans.Providers;
 
 using MongoDB.Bson;
 using MongoDB.Driver;
-using MongoDB.Driver.Builders;
 
 namespace Samples.StorageProviders
 {
@@ -60,9 +44,9 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public override Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
-            this.Name = name;
-            this.ConnectionString = config.Properties["ConnectionString"];
-            this.Database = config.Properties["Database"];
+            Name = name;
+            ConnectionString = config.Properties["ConnectionString"];
+            Database = config.Properties["Database"];
             if (string.IsNullOrWhiteSpace(ConnectionString)) throw new ArgumentException("ConnectionString property not set");
             if (string.IsNullOrWhiteSpace(Database)) throw new ArgumentException("Database property not set");
             DataManager = new GrainStateMongoDataManager(Database, ConnectionString);
@@ -83,9 +67,7 @@ namespace Samples.StorageProviders
         public GrainStateMongoDataManager(string databaseName, string connectionString)
         {
             MongoClient client = new MongoClient(connectionString);
-            _dbServer = client.GetServer();
-            _dbServer.Connect();
-            _database = _dbServer.GetDatabase(databaseName);
+            _database = client.GetDatabase(databaseName);
         }
 
         /// <summary>
@@ -100,10 +82,9 @@ namespace Samples.StorageProviders
             if (collection == null)
                 return TaskDone.Done;
 
-            var query = Query.EQ("key", key);
-            collection.FindAndRemove(query, SortBy.Ascending());
+            var builder = Builders<BsonDocument>.Filter.Eq("key", key);
 
-            return TaskDone.Done;
+            return collection.DeleteManyAsync(builder);
         }
 
         /// <summary>
@@ -112,26 +93,27 @@ namespace Samples.StorageProviders
         /// <param name="collectionName">The type of the grain state object.</param>
         /// <param name="key">The grain id string.</param>
         /// <returns>Completion promise for this operation.</returns>
-        public Task<string> Read(string collectionName, string key)
+        public async Task<string> Read(string collectionName, string key)
         {
             var collection = GetCollection(collectionName);
             if (collection == null)
-                return Task.FromResult<string>(null);
+                return null;
 
-            var query = Query.EQ("key", key);
-            var existing = collection.FindOne(query);
+            var builder = Builders<BsonDocument>.Filter.Eq("key", key);
+
+            var existing = await collection.Find(builder).FirstOrDefaultAsync();
 
             if (existing == null)
-                return Task.FromResult<string>(null);
+                return null;
 
             existing.Remove("_id");
             existing.Remove("key");
 
             var strwrtr = new System.IO.StringWriter();
             var writer = new MongoDB.Bson.IO.JsonWriter(strwrtr, new MongoDB.Bson.IO.JsonWriterSettings());
-            MongoDB.Bson.Serialization.BsonSerializer.Serialize<BsonDocument>(writer, existing);
+            MongoDB.Bson.Serialization.BsonSerializer.Serialize(writer, existing);
 
-            return Task.FromResult(strwrtr.ToString());
+            return strwrtr.ToString();
         }
 
         /// <summary>
@@ -141,27 +123,26 @@ namespace Samples.StorageProviders
         /// <param name="key">The grain id string.</param>
         /// <param name="entityData">The grain state data to be stored./</param>
         /// <returns>Completion promise for this operation.</returns>
-        public Task Write(string collectionName, string key, string entityData)
+        public async Task Write(string collectionName, string key, string entityData)
         {
             var collection = GetOrCreateCollection(collectionName);
 
-            var query = Query.EQ("key", key);
-            var existing = collection.FindOne(query);
+            var builder = Builders<BsonDocument>.Filter.Eq("key", key);
+
+            var existing = await collection.Find(builder).FirstOrDefaultAsync();
 
             var doc = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<BsonDocument>(entityData);
             doc["key"] = key;
 
             if ( existing == null )
             {
-                collection.Insert(doc);
+                await collection.InsertOneAsync(doc);
             }
             else
             {
                 doc["_id"] = existing["_id"];
-                collection.Update(query, Update.Replace(doc));
+                await collection.ReplaceOneAsync(builder, doc);
             }
-
-            return TaskDone.Done;
         }
 
         /// <summary>
@@ -169,9 +150,9 @@ namespace Samples.StorageProviders
         /// </summary>
         /// <param name="name">The name of the collection.</param>
         /// <returns></returns>
-        private MongoCollection<BsonDocument> GetCollection(string name)
+        private IMongoCollection<BsonDocument> GetCollection(string name)
         {
-            return _database.GetCollection(name);
+            return _database.GetCollection<BsonDocument>(name);
         }
 
         /// <summary>
@@ -180,14 +161,13 @@ namespace Samples.StorageProviders
         /// </summary>
         /// <param name="name">The name of the collection.</param>
         /// <returns></returns>
-        private MongoCollection<BsonDocument> GetOrCreateCollection(string name)
+        private IMongoCollection<BsonDocument> GetOrCreateCollection(string name)
         {
-            var collection = _database.GetCollection(name);
-            if (collection == null)
-            {
-                _database.CreateCollection(name);
-                collection = _database.GetCollection(name);
-            }
+            var collection = _database.GetCollection<BsonDocument>(name);
+            if (collection != null)
+                return collection;
+            _database.CreateCollection(name);
+            collection = _database.GetCollection<BsonDocument>(name);
             return collection;
         }
 
@@ -196,13 +176,9 @@ namespace Samples.StorageProviders
         /// </summary>
         public void Dispose()
         {
-            if (_dbServer != null)
-                _dbServer.Disconnect();
-            _dbServer = null;
         }
 
-        private MongoServer _dbServer;
-        private readonly MongoDatabase _database;
+        private readonly IMongoDatabase _database;
 
     }
 }

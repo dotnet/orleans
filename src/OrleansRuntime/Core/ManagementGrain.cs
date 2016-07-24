@@ -1,49 +1,27 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Xml;
 using Orleans.Runtime.MembershipService;
-
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.Management
 {
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
+    [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
         private Logger logger;
         private IMembershipTable membershipTable;
 
-
         public override Task OnActivateAsync()
         {
-            logger = TraceLogger.GetLogger("ManagementGrain", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ManagementGrain", LoggerType.Runtime);
             return TaskDone.Done;
         }
 
@@ -56,6 +34,26 @@ namespace Orleans.Runtime.Management
                 table.Members.Where(item => item.Item1.Status.Equals(SiloStatus.Active)).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
                 table.Members.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
             return t;
+        }
+
+        public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+        {
+            logger.Info("GetDetailedHosts onlyActive={0}", onlyActive);
+
+            var mTable = await GetMembershipTable();
+            var table = await mTable.ReadAll();
+
+            if (onlyActive)
+            {
+                return table.Members
+                    .Where(item => item.Item1.Status.Equals(SiloStatus.Active))
+                    .Select(x => x.Item1)
+                    .ToArray();
+            }
+
+            return table.Members
+                .Select(x => x.Item1)
+                .ToArray();
         }
 
         public Task SetSystemLogLevel(SiloAddress[] siloAddresses, int traceLevel)
@@ -150,6 +148,20 @@ namespace Orleans.Runtime.Management
             return await GetSimpleGrainStatistics(silos);
         }
 
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null)
+        {
+            if (hostsIds == null)
+            {
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                hostsIds = hosts.Keys.ToArray();
+            }
+
+            var all = GetSiloAddresses(hostsIds).Select(s =>
+              GetSiloControlReference(s).GetDetailedGrainStatistics(types)).ToList();
+            await Task.WhenAll(all);
+            return all.SelectMany(s => s.Result).ToArray();
+        }
+
         public async Task<int> GetGrainActivationCount(GrainReference grainReference)
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
@@ -184,13 +196,31 @@ namespace Orleans.Runtime.Management
                     parent.AppendChild(child);
                 }
             }
-            var sw = new StringWriter();
-            document.WriteTo(new XmlTextWriter(sw));
-            var xml = sw.ToString();
-            // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
-            await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
-            await Task.WhenAll(silos.Skip(1).Select(s =>
-                GetSiloControlReference(s).UpdateConfiguration(xml)));
+            
+            using(var sw = new StringWriter())
+            { 
+                using(var xw = XmlWriter.Create(sw))
+                { 
+                    document.WriteTo(xw);
+                    xw.Flush();
+                    var xml = sw.ToString();
+                    // do first one, then all the rest to avoid spamming all the silos in case of a parameter error
+                    await GetSiloControlReference(silos[0]).UpdateConfiguration(xml);
+                    await Task.WhenAll(silos.Skip(1).Select(s => GetSiloControlReference(s).UpdateConfiguration(xml)));
+                }
+            }
+        }
+
+        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
+        {
+            if (hostsIds == null)
+            {
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                SiloAddress[] silos = hosts.Keys.ToArray();
+            }
+            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
+            await Task.WhenAll(all);
+            return all.SelectMany(s => s.Result).Distinct().ToArray();
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -209,13 +239,36 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
+        public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        {
+            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
+                String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
+        }
+
+        private async Task<object[]> ExecutePerSiloCall(Func<ISiloControl, Task<object>> action, string actionToLog)
+        {
+            var silos = await GetHosts(true);
+
+            if(logger.IsVerbose) {
+                logger.Verbose("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
+            }
+
+            var actionPromises = new List<Task<object>>();
+            foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+                actionPromises.Add(action(GetSiloControlReference(siloAddress)));
+
+            return await Task.WhenAll(actionPromises);
+        }
 
         private async Task<IMembershipTable> GetMembershipTable()
         {
             if (membershipTable == null)
             {
                 var factory = new MembershipFactory();
-                membershipTable = await factory.GetMembershipTable(Silo.CurrentSilo);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
+
+                await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
+                    LogManager.GetLogger(membershipTable.GetType().Name));
             }
             return membershipTable;
         }
@@ -269,6 +322,8 @@ namespace Orleans.Runtime.Management
 
         private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
         {
+            if (path == null) return;
+
             var first = path.FirstOrDefault();
             if (first == null) return;
 
@@ -301,7 +356,69 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return SiloControlFactory.GetSystemTarget(Constants.SiloControlId, silo);
+            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
+
+        #region MultiCluster
+
+        private MultiClusterNetwork.IMultiClusterOracle GetMultiClusterOracle()
+        {
+            if (!Silo.CurrentSilo.GlobalConfig.HasMultiClusterNetwork)
+                throw new OrleansException("No multicluster network configured");
+            return Silo.CurrentSilo.LocalMultiClusterOracle;
+        }
+
+        public Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways()
+        {
+            return Task.FromResult(GetMultiClusterOracle().GetGateways().Cast<IMultiClusterGatewayInfo>().ToList());
+        }
+
+        public Task<MultiClusterConfiguration> GetMultiClusterConfiguration()
+        {
+            return Task.FromResult(GetMultiClusterOracle().GetMultiClusterConfiguration());
+        }
+
+        public async Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true)
+        {
+            var multiClusterOracle = GetMultiClusterOracle();
+
+            var configuration = new MultiClusterConfiguration(DateTime.UtcNow, clusters.ToList(), comment);
+
+            if (!MultiClusterConfiguration.OlderThan(multiClusterOracle.GetMultiClusterConfiguration(), configuration))
+                throw new OrleansException("Could not inject multi-cluster configuration: current configuration is newer than clock");
+
+            if (checkForLaggingSilosFirst)
+            {
+                try
+                {
+                    var laggingSilos = await multiClusterOracle.FindLaggingSilos(multiClusterOracle.GetMultiClusterConfiguration());
+
+                    if (laggingSilos.Count > 0)
+                    {
+                        var msg = string.Format("Found unstable silos {0}", string.Join(",", laggingSilos));
+                        throw new OrleansException(msg);
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new OrleansException("Could not inject multi-cluster configuration: stability check failed", e);
+                }
+            }
+
+            await multiClusterOracle.InjectMultiClusterConfiguration(configuration);
+
+            return configuration;
+        }
+
+        public Task<List<SiloAddress>> FindLaggingSilos()
+        {
+            var multiClusterOracle = GetMultiClusterOracle();
+            var expected = multiClusterOracle.GetMultiClusterConfiguration();
+            return multiClusterOracle.FindLaggingSilos(expected);
+        }
+
+        #endregion
+
+
     }
 }

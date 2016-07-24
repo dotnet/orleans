@@ -1,68 +1,123 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
     /// <summary>
-    /// Development mode grain-based implementation of membership table
+    /// Interface for Membership Table.
     /// </summary>
-    [Unordered]
-    internal interface IMembershipTable : IGrain
+    public interface IMembershipTable
     {
+        /// <summary>
+        /// Initializes the membership table, will be called before all other methods
+        /// </summary>
+        /// <param name="globalConfiguration">the give global configuration</param>
+        /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
+        /// <param name="logger">the logger used by the membership table</param>
+        Task InitializeMembershipTable(GlobalConfiguration globalConfiguration, bool tryInitTableVersion, Logger logger);
+
+        /// <summary>
+        /// Deletes all table entries of the given deploymentId
+        /// </summary>
+        Task DeleteMembershipTableEntries(string deploymentId);
+
+        /// <summary>
+        /// Atomically reads the Membership Table information about a given silo.
+        /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
+        /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
+        /// </summary>
+        /// <param name="entry">The address of the silo whose membership information needs to be read.</param>
+        /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
+        /// TableVersion, read atomically.</returns>
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
+        /// <summary>
+        /// Atomically reads the full content of the Membership Table.
+        /// The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the 
+        /// TableVersion for this table. The MembershipEntries and the TableVersion have to be read atomically.
+        /// </summary>
+        /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
+        /// TableVersion, all read atomically.</returns>
         Task<MembershipTableData> ReadAll();
 
+        /// <summary>
+        /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
+        /// If operation succeeds, the following changes would be made to the table:
+        /// 1) New MembershipEntry will be added to the table.
+        /// 2) The newly added MembershipEntry will also be added with the new unique automatically generated eTag.
+        /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
+        /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
+        /// All those changes to the table, insert of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
+        /// The operation should fail in each of the following conditions:
+        /// 1) A MembershipEntry for a given silo already exist in the table
+        /// 2) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
+        /// </summary>
+        /// <param name="entry">MembershipEntry to be inserted.</param>
+        /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
+        /// <returns>True if the insert operation succeeded and false otherwise.</returns>
         Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
 
         /// <summary>
-        /// Writes a new entry iff the entry etag is equal to the provided etag parameter.
+        /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
+        /// If operation succeeds, the following changes would be made to the table:
+        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substitued by the new entry) 
+        /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
+        /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
+        /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
+        /// All those changes to the table, update of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
+        /// The operation should fail in each of the following conditions:
+        /// 1) A MembershipEntry for a given silo does not exist in the table
+        /// 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag.
+        /// 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
         /// </summary>
-        /// <param name="entry"></param>
-        /// <param name="etag"></param>
-        /// <param name="tableVersion"></param>
-        /// <returns>true iff the write was successful</returns>
+        /// <param name="entry">MembershipEntry to be updated.</param>
+        /// <param name="etag">The etag  for the given MembershipEntry.</param>
+        /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
+        /// <returns>True if the update operation succeeded and false otherwise.</returns>
         Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
 
         /// <summary>
-        /// Update the IAmAlive timestamp for this silo.
+        /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
+        /// This operation should only update the IAmAlive collumn and not change other columns.
+        /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
+        /// With regards to eTags update:
+        /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
+        /// With regards to TableVersion:
+        /// this operation should not change the TableVersion of the table. It should leave it untouched.
+        /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
         /// </summary>
         /// <param name="entry"></param>
-        /// <returns></returns>
+        /// <returns>Task representing the successful execution of this operation. </returns>
         Task UpdateIAmAlive(MembershipEntry entry);
     }
-    
-    [Serializable]
-    internal class TableVersion
+
+    /// <summary>
+    /// Membership table interface for grain based implementation.
+    /// </summary>
+    [Unordered]
+    public interface IMembershipTableGrain : IGrainWithGuidKey, IMembershipTable
     {
+        
+    }
+
+    [Serializable]
+    [Immutable]
+    public class TableVersion
+    {
+        /// <summary>
+        /// The version part of this TableVersion. Monotonically increasing number.
+        /// </summary>
         public int Version { get; private set; }
+
+        /// <summary>
+        /// The etag of this TableVersion, used for validation of table update operations.
+        /// </summary>
         public string VersionEtag { get; private set; }
 
         public TableVersion(int version, string eTag)
@@ -83,26 +138,35 @@ namespace Orleans
     }
 
     [Serializable]
-    internal class MembershipTableData
+    public class MembershipTableData
     {
-        public IList<Tuple<MembershipEntry, string>> Members { get; private set; }
+        public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
+
         public TableVersion Version { get; private set; }
 
         public MembershipTableData(List<Tuple<MembershipEntry, string>> list, TableVersion version)
         {
-            Members = list;
+            // put deads at the end, just for logging.
+            list.Sort(
+               (x, y) =>
+               {
+                   if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
+                   if (y.Item1.Status.Equals(SiloStatus.Dead)) return -1; // put Deads at the end
+                   return String.Compare(x.Item1.SiloName, y.Item1.SiloName, StringComparison.Ordinal);
+               });
+            Members = list.AsReadOnly();
             Version = version;
         }
 
         public MembershipTableData(Tuple<MembershipEntry, string> tuple, TableVersion version)
         {
-            Members = new List<Tuple<MembershipEntry, string>> {tuple};
+            Members = (new List<Tuple<MembershipEntry, string>> { tuple }).AsReadOnly();
             Version = version;
         }
 
         public MembershipTableData(TableVersion version)
         {
-            Members = new List<Tuple<MembershipEntry, string>>();
+            Members = (new List<Tuple<MembershipEntry, string>>()).AsReadOnly();
             Version = version;
         }
 
@@ -131,65 +195,101 @@ namespace Orleans
                                 shuttingDown > 0 ? (", " + shuttingDown + " are ShuttingDown") : "",
                                 stopping > 0 ? (", " + stopping + " are Stopping") : "");
 
-            return string.Format("{0} silos, {1} are Active, {2} are Dead{3}: {4}. Version={5}",
+            return string.Format("{0} silos, {1} are Active, {2} are Dead{3}, Version={4}. All silos: {5}",
                 Members.Count,
                 active,
                 dead,
                 otherCounts,
-                Utils.EnumerableToString(Members, (tuple) => tuple.Item1.ToFullString()), //+ " -> eTag " + tuple.Item2),
-                Version);
+                Version,
+                Utils.EnumerableToString(Members, tuple => tuple.Item1.ToFullString()));
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
         public MembershipTableData SupressDuplicateDeads()
         {
-            var dead = new Dictionary<string, Tuple<MembershipEntry, string>>();
+            var dead = new Dictionary<IPEndPoint, Tuple<MembershipEntry, string>>();
             // pick only latest Dead for each instance
-            foreach (var next in this.Members.Where(item => item.Item1.Status == SiloStatus.Dead))
+            foreach (var next in Members.Where(item => item.Item1.Status == SiloStatus.Dead))
             {
-                var name = next.Item1.InstanceName;
-                Tuple<MembershipEntry, string> prev = null;
-                if (!dead.TryGetValue(name, out prev))
+                var ipEndPoint = next.Item1.SiloAddress.Endpoint;
+                Tuple<MembershipEntry, string> prev;
+                if (!dead.TryGetValue(ipEndPoint, out prev))
                 {
-                    dead[name] = next;
+                    dead[ipEndPoint] = next;
                 }
                 else
                 {
                     // later dead.
                     if (next.Item1.SiloAddress.Generation.CompareTo(prev.Item1.SiloAddress.Generation) > 0)
-                        dead[name] = next;
+                        dead[ipEndPoint] = next;
                 }
             }
             //now add back non-dead
             List<Tuple<MembershipEntry, string>> all = dead.Values.ToList();
-            all.AddRange(this.Members.Where(item => item.Item1.Status != SiloStatus.Dead));
-            return new MembershipTableData(all, this.Version);
+            all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
+            return new MembershipTableData(all, Version);
         }
     }
 
     [Serializable]
-    internal class MembershipEntry
+    public class MembershipEntry
     {
+        /// <summary>
+        /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
+        /// </summary>
         public SiloAddress SiloAddress { get; set; }
 
-        public string HostName { get; set; }              // Mandatory
-        public SiloStatus Status { get; set; }                // Mandatory
-        public int ProxyPort { get; set; }             // Optional
-        public bool IsPrimary { get; set; }            // Optional - should be depricated
+        /// <summary>
+        /// The silo status. Managed by the Membership Protocol.
+        /// </summary>
+        public SiloStatus Status { get; set; }
 
-        public string RoleName { get; set; }              // Optional - only for Azure role
-        public string InstanceName { get; set; }          // Optional - only for Azure role
-        public int UpdateZone { get; set; }            // Optional - only for Azure role
-        public int FaultZone { get; set; }             // Optional - only for Azure role
-
-        public DateTime StartTime { get; set; }             // Time this silo was started. For diagnostics.
-        public DateTime IAmAliveTime { get; set; }          // Time this silo updated it was alive. For diagnostics.
-
+        /// <summary>
+        /// The list of silos that suspect this silo. Managed by the Membership Protocol.
+        /// </summary>
         public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
 
-        private static readonly List<Tuple<SiloAddress, DateTime>> emptyList = new List<Tuple<SiloAddress, DateTime>>(0);
+        /// <summary>
+        /// Silo to clients TCP port. Set on silo startup.
+        /// </summary>    
+        public int ProxyPort { get; set; }
 
-        public static bool CompactMembershipLogging = true;
+        /// <summary>
+        /// The DNS host name of the silo. Equals to Dns.GetHostName(). Set on silo startup.
+        /// </summary>
+        public string HostName { get; set; }
+
+        /// <summary>
+        /// the name of the specific silo instance within a cluster. 
+        /// If running in Azure - the name of this role instance. Set on silo startup.
+        /// </summary>
+        public string SiloName { get; set; }
+
+        public string RoleName { get; set; } // Optional - only for Azure role  
+        public int UpdateZone { get; set; }  // Optional - only for Azure role
+        public int FaultZone { get; set; }   // Optional - only for Azure role
+
+        /// <summary>
+        /// Time this silo was started. For diagnostics and troubleshooting only.
+        /// </summary>
+        public DateTime StartTime { get; set; }
+
+        /// <summary>
+        /// the last time this silo reported that it is alive. For diagnostics and troubleshooting only.
+        /// </summary>
+        public DateTime IAmAliveTime { get; set; }
+        
+
+        private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
+
+        public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
+        {
+            if (SuspectTimes == null)
+                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
+
+            var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
+            SuspectTimes.Add(suspector);
+        }
 
         // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
         internal void Update(MembershipEntry updatedSiloEntry)
@@ -199,10 +299,9 @@ namespace Orleans
             //---
             HostName = updatedSiloEntry.HostName;
             ProxyPort = updatedSiloEntry.ProxyPort;
-            IsPrimary = updatedSiloEntry.IsPrimary;
 
             RoleName = updatedSiloEntry.RoleName;
-            InstanceName = updatedSiloEntry.InstanceName;
+            SiloName = updatedSiloEntry.SiloName;
             UpdateZone = updatedSiloEntry.UpdateZone;
             FaultZone = updatedSiloEntry.FaultZone;
 
@@ -214,7 +313,7 @@ namespace Orleans
         internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(TimeSpan expiration)
         {
             if (SuspectTimes == null)
-                return emptyList;
+                return EmptyList;
             DateTime now = DateTime.UtcNow;
             return SuspectTimes.FindAll(voter =>
                 {
@@ -228,15 +327,6 @@ namespace Orleans
                 });
         }
 
-        internal void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
-        {
-            if (SuspectTimes == null)
-                SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
-
-            var suspector = new Tuple<SiloAddress, DateTime>(suspectingSilo, suspectingTime);
-            SuspectTimes.Add(suspector);
-        }
-
         internal void TryUpdateStartTime(DateTime startTime)
         {
             if (StartTime.Equals(default(DateTime)))
@@ -245,12 +335,12 @@ namespace Orleans
 
         public override string ToString()
         {
-            return string.Format("SiloAddress={0} Status={1}", SiloAddress.ToLongString(), Status);
+            return string.Format("SiloAddress={0} SiloName={1} Status={2}", SiloAddress.ToLongString(), SiloName, Status);
         }
 
-        internal string ToFullString()
+        internal string ToFullString(bool full = false)
         {
-            if (MembershipEntry.CompactMembershipLogging)
+            if (!full)
                 return ToString();
 
             List<SiloAddress> suspecters = SuspectTimes == null
@@ -259,25 +349,24 @@ namespace Orleans
             List<DateTime> timestamps = SuspectTimes == null
                 ? null
                 : SuspectTimes.Select(tuple => tuple.Item2).ToList();
-            return string.Format("[SiloAddress={0} Status={1} HostName={2} ProxyPort={3} IsPrimary={4} " +
-                                 "RoleName={5} InstanceName={6} UpdateZone={7} FaultZone={8} StartTime = {9} IAmAliveTime = {10} {11} {12}]",
+            return string.Format("[SiloAddress={0} SiloName={1} Status={2} HostName={3} ProxyPort={4} " +
+                                 "RoleName={5} UpdateZone={6} FaultZone={7} StartTime = {8} IAmAliveTime = {9} {10} {11}]",
                 SiloAddress.ToLongString(),
+                SiloName,
                 Status,
                 HostName,
                 ProxyPort,
-                IsPrimary,
                 RoleName,
-                InstanceName,
                 UpdateZone,
                 FaultZone,
-                TraceLogger.PrintDate(StartTime),
-                TraceLogger.PrintDate(IAmAliveTime),
+                LogFormatter.PrintDate(StartTime),
+                LogFormatter.PrintDate(IAmAliveTime),
                 suspecters == null
                     ? ""
-                    : "Suspecters = " + Utils.EnumerableToString(suspecters, (SiloAddress sa) => sa.ToLongString()),
+                    : "Suspecters = " + Utils.EnumerableToString(suspecters, sa => sa.ToLongString()),
                 timestamps == null
                     ? ""
-                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, TraceLogger.PrintDate)
+                    : "SuspectTimes = " + Utils.EnumerableToString(timestamps, LogFormatter.PrintDate)
                 );
         }
     }

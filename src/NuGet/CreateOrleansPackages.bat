@@ -1,5 +1,5 @@
 @Echo OFF
-@setlocal
+@setlocal EnableExtensions EnableDelayedExpansion
 
 IF %1.==. GOTO Usage
 
@@ -7,11 +7,13 @@ set NUGET_EXE=%~dp0..\.nuget\nuget.exe
 
 set BASE_PATH=%1
 set VERSION=%2
+set SRC_DIR=%3
+set PRERELEASE_BUILD=%4
 IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
 
-@echo CreateOrleansNugetPackages running in directory =
+@echo CreateOrleansNugetPackages running in directory = %1
 @cd
-@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_DIR% using nuget location = %NUGET_EXE%
+@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_PATH% using nuget location = %NUGET_EXE%
 
 if "%BASE_PATH%" == "." (
 	if EXIST "Release" (
@@ -23,20 +25,51 @@ if "%BASE_PATH%" == "." (
 @echo Using binary drop location directory %BASE_PATH%
 
 if EXIST "%VERSION%" (
-    @Echo Using version number from file %VERSION%
-    FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type %VERSION%`) do set VERSION=%%i.%%j.0
+      @Echo Using version number from file %VERSION%
+      FOR /F "usebackq tokens=1,2,3,4 delims=." %%i in (`type "%VERSION%"`) do (
+
+	   set VERSION=%%i.%%j.%%k
+	   set VERSION_BETA=%%l
+	  )
+	  
 ) else (
     @Echo ERROR: Unable to read version number from file %VERSION%
     GOTO Usage
 )
 
-@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH%
+if not "%VERSION_BETA%" == "" (
+    @echo VERSION_BETA=!VERSION_BETA!
+    set VERSION=%VERSION%-!VERSION_BETA!
+)
 
-@set NUGET_PACK_OPTS= -NoPackageAnalysis
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
+if "%PRERELEASE_BUILD%" == "true" (
+    set VERSION_TYPE=Dev
+    set VERSION_TIMESTAMP=%date:~10,4%%date:~4,2%%date:~7,2%%time:~0,2%%time:~3,2%
+    @echo VERSION_TYPE = !VERSION_TYPE!
+    @echo VERSION_TIMESTAMP = !VERSION_TIMESTAMP!
+    set VERSION=%VERSION%-!VERSION_TYPE!!VERSION_TIMESTAMP!
+)
+
+@echo VERSION=!VERSION!
+
+@echo CreateOrleansNugetPackages: Version = !VERSION! -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
+
+@set NUGET_PACK_OPTS= -Version !VERSION!
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
+REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
-  "%NUGET_EXE%" pack "%%G" -Version %VERSION% -BasePath "%BASE_PATH%" %NUGET_PACK_OPTS%
+  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS% -Symbols
+  if ERRORLEVEL 1 EXIT /B 1
+)
+
+FOR %%G IN ("%~dp0*.nuspec-NoSymbols") DO (
+  REM %%~dpnG gets the full filename path but without the extension
+  move "%%G" "%%~dpnG.nuspec"
+  "%NUGET_EXE%" pack "%%~dpnG.nuspec" %NUGET_PACK_OPTS%
+  if ERRORLEVEL 1 EXIT /B 1
+  move "%%~dpnG.nuspec" "%%G"
 )
 
 GOTO EOF
@@ -44,5 +77,6 @@ GOTO EOF
 :Usage
 @ECHO Usage:
 @ECHO    CreateOrleansPackages ^<Path to Orleans SDK folder^> ^<VersionFile^>
+EXIT /B -1
 
 :EOF

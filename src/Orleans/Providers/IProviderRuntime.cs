@@ -1,28 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
+using System.Reflection;
+using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.CodeGeneration;
 
 namespace Orleans.Providers
 {
@@ -42,7 +22,7 @@ namespace Orleans.Providers
         /// <param name="loggerName">Name of the logger being requested.</param>
         /// <param name="logType">Type of the logger being requested.</param>
         /// <returns>Object reference to the requested logger.</returns>
-        /// <seealso cref="TraceLogger.LoggerType"/>
+        /// <seealso cref="LoggerType"/>
         Logger GetLogger(string loggerName);
 
         /// <summary>
@@ -52,6 +32,32 @@ namespace Orleans.Providers
         /// </summary>
         /// <returns>ServiceID Guid for this service.</returns>
         Guid ServiceId { get; }
+
+        /// <summary>
+        /// A unique identifier for the current silo.
+        /// There is no semantic content to this string, but it may be useful for logging.
+        /// </summary>
+        string SiloIdentity { get; }
+
+        /// <summary>
+        /// Factory for getting references to grains.
+        /// </summary>
+        IGrainFactory GrainFactory { get; }
+
+        /// <summary>
+        /// Service provider for dependency injection
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+
+        /// <summary>
+        /// Sets the invocation interceptor which will be invoked on each request.
+        /// </summary>
+        void SetInvokeInterceptor(InvokeInterceptor interceptor);
+
+        /// <summary>
+        /// Gets the invocation interceptor which will be invoked on each request.
+        /// </summary>
+        InvokeInterceptor GetInvokeInterceptor();
     }
 
     /// <summary>
@@ -61,4 +67,18 @@ namespace Orleans.Providers
     {
         // for now empty, later can add storage specific runtime capabilities.
     }
+
+    /// <summary>
+    /// Handles the invocation of the provided <paramref name="request"/>.
+    /// </summary>
+    /// <param name="targetMethod">The method on <paramref name="target"/> being invoked.</param>
+    /// <param name="request">The request.</param>
+    /// <param name="target">The invocation target.</param>
+    /// <param name="invoker">
+    /// The invoker which is used to dispatch the provided <paramref name="request"/> to the provided
+    /// <paramref name="target"/>.
+    /// </param>
+    /// <returns>The result of invocation, which will be returned to the client.</returns>
+    public delegate Task<object> InvokeInterceptor(
+        MethodInfo targetMethod, InvokeMethodRequest request, IGrain target, IGrainMethodInvoker invoker);
 }

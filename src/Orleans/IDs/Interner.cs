@@ -1,30 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 
 using Orleans.Runtime;
@@ -78,7 +56,7 @@ namespace Orleans
     internal class Interner<K, T> where T : class
     {
         private static readonly string internCacheName = "Interner-" + typeof(T).Name;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly TimeSpan cacheCleanupInterval;
         private readonly SafeTimer cacheCleanupTimer;
 
@@ -98,7 +76,7 @@ namespace Orleans
             if (initialSize <= 0) initialSize = InternerConstants.SIZE_MEDIUM;
             int concurrencyLevel = Environment.ProcessorCount * 4; // Default from ConcurrentDictionary class in .NET 4.0
 
-            logger = TraceLogger.GetLogger(internCacheName, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(internCacheName, LoggerType.Runtime);
 
             this.internCache = new ConcurrentDictionary<K, WeakReference>(concurrencyLevel, initialSize);
 
@@ -253,9 +231,16 @@ namespace Orleans
 
         private void InternCacheCleanupTimerCallback(object state)
         {
-            Stopwatch clock = new Stopwatch();
-            clock.Start();
-            long numEntries = internCache.Count;
+            Stopwatch clock = null;
+            long numEntries = 0;
+            var removalResultsLoggingNeeded = logger.IsVerbose || logger.IsVerbose2;
+            if (removalResultsLoggingNeeded)
+            {
+                clock = new Stopwatch();
+                clock.Start();
+                numEntries = internCache.Count;
+            }
+
             foreach (var e in internCache)
             {
                 if (e.Value == null || e.Value.IsAlive == false || e.Value.Target == null)
@@ -268,11 +253,18 @@ namespace Orleans
                     }
                 }
             }
-            long numRemoved = numEntries - internCache.Count;
-            if (numRemoved>0)
+
+            if (!removalResultsLoggingNeeded) return;
+
+            var numRemoved = numEntries - internCache.Count;
+            if (numRemoved > 0)
+            {
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
+            }
             else
+            {
                 if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
+            }
         }
 
         private string PrintInternerContent()

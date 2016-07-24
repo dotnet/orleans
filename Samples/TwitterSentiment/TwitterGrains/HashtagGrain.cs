@@ -1,19 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using System;
 using System.Threading.Tasks;
 using TwitterGrainInterfaces;
@@ -26,21 +10,21 @@ namespace TwitterGrains
     /// <summary>
     /// interface defining the persistent state for hashtag grain
     /// </summary>
-    public interface ITotalsState : IGrainState
+    public class TotalsState : GrainState
     {
-        int Positive { get; set; }
-        int Negative { get; set; }
-        int Total { get; set; }
-        DateTime LastUpdated { get; set; }
-        string Hashtag { get; set; }
-        bool BeenCounted { get; set; }
-        string LastTweet { get; set; }
+        public int Positive { get; set; }
+        public int Negative { get; set; }
+        public int Total { get; set; }
+        public DateTime LastUpdated { get; set; }
+        public string Hashtag { get; set; }
+        public bool BeenCounted { get; set; }
+        public string LastTweet { get; set; }
     }
 
 
     // <Provider Type="Orleans.Storage.AzureTableStorage" Name="store1" DataConnectionString="xxx" />
     [StorageProvider(ProviderName = "store1")]
-    public class HashtagGrain : Orleans.Grain<ITotalsState>, IHashtagGrain
+    public class HashtagGrain : Grain<TotalsState>, IHashtagGrain
     {
         private string hashtag;  // keep note of the hashtag we are tracking
 
@@ -54,8 +38,8 @@ namespace TwitterGrains
             {
                 // record that the grain has now been counted, and store the state
                 this.State.BeenCounted = true;
-                var counter = CounterFactory.GetGrain(0);
-                await Task.WhenAll(counter.IncrementCounter(), this.State.WriteStateAsync());
+                var counter = GrainFactory.GetGrain<ICounter>(0);
+                await Task.WhenAll(counter.IncrementCounter(), this.WriteStateAsync());
             }
             await base.OnActivateAsync();
         }
@@ -80,7 +64,7 @@ namespace TwitterGrains
             if (score != 0)
             {
                 // only save the state if the score is non-zero (otherwise it's not interesting)
-                await this.State.WriteStateAsync();
+                await this.WriteStateAsync();
             }
         }
 

@@ -1,29 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-
 
 namespace Orleans.Providers
 {
@@ -47,19 +26,16 @@ namespace Orleans.Providers
         /// <returns>Completion promise Task for the inttialization work for this provider</returns>
         Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config);
 
-        // For now, I've decided to keep Close in the per-provider interface and not as part of the common IProvider interface.
-        // There is currently no central place where Close can / would be called. 
-        // It might eventually be provided by xProviderManager classes in certain cases, 
-        //  for example: if they detect silo shutdown in progress.
-
-        //Task Close();
+        /// <summary>Close function for this provider instance.</summary>
+        /// <returns>Completion promise for the Close operation on this provider.</returns>
+        Task Close();
     }
     #pragma warning restore 1574
 
     /// <summary>
     /// Internal provider management interface for instantiating dependent providers in a hierarchical tree of dependencies
     /// </summary>
-    internal interface IProviderManager
+    public interface IProviderManager
     {
         /// <summary>
         /// Call into Provider Manager for instantiating dependent providers in a hierarchical tree of dependencies
@@ -74,16 +50,114 @@ namespace Orleans.Providers
     /// </summary>
     public interface IProviderConfiguration
     {
+        /// <summary>
+        /// Full type name of this provider.
+        /// </summary>
+        string Type { get; }
+
+        /// <summary>
+        /// Name of this provider.
+        /// </summary>
         string Name { get; }
 
         /// <summary>
         /// Configuration properties for this provider instance, as name-value pairs.
         /// </summary>
-        IDictionary<string, string> Properties { get; }
+        ReadOnlyDictionary<string, string> Properties { get; }
 
         /// <summary>
         /// Nested providers in case of a hierarchical tree of dependencies
         /// </summary>
         IList<IProvider> Children { get; }
+
+        /// <summary>
+        /// Set a property in this provider configuration.
+        /// If the property with this key already exists, it is been overwritten with the new value, otherwise it is just added.
+        /// </summary>
+        /// <param name="key">The key of the property</param>
+        /// <param name="val">The value of the property</param>
+        /// <returns>Provider instance with the given name</returns>
+        void SetProperty(string key, string val);
+
+        /// <summary>
+        /// Removes a property in this provider configuration.
+        /// </summary>
+        /// <param name="key">The key of the property.</param>
+        /// <returns>True if the property was found and removed, false otherwise.</returns>
+        bool RemoveProperty(string key);
+
+    }
+
+    public static class ProviderConfigurationExtensions
+    {
+        public static int GetIntProperty(this IProviderConfiguration config, string key, int settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? int.Parse(s) : settingDefault;
+        }
+
+        public static string GetProperty(this IProviderConfiguration config, string key, string settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? s : settingDefault;
+        }
+
+        public static Guid GetGuidProperty(this IProviderConfiguration config, string key, Guid settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? Guid.Parse(s) : settingDefault;
+        }
+
+        public static T GetEnumProperty<T>(this IProviderConfiguration config, string key, T settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? (T)Enum.Parse(typeof(T),s) : settingDefault;
+        }
+
+        public static Type GetTypeProperty(this IProviderConfiguration config, string key, Type settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? Type.GetType(s) : settingDefault;
+        }
+
+        public static bool GetBoolProperty(this IProviderConfiguration config, string key, bool settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? bool.Parse(s) : settingDefault;
+        }
+
+        public static TimeSpan GetTimeSpanProperty(this IProviderConfiguration config, string key, TimeSpan settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
+        }
     }
 }

@@ -1,33 +1,10 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.IO;
 using System.Net;
 using System.Runtime;
 using System.Threading;
 using System.Globalization;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 
@@ -95,9 +72,10 @@ namespace Orleans.Runtime.Host
         /// <summary> Whether this silo started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private TraceLogger logger;
+        private Logger logger;
         private Silo orleans;
         private EventWaitHandle startupEvent;
+        private EventWaitHandle shutdownEvent;
         private bool disposed;
 
         /// <summary>
@@ -136,21 +114,13 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void InitializeOrleansSilo()
         {
-    #if DEBUG
+#if DEBUG
             AssemblyLoaderUtils.EnableAssemblyLoadTracing();
-    #endif
+#endif
 
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
-
-                logger.Info( ErrorCode.SiloInitializing, "Initializing Silo {0} on host={1} CPU count={2} running .NET version='{3}' Is .NET 4.5={4} OS version='{5}'",
-                    Name, Environment.MachineName, Environment.ProcessorCount, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion);
-
-                logger.Info(ErrorCode.SiloGcSetting, "Silo running with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
-                if (!GCSettings.IsServerGC)
-                    logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
-                
                 orleans = new Silo(Name, Type, Config);
             }
             catch (Exception exc)
@@ -166,28 +136,53 @@ namespace Orleans.Runtime.Host
         public void UnInitializeOrleansSilo()
         {
             Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
-            Utils.SafeExecute(TraceLogger.UnInitialize);
+            Utils.SafeExecute(LogManager.UnInitialize);
         }
 
         /// <summary>
         /// Start this silo.
         /// </summary>
         /// <returns></returns>
-        public bool StartOrleansSilo()
+        public bool StartOrleansSilo(bool catchExceptions = true)
         {
             try
             {
                 if (string.IsNullOrEmpty(Thread.CurrentThread.Name))
                     Thread.CurrentThread.Name = this.GetType().Name;
-                
+
                 if (orleans != null)
                 {
+                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";
+                    logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+
+                    bool createdNew;
+                    shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
+                    if (!createdNew)
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                    }
+
+                    // Start silo
                     orleans.Start();
-                    
+
+                    // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
+
+                    var shutdownThread = new Thread(o =>
+                       {
+                           shutdownEvent.WaitOne();
+                           logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                           orleans.Shutdown();
+                       });
+                    shutdownThread.IsBackground = true;
+                    shutdownThread.Start();
+
                     var startupEventName = Name;
                     logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
 
-                    bool createdNew;
                     startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
                     if (!createdNew)
                     {
@@ -209,10 +204,15 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception exc)
             {
-                ReportStartupError(exc);
-                orleans = null;
-                IsStarted = false;
-                return false;
+                if (catchExceptions)
+                {
+                    ReportStartupError(exc);
+                    orleans = null;
+                    IsStarted = false;
+                    return false;
+                }
+                else
+                    throw;
             }
 
             return true;
@@ -228,6 +228,15 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
+        /// Gracefully shutdown this silo.
+        /// </summary>
+        public void ShutdownOrleansSilo()
+        {
+            IsStarted = false;
+            if (orleans != null) orleans.Shutdown();
+        }
+
+        /// <summary>
         /// Wait for this silo to shutdown.
         /// </summary>
         /// <remarks>
@@ -236,36 +245,39 @@ namespace Orleans.Runtime.Host
         /// </remarks>
         public void WaitForOrleansSiloShutdown()
         {
-            if (!IsStarted)
-                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
-            
-            if (startupEvent != null)
-                startupEvent.Reset();
-            else
-                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
-            
-            if (orleans != null)
-                orleans.SiloTerminatedEvent.WaitOne();
-            else
-                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+            WaitForOrleansSiloShutdownImpl();
+        }
+
+        /// <summary>
+        /// Wait for this silo to shutdown or to be stopped with provided cancellation token.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <remarks>
+        /// Note: This method call will block execution of current thread, 
+        /// and will not return control back to the caller until the silo is shutdown or 
+        /// an external request for cancellation has been issued.
+        /// </remarks>
+        public void WaitForOrleansSiloShutdown(CancellationToken cancellationToken)
+        {
+            WaitForOrleansSiloShutdownImpl(cancellationToken);
         }
 
         /// <summary>
         /// Set the DeploymentId for this silo, 
-        /// as well as the Azure connection string to use the silo system data, 
+        /// as well as the connection string to use the silo system data, 
         /// such as the cluster membership table..
         /// </summary>
         /// <param name="deploymentId">DeploymentId this silo is part of.</param>
         /// <param name="connectionString">Azure connection string to use the silo system data.</param>
         public void SetDeploymentId(string deploymentId, string connectionString)
         {
-            logger.Info(ErrorCode.SiloSetDeploymentId, "Setting Deployment Id to {0} and data connection string to {1}", 
+            logger.Info(ErrorCode.SiloSetDeploymentId, "Setting Deployment Id to {0} and data connection string to {1}",
                 deploymentId, ConfigUtilities.RedactConnectionStringInfo(connectionString));
 
             Config.Globals.DeploymentId = deploymentId;
             Config.Globals.DataConnectionString = connectionString;
         }
-        
+
         /// <summary>
         /// Set the main endpoint address for this silo,
         /// plus the silo generation value to be used to distinguish this silo instance
@@ -360,6 +372,16 @@ namespace Orleans.Runtime.Host
         }
 
         /// <summary>
+        /// Set expected deployment size.
+        /// </summary>
+        /// <param name="size">The expected deployment size.</param>
+        public void SetExpectedClusterSize(int size)
+        {
+            logger.Info(ErrorCode.SetSiloLivenessType, "Setting Expected Cluster Size to={0}", size);
+            Config.Globals.ExpectedClusterSize = size;
+        }
+
+        /// <summary>
         /// Report an error during silo startup.
         /// </summary>
         /// <remarks>
@@ -373,7 +395,7 @@ namespace Orleans.Runtime.Host
             if (string.IsNullOrWhiteSpace(Name))
                 Name = "Silo";
 
-            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + exc;
+            var errMsg = "ERROR starting Orleans silo name=" + Name + " Exception=" + LogFormatter.PrintException(exc);
             if (logger != null) logger.Error(ErrorCode.Runtime_Error_100105, errMsg, exc);
 
             // Dump Startup error to a log file
@@ -391,7 +413,7 @@ namespace Orleans.Runtime.Host
                 if (logger != null) logger.Error(ErrorCode.Runtime_Error_100106, "Error writing log file " + startupLog, exc2);
             }
 
-            TraceLogger.Flush();
+            LogManager.Flush();
         }
 
         /// <summary>
@@ -421,39 +443,80 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Allows silo config to be programmatically set.
         /// </summary>
-        /// <param name="config">Configuration data for this silo & cluster.</param>
+        /// <param name="config">Configuration data for this silo and cluster.</param>
         private void SetSiloConfig(ClusterConfiguration config)
         {
             Config = config;
 
             if (Verbose > 0)
-                Config.Defaults.DefaultTraceLevel = (Logger.Severity.Verbose - 1 + Verbose);
-            
+                Config.Defaults.DefaultTraceLevel = (Severity.Verbose - 1 + Verbose);
+
 
             if (!String.IsNullOrEmpty(DeploymentId))
                 Config.Globals.DeploymentId = DeploymentId;
-            
+
             if (string.IsNullOrWhiteSpace(Name))
                 throw new ArgumentException("SiloName not defined - cannot initialize config");
 
-            NodeConfig = Config.GetConfigurationForNode(Name);
+            NodeConfig = Config.GetOrCreateNodeConfigurationForSilo(Name);
             Type = NodeConfig.IsPrimaryNode ? Silo.SiloType.Primary : Silo.SiloType.Secondary;
 
             if (TraceFilePath != null)
             {
-                var traceFileName = Config.GetConfigurationForNode(Name).TraceFileName;
+                var traceFileName = NodeConfig.TraceFileName;
                 if (traceFileName != null && !Path.IsPathRooted(traceFileName))
-                    Config.GetConfigurationForNode(Name).TraceFileName = TraceFilePath + "\\" + traceFileName;
+                    NodeConfig.TraceFileName = TraceFilePath + "\\" + traceFileName;
             }
 
             ConfigLoaded = true;
-            InitializeLogger(config.GetConfigurationForNode(Name));
+            InitializeLogger(NodeConfig);
         }
 
         private void InitializeLogger(NodeConfiguration nodeCfg)
         {
-            TraceLogger.Initialize(nodeCfg);
-            logger = TraceLogger.GetLogger("OrleansSiloHost", TraceLogger.LoggerType.Runtime);
+            LogManager.Initialize(nodeCfg);
+            logger = LogManager.GetLogger("OrleansSiloHost", LoggerType.Runtime);
+        }
+
+        /// <summary>
+        /// Helper to wait for this silo to shutdown or to be stopped via a cancellation token.
+        /// </summary>
+        /// <param name="cancellationToken">Optional cancellation token.</param>
+        /// <remarks>
+        /// Note: This method call will block execution of current thread, 
+        /// and will not return control back to the caller until the silo is shutdown or 
+        /// an external request for cancellation has been issued.
+        /// </remarks>
+        private void WaitForOrleansSiloShutdownImpl(CancellationToken? cancellationToken = null)
+        {
+            if (!IsStarted)
+                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " since it was not started successfully previously.");
+
+            if (startupEvent != null)
+                startupEvent.Reset();
+            else
+                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+
+            if (orleans != null)
+            {
+                // Intercept cancellation to initiate silo stop
+                if (cancellationToken.HasValue)
+                    cancellationToken.Value.Register(HandleExternalCancellation);
+
+                orleans.SiloTerminatedEvent.WaitOne();
+            }
+            else
+                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
+        }
+
+        /// <summary>
+        /// Handle the silo stop request coming from an external cancellation token.
+        /// </summary>
+        private void HandleExternalCancellation()
+        {
+            // Try to perform gracefull shutdown of Silo when we a cancellation request has been made
+            logger.Info(ErrorCode.SiloStopping, "External cancellation triggered, starting to shutdown silo.");
+            ShutdownOrleansSilo();
         }
 
         /// <summary>
@@ -465,6 +528,8 @@ namespace Orleans.Runtime.Host
             GC.SuppressFinalize(this);
         }
 
+        /// <summary> Perform the Dispose / cleanup operation. </summary>
+        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (!disposed)

@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -41,7 +18,7 @@ namespace Orleans.Runtime
         internal ISiloMessageCenter Transport { get; private set; }
 
         private readonly Catalog catalog;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly ClusterConfiguration config;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
@@ -58,7 +35,7 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
-            logger = TraceLogger.GetLogger("Dispatcher", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
             errorInjection = rejectionInjectionRate > 0.0d || messageLossInjectionRate > 0.0d;
@@ -108,8 +85,9 @@ namespace Orleans.Runtime
                 ActivationData target = catalog.GetOrCreateActivation(
                     message.TargetAddress, 
                     message.IsNewPlacement, 
-                    message.NewGrainType, 
-                    message.GenericGrainType, 
+                    message.NewGrainType,
+                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
+                    message.RequestContextData,
                     out ignore);
 
                 if (ignore != null)
@@ -123,22 +101,13 @@ namespace Orleans.Runtime
                 }
                 else // Request or OneWay
                 {
-                    if (SiloCanAcceptRequest(message))
+                    if (target.State == ActivationState.Valid)
                     {
-                        ReceiveRequest(message, target);
+                        catalog.ActivationCollector.TryRescheduleCollection(target);
                     }
-                    else if (message.MayResend(config.Globals))
-                    {
-                        // Record that this message is no longer flowing through the system
-                        MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Redirecting");
-                        throw new NotImplementedException("RedirectRequest() is believed to be no longer necessary; please contact the Orleans team if you see this error.");
-                    }
-                    else
-                    {
-                        // Record that this message is no longer flowing through the system
-                        MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Rejecting");
-                        RejectMessage(message, Message.RejectionTypes.Transient, null, "Shutting down");
-                    }
+                    // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
+                    // If activation is shutting down, it will queue and later forward this request.
+                    ReceiveRequest(message, target);
                 }
             }
             catch (Exception ex)
@@ -155,8 +124,16 @@ namespace Orleans.Runtime
                         throw new OrleansException(str, ex);
                     }
 
-                    logger.Warn(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                        String.Format("Intermediate warning for NonExistentActivation from Catalog.GetOrCreateActivation for message {0}", message), ex);
+                    if (nea.IsStatelessWorker)
+                    {
+                        if (logger.IsVerbose) logger.Verbose(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                           String.Format("Intermediate StatelessWorker NonExistentActivation for message {0}", message), ex);
+                    }
+                    else
+                    {
+                        logger.Info(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                            String.Format("Intermediate NonExistentActivation for message {0}", message), ex);
+                    }
 
                     ActivationAddress nonExistentActivation = nea.NonExistentActivation;
 
@@ -217,14 +194,14 @@ namespace Orleans.Runtime
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = message.CreateRejectionResponse(rejectType, str);
+                Message rejection = message.CreateRejectionResponse(rejectType, str, exc as OrleansException);
                 SendRejectionMessage(rejection);
             }
             else
             {
                 logger.Warn(ErrorCode.Messaging_Dispatcher_DiscardRejection,
                     "Discarding {0} rejection for message {1}. Exc = {2}",
-                    Enum.GetName(typeof(Message.Directions), message.Direction), message, exc.Message);
+                    Enum.GetName(typeof(Message.Directions), message.Direction), message, exc == null ? "" : exc.Message);
             }
         }
 
@@ -258,15 +235,6 @@ namespace Orleans.Runtime
 
                 RuntimeClient.Current.ReceiveResponse(message);
             }
-        }
-
-        // Check if it is OK to receive a message to its current target activation. 
-        private bool SiloCanAcceptRequest(Message message)
-        {
-            if (Message.WriteMessagingTraces)
-                message.AddTimestamp(Message.LifecycleTag.TaskIncoming);
-
-            return catalog.SiloStatusOracle.CurrentStatus != SiloStatus.ShuttingDown;
         }
 
         /// <summary>
@@ -328,7 +296,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         private bool ActivationMayAcceptRequest(ActivationData targetActivation, Message incoming)
         {
-            if (!targetActivation.IsUsable) return false;
+            if (targetActivation.State != ActivationState.Valid) return false;
             if (!targetActivation.IsCurrentlyExecuting) return true;
             return CanInterleave(targetActivation, incoming);
         }
@@ -357,8 +325,11 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            object obj = message.GetApplicationHeader(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj == null) return; // first call in a chain
+            var requestContext = message.RequestContextData;
+            object obj;
+            if (requestContext == null ||
+                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
+                obj == null) return; // first call in a chain
 
             var prevChain = ((IList)obj);
             ActivationId nextActivationId = message.TargetActivation;
@@ -372,8 +343,7 @@ namespace Orleans.Runtime
                 newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
                 newChain.Add(new RequestInvocationHistory(message));
                 
-                throw new DeadlockException(newChain.Select(req =>
-                    new Tuple<GrainId, int, int>(req.GrainId, req.InterfaceId, req.MethodId)).ToList());
+                throw new DeadlockException(newChain);
             }
         }
 
@@ -395,8 +365,6 @@ namespace Orleans.Runtime
                 // Now we can actually scheduler processing of this request
                 targetActivation.RecordRunning(message);
                 var context = new SchedulingContext(targetActivation);
-                if (Message.WriteMessagingTraces) 
-                    message.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 Scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context), context);
@@ -417,8 +385,6 @@ namespace Orleans.Runtime
                 RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 return;
             }
-            if (Message.WriteMessagingTraces) 
-                message.AddTimestamp(Message.LifecycleTag.EnqueueWaiting);
             
             bool enqueuedOk = targetActivation.EnqueueMessage(message);
             if (!enqueuedOk)
@@ -521,7 +487,7 @@ namespace Orleans.Runtime
         /// Send an outgoing message
         /// - may buffer for transaction completion / commit if it ends a transaction
         /// - choose target placement address, maintaining send order
-        /// - add ordering info & maintain send order
+        /// - add ordering info and maintain send order
         /// 
         /// </summary>
         /// <param name="message"></param>
@@ -535,7 +501,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                if (!(ex.GetBaseException() is KeyNotFoundException))
+                if (ShouldLogError(ex))
                 {
                     logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed,
                         String.Format("SelectTarget failed with {0}", ex.Message),
@@ -544,6 +510,12 @@ namespace Orleans.Runtime
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
                 RejectMessage(message, Message.RejectionTypes.Unrecoverable, ex);
             }
+        }
+
+        private bool ShouldLogError(Exception ex)
+        {
+            return !(ex.GetBaseException() is KeyNotFoundException) &&
+                   !(ex.GetBaseException() is ClientNotAvailableException);
         }
 
         // this is a compatibility method for portions of the code base that don't use
@@ -557,7 +529,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Resolve target address for a message
         /// - use transaction info
-        /// - check ordering info in message & sending activation
+        /// - check ordering info in message and sending activation
         /// - use sender's placement strategy
         /// </summary>
         /// <param name="message"></param>
@@ -577,7 +549,7 @@ namespace Orleans.Runtime
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, String.Format("AddressMessage could not find target for client pseudo-grain {0}", message));
-                throw new KeyNotFoundException("Attempting to send a message to an unregistered client pseudo-grain");
+                throw new KeyNotFoundException(String.Format("Attempting to send a message {0} to an unregistered client pseudo-grain {1}", message, targetAddress.Grain));
             }
 
             message.SetTargetPlacement(placementResult);
@@ -654,12 +626,10 @@ namespace Orleans.Runtime
 #endif
                 activation.ResetRunning(message);
 
-                if (catalog.SiloStatusOracle.CurrentStatus == SiloStatus.ShuttingDown) return;
-
                 // ensure inactive callbacks get run even with transactions disabled
                 if (!activation.IsCurrentlyExecuting)
                     activation.RunOnInactive();
-                
+
                 // Run message pump to see if there is a new request arrived to be processed
                 RunMessagePump(activation);
             }
@@ -677,7 +647,7 @@ namespace Orleans.Runtime
                     "RunMessagePump {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
             }
 #endif
-            // don't run any messages until activation is ready
+            // don't run any messages if activation is not ready or deactivating
             if (activation.State != ActivationState.Valid) return;
 
             bool runLoop;

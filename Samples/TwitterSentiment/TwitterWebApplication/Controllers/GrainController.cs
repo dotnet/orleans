@@ -1,21 +1,6 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using System.Threading.Tasks;
 using System.Web.Mvc;
+using Orleans;
 using TwitterGrainInterfaces;
 
 namespace TwitterWebApplication.Controllers
@@ -44,7 +29,7 @@ namespace TwitterWebApplication.Controllers
             var tweet = await ReadInputStreamAsync();
 
             // get a handle the to dispatcher grain
-            var grain = TweetDispatcherGrainFactory.GetGrain(0);
+            var grain = GrainClient.GrainFactory.GetGrain<ITweetDispatcherGrain>(0);
 
             // set the score for the hashtags
             await grain.AddScore(score, hashtags.ToLower().Split(','), tweet);
@@ -60,13 +45,13 @@ namespace TwitterWebApplication.Controllers
         public async Task<ActionResult> GetScores(string hashtags)
         {
             // get a handle the to dispatcher grain
-            var tweetGrain = TweetDispatcherGrainFactory.GetGrain(0);
+            var tweetGrain = GrainClient.GrainFactory.GetGrain<ITweetDispatcherGrain>(0);
 
             // get the scores for the hashtags
             var tweetGrainTask = tweetGrain.GetTotals(hashtags.ToLower().Split(','));
 
             // get a handle the to counter grain
-            var counterGrain = CounterFactory.GetGrain(0);
+            var counterGrain = GrainClient.GrainFactory.GetGrain<ICounter>(0);
 
             // get the total number of hashtag activations
             var counterGrainTask = counterGrain.GetTotalCounter();

@@ -1,1 +1,1 @@
-%~dp0src\Test.cmd
+"%~dp0src\Test.cmd"

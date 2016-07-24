@@ -18,13 +18,12 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="1.0.0.0" />
-      <dependency id="Microsoft.Orleans.OrleansAzureUtils" version="1.0.0.0" />
-      <dependency id="Microsoft.Orleans.OrleansProviders" version="1.0.0.0" />
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansCodeGenerator" version="$version$" />
     </dependencies>
   </metadata>
   <files>
-    <file src="ClientConfiguration.xml" target="content" />
-    <file src="ClientInstall.ps1" target="tools\install.ps1" />
+    <file src="Configuration\OrleansConfiguration.xsd" target="tools\client" />
   </files>
 </package>

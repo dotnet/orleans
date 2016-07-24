@@ -1,28 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
-
+using System;
+using System.Reflection;
+using Orleans.GrainDirectory;
+using System.Linq;
 namespace Orleans
 {
     namespace Concurrency
@@ -34,7 +13,7 @@ namespace Orleans
         /// that may significantly improve the performance of your application.
         /// </para>
         /// </summary>
-        [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+        [AttributeUsage(AttributeTargets.Method)]
         internal sealed class ReadOnlyAttribute : Attribute
         {
         }
@@ -68,12 +47,30 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StatelessWorkerAttribute : Attribute
         {
+            /// <summary>
+            /// Maximal number of local StatelessWorkers in a single silo.
+            /// </summary>
+            public int MaxLocalWorkers { get; private set; }
+
+            public StatelessWorkerAttribute(int maxLocalWorkers)
+            {
+                MaxLocalWorkers = maxLocalWorkers;
+            }
+
+            public StatelessWorkerAttribute()
+            {
+                MaxLocalWorkers = -1;
+            }
         }
 
         /// <summary>
         /// The AlwaysInterleaveAttribute attribute is used to mark methods that can interleave with any other method type, including write (non ReadOnly) requests.
         /// </summary>
-        [AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+        /// <remarks>
+        /// Note that this attribute is applied to method declaration in the grain interface, 
+        /// and not to the method in the implementation class itself.
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Method)]
         public sealed class AlwaysInterleaveAttribute : Attribute
         {
         }
@@ -88,6 +85,36 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
         public sealed class ImmutableAttribute : Attribute
         {
+        }
+    }
+
+    namespace MultiCluster
+    {
+        /// <summary>
+        /// base class for multi cluster registration strategies.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public abstract class RegistrationAttribute : Attribute
+        {
+            internal MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
+
+            internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
+            {
+                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class
+        /// will have an independent instance for each cluster with 
+        /// no coordination. 
+        /// </summary>
+        public class OneInstancePerClusterAttribute : RegistrationAttribute
+        {
+            public OneInstancePerClusterAttribute()
+                : base(ClusterLocalRegistration.Singleton)
+            {
+            }
         }
     }
 
@@ -223,17 +250,6 @@ namespace Orleans
         }
     }
 
-    /// <summary>
-    /// Used to make a grain interface as using extended keys.
-    /// </summary>
-    /// <remarks>
-    /// If a grain interface uses extended keys, then an additional set of grain reference 
-    /// factory methods will be generated which accept both primary and extended key parts.
-    /// </remarks>
-    [AttributeUsage(AttributeTargets.Interface)]
-    public sealed class ExtendedPrimaryKeyAttribute : Attribute
-    { }
-
     [AttributeUsage(AttributeTargets.Interface)]
     internal sealed class FactoryAttribute : Attribute
     {
@@ -244,7 +260,7 @@ namespace Orleans
             Both
         };
 
-        private readonly FactoryTypes factoryType = FactoryTypes.Grain;
+        private readonly FactoryTypes factoryType;
 
         public FactoryAttribute(FactoryTypes factoryType)
         {
@@ -253,7 +269,7 @@ namespace Orleans
 
         internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
         {
-            var attribs = type.GetCustomAttributes(typeof(FactoryAttribute), inherit: true);
+            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
 
             // if no attributes are specified, we default to FactoryTypes.Grain.
             if (0 == attribs.Length)
@@ -292,11 +308,11 @@ namespace Orleans
         }
     }
 
-    [AttributeUsage(AttributeTargets.Class)]
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
-        internal string Namespace { get; private set; }
-
+        public string Namespace { get; private set; }
+        
         // We have not yet come to an agreement whether the provider should be specified as well.
         public ImplicitStreamSubscriptionAttribute(string streamNamespace)
         {

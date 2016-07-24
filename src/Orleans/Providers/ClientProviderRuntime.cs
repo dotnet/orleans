@@ -1,70 +1,53 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans.Streams;
 
 using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    internal class ClientProviderRuntime : IProviderRuntime, IStreamProviderRuntime
-    { 
-        private IStreamPubSub pubSub;
+    internal class ClientProviderRuntime : IStreamProviderRuntime
+    {
+        private IStreamPubSub grainBasedPubSub;
+        private IStreamPubSub implictPubSub;
+        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
+        private InvokeInterceptor invokeInterceptor;
 
-        private ClientProviderRuntime() 
+        public ClientProviderRuntime(IGrainFactory grainFactory, IServiceProvider serviceProvider) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
             lockable = new AsyncLock();
+            GrainFactory = grainFactory;
+            ServiceProvider = serviceProvider;
         }
 
-        public static ClientProviderRuntime Instance { get; private set; }
-
-        public static void InitializeSingleton() 
+        public IGrainFactory GrainFactory { get; private set; }
+        public IServiceProvider ServiceProvider { get; private set; }
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
         {
-            if (Instance != null)
-            {
-                UninitializeSingleton();
-            }
-            Instance = new ClientProviderRuntime();
+            this.invokeInterceptor = interceptor;
         }
 
-        public static void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
+
+        public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
             if (null == implicitStreamSubscriberTable)
             {
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
-            Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(), implicitStreamSubscriberTable);
-            Instance.streamDirectory = new StreamDirectory();
+            grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            implictPubSub = tmp;
+            combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
+            streamDirectory = new StreamDirectory();
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -72,14 +55,22 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public static void UninitializeSingleton()
+        public async Task Reset(bool cleanup = true)
         {
-            Instance = null;
+            if (streamDirectory != null)
+            {
+                var tmp = streamDirectory;
+                streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
+                if (cleanup)
+                {
+                    await tmp.Cleanup(true, true);
+                }
+            }
         }
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public Guid ServiceId
@@ -92,6 +83,14 @@ namespace Orleans.Providers
                 // so we return default value here instead of throw exception.
                 //
                 return Guid.Empty;
+            }
+        }
+
+        public string SiloIdentity
+        {
+            get
+            {
+                throw new InvalidOperationException("Cannot access SiloIdentity from client.");
             }
         }
 
@@ -127,11 +126,6 @@ namespace Orleans.Providers
             IAddressable addressable;
             TExtension extension;
 
-            // until we have a means to get the factory related to a grain interface, we have to search linearly for the factory. 
-            var factoryName = String.Format("{0}.{1}Factory", typeof(TExtensionInterface).Namespace, typeof(TExtensionInterface).Name.Substring(1)); // skip the I
-            var factoryType = TypeUtils.ResolveType(factoryName);
-
-
             using (await lockable.LockAsync())
             {
                 Tuple<IGrainExtension, IAddressable> entry;
@@ -141,12 +135,11 @@ namespace Orleans.Providers
                     addressable = entry.Item2;
                 }
                 else
-                {
+                { 
                     extension = newExtensionFunc();
-                    var obj = factoryType.InvokeMember("CreateObjectReference", 
-                        BindingFlags.Default | BindingFlags.InvokeMethod, 
-                        null, null, new object[]{ extension }, CultureInfo.InvariantCulture);
-                    addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
+                    var obj = ((GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
+
+                    addressable = obj;
 
                     if (null == addressable)
                     {
@@ -157,12 +150,7 @@ namespace Orleans.Providers
                 }
             }
 
-            var typedAddressable = (TExtensionInterface) GrainClient.InvokeStaticMethodThroughReflection(
-                 typeof(TExtensionInterface).Assembly.FullName,
-                 factoryName,
-                 "Cast",
-                 new Type[] { typeof(IAddressable) },
-                 new object[] { addressable });
+            var typedAddressable = addressable.Cast<TExtensionInterface>();
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
             return Tuple.Create(extension, typedAddressable);
@@ -170,7 +158,17 @@ namespace Orleans.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
+                    return combinedGrainBasedAndImplicitPubSub;
+                case StreamPubSubType.ExplicitGrainBasedOnly:
+                    return grainBasedPubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -179,13 +177,6 @@ namespace Orleans.Providers
         }
 
         public bool InSilo { get { return false; } }
-
-        public Task InvokeWithinSchedulingContextAsync(Func<Task> asyncFunc, object context)
-        {
-            if (context != null)
-                throw new ArgumentException("The grain client only supports a null scheduling context.");
-            return Task.Run(asyncFunc);
-        }
 
         public object GetCurrentSchedulingContext()
         {

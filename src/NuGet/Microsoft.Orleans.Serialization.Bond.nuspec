@@ -1,0 +1,34 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.Serialization.Bond</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Bond Serializer</title>
+    <authors>Microsoft Research</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <summary>
+      An implementation of an external serializer that handles Bond types.
+    </summary>
+    <description>
+      Referencing this package allows Bond types to be serialized using the Bond Simple Binary serializer.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Bond.Runtime.CSharp" version="3.0.7" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansBondUtils.dll" target="lib\net451" />
+    <file src="OrleansBondUtils.pdb" target="lib\net451" />
+    <file src="OrleansBondUtils.xml" target="lib\net451" />
+    <file src="BondSerializerInstall.ps1" target="tools\Install.ps1" />
+    <file src="BondSerializerUninstall.ps1" target="tools\Uninstall.ps1" />
+    <file src="$SRC_DIR$OrleansBondUtils\**\*.cs" target="src" />
+  </files>
+</package>

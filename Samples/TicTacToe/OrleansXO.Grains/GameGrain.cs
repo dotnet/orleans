@@ -1,18 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -140,11 +125,11 @@ namespace OrleansXO.Grains
                 // collect tasks up, so we await both notifications at the same time
                 var promises = new List<Task>();
                 // inform this player of outcome
-                var playerGrain = PlayerGrainFactory.GetGrain(ListOfPlayers[indexNextPlayerToMove]);
+                var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(ListOfPlayers[indexNextPlayerToMove]);
                 promises.Add(playerGrain.LeaveGame(this.GetPrimaryKey(), win ? GameOutcome.Win : GameOutcome.Draw));
 
                 // inform other player of outcome
-                playerGrain = PlayerGrainFactory.GetGrain(ListOfPlayers[(indexNextPlayerToMove + 1) % 2]);
+                playerGrain = GrainFactory.GetGrain<IPlayerGrain>(ListOfPlayers[(indexNextPlayerToMove + 1) % 2]);
                 promises.Add(playerGrain.LeaveGame(this.GetPrimaryKey(), win ? GameOutcome.Lose : GameOutcome.Draw));
                 await Task.WhenAll(promises);
                 return this.GameState;
@@ -178,7 +163,7 @@ namespace OrleansXO.Grains
             var promises = new List<Task<string>>();
             foreach (var p in this.ListOfPlayers.Where(p => p != player))
             {
-                promises.Add(PlayerGrainFactory.GetGrain(p).GetUsername());
+                promises.Add(GrainFactory.GetGrain<IPlayerGrain>(p).GetUsername());
             }
             await Task.WhenAll(promises);
 

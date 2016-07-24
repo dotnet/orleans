@@ -1,46 +1,27 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IStreamProvider, IStreamProviderImpl
+    public class SimpleMessageStreamProvider : IInternalStreamProvider
     {
         public string                       Name { get; private set; }
 
         private Logger                      logger;
         private IStreamProviderRuntime      providerRuntime;
         private bool                        fireAndForgetDelivery;
-        internal const string               FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        internal const bool                 DEFAULT_FIRE_AND_FORGET_DELIVERY_VALUE = true;
+        private bool                        optimizeForImmutableData;
+        private StreamPubSubType            pubSubType;
 
-        public SimpleMessageStreamProvider()
-        {
-        }
+        internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
+        internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
+        internal const string                OPTIMIZE_FOR_IMMUTABLE_DATA = "OptimizeForImmutableData";
+        internal const StreamPubSubType      DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+
+        internal const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
+        internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
 
         public bool IsRewindable { get { return false; } }
 
@@ -48,15 +29,27 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
-            string fireAndForgetDeliveryStr;
-            fireAndForgetDelivery = !config.Properties.TryGetValue(FIRE_AND_FORGET_DELIVERY, out fireAndForgetDeliveryStr) || Boolean.Parse(fireAndForgetDeliveryStr);
+
+            fireAndForgetDelivery = config.GetBoolProperty(FIRE_AND_FORGET_DELIVERY, DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY);
+            optimizeForImmutableData = config.GetBoolProperty(OPTIMIZE_FOR_IMMUTABLE_DATA, DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA);
+            
+            string pubSubTypeString;
+            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
+                ? DEFAULT_STREAM_PUBSUB_TYPE
+                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
 
             logger = providerRuntime.GetLogger(this.GetType().Name);
-            logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}.", Name, fireAndForgetDelivery);
+            logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
+                "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
             return TaskDone.Done;
         }
 
         public Task Start()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task Close()
         {
             return TaskDone.Done;
         }
@@ -69,14 +62,21 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 () => new StreamImpl<T>(streamId, this, IsRewindable));
         }
 
-        public IAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
-            return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime, fireAndForgetDelivery, IsRewindable);
+            return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime,
+                fireAndForgetDelivery, optimizeForImmutableData, providerRuntime.PubSub(pubSubType), IsRewindable);
         }
 
-        public IAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> stream)
+        IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
+            return GetConsumerInterfaceImpl(streamId);
+        }
+
+        private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
+        {
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime,
+                providerRuntime.PubSub(pubSubType), IsRewindable);
         }
     }
 }

@@ -1,19 +1,3 @@
-﻿//*********************************************************//
-//    Copyright (c) Microsoft. All rights reserved.
-//    
-//    Apache 2.0 License
-//    
-//    You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-//    
-//    Unless required by applicable law or agreed to in writing, software 
-//    distributed under the License is distributed on an "AS IS" BASIS, 
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
-//    implied. See the License for the specific language governing 
-//    permissions and limitations under the License.
-//
-//*********************************************************
-
 using AdventureGrainInterfaces;
 using System;
 using System.Collections.Generic;
@@ -29,23 +13,22 @@ namespace AdventureSetup
     {
         private async Task<IRoomGrain> MakeRoom(RoomInfo data)
         {
-            var roomGrain = GrainFactory.GetGrain<IRoomGrain>(data.Id);
+            var roomGrain = GrainClient.GrainFactory.GetGrain<IRoomGrain>(data.Id);
             await roomGrain.SetInfo(data);
             return roomGrain;
         }
 
         private async Task MakeThing(Thing thing)
         {
-            var roomGrain = GrainFactory.GetGrain<IRoomGrain>(thing.FoundIn);
+            var roomGrain = GrainClient.GrainFactory.GetGrain<IRoomGrain>(thing.FoundIn);
             await roomGrain.Drop(thing);
         }
 
-        private Task MakeMonster(MonsterInfo data, IRoomGrain room)
+        private async Task MakeMonster(MonsterInfo data, IRoomGrain room)
         {
-            var monsterGrain = GrainFactory.GetGrain<IMonsterGrain>(data.Id);
-            monsterGrain.SetInfo(data);
-            monsterGrain.SetRoomGrain(room);
-            return Task.FromResult(true);
+            var monsterGrain = GrainClient.GrainFactory.GetGrain<IMonsterGrain>(data.Id);
+            await monsterGrain.SetInfo(data);
+            await monsterGrain.SetRoomGrain(room);
         }
 
 

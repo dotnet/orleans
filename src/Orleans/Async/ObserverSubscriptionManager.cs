@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
@@ -46,17 +23,17 @@ namespace Orleans
 
         /// <summary>
         /// The set of currently-subscribed observers.
-        /// This is implemented as a dictionary keyed by GrainID so that if the same obsever subscribes multiple times,
+        /// This is implemented as a HashSet of IGrainObserver so that if the same observer subscribes multiple times,
         /// it will still only get invoked once per notification.
         /// </summary>
-        private readonly Dictionary<GrainId,T> observers;
+        private readonly HashSet<T> observers;
 
         /// <summary>
         /// Constructs an empty subscription manager.
         /// </summary>
         public ObserverSubscriptionManager()
         {
-            observers = new Dictionary<GrainId, T>();
+            observers = new HashSet<T>();
         }
 
         /// <summary>
@@ -68,14 +45,19 @@ namespace Orleans
         /// In this case, the existing subscription is unaffected.</para></returns>
         public void Subscribe(T observer)
         {
-            GrainId id = ((GrainReference)((IGrainObserver)observer)).GrainId; // for some reason can't cast directly to GrainReference
-            
-            if (observers.ContainsKey(id))
+            if (!observers.Add(observer))
                 throw new OrleansException(String.Format("Cannot subscribe already subscribed observer {0}.", observer));
-
-            observers.Add(id, observer);
         }
 
+        /// <summary>
+        /// Determines if the SubscriptionManager has the input observer
+        /// </summary>
+        /// <param name="observer">True if the the observer is already subscribed, otherwise False.</param>
+        /// <returns>True is the SubscriptionManager has the input observer.</returns>
+        public bool IsSubscribed(T observer)
+        {
+            return observers.Contains(observer);
+        }
 
         /// <summary>
         /// Removes a (former) subscriber.
@@ -85,11 +67,8 @@ namespace Orleans
         /// This promise will be broken if the observer is not a subscriber.</returns>
         public void Unsubscribe(T observer)
         {
-            GrainId id = ((GrainReference)((IGrainObserver)observer)).GrainId; // for some reason can't cast directly to GrainReference
-            if (!observers.ContainsKey(id))
+            if (!observers.Remove(observer))
                 throw new OrleansException(String.Format("Observer {0} is not subscribed.", observer));
-
-            observers.Remove(id);
         }
         
         /// <summary>
@@ -108,22 +87,29 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public void Notify(Action<T> notification)
         {
-            var failed = new List<GrainId>();
-
-            foreach (var pair in observers)
+            List<T> failed = null;
+            foreach (var observer in observers)
             {
                 try
                 {
-                    notification(pair.Value);
+                    notification(observer);
                 }
                 catch (Exception)
                 {
-                    failed.Add(pair.Key);
+                    if (failed == null)
+                    {
+                        failed = new List<T>();
+                    }
+                    failed.Add(observer);
                 }
             }
-            foreach (var key in failed)
+            if (failed != null)
             {
-                observers.Remove(key);
+                foreach (var key in failed)
+                {
+                    observers.Remove(key);
+                }
+                throw new OrleansException(String.Format("Failed to notify the following observers: {0}", Utils.EnumerableToString(failed)));
             }
         }
     }

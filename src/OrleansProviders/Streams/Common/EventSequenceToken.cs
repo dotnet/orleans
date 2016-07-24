@@ -1,83 +1,104 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-﻿using System;
+using System;
 using System.Globalization;
 
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
+    /// <summary>
+    /// Stream sequcen token that tracks sequence nubmer and event index
+    /// </summary>
     [Serializable]
     public class EventSequenceToken : StreamSequenceToken
     {
-        private readonly long sequenceNumber;
-        private readonly int eventIndex;
+        /// <summary>
+        /// Number of event batches in stream prior to this event batch
+        /// </summary>
+        public long SequenceNumber { get; set; }
+        
+        /// <summary>
+        /// Number of events in batch prior to this event
+        /// </summary>
+        public int EventIndex { get; set; }
 
-        internal EventSequenceToken(long seqNumber, int eventInd)
-        {
-            sequenceNumber = seqNumber;
-            eventIndex = eventInd;
-        }
-
+        /// <summary>
+        /// Sequence token constructor
+        /// </summary>
+        /// <param name="seqNumber"></param>
         public EventSequenceToken(long seqNumber)
         {
-            sequenceNumber = seqNumber;
-            eventIndex = 0;
+            SequenceNumber = seqNumber;
+            EventIndex = 0;
         }
 
-        internal EventSequenceToken NextSequenceNumber()
+        /// <summary>
+        /// Sequence token constructor
+        /// </summary>
+        /// <param name="seqNumber"></param>
+        /// <param name="eventInd"></param>
+        public EventSequenceToken(long seqNumber, int eventInd)
         {
-            return new EventSequenceToken(sequenceNumber + 1, eventIndex);
+            SequenceNumber = seqNumber;
+            EventIndex = eventInd;
         }
 
+        /// <summary>
+        /// Sequence number of next event batch in the stream
+        /// </summary>
+        /// <returns></returns>
+        public EventSequenceToken NextSequenceNumber()
+        {
+            return new EventSequenceToken(SequenceNumber + 1, EventIndex);
+        }
+
+        /// <summary>
+        /// Creates a sequence token for a specific event in the current batch
+        /// </summary>
+        /// <param name="eventInd"></param>
+        /// <returns></returns>
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
-            return new EventSequenceToken(sequenceNumber, eventInd);
+            return new EventSequenceToken(SequenceNumber, eventInd);
         }
 
         internal static long Distance(EventSequenceToken first, EventSequenceToken second)
         {
-            return first.sequenceNumber - second.sequenceNumber;
+            return first.SequenceNumber - second.SequenceNumber;
         }
 
-        internal bool IsInvalid()
-        {
-            return sequenceNumber == -1;
-        }
-
+        /// <summary>
+        /// Determines whether the specified object is equal to the current object.
+        /// </summary>
+        /// <returns>
+        /// true if the specified object  is equal to the current object; otherwise, false.
+        /// </returns>
+        /// <param name="obj">The object to compare with the current object. </param><filterpriority>2</filterpriority>
         public override bool Equals(object obj)
         {
             return Equals(obj as EventSequenceToken);
         }
 
+        /// <summary>
+        /// Indicates whether the current object is equal to another object of the same type.
+        /// </summary>
+        /// <returns>
+        /// true if the current object is equal to the <paramref name="other"/> parameter; otherwise, false.
+        /// </returns>
+        /// <param name="other">An object to compare with this object.</param>
         public override bool Equals(StreamSequenceToken other)
         {
             var token = other as EventSequenceToken;
-            return token != null && (token.sequenceNumber == sequenceNumber &&
-                                     token.eventIndex == eventIndex);
+            return token != null && (token.SequenceNumber == SequenceNumber &&
+                                     token.EventIndex == EventIndex);
         }
 
+        /// <summary>
+        /// Compares the current object with another object of the same type.
+        /// </summary>
+        /// <returns>
+        /// A value that indicates the relative order of the objects being compared. The return value has the following meanings: Value Meaning Less than zero This object is less than the <paramref name="other"/> parameter.Zero This object is equal to <paramref name="other"/>. Greater than zero This object is greater than <paramref name="other"/>. 
+        /// </returns>
+        /// <param name="other">An object to compare with this object.</param>
         public override int CompareTo(StreamSequenceToken other)
         {
             if (other == null)
@@ -87,19 +108,19 @@ namespace Orleans.Providers.Streams.Common
             if (token == null)
                 throw new ArgumentOutOfRangeException("other");
             
-            int difference = sequenceNumber.CompareTo(token.sequenceNumber);
-            return difference != 0 ? difference : eventIndex.CompareTo(token.eventIndex);
+            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }
 
         public override int GetHashCode()
         {
             // why 397?
-            return (eventIndex * 397) ^ sequenceNumber.GetHashCode();
+            return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
         }
 
         public override string ToString()
         {
-            return string.Format(CultureInfo.InvariantCulture, "EventSequenceToken: SequenceNumber={0}, EventIndex={1}", sequenceNumber, eventIndex);
+            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
         }
     }
 }

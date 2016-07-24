@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,13 +5,16 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Xml;
+using Orleans.Providers;
+using System.Reflection;
+using System.Threading;
 
 namespace Orleans.Runtime.Configuration
 {
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
-    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration, ILimitsConfiguration
+    public class ClientConfiguration : MessagingConfiguration, ITraceConfiguration, IStatisticsConfiguration
     {
         /// <summary>
         /// Specifies the type of the gateway provider.
@@ -44,7 +24,9 @@ namespace Orleans.Runtime.Configuration
             None,               // 
             AzureTable,         // use Azure, requires SystemStore element
             SqlServer,          // use SQL, requires SystemStore element
-            Config              // use Config based static list, requires Config element(s)
+            ZooKeeper,          // use ZooKeeper, requires SystemStore element
+            Config,             // use Config based static list, requires Config element(s)
+            Custom              // use provider from third-party assembly
         }
 
         /// <summary>
@@ -76,24 +58,32 @@ namespace Orleans.Runtime.Configuration
         /// Specifies a unique identifier of this deployment.
         /// If the silos are deployed on Azure (run as workers roles), deployment id is set automatically by Azure runtime, 
         /// accessible to the role via RoleEnvironment.DeploymentId static variable and is passed to the silo automatically by the role via config. 
-        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConmfiguration.xml file.
+        /// So if the silos are run as Azure roles this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles, this variable should be set by a deployment script in the OrleansConfiguration.xml file.
         /// </summary>
         public string DeploymentId { get; set; }
         /// <summary>
-        /// Specifies the connection string for azure storage account.
+        /// Specifies the connection string for the gateway provider.
         /// If the silos are deployed on Azure (run as workers roles), DataConnectionString may be specified via RoleEnvironment.GetConfigurationSettingValue("DataConnectionString");
         /// In such a case it is taken from there and passed to the silo automatically by the role via config.
         /// So if the silos are run as Azure roles and this config is specified via RoleEnvironment, 
-        /// this variable should not be specified in the OrleansConmfiguration.xml (it will be overwritten if specified).
-        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConmfiguration.xml file.
+        /// this variable should not be specified in the OrleansConfiguration.xml (it will be overwritten if specified).
+        /// If the silos are deployed on the cluster and not as Azure roles,  this variable should be set in the OrleansConfiguration.xml file.
         /// If not set at all, DevelopmentStorageAccount will be used.
         /// </summary>
         public string DataConnectionString { get; set; }
 
-        public Logger.Severity DefaultTraceLevel { get; set; }
-        public IList<Tuple<string, Logger.Severity>> TraceLevelOverrides { get; private set; }
-        public bool WriteMessagingTraces { get; set; }
+        /// <summary>
+        /// When using ADO, identifies the underlying data provider for the gateway provider. This three-part naming syntax is also used when creating a new factory 
+        /// and for identifying the provider in an application configuration file so that the provider name, along with its associated 
+        /// connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
+        /// </summary>
+        public string AdoInvariant { get; set; }
+
+        public string CustomGatewayProviderAssemblyName { get; set; }
+
+        public Severity DefaultTraceLevel { get; set; }
+        public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
         public bool TraceToConsole { get; set; }
         public int LargeMessageWarningThreshold { get; set; }
         public bool PropagateActivityId { get; set; }
@@ -125,7 +115,7 @@ namespace Orleans.Runtime.Configuration
         public bool StatisticsWriteLogStatisticsToTable { get; set; }
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        public IDictionary<string, LimitValue> LimitValues { get; private set; }
+        public LimitManager LimitManager { get; private set; }
 
         private static readonly TimeSpan DEFAULT_GATEWAY_LIST_REFRESH_PERIOD = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -187,12 +177,13 @@ namespace Orleans.Runtime.Configuration
             DNSHostName = Dns.GetHostName();
             DeploymentId = Environment.UserName;
             DataConnectionString = "";
+            // Assume the ado invariant is for sql server storage if not explicitly specified
+            AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
-            DefaultTraceLevel = Logger.Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
+            DefaultTraceLevel = Severity.Info;
+            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
-            WriteMessagingTraces = false;
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             BulkMessageLimit = Constants.DEFAULT_LOGGER_BULK_MESSAGE_LIMIT;
@@ -204,17 +195,8 @@ namespace Orleans.Runtime.Configuration
             StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
             StatisticsWriteLogStatisticsToTable = true;
             StatisticsCollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
-            LimitValues = new Dictionary<string, LimitValue>();
+            LimitManager = new LimitManager();
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
-        }
-
-        /// <summary>
-        /// </summary>
-        public LimitValue GetLimit(string name)
-        {
-            LimitValue limit;
-            LimitValues.TryGetValue(name, out limit);
-            return limit;
         }
 
         public void Load(TextReader input)
@@ -237,7 +219,7 @@ namespace Orleans.Runtime.Configuration
                     switch (child.LocalName)
                     {
                         case "Gateway":
-                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child));
+                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child).GetResult());
                             if (GatewayProvider == GatewayProviderType.None)
                             {
                                 GatewayProvider = GatewayProviderType.Config;
@@ -252,6 +234,14 @@ namespace Orleans.Runtime.Configuration
                             {
                                 var sst = child.GetAttribute("SystemStoreType");
                                 GatewayProvider = (GatewayProviderType)Enum.Parse(typeof(GatewayProviderType), sst);
+                            }
+                            if (child.HasAttribute("CustomGatewayProviderAssemblyName"))
+                            {
+                                CustomGatewayProviderAssemblyName = child.GetAttribute("CustomGatewayProviderAssemblyName");
+                                if (CustomGatewayProviderAssemblyName.EndsWith(".dll"))
+                                    throw new FormatException("Use fully qualified assembly name for \"CustomGatewayProviderAssemblyName\"");
+                                if (GatewayProvider != GatewayProviderType.Custom)
+                                    throw new FormatException("SystemStoreType should be \"Custom\" when CustomGatewayProviderAssemblyName is specified");
                             }
                             if (child.HasAttribute("DeploymentId"))
                             {
@@ -270,6 +260,14 @@ namespace Orleans.Runtime.Configuration
                                     GatewayProvider = GatewayProviderType.AzureTable;
                                 }
                             }
+                            if (child.HasAttribute(Constants.ADO_INVARIANT_NAME))
+                            {
+                                AdoInvariant = child.GetAttribute(Constants.ADO_INVARIANT_NAME);
+                                if (String.IsNullOrWhiteSpace(AdoInvariant))
+                                {
+                                    throw new FormatException("SystemStore.AdoInvariant cannot be blank");
+                                }
+                            }
                             break;
                         case "Tracing":
                             ConfigUtilities.ParseTracing(this, child, ClientName);
@@ -278,7 +276,7 @@ namespace Orleans.Runtime.Configuration
                             ConfigUtilities.ParseStatistics(this, child, ClientName);
                             break;
                         case "Limits":
-                            ConfigUtilities.ParseLimitValues(this, child, ClientName);
+                            ConfigUtilities.ParseLimitValues(LimitManager, child, ClientName);
                             break;
                         case "Debug":
                             break;
@@ -305,12 +303,23 @@ namespace Orleans.Runtime.Configuration
                                     "Invalid integer value for the Port attribute on the LocalAddress element");
                             }
                             break;
+                        case "Telemetry":
+                            ConfigUtilities.ParseTelemetry(child);
+                            break;
                         default:
                             if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                             {
-                                var providerConfig = new ProviderCategoryConfiguration();
-                                providerConfig.Load(child);
-                                ProviderConfigurations.Add(providerConfig.Name, providerConfig);
+                                var providerCategory = ProviderCategoryConfiguration.Load(child);
+
+                                if (ProviderConfigurations.ContainsKey(providerCategory.Name))
+                                {
+                                    var existingCategory = ProviderConfigurations[providerCategory.Name];
+                                    existingCategory.Merge(providerCategory);
+                                }
+                                else
+                                {
+                                    ProviderConfigurations.Add(providerCategory.Name, providerCategory);
+                                }
                             }
                             break;
                     }
@@ -322,30 +331,66 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public static ClientConfiguration LoadFromFile(string fileName)
         {
-            if (fileName == null) return null;
+            if (fileName == null)
+            { return null; }
 
-            TextReader input = null;
-            try
+            using (TextReader input = File.OpenText(fileName))
             {
                 var config = new ClientConfiguration();
-                input = File.OpenText(fileName);
                 config.Load(input);
                 config.SourceFile = fileName;
                 return config;
             }
-            finally
-            {
-                if (input != null) input.Close();
-            }
+            
         }
 
         /// <summary>
-        /// This method may be called by the client host or test host to tweak a provider configuration after it has been already loaded.
-        /// Its is optional and should NOT be automaticaly called by the runtime.
+        /// Registers a given type of <typeparamref name="T"/> where <typeparamref name="T"/> is stream provider
         /// </summary>
-        internal void AdjustConfiguration()
+        /// <typeparam name="T">Non-abstract type which implements <see cref="Orleans.Streams.IStreamProvider"/> stream</typeparam>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
+        public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            GlobalConfiguration.AdjustConfiguration(ProviderConfigurations, DeploymentId);
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Registers a given stream provider.
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="properties">Properties that will be passed to the stream provider upon initialization </param>
+        public void RegisterStreamProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+        /// <summary>
+        /// Retrieves an existing provider configuration
+        /// </summary>
+        /// <param name="providerTypeFullName">Full name of the stream provider type</param>
+        /// <param name="providerName">Name of the stream provider</param>
+        /// <param name="config">The provider configuration, if exists</param>
+        /// <returns>True if a configuration for this provider already exists, false otherwise.</returns>
+        public bool TryGetProviderConfiguration(string providerTypeFullName, string providerName, out IProviderConfiguration config)
+        {
+            return ProviderConfigurationUtility.TryGetProviderConfiguration(ProviderConfigurations, providerTypeFullName, providerName, out config);
+        }
+
+        /// <summary>
+        /// Retrieves an enumeration of all currently configured provider configurations.
+        /// </summary>
+        /// <returns>An enumeration of all currently configured provider configurations.</returns>
+        public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
+        {
+            return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
         }
 
         /// <summary>
@@ -368,7 +413,7 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendLine("Client Configuration:");
             sb.Append("   Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
-            sb.Append("   Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("   Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("   Gateway Provider: ").Append(GatewayProvider);
             if (GatewayProvider == GatewayProviderType.None)
             {
@@ -413,17 +458,17 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Client Name: ").AppendLine(ClientName);
             sb.Append(ConfigUtilities.TraceConfigurationToString(this));
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
-            if (LimitValues.Count > 0)
-            {
-                sb.Append("   Limits Values: ").AppendLine();
-                foreach (var limit in LimitValues.Values)
-                {
-                    sb.AppendFormat("       {0}", limit).AppendLine();
-                }
-            }
+            sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
+            sb.Append("   .NET: ").AppendLine();
+            int workerThreads;
+            int completionPortThreads;
+            ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
             sb.AppendFormat("   Providers:").AppendLine();
-            sb.Append(GlobalConfiguration.PrintProviderConfigurations(ProviderConfigurations));
+            sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();
         }
 
@@ -450,11 +495,34 @@ namespace Orleans.Runtime.Configuration
                     if (!HasStaticGateways)
                         throw new ArgumentException("Config specifies Config based GatewayProviderType, but Gateway element(s) is/are not specified.", "GatewayProvider");
                     break;
+                case GatewayProviderType.Custom:
+                    if (String.IsNullOrEmpty(CustomGatewayProviderAssemblyName))
+                        throw new ArgumentException("Config specifies Custom GatewayProviderType, but CustomGatewayProviderAssemblyName attribute is not specified", "GatewayProvider");
+                    break;
                 case GatewayProviderType.None:
                     if (!UseAzureSystemStore && !HasStaticGateways)
                         throw new ArgumentException("Config does not specify GatewayProviderType, and also does not have the adequate defaults: no Azure and or Gateway element(s) are specified.","GatewayProvider");
                     break;
+                case GatewayProviderType.SqlServer:
+                    if (!UseSqlSystemStore)
+                        throw new ArgumentException("Config specifies SqlServer based GatewayProviderType, but DeploymentId or DataConnectionString are not specified or not complete.", "GatewayProvider");
+                    break;
+                case GatewayProviderType.ZooKeeper:
+                    break;
             }
+        }
+
+        /// <summary>
+        /// Retuurns a ClientConfiguration object for connecting to a local silo (for testing).
+        /// </summary>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClientConfiguration object that can be passed to GrainClient class for initialization</returns>
+        public static ClientConfiguration LocalhostSilo(int gatewayPort = 40000)
+        {
+            var config = new ClientConfiguration {GatewayProvider = GatewayProviderType.Config};
+            config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayPort));
+
+            return config;
         }
     }
 }
