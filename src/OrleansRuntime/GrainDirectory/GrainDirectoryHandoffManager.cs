@@ -139,6 +139,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // adjust copy for the predecessor of the failed silo
                 directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
             }
+            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo]);
             if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
             directoryPartitionsMap.Remove(removedSilo);
         }
@@ -280,6 +281,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 directoryPartitionsMap[source].Update(partition);
             }
+
+            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
         }
 
         internal void RemoveHandoffPartition(SiloAddress source)

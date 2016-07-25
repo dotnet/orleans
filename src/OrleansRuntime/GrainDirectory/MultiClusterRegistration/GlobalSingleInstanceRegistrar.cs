@@ -60,9 +60,8 @@ namespace Orleans.Runtime.GrainDirectory
             if (config == null || !config.Clusters.Contains(myClusterId))
             {
                 // we are not joined to the cluster yet/anymore. Go to doubtful state directly.
+                gsiActivationMaintainer.TrackDoubtfulGrain(address.Grain);
                 return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful);
-                gsiActivationMaintainer.MarkActivationDoubtful(address.Activation);
-                return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful, out ignored);
             }
 
             var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();

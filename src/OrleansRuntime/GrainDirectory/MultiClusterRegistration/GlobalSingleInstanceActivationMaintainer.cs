@@ -29,15 +29,49 @@ namespace Orleans.Runtime.GrainDirectory
         // scanning the entire directory for doubtful activations is too slow.
         // therefore, we maintain a list of potentially doubtful activations on the side.
         // maintainer periodically takes and processes this list.
-        private List<ActivationId> doubtfulActivations = new List<ActivationId>();
+        private List<GrainId> doubtfulGrains = new List<GrainId>();
         private object lockable = new object();
 
-        public void MarkActivationDoubtful(ActivationId activation)
+        public void TrackDoubtfulGrain(GrainId grain)
         {
             lock (lockable)
-                doubtfulActivations.Add(activation);
+                doubtfulGrains.Add(grain);
+        }
+        public void TrackDoubtfulGrains(Dictionary<GrainId, IGrainInfo> newstuff)
+        {
+            var newdoubtful = newstuff.Where(kp =>
+             {
+                 if (!kp.Value.SingleInstance) return false;
+                 var act = kp.Value.Instances.FirstOrDefault();
+                 if (act.Key == null) return false;
+                 if (act.Value.RegistrationStatus == MultiClusterStatus.Doubtful) return true;
+                 return false;
+             }).Select(kp => kp.Key);
+
+            lock (lockable)
+            {
+                doubtfulGrains.AddRange(newdoubtful);
+            }
         }
 
+        public void TrackDoubtfulGrains(GrainDirectoryPartition newstuff)
+        {
+            var newdoubtful = newstuff.GetItems().Where(kp =>
+            {
+                if (!kp.Value.SingleInstance) return false;
+                var act = kp.Value.Instances.FirstOrDefault();
+                if (act.Key == null) return false;
+                if (act.Value.RegistrationStatus == MultiClusterStatus.Doubtful) return true;
+                return false;
+            }).Select(kp => kp.Key);
+
+            lock (lockable)
+            {
+                doubtfulGrains.AddRange(newdoubtful);
+            }
+        }
+
+        // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
         protected override async void Run()
         {
             var globalConfig = Silo.CurrentSilo.OrleansConfig.Globals;
@@ -72,8 +106,8 @@ namespace Orleans.Runtime.GrainDirectory
                             if (!kp.Value.SingleInstance) return false;
                             var act = kp.Value.Instances.FirstOrDefault();
                             if (act.Key == null) return false;
-                            if (act.Value.RegistrationStatus == MultiClusterStatus.Owned) return false;
-                            return true;
+                            if (act.Value.RegistrationStatus == MultiClusterStatus.Owned) return true;
+                            return false;
                         }).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
 
                         logger.Verbose("GSIP:M make {0} owned entries doubtful", ownedEntries.Count);
@@ -89,29 +123,21 @@ namespace Orleans.Runtime.GrainDirectory
                         // go through all doubtful entries and broadcast ownership requests for each
 
                         // take them all out of the list for processing.
-                        List<ActivationId> activations_to_check;
+                        List<GrainId> grains;
                         lock (lockable)
                         {
-                            activations_to_check = doubtfulActivations;
-                            doubtfulActivations = new List<ActivationId>();
+                            grains = doubtfulGrains;
+                            doubtfulGrains = new List<GrainId>();
                         }
 
-                        //var doubtfulEntries = allEntries.Where(kp =>
-                        //{
-                        //    if (!kp.Value.SingleInstance) return false;
-                        //    var act = kp.Value.Instances.FirstOrDefault();
-                        //    if (act.Key == null) return false;
-                        //    if (act.Value.RegistrationStatus != MultiClusterStatus.Doubtful) return false;
-                        //    return true;
-                        //}).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
-
-                        //logger.Verbose("GSIP:M retry {0} doubtful entries", doubtfulEntries.Count);
+                        // filter
+                        logger.Verbose("GSIP:M retry {0} doubtful entries", grains.Count);
                         
-                        //var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
-                        //await router.Scheduler.QueueTask(
-                        //    () => RunBatchedActivationRequests(remoteClusters, doubtfulEntries),
-                        //    router.CacheValidator.SchedulingContext
-                        //);
+                        var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
+                        await router.Scheduler.QueueTask(
+                            () => RunBatchedActivationRequests(remoteClusters, grains),
+                            router.CacheValidator.SchedulingContext
+                        );
                     }
               
                     // NOT DOING CACHE INVALIDATION for now. it is not required for correctness
@@ -171,26 +197,29 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (var entry in entries)
             {
                 router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.Doubtful, MultiClusterStatus.Owned);
-                MarkActivationDoubtful(entry.Item2.Key);
+                TrackDoubtfulGrain(entry.Item1);
             }
 
             return TaskDone.Done;
         }
 
-        private async Task RunBatchedActivationRequests(List<string> remoteClusters, List<Tuple<GrainId, KeyValuePair<ActivationId,IActivationInfo>>> entries)
+        private async Task RunBatchedActivationRequests(List<string> remoteClusters, List<GrainId> grains)
         {
             var addresses = new List<ActivationAddress>();
 
-            foreach (var entry in entries)
+            foreach (var grain in grains)
             {
-                // transition to requesting state
-                if (router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.Doubtful))
+                // retrieve activation
+                ActivationAddress address;
+                int version;
+                var mcstate = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
+
+                // work on the doubtful ones only
+                if (mcstate == MultiClusterStatus.Doubtful)
                 {
-                    ActivationAddress address;
-                    int version;
-                    MultiClusterStatus mcstatus = router.DirectoryPartition.TryGetActivation(entry.Item1, out address, out version);
-                    if (address != null)
-                    { 
+                    // try to start retry by moving into requested_ownership state
+                    if (router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.Doubtful))
+                    {
                         addresses.Add(address);
                     }
                 }
@@ -262,7 +291,6 @@ namespace Orleans.Runtime.GrainDirectory
                         summary.Faulted);
                 }
             }
-
 
             // process each address
 
@@ -338,7 +366,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ProtocolError(address, "unhandled protocol state");
                 }
 
-                MarkActivationDoubtful(address.Activation);
+                TrackDoubtfulGrain(address.Grain);
             }
 
             // remove loser activations
