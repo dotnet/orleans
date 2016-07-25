@@ -120,6 +120,7 @@ namespace Orleans.Runtime.Host
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
                 orleans = new Silo(Name, Type, Config);
+                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", orleans.Name, orleans.Type);
             }
             catch (Exception exc)
             {
