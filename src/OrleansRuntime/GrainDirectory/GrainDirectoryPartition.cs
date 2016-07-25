@@ -90,7 +90,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Instances.Add(act, new ActivationInfo(silo, registrationStatus));
                 VersionTag = rand.Next();
-                return ActivationAddress.GetAddress(silo, grain, act, registrationStatus);
+                return ActivationAddress.GetAddress(silo, grain, act);
             }
         }
 
@@ -346,24 +346,53 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        internal AddressesAndTag LookUpGrain(GrainId grain)
+        internal AddressesAndTag LookUpActivations(GrainId grain)
         {
             var result = new AddressesAndTag();
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
                 {
                     result.Addresses = new List<ActivationAddress>();
                     result.VersionTag = partitionData[grain].VersionTag;
 
                     foreach (var route in partitionData[grain].Instances.Where(route => IsValidSilo(route.Value.SiloAddress)))
                     {
-                        result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key, route.Value.RegistrationStatus));
+                        result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
                     }
                 }
             }
             return result;
         }
+
+
+        /// <summary>
+        /// Returns the activation of a single-activation grain, if present.
+        /// </summary>
+        internal MultiClusterStatus TryGetActivation(GrainId grain, out ActivationAddress address, out int version)
+        {
+            lock (lockable)
+            {
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
+                {
+                    var first = graininfo.Instances.FirstOrDefault();
+
+                    if (first.Value != null)
+                    {
+                        address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
+                        version = graininfo.VersionTag;
+                        return first.Value.RegistrationStatus;
+                    }
+                }
+            }
+            address = null;
+            version = 0;
+            return MultiClusterStatus.Invalid;
+        }
+
+
 
         /// <summary>
         /// Returns the version number of the list of activations for the grain.
@@ -559,9 +588,10 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
                 {
-                    return partitionData[grain].UpdateClusterRegistrationStatus(activationId, registrationStatus, compareWith);
+                    return graininfo.UpdateClusterRegistrationStatus(activationId, registrationStatus, compareWith);
                 }
                 return false;
             }

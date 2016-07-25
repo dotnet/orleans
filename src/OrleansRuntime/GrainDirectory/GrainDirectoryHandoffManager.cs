@@ -37,7 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             foreach (var partition in directoryPartitionsMap.Values)
             {
-                var result = partition.LookUpGrain(grain);
+                var result = partition.LookUpActivations(grain);
                 if (result.Addresses != null)
                     return result.Addresses;
             }

@@ -70,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
             RemoteClusterActivationResponse response;
 
             //This function will be called only on the Owner silo.
-    
+
             //Optimize? Look in the cache first?
             //NOTE: THIS COMMENT IS FROM LOOKUP. HAS IMPLICATIONS ON "OWNED" INVARIANCE.
             //// It can happen that we cannot find the grain in our partition if there were 
@@ -80,79 +80,70 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 //var activations = await LookUp(grain, LocalGrainDirectory.NUM_RETRIES);
                 //since we are the owner, we can look directly into the partition. No need to lookinto the cache.
-                var localResult = router.DirectoryPartition.LookUpGrain(grain);
+                ActivationAddress address;
+                int version;
+                MultiClusterStatus existingActivationStatus = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
 
-                if (localResult.Addresses == null)
+
+                //Return appropriate protocol response, given current mc status   
+                switch (existingActivationStatus)
                 {
-                    //If no activation found in the cluster, return response as PASS.
-                    response = RemoteClusterActivationResponse.Pass;
-                }
-                else
-                {
-                    //Find the Activation Status for the entry and return appropriate value.
-
-                    //addresses should contain only one item since there should be only one valid instance per cluster. Hence FirstOrDefault() should work fine.
-                    var addressAndTag = new AddressAndTag()
-                    {
-                        Address = localResult.Addresses.FirstOrDefault(),
-                        VersionTag = localResult.VersionTag
-                    };
-
-                    if (addressAndTag.Address == null)
-                    {
+                    case MultiClusterStatus.Invalid:
                         response = RemoteClusterActivationResponse.Pass;
-                    }
-                    else
-                    {
-                        var existingActivationStatus = addressAndTag.Address.Status;
+                        break;
 
-                        switch (existingActivationStatus)
+                    case MultiClusterStatus.Owned:
+                        response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
                         {
-                            case MultiClusterStatus.Owned:
-                                response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
-                                {
-                                    ExistingActivationAddress = addressAndTag,
-                                    ClusterId = clusterId,
-                                    Owned = true
-                                };
-                                break;
+                            ExistingActivationAddress = new AddressAndTag()
+                            {
+                                Address = address,
+                                VersionTag = version
+                            },
+                            ClusterId = clusterId,
+                            Owned = true
+                        };
+                        break;
 
-                            case MultiClusterStatus.Cached:
-                            case MultiClusterStatus.RaceLoser:
-                                response = RemoteClusterActivationResponse.Pass;
-                                break;
+                    case MultiClusterStatus.Cached:
+                    case MultiClusterStatus.RaceLoser:
+                        response = RemoteClusterActivationResponse.Pass;
+                        break;
 
-                            case MultiClusterStatus.RequestedOwnership:
-                            case MultiClusterStatus.Doubtful:
-                                var iWin = MultiClusterUtils.ActivationPrecedenceFunc(grain, clusterId, requestClusterId);
-                                if (iWin)
+                    case MultiClusterStatus.RequestedOwnership:
+                    case MultiClusterStatus.Doubtful:
+                        var iWin = MultiClusterUtils.ActivationPrecedenceFunc(grain, clusterId, requestClusterId);
+                        if (iWin)
+                        {
+                            response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
+                            {
+                                ExistingActivationAddress = new AddressAndTag()
                                 {
-                                    response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
-                                    {
-                                        ExistingActivationAddress = addressAndTag,
-                                        ClusterId = clusterId,
-                                        Owned = false
-                                    };
-                                }
-                                else
-                                {
-                                    response = RemoteClusterActivationResponse.Pass;
-                                    //update own activation status to race loser.
-                                    if (existingActivationStatus == MultiClusterStatus.RequestedOwnership)
-                                    {
-                                        var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, addressAndTag.Address.Activation, MultiClusterStatus.RaceLoser, MultiClusterStatus.RequestedOwnership);
-                                        if (!success)
-                                        {
-                                            // there was a race. retry.
-                                            return ProcessRequestLocal(grain, requestClusterId);
-                                        }
-                                    }
-                                }
-                                break;
-                            default:
-                                throw new InvalidOperationException("Invalid MultiClusterStatus value");
+                                    Address = address,
+                                    VersionTag = version
+                                },
+                                ClusterId = clusterId,
+                                Owned = false
+                            };
                         }
-                    }
+                        else
+                        {
+                            response = RemoteClusterActivationResponse.Pass;
+                            //update own activation status to race loser.
+                            if (existingActivationStatus == MultiClusterStatus.RequestedOwnership)
+                            {
+                                var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, MultiClusterStatus.RaceLoser, MultiClusterStatus.RequestedOwnership);
+                                if (!success)
+                                {
+                                    // there was a race. retry.
+                                    return ProcessRequestLocal(grain, requestClusterId);
+                                }
+                            }
+                        }
+                        break;
+                    default:
+                        throw new InvalidOperationException("Invalid MultiClusterStatus value");
+
                 }
             }
             catch (Exception ex)

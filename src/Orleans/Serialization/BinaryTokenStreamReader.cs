@@ -436,7 +436,6 @@ namespace Orleans.Serialization
             var silo = ReadSiloAddress();
             var grain = ReadGrainId();
             var act = ReadActivationId();
-            var mcstatus = ReadMultiClusterStatus();
 
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
@@ -444,7 +443,7 @@ namespace Orleans.Serialization
             if (act.Equals(ActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act, mcstatus);
+            return ActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>

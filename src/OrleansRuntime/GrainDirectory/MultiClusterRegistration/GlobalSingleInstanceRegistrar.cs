@@ -110,15 +110,14 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 // we were not successful, reread state to determine what is going on
-                var currentActivations = directoryPartition.LookUpGrain(address.Grain).Addresses;
-                address = currentActivations.FirstOrDefault();
-                Debug.Assert(address != null && address.Equals(myActivation.Address));
+                int version;
+                var mcstatus = directoryPartition.TryGetActivation(address.Grain, out address, out version);
 
-                if (address.Status == MultiClusterStatus.RequestedOwnership)
+                if (mcstatus == MultiClusterStatus.RequestedOwnership)
                 {
                     // we failed because of inconclusive answers. Stay in this state for retry.
                 }
-                else  if (address.Status == MultiClusterStatus.RaceLoser)
+                else  if (mcstatus == MultiClusterStatus.RaceLoser)
                 {
                     // we failed because an external request moved us to RACE_LOSER. Go back to REQUESTED_OWNERSHIP for retry
                     var success = directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.RaceLoser);
