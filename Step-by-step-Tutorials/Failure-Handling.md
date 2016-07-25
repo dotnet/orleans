@@ -39,6 +39,8 @@ If you have a grain responsible for database saves and database is not available
 
 As described in the section above, choosing a strategy is application and context dependent and strategies usually have parameters which again have to be decided at the application level. For example you might want to retry a request maximum 5 times per minute and can deal with it being done eventually but for some other action you might not be able to continue if something is resolved. If your Login grain fails , you can not process any other requests from the user as an example. 
 
+There is a guide [on MSDN](https://msdn.microsoft.com/en-us/library/dn568099.aspx) about good patterns and practices for the cloud which applies to Orleans in most cases as well.
+
 ## A note about supervision trees
 
 Developers used to Erlang/Akka/Akka.Net might be surprised to see that there is no supervision tree in Orleans and wonder how they can recover from failures. The point is that in Orleans since actors are reactivated automatically and you don't handle their life-cycle, you usually only deal with making sure that actor state is correct. If you need to store relations between grains, you can simply do it and it is a widely done practice. 
