@@ -14,12 +14,14 @@ namespace Orleans.Runtime.GrainDirectory
         private static int NUM_RETRIES = 3;
         private readonly Logger logger;
         private readonly GrainDirectoryPartition directoryPartition;
+        private readonly GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer;
 
-        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger)
+        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer)
              
         {
             this.directoryPartition = partition;
             this.logger = logger;
+            this.gsiActivationMaintainer = gsiActivationMaintainer;
         }
 
         public bool IsSynchronous { get { return false; } }
@@ -59,6 +61,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // we are not joined to the cluster yet/anymore. Go to doubtful state directly.
                 return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful);
+                gsiActivationMaintainer.MarkActivationDoubtful(address.Activation);
+                return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.Doubtful, out ignored);
             }
 
             var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();

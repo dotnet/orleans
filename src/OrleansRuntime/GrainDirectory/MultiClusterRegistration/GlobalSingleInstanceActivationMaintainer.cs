@@ -26,6 +26,18 @@ namespace Orleans.Runtime.GrainDirectory
 
         }
 
+        // scanning the entire directory for doubtful activations is too slow.
+        // therefore, we maintain a list of potentially doubtful activations on the side.
+        // maintainer periodically takes and processes this list.
+        private List<ActivationId> doubtfulActivations = new List<ActivationId>();
+        private object lockable = new object();
+
+        public void MarkActivationDoubtful(ActivationId activation)
+        {
+            lock (lockable)
+                doubtfulActivations.Add(activation);
+        }
+
         protected override async void Run()
         {
             var globalConfig = Silo.CurrentSilo.OrleansConfig.Globals;
@@ -46,15 +58,15 @@ namespace Orleans.Runtime.GrainDirectory
                     // examine the multicluster configuration
                     var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
 
-                    // copy all entries before further processing
-                    // TODO I think this is too wasteful, should implement iteration without full copy
-                    var allEntries = router.DirectoryPartition.GetItems();
-
                     if (config == null || !config.Clusters.Contains(myClusterId))
                     {
                         // we are not joined to the cluster yet/anymore. 
                         // go through all owned entries and make them doubtful
+                        // this will not happen under normal operation
+                        // (because nodes are supposed to shut down before being removed from the multi cluster)
+                        // but if it happens anyway, this is the correct thing to do
 
+                        var allEntries = router.DirectoryPartition.GetItems();
                         var ownedEntries = allEntries.Where(kp =>
                         {
                             if (!kp.Value.SingleInstance) return false;
@@ -76,22 +88,30 @@ namespace Orleans.Runtime.GrainDirectory
                         // we are joined to the multicluster.
                         // go through all doubtful entries and broadcast ownership requests for each
 
-                        var doubtfulEntries = allEntries.Where(kp =>
+                        // take them all out of the list for processing.
+                        List<ActivationId> activations_to_check;
+                        lock (lockable)
                         {
-                            if (!kp.Value.SingleInstance) return false;
-                            var act = kp.Value.Instances.FirstOrDefault();
-                            if (act.Key == null) return false;
-                            if (act.Value.RegistrationStatus != MultiClusterStatus.Doubtful) return false;
-                            return true;
-                        }).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
+                            activations_to_check = doubtfulActivations;
+                            doubtfulActivations = new List<ActivationId>();
+                        }
 
-                        logger.Verbose("GSIP:M retry {0} doubtful entries", doubtfulEntries.Count);
+                        //var doubtfulEntries = allEntries.Where(kp =>
+                        //{
+                        //    if (!kp.Value.SingleInstance) return false;
+                        //    var act = kp.Value.Instances.FirstOrDefault();
+                        //    if (act.Key == null) return false;
+                        //    if (act.Value.RegistrationStatus != MultiClusterStatus.Doubtful) return false;
+                        //    return true;
+                        //}).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
+
+                        //logger.Verbose("GSIP:M retry {0} doubtful entries", doubtfulEntries.Count);
                         
-                        var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
-                        await router.Scheduler.QueueTask(
-                            () => RunBatchedActivationRequests(remoteClusters, doubtfulEntries),
-                            router.CacheValidator.SchedulingContext
-                        );
+                        //var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
+                        //await router.Scheduler.QueueTask(
+                        //    () => RunBatchedActivationRequests(remoteClusters, doubtfulEntries),
+                        //    router.CacheValidator.SchedulingContext
+                        //);
                     }
               
                     // NOT DOING CACHE INVALIDATION for now. it is not required for correctness
@@ -149,7 +169,10 @@ namespace Orleans.Runtime.GrainDirectory
         private Task RunBatchedDemotion(List<Tuple<GrainId, KeyValuePair<ActivationId, IActivationInfo>>> entries)
         {
             foreach (var entry in entries)
+            {
                 router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.Doubtful, MultiClusterStatus.Owned);
+                MarkActivationDoubtful(entry.Item2.Key);
+            }
 
             return TaskDone.Done;
         }
@@ -312,6 +335,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     ProtocolError(address, "unhandled protocol state");
                 }
+
+                MarkActivationDoubtful(address.Activation);
             }
 
             // remove loser activations

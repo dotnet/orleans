@@ -17,7 +17,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly List<SiloAddress> membershipRingList;
         private readonly HashSet<SiloAddress> membershipCache;
         private readonly AsynchAgent maintainer;
-        private readonly AsynchAgent globalSingleInstanceActivationMaintainer;
         private readonly Logger log;
         private readonly SiloAddress seed;
         internal ISiloStatusOracle Membership;
@@ -49,6 +48,8 @@ namespace Orleans.Runtime.GrainDirectory
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
 
         internal ISiloStatusListener CatalogSiloStatusListener { get; set; }
+
+        internal GlobalSingleInstanceActivationMaintainer GsiActivationMaintainer { get; private set; }
 
         private readonly CounterStatistic localLookups;
         private readonly CounterStatistic localSuccesses;
@@ -97,7 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             });
             maintainer = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(this, DirectoryCache);
-            globalSingleInstanceActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, silo.GlobalConfig);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, silo.GlobalConfig);
 
             if (silo.GlobalConfig.SeedNodes.Count > 0)
             {
@@ -183,9 +184,9 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 maintainer.Start();
             }
-            if (globalSingleInstanceActivationMaintainer != null)
+            if (GsiActivationMaintainer != null)
             {
-                globalSingleInstanceActivationMaintainer.Start();
+                GsiActivationMaintainer.Start();
             }
         }
 

@@ -22,7 +22,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             Instance = new RegistrarManager();
             Instance.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(router.DirectoryPartition));
-            Instance.Register<GlobalSingleInstanceRegistration>(new GlobalSingleInstanceRegistrar(router.DirectoryPartition, router.Logger));
+            Instance.Register<GlobalSingleInstanceRegistration>(new GlobalSingleInstanceRegistrar(router.DirectoryPartition, router.Logger, router.GsiActivationMaintainer));
         }
 
         private void Register<TStrategy>(IGrainRegistrar directory)
