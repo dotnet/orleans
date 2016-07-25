@@ -6,6 +6,11 @@
     internal enum MultiClusterStatus : byte
     {
         /// <summary>
+        /// No registration.
+        /// </summary>
+        Invalid,
+
+        /// <summary>
         /// Registration is owned by this cluster.
         /// </summary>
         Owned,

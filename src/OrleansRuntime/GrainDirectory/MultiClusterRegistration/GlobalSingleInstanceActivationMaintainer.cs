@@ -186,10 +186,13 @@ namespace Orleans.Runtime.GrainDirectory
                 // transition to requesting state
                 if (router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.Doubtful))
                 {
-                    var currentActivations = router.DirectoryPartition.LookUpGrain(entry.Item1).Addresses;
-                    var address = currentActivations.FirstOrDefault();
-                    Debug.Assert(address != null && address.Status == MultiClusterStatus.RequestedOwnership);
-                    addresses.Add(address); // TODO simplify the above code?
+                    ActivationAddress address;
+                    int version;
+                    MultiClusterStatus mcstatus = router.DirectoryPartition.TryGetActivation(entry.Item1, out address, out version);
+                    if (address != null)
+                    { 
+                        addresses.Add(address);
+                    }
                 }
             }
 
@@ -314,18 +317,17 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 // we were not successful, reread state to determine what is going on
-                var currentActivations = router.DirectoryPartition.LookUpGrain(address.Grain).Addresses;
-                address = currentActivations.FirstOrDefault();
-                Debug.Assert(address != null);
+                int version;
+                var mcstatus = router.DirectoryPartition.TryGetActivation(address.Grain, out address, out version);
 
                 // in each case, go back to DOUBTFUL
-                if (address.Status == MultiClusterStatus.RequestedOwnership)
+                if (mcstatus == MultiClusterStatus.RequestedOwnership)
                 {
                     // we failed because of inconclusive answers
                     var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RequestedOwnership);
                     if (!success) ProtocolError(address, "unable to transition from REQUESTED_OWNERSHIP to DOUBTFUL");
                 }
-                else if (address.Status == MultiClusterStatus.RaceLoser)
+                else if (mcstatus == MultiClusterStatus.RaceLoser)
                 {
                     // we failed because an external request moved us to RACE_LOSER
                     var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RaceLoser);

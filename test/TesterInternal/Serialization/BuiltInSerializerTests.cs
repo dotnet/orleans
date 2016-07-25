@@ -71,19 +71,17 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             //SerializationManager.UseStandardSerializer = false;
             var grain = GrainId.NewId();
-            var addr = ActivationAddress.GetAddress(null, grain, null, MultiClusterStatus.Doubtful);
+            var addr = ActivationAddress.GetAddress(null, grain, null);
             object deserialized = OrleansSerializationLoop(addr, false);
             Assert.IsAssignableFrom<ActivationAddress>(deserialized);
             Assert.Null(((ActivationAddress)deserialized).Activation); //Activation no longer null after copy
             Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after copy
             Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
-            Assert.Equal(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status); //MultiClusterStatus different after copy
             deserialized = OrleansSerializationLoop(addr);
             Assert.IsAssignableFrom<ActivationAddress>(deserialized); //ActivationAddress full serialization loop as wrong type
             Assert.Null(((ActivationAddress)deserialized).Activation); //Activation no longer null after full serialization loop
             Assert.Null(((ActivationAddress)deserialized).Silo); //Silo no longer null after full serialization loop
             Assert.Equal(grain, ((ActivationAddress)deserialized).Grain); //Grain different after copy
-            Assert.Equal(MultiClusterStatus.Doubtful, ((ActivationAddress)deserialized).Status); //MultiClusterStatus different after copy
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

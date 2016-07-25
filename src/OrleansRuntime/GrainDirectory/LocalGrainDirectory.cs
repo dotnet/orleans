@@ -769,7 +769,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressesAndTag GetLocalDirectoryData(GrainId grain)
         {
-            var result = DirectoryPartition.LookUpGrain(grain);
+            var result = DirectoryPartition.LookUpActivations(grain);
             if (result.Addresses != null)
                 result.Addresses = result.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
             return result;
@@ -801,7 +801,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // we are the owner
                 LocalDirectoryLookups.Increment();
-                var localResult = DirectoryPartition.LookUpGrain(grainId);
+                var localResult = DirectoryPartition.LookUpActivations(grainId);
                 if (localResult.Addresses == null)
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
