@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans

@@ -1,8 +1,8 @@
 
 using System;
 using System.Collections.Generic;
-using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
 {

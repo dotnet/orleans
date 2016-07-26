@@ -10,14 +10,14 @@ using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
-using System.Text;
-using Orleans.Runtime;
-using Orleans.Concurrency;
-using Orleans.CodeGeneration;
-using Orleans.Runtime.Configuration;
-using Newtonsoft.Json;
-using Orleans.Providers;
 using System.Runtime.Serialization.Formatters;
+using System.Text;
+using Newtonsoft.Json;
+using Orleans.CodeGeneration;
+using Orleans.Concurrency;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {

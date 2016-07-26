@@ -4,8 +4,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
-using Orleans.Runtime.Configuration;
-
 
 namespace Orleans.Runtime.Scheduler
 {

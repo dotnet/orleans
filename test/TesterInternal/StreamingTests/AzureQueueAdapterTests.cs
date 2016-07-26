@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
@@ -15,7 +14,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 

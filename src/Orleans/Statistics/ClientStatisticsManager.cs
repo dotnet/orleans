@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {

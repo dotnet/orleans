@@ -5,9 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Azure.SqlDatabase.ElasticScale.ShardManagement;
-
 using Orleans.Runtime;
-using Orleans.SqlUtils.StorageProvider.GrainClasses;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 using Orleans.SqlUtils.StorageProvider.Instrumentation;
 using Xunit;

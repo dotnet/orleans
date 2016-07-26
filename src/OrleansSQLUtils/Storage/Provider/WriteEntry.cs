@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.SqlUtils.StorageProvider

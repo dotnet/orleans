@@ -1,5 +1,4 @@
 using System;
-using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;

@@ -1,8 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.FSharp.Core;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using System;
-using Microsoft.FSharp.Core;
 using Xunit;
 
 namespace UnitTests.General

@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Net;
+using System.Reflection;
+using System.Text;
 using System.Xml;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
-using Orleans.Streams;
 using Orleans.Storage;
-using System.Reflection;
+using Orleans.Streams;
 
 namespace Orleans.Runtime.Configuration
 {

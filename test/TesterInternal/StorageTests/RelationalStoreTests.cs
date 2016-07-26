@@ -1,7 +1,4 @@
 ﻿
-using Orleans;
-using Orleans.Runtime;
-using Orleans.SqlUtils;
 using System;
 using System.Data;
 using System.Data.Common;
@@ -9,6 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+using Orleans.SqlUtils;
 using UnitTests.General;
 using Xunit;
 

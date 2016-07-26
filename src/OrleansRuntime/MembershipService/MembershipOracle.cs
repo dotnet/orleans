@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {

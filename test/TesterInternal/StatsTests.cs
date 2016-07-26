@@ -4,14 +4,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Xunit;
-using Tester;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.Stats

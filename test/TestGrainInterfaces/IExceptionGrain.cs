@@ -1,7 +1,6 @@
 namespace UnitTests.GrainInterfaces
 {
     using System.Threading.Tasks;
-
     using Orleans;
 
     /// <summary>

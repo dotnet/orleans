@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
+﻿using Orleans;
 using UnitTests.FSharpInterfaces;
 
 namespace UnitTests.GrainInterfaces

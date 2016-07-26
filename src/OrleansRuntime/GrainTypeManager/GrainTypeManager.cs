@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
-using System.Reflection;
 
 namespace Orleans.Runtime
 {

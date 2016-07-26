@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;

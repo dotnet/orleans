@@ -1,10 +1,7 @@
 
-using Orleans.AzureUtils;
-using Orleans.TestingHost;
 using System;
 using System.Net;
-using Tester;
-using UnitTests.Tester;
+using Orleans.AzureUtils;
 using Xunit;
 
 namespace UnitTests.StorageTests

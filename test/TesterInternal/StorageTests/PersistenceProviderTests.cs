@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers;

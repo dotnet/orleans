@@ -7,13 +7,10 @@ namespace Orleans.CodeGenerator
     using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 

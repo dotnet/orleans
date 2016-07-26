@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.Tester;
 using Xunit;
 using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
-using UnitTests.Tester;
 
 namespace UnitTests
 {

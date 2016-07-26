@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Streams;
-using static System.String;
 
 namespace Orleans.Providers.Streams.Common
 {

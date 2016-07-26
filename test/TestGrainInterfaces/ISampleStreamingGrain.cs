@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
-﻿
+
 namespace UnitTests.GrainInterfaces
 {
     public interface ISampleStreaming_ProducerGrain : IGrainWithGuidKey

@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common

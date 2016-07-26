@@ -6,10 +6,10 @@
 using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
-using scg = global::System.Collections.Generic;
-namespace UnitTests.Serialization {
+namespace UnitTests.Serialization
+{
 
-  [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
   public static partial class Addressbook {
 
     #region Descriptor

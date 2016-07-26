@@ -1,9 +1,9 @@
 ﻿using System;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.CodeGeneration;
 
 // ReSharper disable ConvertToConstant.Local
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,9 +10,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using UnitTests.Tester;
-using Tester;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {

@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests
