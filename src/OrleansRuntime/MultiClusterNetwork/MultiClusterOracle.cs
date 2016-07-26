@@ -471,6 +471,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private SiloGossipWorker GetSiloWorker(SiloAddress silo)
         {
+            if (silo == null) throw new ArgumentNullException("silo");
             SiloGossipWorker worker;
             if (!this.siloWorkers.TryGetValue(silo, out worker))
                 this.siloWorkers[silo] = worker = new SiloGossipWorker(this, silo);
@@ -478,6 +479,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
         private SiloGossipWorker GetClusterWorker(string cluster)
         {
+            if (cluster == null) throw new ArgumentNullException("cluster");
             SiloGossipWorker worker;
             if (!this.clusterWorkers.TryGetValue(cluster, out worker))
                 this.clusterWorkers[cluster] = worker = new SiloGossipWorker(this, cluster);
@@ -485,6 +487,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
         private ChannelGossipWorker GetChannelWorker(IGossipChannel channel)
         {
+            if (channel == null) throw new ArgumentNullException("channel");
             ChannelGossipWorker worker;
             if (!this.channelWorkers.TryGetValue(channel, out worker))
                 this.channelWorkers[channel] = worker = new ChannelGossipWorker(this, channel);

@@ -283,10 +283,11 @@ namespace UnitTests.GeoClusterTests
              grainsbysilo[Clusters[ClusterC].Silos[1].Silo.SiloAddress.ToString()]
             };
 
+
             // clients should have grains that are local to their cluster
             for (int i = 0; i < 6; i++)
                 foreach (var g in GrainsBySiloSorted[i])
-                    Assert.AreEqual(g.client / 3, i / 3, g.gref);
+                    Assert.AreEqual(g.client / 2, i / 2, g.gref);
 
             // deactivate the grains
             Parallel.ForEach(grainsbysilo.SelectMany((kvp, i) => kvp.Value),

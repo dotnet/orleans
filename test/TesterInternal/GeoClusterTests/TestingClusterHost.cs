@@ -108,11 +108,7 @@ namespace Tests.GeoClusterTests
         {
             return 22000 + (clusternumber + 2) * 100;
         }
-        private static int DetermineGatewayPort(int clusternumber, int clientnumber)
-        {
-            return GetProxyBase(clusternumber) + clientnumber % 3;
-        }
-     
+      
         #endregion
 
         #region Cluster Creation
@@ -146,9 +142,10 @@ namespace Tests.GeoClusterTests
         {
             lock (Clusters)
             {
-                WriteLog("Starting Cluster {0}...", clusterId);
-
                 var myCount = Clusters.Count;
+
+                WriteLog("Starting Cluster {0}  ({1})...", myCount, clusterId);
+
                 if (myCount == 0)
                 {
                     TestingSiloHost.StopAllSilosIfRunning();
@@ -180,7 +177,7 @@ namespace Tests.GeoClusterTests
                 if (myCount == 0)
                     gossipStabilizationTime = GetGossipStabilizationTime(silohandles[0].Silo.GlobalConfig);
 
-                WriteLog("Cluster {0} started.", clusterId);
+                WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", silohandles.Select(s=>s.ToString())));
             }
         }
 
@@ -264,9 +261,13 @@ namespace Tests.GeoClusterTests
         {
             var ci = Clusters[ClusterId];
             var name = string.Format("Client-{0}-{1}", ClusterId, ClientNumber);
-            var gatewayport = DetermineGatewayPort(ci.SequenceNumber, ClientNumber);
+
+            // clients are assigned to silos round-robin
+            var gatewayport = ci.Silos[ClientNumber % ci.Silos.Count].GatewayPort;
        
-            var clientArgs = new object[] { name, gatewayport };
+            WriteLog("Starting {0} connected to {1}", name, gatewayport);
+
+            var clientArgs = new object[] { name, gatewayport.Value };
             var setup = new AppDomainSetup { ApplicationBase = Environment.CurrentDirectory };
             var clientDomain = AppDomain.CreateDomain(name, null, setup);
 
@@ -309,13 +310,19 @@ namespace Tests.GeoClusterTests
         {
             foreach (var silo in Clusters[from].Silos)
                 foreach (var dest in Clusters[to].Silos)
+                {
+                    WriteLog("Blocking {0}->{1}", silo, dest);
                     silo.Silo.TestHook.BlockSiloCommunication(dest.Endpoint, 100);
+                }
         }
 
         public void UnblockAllClusterCommunication(string from)
         {
             foreach (var silo in Clusters[from].Silos)
-                    silo.Silo.TestHook.UnblockSiloCommunication();
+            {
+                WriteLog("Unblocking {0}", silo);
+                silo.Silo.TestHook.UnblockSiloCommunication();
+            }
         }
   
         private SiloHandle GetActiveSiloInClusterByName(string clusterId, string siloName)

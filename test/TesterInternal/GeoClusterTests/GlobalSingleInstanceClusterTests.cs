@@ -86,6 +86,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestClusterCreation_1_1()
         {
+            const int numGrains = 2000;
+
             await RunWithTimeout("TestClusterCreation_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
@@ -110,9 +112,6 @@ namespace Tests.GeoClusterTests
                 int baseCount0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
                 int baseCount1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
                 int baseCount = baseCount0 + baseCount1;
-
-
-                const int numGrains = 2000;
 
                 WriteLog("Starting parallel creation of {0} grains", numGrains);
 
@@ -163,6 +162,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster")]
         public async Task TestClusterCreation_3_4()
         {
+            const int numGrains = 2000;
+
             await RunWithTimeout("TestClusterCreation_3_4", 240000, async () =>
             {    // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
@@ -192,8 +193,6 @@ namespace Tests.GeoClusterTests
 
                 // Create 2000 grains, 1000 grains in each cluster. We alternate the calls among two clients connected to the same cluster. This allows
                 // us to ensure that two clients within the same cluster never end up with two separate activations of the same grain.
-
-                const int numGrains = 2000;
 
                 WriteLog("Starting parallel creation of {0} grains", numGrains);
 
@@ -273,6 +272,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestClusterRace_1_1()
         {
+            const int numGrains = 2000;
+
             await RunWithTimeout("TestClusterRace_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
@@ -302,8 +303,6 @@ namespace Tests.GeoClusterTests
                 new ClientIdentity() { cluster = cluster1, number = 0 },
             };
 
-                const int numGrains = 2000;
-
                 // We perform a run of concurrent experiments. 
                 // we expect that all calls from concurrent clients will reference 
                 // the same activation of a grain.
@@ -321,6 +320,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster")]
         public async Task TestClusterRace_3_4()
         {
+            const int numGrains = 2000;
+
             await RunWithTimeout("TestClusterRace_3_4", 180000, async () =>
             {
                 // use a random global service id for testing purposes
@@ -338,8 +339,6 @@ namespace Tests.GeoClusterTests
                 var cfgclient = NewClient<ClientWrapper>(cluster1, 0);
                 cfgclient.InjectMultiClusterConf(cluster0, cluster1);
                 await WaitForMultiClusterGossipToStabilizeAsync(false);
-
-                const int numGrains = 2000;
 
                 // Create multiple clients. Two clients connect to each cluster.
                 var clients = new List<ClientIdentity>
@@ -431,6 +430,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster"), TestCategory("Functional")]
         public async Task TestConflictResolution_1_1()
         {
+            const int numGrains = 10;
+
             await RunWithTimeout("TestConflictResolution_1_1", 120000, async () =>
             {
                 // use a random global service id for testing purposes
@@ -439,6 +440,8 @@ namespace Tests.GeoClusterTests
                 {
                     // run the retry process every 5 seconds to keep this test shorter
                     c.Globals.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5);
+
+
                 };
 
                 // create two clusters with 1 silo each
@@ -466,8 +469,6 @@ namespace Tests.GeoClusterTests
                 // Turn off intercluster messaging to simulate a partition.
                 BlockAllClusterCommunication(cluster0, cluster1);
                 BlockAllClusterCommunication(cluster1, cluster0);
-
-                const int numGrains = 10;
 
                 WriteLog("Starting creation of {0} grains on isolated clusters", numGrains);
 
@@ -526,6 +527,8 @@ namespace Tests.GeoClusterTests
         [Fact, TestCategory("GeoCluster")]
         public async Task TestConflictResolution_3_4()
         {
+            const int numGrains = 1000;
+
             await RunWithTimeout("TestConflictResolution_3_4", 330000, async () =>
             {
                 // use a random global service id for testing purposes
@@ -566,7 +569,6 @@ namespace Tests.GeoClusterTests
                 BlockAllClusterCommunication(cluster0, cluster1);
                 BlockAllClusterCommunication(cluster1, cluster0);
 
-                const int numGrains = 40;
 
                 WriteLog("Starting creation of {0} grains on isolated clusters", numGrains);
 

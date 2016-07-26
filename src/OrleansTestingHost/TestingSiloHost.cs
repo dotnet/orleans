@@ -755,10 +755,11 @@ namespace Orleans.TestingHost
             nodeConfig.PropagateActivityId = config.Defaults.PropagateActivityId;
             nodeConfig.BulkMessageLimit = config.Defaults.BulkMessageLimit;
 
+            int? gatewayport = null;
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                int proxyBasePort = options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort;
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, proxyBasePort + instanceCount);
+                gatewayport = (options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort) + instanceCount;
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, gatewayport.Value);
             }
 
             config.Globals.ExpectedClusterSize = 2;
@@ -779,6 +780,7 @@ namespace Orleans.TestingHost
                 Silo = silo,
                 Options = options,
                 Endpoint = silo.SiloAddress.Endpoint,
+                GatewayPort = gatewayport,
                 AppDomain = appDomain,
             };
             host.ImportGeneratedAssemblies(retValue);
