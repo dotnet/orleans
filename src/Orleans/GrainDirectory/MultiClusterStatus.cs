@@ -6,12 +6,22 @@
     internal enum MultiClusterStatus : byte
     {
         /// <summary>
-        /// No registration.
+        /// Used as a return value, indicating no registration present in directory.
         /// </summary>
         Invalid,
 
+        //--- the following state is used for cluster-local grains
+
         /// <summary>
-        /// Registration is owned by this cluster.
+        /// Used for normal grains that have no multi-cluster semantics.
+        /// </summary>
+        ClusterLocal,
+
+
+        //--- the following states are used for global-single-instance grain, the meaning is as defined by the GSI protocol
+
+        /// <summary>
+        /// Registration that is owned by this cluster.
         /// </summary>
         Owned,
 

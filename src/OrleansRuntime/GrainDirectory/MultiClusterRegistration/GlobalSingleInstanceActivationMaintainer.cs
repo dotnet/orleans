@@ -110,7 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
                             return false;
                         }).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
 
-                        logger.Verbose("GSIP:M make {0} owned entries doubtful", ownedEntries.Count);
+                        logger.Verbose("GSIP:M Not joined to multicluster. Make {0} owned entries doubtful {1}", ownedEntries.Count, logger.IsVerbose2 ? string.Join(",", ownedEntries.Select(s => s.Item1)) : "");
 
                         await router.Scheduler.QueueTask(
                             () => RunBatchedDemotion(ownedEntries),
@@ -131,8 +131,8 @@ namespace Orleans.Runtime.GrainDirectory
                         }
 
                         // filter
-                        logger.Verbose("GSIP:M retry {0} doubtful entries", grains.Count);
-                        
+                        logger.Verbose("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsVerbose2 ? string.Join(",", grains) : "");
+
                         var remoteClusters = config.Clusters.Where(id => id != myClusterId).ToList();
                         await router.Scheduler.QueueTask(
                             () => RunBatchedActivationRequests(remoteClusters, grains),
@@ -188,7 +188,8 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 catch (Exception e)
                 {
-                    System.Diagnostics.Debug.WriteLine("Caught exception: {0}", e);
+                    logger.Error(ErrorCode.GlobalSingleInstance_MaintainerException,
+                            "GSIP:M caught exception", e);
                 }
             }
         }
@@ -313,7 +314,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 var outcome = tracker.Task.Result;
 
-                if (logger.IsVerbose)
+                if (logger.IsVerbose2)
                     logger.Verbose("GSIP:M {0} Result={1}", address.Grain.ToString(), outcome.ToString());
 
                 switch (outcome)

@@ -82,14 +82,14 @@ namespace Orleans.Runtime.GrainDirectory
             while (retries-- > 0)
             {
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:R {0} Round={1} Act={2}", address.Grain.ToString(), NUM_RETRIES - retries, myActivation.Address.ToString());
+                    logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), NUM_RETRIES - retries, myActivation.Address.ToString());
 
                 var responses = SendRequestRound(address, remoteClusters);
 
                 var outcome = await responses.Task;
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:R {0} Round={1} Result={2}", address.Grain.ToString(), NUM_RETRIES - retries, outcome.ToString());
+                    logger.Verbose("GSIP:Req {0} Round={1} Outcome={2}", address.Grain.ToString(), NUM_RETRIES - retries, outcome.ToString());
 
                 switch (outcome)
                 {
@@ -139,12 +139,14 @@ namespace Orleans.Runtime.GrainDirectory
            
             if (!ok) ProtocolError(address, "unable to transition into doubtful");
 
+            this.gsiActivationMaintainer.TrackDoubtfulGrain(address.Grain);
+
             return myActivation;
         }
 
         private void ProtocolError(ActivationAddress address, string msg)
         {
-            logger.Error((int)ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:R {0} {1}", address.Grain.ToString(), msg));
+            logger.Error((int)ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:Req {0} PROTOCOL ERROR {1}", address.Grain.ToString(), msg));
             Debugger.Break();
         }
 

@@ -73,12 +73,12 @@ namespace Orleans.Runtime.GrainDirectory
                     return false;
                 }
             }
-            Instances[act] = new ActivationInfo(silo, MultiClusterStatus.Owned);
+            Instances[act] = new ActivationInfo(silo, MultiClusterStatus.ClusterLocal);
             VersionTag = rand.Next();
             return true;
         }
 
-        public ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned)
+        public ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus)
         {
             SingleInstance = true;
             if (Instances.Count > 0)
@@ -287,7 +287,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo"></param>
         /// <param name="registrationStatus"></param>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned)
+        internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, MultiClusterStatus registrationStatus)
         {
             if (log.IsVerbose3) log.Verbose3("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
 

@@ -1084,7 +1084,9 @@ namespace Orleans
 
         GlobalSingleInstanceBase = Runtime + 4100,
         GlobalSingleInstance_ProtocolError = GlobalSingleInstanceBase + 1,
-       
+        GlobalSingleInstance_WarningInvalidOrigin = GlobalSingleInstanceBase + 2,
+        GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
+
     }
 }
 // ReSharper restore InconsistentNaming

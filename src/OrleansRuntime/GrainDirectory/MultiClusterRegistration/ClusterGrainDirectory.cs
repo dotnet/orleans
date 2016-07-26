@@ -36,8 +36,8 @@ namespace Orleans.Runtime.GrainDirectory
             var multiClusterConfiguration = Runtime.Silo.CurrentSilo.LocalMultiClusterOracle?.GetMultiClusterConfiguration();
             if (multiClusterConfiguration == null || !multiClusterConfiguration.Clusters.Contains(requestClusterId))       
             {
-                if (logger.IsVerbose)
-                    logger.Verbose("GSIP:D {0} From={1} Result={2}", grain.ToString(), requestClusterId, "FAILED not in config");
+                logger.Warn(ErrorCode.GlobalSingleInstance_WarningInvalidOrigin, 
+                    "GSIP:Rsp {0} Origin={1} GSI request rejected because origin is not in MC configuration", grain.ToString(), requestClusterId);
 
                 return new RemoteClusterActivationResponse(ActivationResponseStatus.Failed);
             }
@@ -57,8 +57,8 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                if (logger.IsVerbose)
-                    logger.Verbose("GSIP:D {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
+                if (logger.IsVerbose2)
+                    logger.Verbose("GSIP:Rsp {0} Origin={1} forward to {2}", grain.ToString(), requestClusterId, forwardAddress);
 
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, forwardAddress);
                 return await clusterGrainDir.ProcessActivationRequest(grain, requestClusterId, hopCount + 1);
@@ -156,7 +156,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             if (logger.IsVerbose)
-                logger.Verbose("GSIP:D {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response);
+                logger.Verbose("GSIP:Rsp {0} Origin={1} Result={2}", grain.ToString(), requestClusterId, response);
 
             return response;
         }
