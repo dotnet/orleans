@@ -43,7 +43,7 @@ if not "%VERSION_BETA%" == "" (
 )
 
 if "%PRERELEASE_BUILD%" == "true" (
-    set VERSION_TYPE=Dev
+    if "%VERSION_BETA%" == "" (set VERSION_TYPE=Dev) else (set VERSION_TYPE=)
     set VERSION_TIMESTAMP=%date:~10,4%%date:~4,2%%date:~7,2%%time:~0,2%%time:~3,2%
     @echo VERSION_TYPE = !VERSION_TYPE!
     @echo VERSION_TIMESTAMP = !VERSION_TIMESTAMP!
