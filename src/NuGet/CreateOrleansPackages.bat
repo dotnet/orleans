@@ -43,7 +43,7 @@ if not "%VERSION_BETA%" == "" (
 )
 
 if "%PRERELEASE_BUILD%" == "true" (
-    set VERSION_TYPE=Dev
+    if "%VERSION_BETA%" == "" (set VERSION_TYPE=Dev) else (set VERSION_TYPE=)
     for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set VERSION_TIMESTAMP=%%i
     @echo VERSION_TYPE = !VERSION_TYPE!
     @echo VERSION_TIMESTAMP = !VERSION_TIMESTAMP!
