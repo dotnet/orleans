@@ -117,6 +117,7 @@ namespace Orleans.Runtime
             {
                 if (limitBuffersCount && currentAllocatedBuffers > maxBuffersCount)
                 {
+                    droppedBufferCounter.Increment();
                     return;
                 }
 
