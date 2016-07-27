@@ -8,7 +8,7 @@
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://github.com/dotnet/orleans/blob/gh-pages/assets/logo.png</iconUrl>
     <summary>
       Collection of Microsoft Orleans libraries and files needed on the server.
     </summary>
