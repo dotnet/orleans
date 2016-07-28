@@ -830,12 +830,7 @@ namespace Orleans.Serialization
                 typeInfo = type.GetTypeInfo();
             }
 
-            var constructor =
-                typeInfo.GetConstructor(
-                                BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
-                                null,
-                                new[] { typeof(GrainReference) },
-                                null);
+            var constructor = TypeUtils.GetConstructorThatMatches(type, new[] { typeof(GrainReference) });
 
             var ctorParam = Expression.Parameter(typeof(GrainReference), "grainRef");
             var lambda = Expression.Lambda(

@@ -1040,6 +1040,54 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Get a public or non-public constructor that matches the constructor arguments signature
+        /// </summary>
+        /// <param name="type">The type to use.</param>
+        /// <param name="constructorArguments">The constructor argument types to match for the signature.</param>
+        /// <returns>A constructor that matches the signature or <see langword="null"/>.</returns>
+        public static ConstructorInfo GetConstructorThatMatches(Type type, Type[] constructorArguments)
+        {
+#if NETSTANDARD
+            var candidates = type.GetTypeInfo().GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            foreach (ConstructorInfo candidate in candidates)
+            {
+                if (ConstructorMatches(candidate, constructorArguments))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+#else
+            var constructorInfo = type.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                constructorArguments,
+                null);
+            return constructorInfo;
+#endif
+        }
+
+        private static bool ConstructorMatches(ConstructorInfo candidate, Type[] constructorArguments)
+        {
+            ParameterInfo[] parameters = candidate.GetParameters();
+            if (parameters.Length == constructorArguments.Length)
+            {
+                for (int i = 0; i < constructorArguments.Length; i++)
+                {
+                    if (parameters[i].ParameterType != constructorArguments[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Returns a value indicating whether or not the provided assembly is the Orleans assembly or references it.
         /// </summary>
         /// <param name="assembly">The assembly.</param>
