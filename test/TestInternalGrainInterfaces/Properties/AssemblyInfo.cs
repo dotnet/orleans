@@ -23,6 +23,7 @@ using Orleans.CodeGeneration;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("OrleansCodeGen")]
 
 // generate Orleans serializers for types in FSharp.core.dll
 [assembly: KnownAssembly(typeof(FSharpOption<>))]
