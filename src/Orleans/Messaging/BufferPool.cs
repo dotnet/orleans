@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         private readonly CounterStatistic droppedBufferCounter;
         private readonly CounterStatistic droppedTooLargeBufferCounter;
 
-        private int currentAllocatedBuffers;
+        private int currentBufferCount;
 
         public static BufferPool GlobalPool;
 
@@ -91,7 +91,7 @@ namespace Orleans.Runtime
             }
             else if (limitBuffersCount)
             {
-                Interlocked.Decrement(ref currentAllocatedBuffers);
+                Interlocked.Decrement(ref currentBufferCount);
             }
 
             checkedOutBufferCounter.Increment();
@@ -115,7 +115,7 @@ namespace Orleans.Runtime
         {
             if (buffer.Length == byteBufferSize)
             {
-                if (limitBuffersCount && currentAllocatedBuffers > maxBuffersCount)
+                if (limitBuffersCount && currentBufferCount > maxBuffersCount)
                 {
                     droppedBufferCounter.Increment();
                     return;
@@ -125,7 +125,7 @@ namespace Orleans.Runtime
 
                 if (limitBuffersCount)
                 {
-                    Interlocked.Increment(ref currentAllocatedBuffers);
+                    Interlocked.Increment(ref currentBufferCount);
                 }
 
                 checkedInBufferCounter.Increment();
