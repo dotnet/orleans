@@ -630,8 +630,7 @@ namespace Orleans.Runtime
         private void CreateGrainInstance(string grainTypeName, ActivationData data, string genericArguments)
         {
             string grainClassName;
-            var interfaceToClassMap = GrainTypeManager.GetGrainInterfaceToClassMap();
-            if (!interfaceToClassMap.TryGetValue(grainTypeName, out grainClassName))
+            if (!GrainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
             {
                 // Lookup from grain type code
                 var typeCode = data.Grain.GetTypeCode();

@@ -68,6 +68,11 @@ namespace Orleans.Runtime
             return grainInterfaceMap.GetPrimaryImplementations();
         }
 
+        internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
+        {
+            return grainInterfaceMap.TryGetPrimaryImplementation(grainInterface, out grainClass);
+        }
+
         internal GrainTypeData this[string className]
         {
             get
