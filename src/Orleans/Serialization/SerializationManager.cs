@@ -159,6 +159,10 @@ namespace Orleans.Serialization
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
                 AssemblyProcessor.Initialize();
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    AssemblyProcessor.ProcessAssembly(assembly);
+                }
                 fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
             }
             catch (ReflectionTypeLoadException ex)

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
 {
@@ -35,8 +36,31 @@ namespace Orleans.Runtime
 
             // Ensure that each assembly which is loaded is processed.
             AssemblyProcessor.Initialize();
+
+            // initialize serialization for all assemblies to be loaded.
+            AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
+
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            // initialize serialization for already loaded assemblies.
+            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+            foreach (var assembly in assemblies)
+            {
+                AssemblyProcessor.ProcessAssembly(assembly);
+            }
         }
-        
+
+
+        /// <summary>
+        /// Handles <see cref="AppDomain.AssemblyLoad"/> events.
+        /// </summary>
+        /// <param name="sender">The sender of the event.</param>
+        /// <param name="args">The event arguments.</param>
+        private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        {
+            AssemblyProcessor.ProcessAssembly(args.LoadedAssembly);
+        }
+
         /// <summary>
         /// Loads assemblies according to caller-defined criteria.
         /// </summary>

@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// The assembly processor.
     /// </summary>
-    internal class AssemblyProcessor
+    internal static class AssemblyProcessor
     {
         /// <summary>
         /// The collection of assemblies which have already been processed.
@@ -60,37 +60,15 @@ namespace Orleans.Runtime
                 // load the code generator before intercepting assembly loading
                 CodeGeneratorManager.Initialize(); 
 
-                // initialize serialization for all assemblies to be loaded.
-                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
-
-                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-                // initialize serialization for already loaded assemblies.
-                CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
-                foreach (var assembly in assemblies)
-                {
-                    ProcessAssembly(assembly);
-                }
-
                 initialized = true;
             }
-        }
-
-        /// <summary>
-        /// Handles <see cref="AppDomain.AssemblyLoad"/> events.
-        /// </summary>
-        /// <param name="sender">The sender of the event.</param>
-        /// <param name="args">The event arguments.</param>
-        private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
-        {
-            ProcessAssembly(args.LoadedAssembly);
         }
 
         /// <summary>
         /// Processes the provided assembly.
         /// </summary>
         /// <param name="assembly">The assembly to process.</param>
-        private static void ProcessAssembly(Assembly assembly)
+        public static void ProcessAssembly(Assembly assembly)
         {
             string assemblyName = assembly.GetName().Name;
             if (Logger.IsVerbose3)
