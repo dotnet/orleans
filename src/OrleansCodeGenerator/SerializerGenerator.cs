@@ -460,7 +460,7 @@ namespace Orleans.CodeGenerator
             {
                 // Create an unformatted object.
                 Expression<Func<object>> getUninitializedObject =
-#if DNXCORE50
+#if NETSTANDARD1_6
                     () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
 #else
                     () => FormatterServices.GetUninitializedObject(default(Type));
