@@ -33,7 +33,7 @@ namespace Orleans.GrainDirectory
 
         public override bool Equals(object obj)
         {
-            return obj is ClusterLocalRegistration;
+            return obj is GlobalSingleInstanceRegistration;
         }
 
         public override int GetHashCode()
