@@ -37,16 +37,12 @@ namespace Orleans.Runtime.GrainDirectory
             lock (lockable)
                 doubtfulGrains.Add(grain);
         }
+
         public void TrackDoubtfulGrains(Dictionary<GrainId, IGrainInfo> newstuff)
         {
-            var newdoubtful = newstuff.Where(kp =>
-             {
-                 if (!kp.Value.SingleInstance) return false;
-                 var act = kp.Value.Instances.FirstOrDefault();
-                 if (act.Key == null) return false;
-                 if (act.Value.RegistrationStatus == MultiClusterStatus.Doubtful) return true;
-                 return false;
-             }).Select(kp => kp.Key);
+            var newdoubtful = FilterByMultiClusterStatus(newstuff, MultiClusterStatus.Doubtful)
+                .Select(kvp => kvp.Key)
+                .ToList();
 
             lock (lockable)
             {
@@ -54,20 +50,17 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public void TrackDoubtfulGrains(GrainDirectoryPartition newstuff)
+        public static IEnumerable<KeyValuePair<GrainId, IGrainInfo>> FilterByMultiClusterStatus(Dictionary<GrainId, IGrainInfo> collection, MultiClusterStatus status)
         {
-            var newdoubtful = newstuff.GetItems().Where(kp =>
+            foreach (var kvp in collection)
             {
-                if (!kp.Value.SingleInstance) return false;
-                var act = kp.Value.Instances.FirstOrDefault();
-                if (act.Key == null) return false;
-                if (act.Value.RegistrationStatus == MultiClusterStatus.Doubtful) return true;
-                return false;
-            }).Select(kp => kp.Key);
-
-            lock (lockable)
-            {
-                doubtfulGrains.AddRange(newdoubtful);
+                if (!kvp.Value.SingleInstance)
+                    continue;
+                var act = kvp.Value.Instances.FirstOrDefault();
+                if (act.Key == null)
+                    continue;
+                if (act.Value.RegistrationStatus == status)
+                    yield return kvp;
             }
         }
 
@@ -101,14 +94,9 @@ namespace Orleans.Runtime.GrainDirectory
                         // but if it happens anyway, this is the correct thing to do
 
                         var allEntries = router.DirectoryPartition.GetItems();
-                        var ownedEntries = allEntries.Where(kp =>
-                        {
-                            if (!kp.Value.SingleInstance) return false;
-                            var act = kp.Value.Instances.FirstOrDefault();
-                            if (act.Key == null) return false;
-                            if (act.Value.RegistrationStatus == MultiClusterStatus.Owned) return true;
-                            return false;
-                        }).Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault())).ToList();
+                        var ownedEntries = FilterByMultiClusterStatus(allEntries, MultiClusterStatus.Owned)
+                            .Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault()))
+                            .ToList();
 
                         logger.Verbose("GSIP:M Not joined to multicluster. Make {0} owned entries doubtful {1}", ownedEntries.Count, logger.IsVerbose2 ? string.Join(",", ownedEntries.Select(s => s.Item1)) : "");
 
