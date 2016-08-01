@@ -6,9 +6,9 @@ namespace Orleans
     // Based on the version in http://home.comcast.net/~bretm/hash/7.html, which is based on that
     // in http://burtleburtle.net/bob/hash/evahash.html.
     // Note that we only use the version that takes three ulongs, which was written by the Orleans team.
-    internal class JenkinsHash
+    public class JenkinsHash
     {
-        internal static class Factory
+        public static class Factory
         {
             private static readonly ThreadLocal<JenkinsHash> hashGenerator = new ThreadLocal<JenkinsHash>(() => new JenkinsHash());
 
@@ -118,6 +118,6 @@ namespace Orleans
             c += 24;
             Mix();
             return c;
-        } 
+        }
     }
 }
