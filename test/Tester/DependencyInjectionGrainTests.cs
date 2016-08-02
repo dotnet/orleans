@@ -12,6 +12,8 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    using Orleans.Providers;
+
     public class DependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DependencyInjectionGrainTests.Fixture>
     {
         private class Fixture : BaseTestClusterFixture
@@ -39,7 +41,7 @@ namespace UnitTests.General
 
             // the injected service will return the same value only if it's the same instance
             Assert.Equal(
-                await grain1.GetStringValue(), 
+                await grain1.GetStringValue(),
                 await grain2.GetStringValue());
         }
 
@@ -50,6 +52,57 @@ namespace UnitTests.General
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetTicksFromService());
             Assert.Contains("Error creating activation for", exception.Message);
             Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+        }
+    }
+
+    public class DelegateDependencyInjectionGrainTests : OrleansTestingBase, IClassFixture<DelegateDependencyInjectionGrainTests.Fixture>
+    {
+        private class Fixture : BaseTestClusterFixture
+        {
+            protected override TestCluster CreateTestCluster()
+            {
+                return new TestCluster(new TestClusterOptions(1))
+                {
+                    AppDomainSiloCreatorType = typeof(SiloCreator)
+                };
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task CanGetGrainWithInjectedDependencies()
+        {
+            ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId());
+            long ignored = await grain.GetTicksFromService();
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task CanResolveSingletonDependencies()
+        {
+            var grain1 = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId());
+            var grain2 = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId());
+
+            // the injected service will return the same value only if it's the same instance
+            Assert.Equal(
+                await grain1.GetStringValue(),
+                await grain2.GetStringValue());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        public async Task CannotGetExplictlyRegisteredGrain()
+        {
+            ISimpleDIGrain grain = GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetTicksFromService());
+            Assert.Contains("Error creating activation for", exception.Message);
+            Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+        }
+    }
+
+    public class SiloCreator : AppDomainSiloCreator
+    {
+        public SiloCreator(string siloName, Silo.SiloType type, ClusterConfiguration config)
+        {
+            config.ApplyToAllNodes(nodeConfig => nodeConfig.ServiceProviderBuilder = new TestStartup().ConfigureServices);
+            this.Silo = new Silo(siloName, type, config);
         }
     }
 

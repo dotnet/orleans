@@ -35,6 +35,14 @@ namespace Orleans.TestingHost
 
         public ClusterConfiguration ClusterConfiguration { get; private set; }
 
+        /// <summary>
+        /// The type of the <see cref="AppDomainSiloCreator"/> class to use for creating new silos.
+        /// </summary>
+        /// <remarks>
+        /// This acts as an AppDomain initialization hook so that non-serializable configuration can be performed on silos.
+        /// </remarks>
+        public Type AppDomainSiloCreatorType { get; set; } = typeof(AppDomainSiloCreator);
+
         private readonly StringBuilder log = new StringBuilder();
 
         public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
@@ -578,15 +586,20 @@ namespace Orleans.TestingHost
             }
 
             var args = new object[] { siloName, type, config };
-
-            var silo = (Silo)appDomain.CreateInstanceFromAndUnwrap(
-                "OrleansRuntime.dll", typeof(Silo).FullName, false,
-                BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
-                new object[] { });
+            var siloCreator =
+                (AppDomainSiloCreator)
+                appDomain.CreateInstanceAndUnwrap(AppDomainSiloCreatorType.Assembly.FullName,
+                                                  AppDomainSiloCreatorType.FullName,
+                                                  false,
+                                                  BindingFlags.Default,
+                                                  null,
+                                                  args,
+                                                  CultureInfo.CurrentCulture,
+                                                  new object[] { });
 
             appDomain.UnhandledException += ReportUnobservedException;
 
-            return silo;
+            return siloCreator.Silo;
         }
 
         private void UnloadSiloInAppDomain(AppDomain appDomain)

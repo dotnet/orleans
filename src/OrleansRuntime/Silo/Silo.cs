@@ -32,6 +32,10 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.DependencyInjection.Extensions;
+
+    using Orleans.Runtime.ReminderService;
 
     /// <summary>
     /// Orleans silo.
@@ -175,6 +179,28 @@ namespace Orleans.Runtime
             globalConfig = config.Globals;
             config.OnConfigChange("Defaults", () => nodeConfig = config.GetOrCreateNodeConfigurationForSilo(name));
 
+            // Configure DI using Startup type
+            bool usingCustomServiceProvider;
+            Action<IServiceCollection> configureServices = serviceCollection =>
+            {
+                serviceCollection.AddSingleton(this);
+                serviceCollection.AddTransient<GrainBasedMembershipTable>();
+                serviceCollection.AddTransient<GrainBasedReminderTable>();
+
+                serviceCollection.AddSingleton(config);
+                serviceCollection.AddTransient(_ => this.globalConfig);
+                serviceCollection.AddTransient(_ => this.nodeConfig);
+                serviceCollection.TryAddSingleton(_ => membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly));
+                serviceCollection.AddSingleton(svc =>
+                {
+                    var silo = svc.GetRequiredService<Silo>();
+                    var membershipTable = svc.GetRequiredService<IMembershipTable>();
+                    return membershipFactory.CreateMembershipOracle(silo, membershipTable);
+                });
+            };
+
+            Services = StartupBuilder.ConfigureStartup(nodeConfig, configureServices, out usingCustomServiceProvider);
+
             if (!LogManager.IsInitialized)
                 LogManager.Initialize(nodeConfig);
 
@@ -219,9 +245,6 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            // Configure DI using Startup type
-            bool usingCustomServiceProvider;
-            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -458,8 +481,8 @@ namespace Orleans.Runtime
             siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
             siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
 
-            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
-            membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
+            IMembershipTable membershipTable = Services.GetRequiredService<IMembershipTable>();
+            membershipOracle = Services.GetRequiredService<IMembershipOracle>();
             multiClusterOracle = multiClusterFactory.CreateGossipOracle(this).WaitForResultWithThrow(initTimeout);
             
             // This has to follow the above steps that start the runtime components
