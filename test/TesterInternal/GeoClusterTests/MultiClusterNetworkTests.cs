@@ -14,23 +14,12 @@ using Xunit.Abstractions;
 
 namespace Tests.GeoClusterTests
 {
-    public class MultiClusterNetworkTests : TestingClusterHost, IDisposable
+    public class MultiClusterNetworkTests : TestingClusterHost
     {
         public MultiClusterNetworkTests(ITestOutputHelper output) : base(output)
         { }
 
-        // Kill all clients and silos.
-        public void Dispose()
-        {
-            try
-            {
-                StopAllClientsAndClusters();
-            }
-            catch (Exception e)
-            {
-                WriteLog("Exception caught in test cleanup function: {0}", e);
-            }
-        }
+       
 
         // We need use ClientWrapper to load a client object in a new app domain. 
         // This allows us to create multiple clients that are connected to different silos.

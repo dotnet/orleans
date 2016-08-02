@@ -19,7 +19,7 @@ namespace Tests.GeoClusterTests
     /// A utility class for tests that include multiple clusters.
     /// It calls static methods on TestingSiloHost for starting and stopping silos.
     /// </summary>
-    public class TestingClusterHost   
+    public class TestingClusterHost : IDisposable
     {
         ITestOutputHelper output;
 
@@ -28,7 +28,7 @@ namespace Tests.GeoClusterTests
 
         private TimeSpan gossipStabilizationTime;
 
-        public TestingClusterHost(ITestOutputHelper output) 
+        public TestingClusterHost(ITestOutputHelper output)
         {
             Clusters = new Dictionary<string, ClusterInfo>();
             this.output = output;
@@ -43,20 +43,32 @@ namespace Tests.GeoClusterTests
 
         public void WriteLog(string format, params object[] args)
         {
-            output.WriteLine(format, args);
+            output.WriteLine("{0} {1}", DateTime.UtcNow, string.Format(format, args));
         }
 
         public async Task RunWithTimeout(string name, int msec, Func<Task> test)
         {
-            WriteLog("Starting {0}", name);
+            WriteLog("--- Starting {0}", name);
             var stopwatch = new System.Diagnostics.Stopwatch();
             stopwatch.Start();
             var testtask = test();
             await Task.WhenAny(testtask, Task.Delay(System.Diagnostics.Debugger.IsAttached ? 3600000 : msec));
-            Assert.True(testtask.IsCompleted, string.Format("{0} took too long, timed out", name));
-            await testtask;
             stopwatch.Stop();
-            WriteLog("{0} Done (elapsed = {1})", name, stopwatch.Elapsed);
+            if (!testtask.IsCompleted)
+            {
+                WriteLog("--- {0} Timed out after {1})", name, stopwatch.Elapsed);
+                Assert.True(false, string.Format("{0} took too long, timed out", name));
+            }
+            try // see if there was an exception and print it for logging
+            {
+                await testtask;
+                WriteLog("--- {0} Done (elapsed = {1})", name, stopwatch.Elapsed);
+            }
+            catch (Exception e)
+            {
+                WriteLog("--- Exception observed in {0}: {1})", name, e);
+                throw e;
+            }
         }
 
         /// <summary>
@@ -65,7 +77,7 @@ namespace Tests.GeoClusterTests
         public async Task WaitForMultiClusterGossipToStabilizeAsync(bool account_for_lost_messages)
         {
             TimeSpan stabilizationTime = account_for_lost_messages ? gossipStabilizationTime : TimeSpan.FromSeconds(1);
-            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForMultiClusterGossipToStabilizeAsync is about to sleep for {0}", stabilizationTime);
+            WriteLog("WaitForMultiClusterGossipToStabilizeAsync is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
             WriteLog("WaitForMultiClusterGossipToStabilizeAsync is done sleeping");
         }
@@ -98,6 +110,8 @@ namespace Tests.GeoClusterTests
             siloHost.StopAllSilos();
         }
 
+        public ParallelOptions paralleloptions = new ParallelOptions() { MaxDegreeOfParallelism = 4 };
+
         #region Default Cluster and Client Configuration
 
         private static int GetPortBase(int clusternumber)
@@ -108,7 +122,7 @@ namespace Tests.GeoClusterTests
         {
             return 22000 + (clusternumber + 2) * 100;
         }
-      
+
         #endregion
 
         #region Cluster Creation
@@ -123,7 +137,7 @@ namespace Tests.GeoClusterTests
                     config.Globals.MaxMultiClusterGateways = 2;
                     config.Globals.DefaultMultiCluster = null;
 
-                    config.Globals.GossipChannels = new List<GlobalConfiguration.GossipChannelConfiguration>(1) { 
+                    config.Globals.GossipChannels = new List<GlobalConfiguration.GossipChannelConfiguration>(1) {
                           new GlobalConfiguration.GossipChannelConfiguration()
                           {
                               ChannelType = GlobalConfiguration.GossipChannelType.AzureTable,
@@ -163,7 +177,7 @@ namespace Tests.GeoClusterTests
                 };
                 silohandles[0] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Primary, options, 0);
 
-                Parallel.For(1, numSilos, i =>
+                Parallel.For(1, numSilos, paralleloptions, i =>
                 {
                     silohandles[i] = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, i);
                 });
@@ -177,7 +191,7 @@ namespace Tests.GeoClusterTests
                 if (myCount == 0)
                     gossipStabilizationTime = GetGossipStabilizationTime(silohandles[0].Silo.GlobalConfig);
 
-                WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", silohandles.Select(s=>s.ToString())));
+                WriteLog("Cluster {0} started. [{1}]", clusterId, string.Join(" ", silohandles.Select(s => s.ToString())));
             }
         }
 
@@ -193,20 +207,45 @@ namespace Tests.GeoClusterTests
 
             var silo = TestingSiloHost.StartOrleansSilo(this.siloHost, Silo.SiloType.Secondary, options, clusterinfo.Silos.Count);
         }
+        public virtual void Dispose()
+        {
+            StopAllClientsAndClusters();
+        }
+
 
         public void StopAllClientsAndClusters()
         {
-            WriteLog("Stopping All Clients and Clusters...");
-            StopAllClients();
-            StopAllClusters();
-            WriteLog("All Clients and Clusters Are Stopped.");
+            WriteLog("Stopping all Clients and Clusters...");
+            var stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
+            try
+            {
+                var disposetask = Task.Run(() => {
+                    StopAllClients();
+                    WriteLog("All Clients are Stopped.");
+                    StopAllClusters();
+                    WriteLog("All Clusters are Stopped.");
+                });
+           
+
+                disposetask.WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 2));
+            }
+            catch (Exception e)
+            {
+                WriteLog("Exception caught in test cleanup function: {0}", e);
+                throw e;
+            }
+
+            stopwatch.Stop();
+            WriteLog("Dispose completed (elapsed = {0}).", stopwatch.Elapsed);        
         }
 
         public void StopAllClusters()
         {
             lock (Clusters)
             {
-                Parallel.ForEach(Clusters.Keys, key =>
+                Parallel.ForEach(Clusters.Keys, paralleloptions, key =>
                 {
                     var info = Clusters[key];
                     Parallel.For(1, info.Silos.Count, i => siloHost.StopSilo(info.Silos[i]));
@@ -230,6 +269,8 @@ namespace Tests.GeoClusterTests
 
             public string Name { get; private set; }
 
+            static Lazy<ClientConfiguration> clientconfiguration = new Lazy<ClientConfiguration>(() => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
+
             public ClientWrapperBase(string name, int gatewayport)
             {
                 this.Name = name;
@@ -239,7 +280,7 @@ namespace Tests.GeoClusterTests
                 ClientConfiguration config = null;
                 try
                 {
-                    config = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
+                    config = clientconfiguration.Value;
                 }
                 catch (Exception) { }
 
@@ -253,18 +294,18 @@ namespace Tests.GeoClusterTests
 
                 GrainClient.Initialize(config);
             }
-            
+
         }
 
         // Create a client, loaded in a new app domain.
-        public T NewClient<T>(string ClusterId, int ClientNumber) where T: ClientWrapperBase
+        public T NewClient<T>(string ClusterId, int ClientNumber) where T : ClientWrapperBase
         {
             var ci = Clusters[ClusterId];
             var name = string.Format("Client-{0}-{1}", ClusterId, ClientNumber);
 
             // clients are assigned to silos round-robin
             var gatewayport = ci.Silos[ClientNumber % ci.Silos.Count].GatewayPort;
-       
+
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
 
             var clientArgs = new object[] { name, gatewayport.Value };
@@ -281,27 +322,34 @@ namespace Tests.GeoClusterTests
                 activeClients.Add(clientDomain);
             }
 
+            WriteLog("Started {0} connected", name);
+
             return client;
         }
 
         public void StopAllClients()
         {
+            List<AppDomain> ac;
+
             lock (activeClients)
             {
-                foreach (var client in activeClients)
-                {
-                    try
-                    {
-                        AppDomain.Unload(client);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-                        throw;
-                    }
-                }
+                ac = activeClients.ToList();
                 activeClients.Clear();
             }
+
+            Parallel.For(0, ac.Count, paralleloptions, (i) =>
+            {
+                try
+                {
+                    WriteLog("Unloading client {0}", i);
+
+                    AppDomain.Unload(ac[i]);
+                }
+                catch (Exception e)
+                {
+                    WriteLog("Exception Caught While Unloading AppDomain for client {0}: {1}", i, e);
+                }
+            });
         }
 
         #endregion
