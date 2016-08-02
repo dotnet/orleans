@@ -491,13 +491,13 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
-            var streamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
+            var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
-                () => streamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
+                () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
-            InsideRuntimeClient.Current.CurrentStreamProviderManager = streamProviderManager;
-            allSiloProviders.AddRange(streamProviderManager.GetProviders());
+            InsideRuntimeClient.Current.CurrentStreamProviderManager = siloStreamProviderManager;
+            allSiloProviders.AddRange(siloStreamProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
@@ -568,7 +568,7 @@ namespace Orleans.Runtime
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
-                scheduler.QueueTask(streamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
+                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
                     .WaitWithThrow(initTimeout);
                 if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
 

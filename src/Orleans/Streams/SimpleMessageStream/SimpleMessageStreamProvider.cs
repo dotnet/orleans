@@ -8,7 +8,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
     public class SimpleMessageStreamProvider : IInternalStreamProvider
     {
         public string                       Name { get; private set; }
-        private ProviderState               State { get; set; }
 
         private Logger                      logger;
         private IStreamProviderRuntime      providerRuntime;
@@ -44,7 +43,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
-            State = ProviderState.Initialized;
             stateManager.CommitState();
             return TaskDone.Done;
         }
