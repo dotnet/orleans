@@ -169,13 +169,12 @@ namespace Orleans.Runtime.Host
             host.SetExpectedClusterSize(serviceRuntimeWrapper.RoleInstanceCount);
             siloInstanceManager.RegisterSiloInstance(myEntry);
 
-            // Initialise this Orleans silo instance
+            // Initialize this Orleans silo instance
             host.SetDeploymentId(deploymentId, connectionString);
             host.SetSiloEndpoint(myEndpoint, generation);
             host.SetProxyEndpoint(proxyEndpoint);
 
             host.InitializeOrleansSilo();
-            logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
             return StartSilo();
         }
 
@@ -215,15 +214,18 @@ namespace Orleans.Runtime.Host
         private bool StartSilo()
         {
             logger.Info(ErrorCode.Runtime_Error_100292, "Starting Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
-
-            bool ok = host.StartOrleansSilo();
-
-            if (ok)
-                logger.Info(ErrorCode.Runtime_Error_100293, "Successfully started Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
-            else
-                logger.Error(ErrorCode.Runtime_Error_100285, string.Format("Failed to start Orleans silo '{0}' as a {1} node.", host.Name, host.Type));
             
-            return ok;
+            try
+            {
+                bool ok = host.StartOrleansSilo(false);
+                logger.Info(ErrorCode.Runtime_Error_100293, "Successfully started Orleans silo '{0}' as a {1} node.", host.Name, host.Type);
+                return ok;
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Runtime_Error_100285, string.Format("Failed to start Orleans silo '{0}' as a {1} node.", host.Name, host.Type));
+                throw new OrleansException("Silo failed to start correctly - aborting", exc);
+            }
         }
 
         private void HandleAzureRoleStopping(object sender, object e)
@@ -249,15 +251,15 @@ namespace Orleans.Runtime.Host
 			// Hook up to receive notification of Azure role stopping events
             serviceRuntimeWrapper.SubscribeForStoppingNotification(this, HandleAzureRoleStopping);
 
-			if (host.IsStarted)
-			{
-				if (cancellationToken.HasValue)
-					host.WaitForOrleansSiloShutdown(cancellationToken.Value);
-				else
-					host.WaitForOrleansSiloShutdown();
-			}
-			else
-				throw new Exception("Silo failed to start correctly - aborting");
+            if (host.IsStarted)
+            {
+                if (cancellationToken.HasValue)
+                    host.WaitForOrleansSiloShutdown(cancellationToken.Value);
+                else
+                    host.WaitForOrleansSiloShutdown();
+            }
+            else
+                throw new OrleansException("Cannot run silo because it failed to start correctly - aborting");
 		}
     }
 }
