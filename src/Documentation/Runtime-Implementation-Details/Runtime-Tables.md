@@ -32,14 +32,14 @@ All rows in this table consist of the following columns ([`SiloInstanceTableEntr
 8. *Status* - status of this silo, as set by cluster management protocol. Any of the type [`Orleans.Runtime.SiloStatus`](https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs)
 9. *ProxyPort* - silo to clients TCP port
 10. *Primary* - whether this silo is primary or not. Deprecated.
-11. *RoleName* - If running is Azure - the name of this role. If running on premises, the name of the executing assembly.
-12. *InstanceName* - If running is Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.
-13. *UpdateZone* - Azure update zone, if running is Azure.
-14. *FaultZone* - Azure fault zone, if running is Azure.
+11. *RoleName* - If running in Azure - the name of this role. If running on premises, the name of the executing assembly.
+12. *InstanceName* - If running in Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.
+13. *UpdateZone* - Azure update zone, if running in Azure.
+14. *FaultZone* - Azure fault zone, if running in Azure.
 15. *SuspectingSilos* - the list of silos that suspect this silo. Managed by cluster management protocol.
 16. *SuspectingTimes* - the list of times when this silo was suspected. Managed by cluster management protocol.
 17. *StartTime* - the time when this silo was started.
-18. *IAmAliveTime* - the last time this silo reoprted that it is alive. Used for diagnostics and troubleshooting only.
+18. *IAmAliveTime* - the last time this silo reported that it is alive. Used for diagnostics and troubleshooting only.
 
 There is also a special row in this table, called membership version row, with the following columns:
 
@@ -77,7 +77,7 @@ Orleans Reminders table durably stores all the reminders registered in the syste
 
 ## Silo Metrics table
 
-Silo metrics table containes a small set of per-silo important key performance metrics (usually known as KPI - [Key Performance Indicators](http://en.wikipedia.org/wiki/Performance_indicator)). Each silo has one row, periodically updated in-place by its silo ([`SiloMetricsData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36)).
+Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - [Key Performance Indicators](http://en.wikipedia.org/wiki/Performance_indicator)). Each silo has one row, periodically updated in-place by its silo ([`SiloMetricsData`](https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36)).
 
 1. *PartitionKey* - DeploymentId
 2. *RowKey* -  silo name
