@@ -10,7 +10,6 @@ using Orleans.Runtime;
 using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit.Abstractions;
 
 // ReSharper disable InconsistentNaming
@@ -158,7 +157,7 @@ namespace Tests.GeoClusterTests
             Parallel.For(0, numGrains, paralleloptions, i =>
              {
                  int val = clients[i % clients.Count()].CallGrain(offset + i);
-                 Assert.AreEqual(1, val);
+                 Assert.Equal(1, val);
              });
 
             // We expect all requests to resolve, and all created activations are in state OWNED
@@ -174,12 +173,12 @@ namespace Tests.GeoClusterTests
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2}", own1, requested1, doubtful1);
 
             // Assert that all grains are in owned state
-            Assert.AreEqual(numGrains / 2, own0 - base_own0);
-            Assert.AreEqual(numGrains / 2, own1 - base_own1);
-            Assert.AreEqual(doubtful0, base_doubtful0);
-            Assert.AreEqual(doubtful1, base_doubtful1);
-            Assert.AreEqual(requested0, base_requested0);
-            Assert.AreEqual(requested1, base_requested1);
+            Assert.Equal(numGrains / 2, own0 - base_own0);
+            Assert.Equal(numGrains / 2, own1 - base_own1);
+            Assert.Equal(doubtful0, base_doubtful0);
+            Assert.Equal(doubtful1, base_doubtful1);
+            Assert.Equal(requested0, base_requested0);
+            Assert.Equal(requested1, base_requested1);
 
             return TaskDone.Done;
         }
@@ -286,7 +285,7 @@ namespace Tests.GeoClusterTests
             WriteLog("Validating cluster race results");
 
             // there should be the right number of grains
-            Assert.AreEqual(numGrains, grains.Count, "number of grains in directory does not match");
+            AssertEqual(numGrains, grains.Count, "number of grains in directory does not match");
 
             // each grain should have one activation per cluster
             foreach (var kvp in grains)
@@ -296,9 +295,9 @@ namespace Tests.GeoClusterTests
 
                 Action error = () =>
                 {
-                    Assert.Fail("grain {0} has wrong activations {1}",
+                    Assert.True(false, string.Format("grain {0} has wrong activations {1}",
                         key, string.Join(",", activations.Select(x =>
-                            string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus))));
+                            string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus)))));
                     Debugger.Break();
                 };
 
@@ -326,7 +325,7 @@ namespace Tests.GeoClusterTests
             // For each of the results that get, ensure that we see a sequence of values.
 
             foreach (var list in results)
-                Assert.AreEqual(numGrains, list.Count);
+                Assert.Equal(numGrains, list.Count);
 
             for (int i = 0; i < numGrains; ++i)
             {
@@ -338,7 +337,7 @@ namespace Tests.GeoClusterTests
                 vals.Sort();
 
                 for (int x = 0; x < results.Length; x++)
-                    Assert.AreEqual(x + 1, vals[x], "expect sequence of results, but got " + string.Join(",", vals));
+                    AssertEqual(x + 1, vals[x], "expect sequence of results, but got " + string.Join(",", vals));
             }
         }
 
@@ -395,15 +394,15 @@ namespace Tests.GeoClusterTests
                     res3 = clients[1].CallGrain(offset + i);
                 }
 
-                Assert.AreEqual(1, res0);
-                Assert.AreEqual(1, res1);
-                Assert.AreEqual(2, res2);
-                Assert.AreEqual(2, res3);
+                Assert.Equal(1, res0);
+                Assert.Equal(1, res1);
+                Assert.Equal(2, res2);
+                Assert.Equal(2, res3);
             });
 
             // Validate that all the created grains are in DOUBTFUL, one activation in each cluster.
-            Assert.IsTrue(GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count == numGrains, "c0 - Expecting All are Doubtful");
-            Assert.IsTrue(GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count == numGrains, "c1 - Expecting All are Doubtful");
+            Assert.True(GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count == numGrains);
+            Assert.True(GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count == numGrains);
 
             WriteLog("Restoring inter-cluster communication");
 
@@ -429,11 +428,11 @@ namespace Tests.GeoClusterTests
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own0, requested0, doubtful0, cached0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own1, requested1, doubtful1, cached1);
 
-            Assert.AreEqual(numGrains + base_own0 + base_own1, own0 + own1, "Expecting All are now Owned");
-            Assert.AreEqual(numGrains, cached0 + cached1 - base_cached0 - base_cached1, "Expecting All Owned have a cached in the other cluster");
-            Assert.AreEqual(0, doubtful0 + doubtful1 - base_doubtful0 - base_doubtful1, "Expecting No Doubtful");
-            Assert.AreEqual(requested0, base_requested0);
-            Assert.AreEqual(requested1, base_requested1);
+            AssertEqual(numGrains + base_own0 + base_own1, own0 + own1, "Expecting All are now Owned");
+            AssertEqual(numGrains, cached0 + cached1 - base_cached0 - base_cached1, "Expecting All Owned have a cached in the other cluster");
+            AssertEqual(0, doubtful0 + doubtful1 - base_doubtful0 - base_doubtful1, "Expecting No Doubtful");
+            Assert.Equal(requested0, base_requested0);
+            Assert.Equal(requested1, base_requested1);
 
             // each grain should have one activation per cluster
             var grains = GetGrainActivations(baseline);
@@ -444,9 +443,9 @@ namespace Tests.GeoClusterTests
 
                 Action error = () =>
                 {
-                    Assert.Fail("grain {0} has wrong activations {1}",
+                    Assert.True(false, string.Format("grain {0} has wrong activations {1}",
                         key, string.Join(",", activations.Select(x =>
-                            string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus))));
+                            string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus)))));
                     Debugger.Break();
                 };
 
@@ -492,10 +491,10 @@ namespace Tests.GeoClusterTests
                 }
                 //From the previous grain calls, the last value of the counter in each grain was 2.
                 //So here should be sequenced from 3.
-                Assert.AreEqual(3, res0);
-                Assert.AreEqual(4, res1);
-                Assert.AreEqual(5, res2);
-                Assert.AreEqual(6, res3);
+                Assert.Equal(3, res0);
+                Assert.Equal(4, res1);
+                Assert.Equal(5, res2);
+                Assert.Equal(6, res3);
             }
 
         }
