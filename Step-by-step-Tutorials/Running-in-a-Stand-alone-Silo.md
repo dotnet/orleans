@@ -37,7 +37,7 @@ static void Main(string[] args)
 }
 ```
 
-Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. Try to not mix NuGet package versions, make sure all Orlean packages are aligned in the solution.
+Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. Try to not mix NuGet package versions, make sure all Orlean packages (client, graininterface and grain projects) are aligned in the solution.
 
 You also need to add a OrleansConfiguration.xml file, you can create it using the instruction in [Minimal Orleans Application tutorial](Minimal-Orleans-Application#host--orleansconfigurationxml). Then, in this file, make sure that the `ProxyingGateway` element inside its Defaults section matches this value:
 
@@ -61,6 +61,16 @@ To demonstrate keeping state around across client sessions, let's modify the `Sa
 Then, we will have our grain save each string it is sent and return the last one. 
 Only at the first greeting will we see something we didn't send to the grain from the client.
 
+First, change the interface definition of SayHello
+
+``` csharp
+public interface IGrain1 : IGrainWithIntegerKey
+{
+    Task<string> SayHello(string greeting);
+}
+```
+Then change the Implementation
+
 ``` csharp
 private string text = "Hello World!";
 
@@ -72,8 +82,7 @@ public Task<string> SayHello(string greeting)
 }
 ```
 
-
- We also change the client to send a greeting several times:
+ We also change the client to send a greeting several times in Program.cs:
 
 ``` csharp
 var hello = GrainClient.GrainFactory.GetGrain<IGrain1>(0);
