@@ -66,7 +66,6 @@ namespace UnitTests.StreamingTests
         public async void Dispose()
         {
             await RemoveAllProviders();
-            //fixture.DefaultStreamProviderSettings.Remove(FailureInjectionStreamProvider.FailureInjectionModeString);
         }
 
         public DynamicStreamProviderConfigurationTests(Fixture fixture)
@@ -173,13 +172,13 @@ namespace UnitTests.StreamingTests
             Assert.Equal(providerNames.Count(), 0);
 
             bool exceptionThrown = false;
-            Dictionary<string, string> ProviderSettings = new Dictionary<string, string>(fixture.DefaultStreamProviderSettings);
-            ProviderSettings.Add(FailureInjectionStreamProvider.FailureInjectionModeString, 
+            Dictionary<string, string> providerSettings = new Dictionary<string, string>(fixture.DefaultStreamProviderSettings);
+            providerSettings.Add(FailureInjectionStreamProvider.FailureInjectionModeString, 
                 FailureInjectionStreamProviderMode.InitializationThrowsException.ToString());
             providerNames = new [] {"FailureInjectionStreamProvider"};
             try
             {
-                await AddFailureInjectionStreamProviderAndVerify(providerNames, ProviderSettings);
+                await AddFailureInjectionStreamProviderAndVerify(providerNames, providerSettings);
             }
             catch (ProviderInitializationException)
             {
@@ -195,13 +194,13 @@ namespace UnitTests.StreamingTests
             IEnumerable<String> providerNames = fixture.HostedCluster.Primary.Silo.TestHook.GetStreamProviderNames();
             Assert.Equal(providerNames.Count(), 0);
             bool exceptionThrown = false;
-            Dictionary<string, string> ProviderSettings = new Dictionary<string, string>(fixture.DefaultStreamProviderSettings);
-            ProviderSettings.Add(FailureInjectionStreamProvider.FailureInjectionModeString,
+            Dictionary<string, string> providerSettings = new Dictionary<string, string>(fixture.DefaultStreamProviderSettings);
+            providerSettings.Add(FailureInjectionStreamProvider.FailureInjectionModeString,
                 FailureInjectionStreamProviderMode.StartThrowsException.ToString());
             providerNames = new [] { "FailureInjectionStreamProvider"};
             try
             {
-                await AddFailureInjectionStreamProviderAndVerify(providerNames, ProviderSettings);
+                await AddFailureInjectionStreamProviderAndVerify(providerNames, providerSettings);
             }
             catch (ProviderStartException)
             {
