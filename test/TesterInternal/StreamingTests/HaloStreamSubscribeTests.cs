@@ -10,7 +10,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 namespace UnitTests.HaloTests.Streaming
 {

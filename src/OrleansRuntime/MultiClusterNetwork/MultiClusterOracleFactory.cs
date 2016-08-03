@@ -1,6 +1,6 @@
-﻿using Orleans.Runtime.Configuration;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {

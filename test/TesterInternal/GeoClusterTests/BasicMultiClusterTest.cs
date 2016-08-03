@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
-using Assert = Xunit.Assert;
 using Xunit.Abstractions;
 
 namespace Tests.GeoClusterTests

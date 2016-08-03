@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests
@@ -44,14 +43,14 @@ namespace UnitTests
             try
             {
                 await intPromise;
-                Assert.Fail("Should not have executed");
+                Assert.True(false, "Should not have executed");
             }
             catch (Exception exc2)
             {
-                Assert.AreEqual(exc2.GetBaseException().Message, (new Exception("GetAxBError-Exception")).Message);
+                Assert.Equal(exc2.GetBaseException().Message, (new Exception("GetAxBError-Exception")).Message);
             }
 
-            Assert.IsTrue(intPromise.Status == TaskStatus.Faulted);                
+            Assert.True(intPromise.Status == TaskStatus.Faulted);                
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
@@ -65,25 +64,25 @@ namespace UnitTests
             try
             {
                 intPromise.Wait();
-                Assert.Fail("Should have thrown");
+                Assert.True(false, "Should have thrown");
             }
             catch (Exception)
             {
-                Assert.IsTrue(intPromise.Status == TaskStatus.Faulted);
+                Assert.True(intPromise.Status == TaskStatus.Faulted);
             }
 
             try
             {
                 intPromise.Wait();
-                Assert.Fail("Should have thrown");
+                Assert.True(false, "Should have thrown");
             }
             catch (Exception exc2)
             {
-                Assert.IsTrue(intPromise.Status == TaskStatus.Faulted);
-                Assert.AreEqual((new Exception("GetAxBError-Exception")).Message, exc2.GetBaseException().Message);
+                Assert.True(intPromise.Status == TaskStatus.Faulted);
+                Assert.Equal((new Exception("GetAxBError-Exception")).Message, exc2.GetBaseException().Message);
             }
 
-            Assert.IsTrue(intPromise.Status == TaskStatus.Faulted);
+            Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
 
@@ -103,13 +102,13 @@ namespace UnitTests
             stopwatch.Stop();
 
             // these asserts depend on timing issues and will be wrong for the sync version of OrleansTask
-            Assert.IsTrue(!finished);
-            Assert.IsTrue(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.IsTrue(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+            Assert.True(!finished);
+            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
+            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
 
             promise.Wait(); // just wait for the server side grain invocation to finish
             
-            Assert.IsTrue(promise.Status == TaskStatus.RanToCompletion);
+            Assert.True(promise.Status == TaskStatus.RanToCompletion);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling")]
@@ -125,22 +124,22 @@ namespace UnitTests
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            Assert.IsFalse(promise.Wait(1000), "The task shouldn't have completed yet.");
+            Assert.False(promise.Wait(1000), "The task shouldn't have completed yet.");
 
             stopwatch.Stop();
-            Assert.IsTrue(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
-            Assert.IsTrue(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
+            Assert.True(stopwatch.ElapsedMilliseconds >= 900, "Waited less than 900ms"); // check that we waited at least 0.9 second
+            Assert.True(stopwatch.ElapsedMilliseconds <= 1100, "Waited longer than 1100ms");
 
             try
             {
                 promise.Wait();
-                Assert.Fail("Should have thrown");
+                Assert.True(false, "Should have thrown");
             }
             catch (Exception)
             {
             }
 
-            Assert.IsTrue(promise.Status == TaskStatus.Faulted);
+            Assert.True(promise.Status == TaskStatus.Faulted);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
@@ -183,7 +182,7 @@ namespace UnitTests
             IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             Task<bool> promise = grain.ExecuteDelayed(TimeSpan.FromMilliseconds(2000));
             bool result = await promise;
-            Assert.AreEqual(true, result);
+            Assert.Equal(true, result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
@@ -197,7 +196,7 @@ namespace UnitTests
             setPromise.Wait();
 
             Task<int> intPromise = grain.GetAxB_Async();
-            Assert.AreEqual(300, intPromise.Result);
+            Assert.Equal(300, intPromise.Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
@@ -206,7 +205,7 @@ namespace UnitTests
             ISimpleGrain forwardGrain = GrainClient.GrainFactory.GetGrain<IPromiseForwardGrain>(GetRandomGrainId());
             Task<int> promise = forwardGrain.GetAxB(5, 6);
             int result = promise.Result;
-            Assert.AreEqual(30, result);
+            Assert.Equal(30, result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("SimpleGrain")]
@@ -282,7 +281,7 @@ namespace UnitTests
             //Thread.Sleep(2000);
             //Client.Uninitialize();
             //var timeout80sec = TimeSpan.FromSeconds(80);
-            //Assert.IsFalse(result.WaitForFinished(timeout80sec), "WaitforFinished Timeout=" + timeout80sec);
+            //Assert.False(result.WaitForFinished(timeout80sec), "WaitforFinished Timeout=" + timeout80sec);
             //// prevent silo from shutting down right away
             //Thread.Sleep(Debugger.IsAttached ? TimeSpan.FromMinutes(2) : TimeSpan.FromSeconds(5));
         }

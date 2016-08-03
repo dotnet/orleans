@@ -2,10 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
@@ -54,19 +50,19 @@ namespace UnitTests.StorageTests
             var data = new Dictionary<string, object>();
 
             data[rangeParamName] = "Rem09";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem10";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem11";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem12";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = testName;
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -83,19 +79,19 @@ namespace UnitTests.StorageTests
             var data = new Dictionary<string, object>();
 
             data[rangeParamName] = "Rem09";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem10";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem11";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem12";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = testName;
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -112,19 +108,19 @@ namespace UnitTests.StorageTests
             var data = new Dictionary<string, object>();
 
             data[rangeParamName] = "Rem09";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem10";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem11";
-            Assert.IsTrue(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = "Rem12";
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
 
             data[rangeParamName] = testName;
-            Assert.IsFalse(compareClause(data), "From={0} To={1} Compare Value={2}", fromValue, toValue, data[rangeParamName]);
+            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -139,7 +135,7 @@ namespace UnitTests.StorageTests
             }.ToList();
 
             string keyStr = HierarchicalKeyStore.MakeStoreKey(keys);
-            Assert.AreEqual("One=1+Two=2", keyStr, "Output from MakeStoreKey");
+            Assert.Equal("One=1+Two=2", keyStr); // Output from MakeStoreKey
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
@@ -163,10 +159,10 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys);
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -193,10 +189,10 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys);
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -227,10 +223,10 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys);
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -261,10 +257,10 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys);
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -300,15 +296,15 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys1);
 
-            Assert.IsNotNull(result, "Should not be Null result after DeleteRow");
-            Assert.AreEqual(0, result.Count, "No data after DeleteRow");
+            Assert.NotNull(result); // Should not be Null result after DeleteRow
+            Assert.Equal(0, result.Count); // No data after DeleteRow
 
             result = store.ReadRow(keys2);
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -336,15 +332,15 @@ namespace UnitTests.StorageTests
 
             var results = store.ReadMultiRow(readKeys);
 
-            Assert.IsNotNull(results, "Null results");
-            Assert.AreEqual(1, results.Count, "Number of results");
+            Assert.NotNull(results); // Null results
+            Assert.Equal(1, results.Count); // Number of results
 
             var result = results.First();
 
-            Assert.IsNotNull(result, "Null result");
+            Assert.NotNull(result); // Null result
             foreach (string valueName in data.Keys)
             {
-                Assert.AreEqual(data[valueName], result[valueName], valueName);
+                Assert.Equal(data[valueName], result[valueName]);
             }
         }
 
@@ -362,8 +358,8 @@ namespace UnitTests.StorageTests
 
             var result = store.ReadRow(keys);
 
-            Assert.IsNotNull(result, "Null result");
-            Assert.AreEqual(0, result.Count, "No data");
+            Assert.NotNull(result); // Null result
+            Assert.Equal(0, result.Count); // No data
         }
 
         // Utility methods

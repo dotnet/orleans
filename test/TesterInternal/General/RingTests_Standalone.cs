@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using Xunit;
@@ -174,9 +173,9 @@ namespace UnitTests.General
             foreach (ConsistentRingProvider r in rings.Values)
             {
                 // see if there is no overlap between the responsibilities of two nodes
-                Assert.IsTrue(fullring.Remove(r.GetMyRange()), string.Format("Couldn't find & break range {0} in {1}. Some other node already claimed responsibility.", r.GetMyRange(), fullring));
+                Assert.True(fullring.Remove(r.GetMyRange()), string.Format("Couldn't find & break range {0} in {1}. Some other node already claimed responsibility.", r.GetMyRange(), fullring));
             }
-            Assert.IsTrue(fullring.NumRanges == 0, string.Format("Range not completely covered. Uncovered ranges: {0}", fullring));
+            Assert.True(fullring.NumRanges == 0, string.Format("Range not completely covered. Uncovered ranges: {0}", fullring));
         }
 
         /// <summary>

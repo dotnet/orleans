@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -8,12 +9,16 @@ namespace Orleans.Runtime
     internal class BufferPool
     {
         private readonly int byteBufferSize;
-        private readonly BlockingCollection<byte[]> buffers;
+        private readonly int maxBuffersCount;
+        private readonly bool limitBuffersCount;
+        private readonly ConcurrentBag<byte[]> buffers;
         private readonly CounterStatistic allocatedBufferCounter;
         private readonly CounterStatistic checkedOutBufferCounter;
         private readonly CounterStatistic checkedInBufferCounter;
         private readonly CounterStatistic droppedBufferCounter;
         private readonly CounterStatistic droppedTooLargeBufferCounter;
+
+        private int currentBufferCount;
 
         public static BufferPool GlobalPool;
 
@@ -47,7 +52,9 @@ namespace Orleans.Runtime
         {
             Name = name;
             byteBufferSize = bufferSize;
-            buffers = maxBuffers <= 0 ? new BlockingCollection<byte[]>() : new BlockingCollection<byte[]>(maxBuffers);
+            maxBuffersCount = maxBuffers;
+            limitBuffersCount = maxBuffers > 0;
+            buffers = new ConcurrentBag<byte[]>();
 
             var globalPoolSizeStat = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_BUFFERS_INPOOL,
                                                                     () => Count);
@@ -82,6 +89,11 @@ namespace Orleans.Runtime
                 buffer = new byte[byteBufferSize];
                 allocatedBufferCounter.Increment();
             }
+            else if (limitBuffersCount)
+            {
+                Interlocked.Decrement(ref currentBufferCount);
+            }
+
             checkedOutBufferCounter.Increment();
 
             return buffer;
@@ -103,14 +115,20 @@ namespace Orleans.Runtime
         {
             if (buffer.Length == byteBufferSize)
             {
-                if (buffers.TryAdd(buffer))
-                {
-                    checkedInBufferCounter.Increment();
-                }
-                else
+                if (limitBuffersCount && currentBufferCount > maxBuffersCount)
                 {
                     droppedBufferCounter.Increment();
+                    return;
                 }
+
+                buffers.Add(buffer);
+
+                if (limitBuffersCount)
+                {
+                    Interlocked.Increment(ref currentBufferCount);
+                }
+
+                checkedInBufferCounter.Increment();
             }
             else
             {

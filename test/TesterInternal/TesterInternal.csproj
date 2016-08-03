@@ -1,7 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(SolutionDir)packages\Xunit.SkippableFact.1.2.14\build\net45\Xunit.SkippableFact.props" Condition="Exists('$(SolutionDir)packages\Xunit.SkippableFact.1.2.14\build\net45\Xunit.SkippableFact.props')" />
-  <Import Project="$(SolutionDir)packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props" Condition="Exists('$(SolutionDir)packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -16,6 +14,8 @@
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
+    <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -47,71 +47,16 @@
       <HintPath>$(SolutionDir)packages\Microsoft.Azure.KeyVault.Core.1.0.0\lib\net40\Microsoft.Azure.KeyVault.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Azure.SqlDatabase.ElasticScale.Client">
-      <HintPath>$(SolutionDir)packages\Microsoft.Azure.SqlDatabase.ElasticScale.Client.1.1.0\lib\net45\Microsoft.Azure.SqlDatabase.ElasticScale.Client.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="Microsoft.Data.Edm">
-      <HintPath>$(SolutionDir)packages\Microsoft.Data.Edm.5.6.4\lib\net40\Microsoft.Data.Edm.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Data.OData">
-      <HintPath>$(SolutionDir)packages\Microsoft.Data.OData.5.6.4\lib\net40\Microsoft.Data.OData.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.Data.Services.Client">
-      <HintPath>$(SolutionDir)packages\Microsoft.Data.Services.Client.5.6.4\lib\net40\Microsoft.Data.Services.Client.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework">
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Microsoft.WindowsAzure.Storage">
-      <HintPath>$(SolutionDir)packages\WindowsAzure.Storage.5.0.2\lib\net40\Microsoft.WindowsAzure.Storage.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Validation, Version=2.2.0.0, Culture=neutral, PublicKeyToken=2fc06f0d701809a7, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\Validation.2.2.8\lib\dotnet\Validation.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="xunit.assert, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\xunit.assert.2.1.0\lib\dotnet\xunit.assert.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="xunit.core, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\xunit.extensibility.core.2.1.0\lib\dotnet\xunit.core.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="xunit.execution.desktop, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\xunit.extensibility.execution.2.1.0\lib\net45\xunit.execution.desktop.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data.Services" />
-    <Reference Include="System.Spatial">
-      <HintPath>$(SolutionDir)packages\System.Spatial.5.6.4\lib\net40\System.Spatial.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System.Transactions" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.XML" />
-    <Reference Include="Xunit.SkippableFact, Version=1.2.0.0, Culture=neutral, PublicKeyToken=b2b52da82b58eb73, processorArchitecture=MSIL">
-      <HintPath>$(SolutionDir)packages\Xunit.SkippableFact.1.2.14\lib\net45\Xunit.SkippableFact.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
@@ -119,6 +64,8 @@
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
     <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
@@ -128,6 +75,23 @@
     <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
+    <Compile Include="StorageTests\Relational\CommonFixture.cs" />
+    <Compile Include="StorageTests\Relational\CommonStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\CommonStorageUtilities.cs" />
+    <Compile Include="StorageTests\Relational\ConstantHasher.cs" />
+    <Compile Include="StorageTests\Relational\MySqlStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\RandomUtilities.cs" />
+    <Compile Include="StorageTests\Relational\Range.cs" />
+    <Compile Include="StorageTests\Relational\RelationalStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\SqlServerStorageTests.cs" />
+    <Compile Include="StorageTests\Relational\SymbolSet.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetPlain.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetGeneric.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\GrainTypeGenerator.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\TestState1.cs" />
+    <Compile Include="StorageTests\Relational\TestDataSets\TestStateGeneric1.cs" />
+    <Compile Include="StorageTests\Relational\TestEnvironmentInvariant.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="AssemblyLoaderTests.cs" />
     <Compile Include="AsynchAgentRestartTest.cs" />
@@ -222,8 +186,6 @@
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
     <Compile Include="StorageTests\PersistenceProviderTests.cs" />
-    <Compile Include="StorageTests\SQLAdapter\SampleGrainStateMapFactory.cs" />
-    <Compile Include="StorageTests\SQLAdapter\ShardTests.cs" />
     <Compile Include="StorageTests\StorageProviders\BaseJSONStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
@@ -342,7 +304,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="packages.config" />
     <None Include="ReadMe.md" />
     <Content Include="Config_AdditionalAssemblies.xml">
       <SubType>Designer</SubType>
@@ -351,6 +312,7 @@
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\src\Build\Version.txt">
@@ -483,12 +445,6 @@ set Configuration=$(Configuration)
 call "$(SolutionDir)Build\PostBuild.cmd"
 </PostBuildEvent>
   </PropertyGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)packages\Xunit.SkippableFact.1.2.14\build\net45\Xunit.SkippableFact.props')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)packages\Xunit.SkippableFact.1.2.14\build\net45\Xunit.SkippableFact.props'))" />
-  </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

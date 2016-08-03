@@ -1,11 +1,8 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
-using System;
 using Xunit;
 
 namespace UnitTests.Streaming

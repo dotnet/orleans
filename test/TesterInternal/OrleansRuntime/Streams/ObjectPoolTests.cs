@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Xunit;
 
@@ -47,7 +46,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 resource.Dispose();
             }
             // only 1 at a time was ever allocated, so max allocated should be 1
-            Assert.AreEqual(1, accumulator.MaxAllocated);
+            Assert.Equal(1, accumulator.MaxAllocated);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -63,7 +62,7 @@ namespace UnitTests.OrleansRuntime.Streams
             resources.ForEach(r => r.Dispose());
 
             // pool was pre-populated with 10, so max allocated should be 10
-            Assert.AreEqual(10, accumulator.MaxAllocated);
+            Assert.Equal(10, accumulator.MaxAllocated);
 
             // Allocate and free 10 items
             for (int i = 0; i < 10; i++)
@@ -73,7 +72,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
 
             // only 1 at a time was ever allocated, but pool was pre-populated with 10, so max allocated should be 10
-            Assert.AreEqual(10, accumulator.MaxAllocated);
+            Assert.Equal(10, accumulator.MaxAllocated);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -95,7 +94,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 resources.ForEach(r => r.Dispose());
 
                 // pool was pre-populated with WorkngSet, so max allocated should be 10
-                Assert.AreEqual(WorkngSet, accumulator.MaxAllocated);
+                Assert.Equal(WorkngSet, accumulator.MaxAllocated);
 
                 // Allocate and free 5 items
                 for (int j = 0; j < 5; j++)
@@ -103,12 +102,12 @@ namespace UnitTests.OrleansRuntime.Streams
                     TestPooledResource resource = pool.Allocate();
                     int expectedAllocationCount = (i*(5 + 1)) // allocations accumulated in previous loops
                                                   + (j + 1); // allocations accumulated in this loop
-                    Assert.AreEqual(expectedAllocationCount, resource.AllocationCount);
+                    Assert.Equal(expectedAllocationCount, resource.AllocationCount);
                     resource.Dispose();
                 }
 
                 // only 1 at a time was ever allocated, but pool was pre-populated with WorkngSet, so max allocated should be 10
-                Assert.AreEqual(WorkngSet, accumulator.MaxAllocated);
+                Assert.Equal(WorkngSet, accumulator.MaxAllocated);
             }
         }
 

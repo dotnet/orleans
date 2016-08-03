@@ -1,22 +1,20 @@
 ﻿//#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans;
-using Orleans.AzureUtils;
-using Orleans.Runtime;
-using Orleans.Storage;
-using Orleans.TestingHost;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans;
+using Orleans.AzureUtils;
+using Orleans.Runtime;
+using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using System.IO;
 using Xunit.Abstractions;
 
 // ReSharper disable RedundantAssignment
@@ -57,12 +55,12 @@ namespace UnitTests.StorageTests
             await grain.DoDelete();
 
             int val = await grain.GetValue(); // Should this throw instead?
-            Assert.AreEqual(0, val, "Value after Delete");
+            Assert.Equal(0,  val);  // "Value after Delete"
 
             await grain.DoWrite(2);
 
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Delete + New Write");
+            Assert.Equal(2,  val);  // "Value after Delete + New Write"
         }
 
         protected async Task Grain_AzureStore_Read()
@@ -72,7 +70,7 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
         }
 
         protected async Task Grain_GuidKey_AzureStore_Read_Write()
@@ -82,19 +80,19 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
 
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
         }
 
         protected async Task Grain_LongKey_AzureStore_Read_Write()
@@ -104,19 +102,19 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
 
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
         }
 
         protected async Task Grain_LongKeyExtended_AzureStore_Read_Write()
@@ -129,24 +127,24 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
-            Assert.AreEqual(2, val, "Value after DoRead");
+            Assert.Equal(2,  val);  // "Value after DoRead"
 
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
 
             string extKeyValue = await grain.GetExtendedKeyValue();
-            Assert.AreEqual(extKey, extKeyValue, "Extended Key");
+            Assert.Equal(extKey,  extKeyValue);  // "Extended Key"
         }
 
         protected async Task Grain_GuidKeyExtended_AzureStore_Read_Write()
@@ -159,24 +157,24 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
-            Assert.AreEqual(2, val, "Value after DoRead");
+            Assert.Equal(2,  val);  // "Value after DoRead"
 
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
 
             string extKeyValue = await grain.GetExtendedKeyValue();
-            Assert.AreEqual(extKey, extKeyValue, "Extended Key");
+            Assert.Equal(extKey,  extKeyValue);  // "Extended Key"
         }
 
         protected async Task Grain_Generic_AzureStore_Read_Write()
@@ -187,19 +185,19 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
 
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
         }
 
         protected async Task Grain_Generic_AzureStore_DiffTypes()
@@ -215,55 +213,55 @@ namespace UnitTests.StorageTests
             IAzureStorageGenericGrain<double> grain3 = GrainClient.GrainFactory.GetGrain<IAzureStorageGenericGrain<double>>(id3);
 
             int val1 = await grain1.GetValue();
-            Assert.AreEqual(0, val1, "Initial value - 1");
+            Assert.Equal(0,  val1);  // "Initial value - 1"
 
             string val2 = await grain2.GetValue();
-            Assert.AreEqual(null, val2, "Initial value - 2");
+            Assert.Equal(null,  val2);  // "Initial value - 2"
 
             double val3 = await grain3.GetValue();
-            Assert.AreEqual(0.0, val3, "Initial value - 3");
+            Assert.Equal(0.0,  val3);  // "Initial value - 3"
 
             int expected1 = 1;
             await grain1.DoWrite(expected1);
             val1 = await grain1.GetValue();
-            Assert.AreEqual(expected1, val1, "Value after Write#1 - 1");
+            Assert.Equal(expected1,  val1);  // "Value after Write#1 - 1"
 
             string expected2 = "Three";
             await grain2.DoWrite(expected2);
             val2 = await grain2.GetValue();
-            Assert.AreEqual(expected2, val2, "Value after Write#1 - 2");
+            Assert.Equal(expected2,  val2);  // "Value after Write#1 - 2"
 
             double expected3 = 5.1;
             await grain3.DoWrite(expected3);
             val3 = await grain3.GetValue();
-            Assert.AreEqual(expected3, val3, "Value after Write#1 - 3");
+            Assert.Equal(expected3,  val3);  // "Value after Write#1 - 3"
 
             val1 = await grain1.GetValue();
-            Assert.AreEqual(expected1, val1, "Value before Write#2 - 1");
+            Assert.Equal(expected1,  val1);  // "Value before Write#2 - 1"
             expected1 = 2;
             await grain1.DoWrite(expected1);
             val1 = await grain1.GetValue();
-            Assert.AreEqual(expected1, val1, "Value after Write#2 - 1");
+            Assert.Equal(expected1,  val1);  // "Value after Write#2 - 1"
             val1 = await grain1.DoRead();
-            Assert.AreEqual(expected1, val1, "Value after Re-Read - 1");
+            Assert.Equal(expected1,  val1);  // "Value after Re-Read - 1"
 
             val2 = await grain2.GetValue();
-            Assert.AreEqual(expected2, val2, "Value before Write#2 - 2");
+            Assert.Equal(expected2,  val2);  // "Value before Write#2 - 2"
             expected2 = "Four";
             await grain2.DoWrite(expected2);
             val2 = await grain2.GetValue();
-            Assert.AreEqual(expected2, val2, "Value after Write#2 - 2");
+            Assert.Equal(expected2,  val2);  // "Value after Write#2 - 2"
             val2 = await grain2.DoRead();
-            Assert.AreEqual(expected2, val2, "Value after Re-Read - 2");
+            Assert.Equal(expected2,  val2);  // "Value after Re-Read - 2"
 
             val3 = await grain3.GetValue();
-            Assert.AreEqual(expected3, val3, "Value before Write#2 - 3");
+            Assert.Equal(expected3,  val3);  // "Value before Write#2 - 3"
             expected3 = 6.2;
             await grain3.DoWrite(expected3);
             val3 = await grain3.GetValue();
-            Assert.AreEqual(expected3, val3, "Value after Write#2 - 3");
+            Assert.Equal(expected3,  val3);  // "Value after Write#2 - 3"
             val3 = await grain3.DoRead();
-            Assert.AreEqual(expected3, val3, "Value after Re-Read - 3");
+            Assert.Equal(expected3,  val3);  // "Value after Re-Read - 3"
         }
 
         protected async Task Grain_AzureStore_SiloRestart()
@@ -278,7 +276,7 @@ namespace UnitTests.StorageTests
 
             int val = await grain.GetValue();
 
-            Assert.AreEqual(0, val, "Initial value");
+            Assert.Equal(0,  val);  // "Initial value"
 
             await grain.DoWrite(1);
 
@@ -287,19 +285,19 @@ namespace UnitTests.StorageTests
             output.WriteLine("Silos restarted");
 
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
-            Assert.AreEqual(initialServiceId, this.HostedCluster.Globals.ServiceId, "ServiceId same after restart.");
-            Assert.AreNotEqual(initialDeploymentId, this.HostedCluster.DeploymentId, "DeploymentId different after restart.");
+            Assert.Equal(initialServiceId,  this.HostedCluster.Globals.ServiceId);  // "ServiceId same after restart."
+            Assert.NotEqual(initialDeploymentId,  this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             val = await grain.GetValue();
-            Assert.AreEqual(1, val, "Value after Write-1");
+            Assert.Equal(1,  val);  // "Value after Write-1"
 
             await grain.DoWrite(2);
             val = await grain.GetValue();
-            Assert.AreEqual(2, val, "Value after Write-2");
+            Assert.Equal(2,  val);  // "Value after Write-2"
 
             val = await grain.DoRead();
 
-            Assert.AreEqual(2, val, "Value after Re-Read");
+            Assert.Equal(2,  val);  // "Value after Re-Read"
         }
 
         protected void Persistence_Perf_Activate()
@@ -359,7 +357,7 @@ namespace UnitTests.StorageTests
             {
                 string provider = providerType.FullName;
                 List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
-                Assert.IsTrue(providers.Contains(provider), "No storage provider found: {0}", provider);
+                Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }
 
@@ -406,7 +404,7 @@ namespace UnitTests.StorageTests
 
                 if (elapsed > target.Multiply(2.0 * timingFactor))
                 {
-                    Assert.Fail(msg);
+                    Assert.True(false, msg);
                 }
                 else
                 {

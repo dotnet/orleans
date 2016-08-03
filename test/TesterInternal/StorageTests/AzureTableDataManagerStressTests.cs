@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost;
@@ -73,7 +72,7 @@ namespace UnitTests.StorageTests
             int count = data.Count();
             output.WriteLine("AzureTable_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
-            Assert.IsTrue(count >= iterations, "ReadAllshould return some data: Found={0}", count);
+            Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
         }
 
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)

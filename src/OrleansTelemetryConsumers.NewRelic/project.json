@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "NewRelic.Agent.Api": "5.10.59.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

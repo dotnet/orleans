@@ -1,12 +1,10 @@
 using System;
 using System.Globalization;
 using System.Net;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;
@@ -33,37 +31,37 @@ namespace UnitTests.General
         {
             GrainId testGrain = Constants.DirectoryServiceId;
             output.WriteLine("Testing GrainID " + testGrain);
-            Assert.IsTrue(testGrain.IsSystemTarget, "System grain ID is not flagged as a system ID");
+            Assert.True(testGrain.IsSystemTarget); // System grain ID is not flagged as a system ID
 
             GrainId sGrain = (GrainId)SerializationManager.DeepCopy(testGrain);
             output.WriteLine("Testing GrainID " + sGrain);
-            Assert.IsTrue(sGrain.IsSystemTarget, "String round-trip grain ID is not flagged as a system ID");
-            Assert.AreEqual(testGrain, sGrain, "Should be equivalent GrainId object");
-            Assert.AreSame(testGrain, sGrain, "Should be same / intern'ed GrainId object");
+            Assert.True(sGrain.IsSystemTarget); // String round-trip grain ID is not flagged as a system ID
+            Assert.Equal(testGrain, sGrain); // Should be equivalent GrainId object
+            Assert.Same(testGrain, sGrain); // Should be same / intern'ed GrainId object
 
             ActivationId testActivation = ActivationId.GetSystemActivation(testGrain, SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2456), 0));
             output.WriteLine("Testing ActivationID " + testActivation);
-            Assert.IsTrue(testActivation.IsSystem, "System activation ID is not flagged as a system ID");
+            Assert.True(testActivation.IsSystem); // System activation ID is not flagged as a system ID
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
-            Xunit.Assert.Throws<ArgumentNullException>(() =>
+            Assert.Throws<ArgumentNullException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: null));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsEmptyKeyExtension()
         {
-            Xunit.Assert.Throws<ArgumentException>(() =>
+            Assert.Throws<ArgumentException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: ""));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsWhiteSpaceKeyExtension()
         {
-            Xunit.Assert.Throws<ArgumentException>(() =>
+            Assert.Throws<ArgumentException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: " \t\n\r"));
         }
 
@@ -76,7 +74,7 @@ namespace UnitTests.General
                 writer.Write(expected);
                 BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
                 var actual = reader.ReadUniqueKey();
-                Assert.AreEqual(expected, actual, "UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #1).");
+                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #1).
             }
 
             {
@@ -86,7 +84,7 @@ namespace UnitTests.General
                 writer.Write(expected);
                 BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
                 var actual = reader.ReadUniqueKey();
-                Assert.AreEqual(expected, actual, "UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #2).");
+                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #2).
             }
 
             {
@@ -96,7 +94,7 @@ namespace UnitTests.General
                 writer.Write(expected);
                 BinaryTokenStreamReader reader = new BinaryTokenStreamReader(writer.ToBytes());
                 var actual = reader.ReadUniqueKey();
-                Assert.AreEqual(expected, actual, "UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #3).");
+                Assert.Equal(expected, actual); // UniqueKey.Serialize() and UniqueKey.Deserialize() failed to reproduce an identical object (case #3).
             }
         }
 
@@ -106,26 +104,26 @@ namespace UnitTests.General
             UniqueKey expected1 = UniqueKey.NewKey(Guid.NewGuid());
             string str1 = expected1.ToHexString();
             UniqueKey actual1 = UniqueKey.Parse(str1);
-            Assert.AreEqual(expected1, actual1, "UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 1).");
+            Assert.Equal(expected1, actual1); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 1).
 
             string kx3 = "case 3";
             UniqueKey expected3 = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx3);
             string str3 = expected3.ToHexString();
             UniqueKey actual3 = UniqueKey.Parse(str3);
-            Assert.AreEqual(expected3, actual3, "UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 3).");
+            Assert.Equal(expected3, actual3); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 3).
 
             long pk = random.Next();
             UniqueKey expected4 = UniqueKey.NewKey(pk);
             string str4 = expected4.ToHexString();
             UniqueKey actual4 = UniqueKey.Parse(str4);
-            Assert.AreEqual(expected4, actual4, "UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 4).");
+            Assert.Equal(expected4, actual4); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 4).
 
             pk = random.Next();
             string kx5 = "case 5";
             UniqueKey expected5 = UniqueKey.NewKey(pk, category: UniqueKey.Category.KeyExtGrain, keyExt: kx5);
             string str5 = expected5.ToHexString();
             UniqueKey actual5 = UniqueKey.Parse(str5);
-            Assert.AreEqual(expected5, actual5, "UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 5).");
+            Assert.Equal(expected5, actual5); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 5).
         }
 
 
@@ -138,7 +136,7 @@ namespace UnitTests.General
                 Guid expected = Guid.NewGuid();
                 GrainId grainId = GrainId.GetGrainIdForTesting(expected);
                 Guid actual = grainId.Key.PrimaryKeyToGuid();
-                Assert.AreEqual(expected, actual, string.Format("Failed to encode and decode grain id with GUID {0}", expected));
+                Assert.Equal(expected, actual); // Failed to encode and decode grain id
             }
         }
 
@@ -148,35 +146,35 @@ namespace UnitTests.General
             Guid guid = Guid.NewGuid();
             GrainId grainId = GrainId.GetGrainIdForTesting(guid);
             GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key
 
             string extKey = "Guid-ExtKey-1";
             guid = Guid.NewGuid();
             grainId = GrainId.GetGrainId(0, guid, extKey);
             roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key + Extended Key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
 
             grainId = GrainId.GetGrainId(0, guid, null);
             roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Guid key + null Extended Key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
 
             long key = random.Next();
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainIdForTesting(guid);
             roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key
 
             extKey = "Long-ExtKey-2";
             key = random.Next();
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainId(0, guid, extKey);
             roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key + Extended Key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + Extended Key
 
             guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
             grainId = GrainId.GetGrainId(0, guid, null);
             roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.AreEqual(grainId, roundTripped, "GrainId.ToPrintableString -- Int64 key + null Extended Key");
+            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + null Extended Key
         }
 
         private GrainId RoundTripGrainIdToParsable(GrainId input)
@@ -193,10 +191,7 @@ namespace UnitTests.General
             var uk = UniqueKey.NewKey(0, UniqueKey.Category.None, expected);
             var actual = uk.BaseTypeCode;
 
-            Assert.AreEqual(
-                expected,
-                actual,
-                "UniqueKey.BaseTypeCode should store at least 32 bits of information.");
+            Assert.Equal(expected, actual);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -208,28 +203,16 @@ namespace UnitTests.General
             var uk1 = UniqueKey.NewKey(expectedKey1, UniqueKey.Category.KeyExtGrain, all32Bits, expectedKeyExt1);
             string actualKeyExt1;
             var actualKey1 = uk1.PrimaryKeyToGuid(out actualKeyExt1);
-            Assert.AreEqual(
-                expectedKey1,
-                actualKey1,
-                "UniqueKey objects should preserve the value of their primary key (Guid case #1).");
-            Assert.AreEqual(
-                expectedKeyExt1,
-                actualKeyExt1,
-                "UniqueKey objects should preserve the value of their key extension (Guid case #1).");
+            Assert.Equal(expectedKey1, actualKey1); //"UniqueKey objects should preserve the value of their primary key (Guid case #1).");
+            Assert.Equal(expectedKeyExt1, actualKeyExt1); //"UniqueKey objects should preserve the value of their key extension (Guid case #1).");
 
             var expectedKey2 = Guid.NewGuid();
             const string expectedKeyExt2 = "2";
             var uk2 = UniqueKey.NewKey(expectedKey2, UniqueKey.Category.KeyExtGrain, all32Bits, expectedKeyExt2);
             string actualKeyExt2;
             var actualKey2 = uk2.PrimaryKeyToGuid(out actualKeyExt2);
-            Assert.AreEqual(
-                expectedKey2,
-                actualKey2,
-                "UniqueKey objects should preserve the value of their primary key (Guid case #2).");
-            Assert.AreEqual(
-                expectedKeyExt2,
-                actualKeyExt2,
-                "UniqueKey objects should preserve the value of their key extension (Guid case #2).");
+            Assert.Equal(expectedKey2, actualKey2); // "UniqueKey objects should preserve the value of their primary key (Guid case #2).");
+            Assert.Equal(expectedKeyExt2, actualKeyExt2); // "UniqueKey objects should preserve the value of their key extension (Guid case #2).");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -246,14 +229,8 @@ namespace UnitTests.General
             string actualKeyExt;
             var actualKey = uk.PrimaryKeyToLong(out actualKeyExt);
 
-            Assert.AreEqual(
-                expectedKey,
-                actualKey,
-                "UniqueKey objects should preserve the value of their primary key (long case).");
-            Assert.AreEqual(
-                expectedKeyExt,
-                actualKeyExt,
-                "UniqueKey objects should preserve the value of their key extension (long case).");
+            Assert.Equal(expectedKey, actualKey); // "UniqueKey objects should preserve the value of their primary key (long case).");
+            Assert.Equal(expectedKeyExt, actualKeyExt); // "UniqueKey objects should preserve the value of their key extension (long case).");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -271,7 +248,7 @@ namespace UnitTests.General
                 ulong u3 = BitConverter.ToUInt64(byteData, 16);
                 var referenceHash = jenkinsHash.ComputeHash(byteData);
                 var optimizedHash = jenkinsHash.ComputeHash(u1, u2, u3);
-                Assert.AreEqual(referenceHash, optimizedHash, "Optimized hash value doesn't match the reference value for inputs {0}, {1}, {2}", u1, u2, u3);
+                Assert.Equal(referenceHash,  optimizedHash);  //  "Optimized hash value doesn't match the reference value for inputs {0}, {1}, {2}", u1, u2, u3
             }
         }
 
@@ -281,15 +258,15 @@ namespace UnitTests.General
             Guid guid = new Guid();
             GrainId gid1 = GrainId.FromParsableString(guid.ToString("B"));
             GrainId gid2 = GrainId.FromParsableString(guid.ToString("N"));
-            Assert.AreEqual(gid1, gid2, "Should be equal GrainId's");
-            Assert.AreSame(gid1, gid2, "Should be same / intern'ed GrainId object");
+            Assert.Equal(gid1, gid2); // Should be equal GrainId's
+            Assert.Same(gid1, gid2); // Should be same / intern'ed GrainId object
 
             // Round-trip through Serializer
             GrainId gid3 = (GrainId)SerializationManager.RoundTripSerializationForTesting(gid1);
-            Assert.AreEqual(gid1, gid3, "Should be equal GrainId's");
-            Assert.AreEqual(gid2, gid3, "Should be equal GrainId's");
-            Assert.AreSame(gid1, gid3, "Should be same / intern'ed GrainId object");
-            Assert.AreSame(gid2, gid3, "Should be same / intern'ed GrainId object");
+            Assert.Equal(gid1, gid3); // Should be equal GrainId's
+            Assert.Equal(gid2, gid3); // Should be equal GrainId's
+            Assert.Same(gid1, gid3); // Should be same / intern'ed GrainId object
+            Assert.Same(gid2, gid3); // Should be same / intern'ed GrainId object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -300,14 +277,14 @@ namespace UnitTests.General
             string r1 = interner.FindOrCreate("1", () => str);
             string r2 = interner.FindOrCreate("1", () => null); // Should always be found
 
-            Assert.AreEqual(r1, r2, "1: Objects should be equal");
-            Assert.AreSame(r1, r2, "2: Objects should be same / intern'ed");
+            Assert.Equal(r1, r2); // 1: Objects should be equal
+            Assert.Same(r1, r2); // 2: Objects should be same / intern'ed
 
             // Round-trip through Serializer
             string r3 = (string)SerializationManager.RoundTripSerializationForTesting(r1);
 
-            Assert.AreEqual(r1, r3, "3: Should be equal");
-            Assert.AreEqual(r2, r3, "4: Should be equal");
+            Assert.Equal(r1, r3); // 3: Should be equal
+            Assert.Equal(r2, r3); // 4: Should be equal
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -319,27 +296,27 @@ namespace UnitTests.General
             var obj3 = new B();
 
             var r1 = interner.InternAndUpdateWithMoreDerived(1, obj1);
-            Assert.AreEqual(obj1, r1, "Objects should be equal");
-            Assert.AreSame(obj1, r1, "Objects should be same / intern'ed");
+            Assert.Equal(obj1, r1); // Objects should be equal
+            Assert.Same(obj1, r1); // Objects should be same / intern'ed
 
             var r2 = interner.InternAndUpdateWithMoreDerived(2, obj2);
-            Assert.AreEqual(obj2, r2, "Objects should be equal");
-            Assert.AreSame(obj2, r2, "Objects should be same / intern'ed");
+            Assert.Equal(obj2, r2); // Objects should be equal
+            Assert.Same(obj2, r2); // Objects should be same / intern'ed
 
             // Interning should not replace instances of same class
             var r3 = interner.InternAndUpdateWithMoreDerived(2, obj3);
-            Assert.AreSame(obj2, r3, "Interning should return previous object");
-            Assert.AreNotSame(obj3, r3, "Interning should not replace previous object of same class");
+            Assert.Same(obj2, r3); // Interning should return previous object
+            Assert.NotSame(obj3, r3); // Interning should not replace previous object of same class
 
             // Interning should return instances of most derived class
             var r4 = interner.InternAndUpdateWithMoreDerived(1, obj2);
-            Assert.AreSame(obj2, r4, "Interning should return most derived object");
-            Assert.AreNotSame(obj1, r4, "Interning should replace cached instances of less derived object");
+            Assert.Same(obj2, r4); // Interning should return most derived object
+            Assert.NotSame(obj1, r4); // Interning should replace cached instances of less derived object
 
             // Interning should not return instances of less derived class
             var r5 = interner.InternAndUpdateWithMoreDerived(2, obj1);
-            Assert.AreNotSame(obj1, r5, "Interning should not return less derived object");
-            Assert.AreSame(obj2, r5, "Interning should return previously cached instances of more derived object");
+            Assert.NotSame(obj1, r5); // Interning should not return less derived object
+            Assert.Same(obj2, r5); // Interning should return previously cached instances of more derived object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -351,27 +328,27 @@ namespace UnitTests.General
             var obj3 = new B();
 
             var r1 = interner.FindOrCreate(1, () => obj1);
-            Assert.AreEqual(obj1, r1, "Objects should be equal");
-            Assert.AreSame(obj1, r1, "Objects should be same / intern'ed");
+            Assert.Equal(obj1, r1); // Objects should be equal
+            Assert.Same(obj1, r1); // Objects should be same / intern'ed
 
             var r2 = interner.FindOrCreate(2, () => obj2);
-            Assert.AreEqual(obj2, r2, "Objects should be equal");
-            Assert.AreSame(obj2, r2, "Objects should be same / intern'ed");
+            Assert.Equal(obj2, r2); // Objects should be equal
+            Assert.Same(obj2, r2); // Objects should be same / intern'ed
 
             // FindOrCreate should not replace instances of same class
             var r3 = interner.FindOrCreate(2, () => obj3);
-            Assert.AreSame(obj2, r3, "FindOrCreate should return previous object");
-            Assert.AreNotSame(obj3, r3, "FindOrCreate should not replace previous object of same class");
+            Assert.Same(obj2, r3); // FindOrCreate should return previous object
+            Assert.NotSame(obj3, r3); // FindOrCreate should not replace previous object of same class
 
             // FindOrCreate should not replace cached instances with instances of most derived class
             var r4 = interner.FindOrCreate(1, () => obj2);
-            Assert.AreSame(obj1, r4, "FindOrCreate return previously cached object");
-            Assert.AreNotSame(obj2, r4, "FindOrCreate should not replace previously cached object");
+            Assert.Same(obj1, r4); // FindOrCreate return previously cached object
+            Assert.NotSame(obj2, r4); // FindOrCreate should not replace previously cached object
 
             // FindOrCreate should not replace cached instances with instances of less derived class
             var r5 = interner.FindOrCreate(2, () => obj1);
-            Assert.AreNotSame(obj1, r5, "FindOrCreate should not replace previously cached object");
-            Assert.AreSame(obj2, r5, "FindOrCreate return previously cached object");
+            Assert.NotSame(obj1, r5); // FindOrCreate should not replace previously cached object
+            Assert.Same(obj2, r5); // FindOrCreate return previously cached object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -380,15 +357,15 @@ namespace UnitTests.General
             //string addrStr1 = "1.2.3.4@11111@1";
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
             SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
-            Assert.AreEqual(a1, a2, "Should be equal SiloAddress's");
-            Assert.AreSame(a1, a2, "Should be same / intern'ed SiloAddress object");
+            Assert.Equal(a1, a2); // Should be equal SiloAddress's
+            Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
             // Round-trip through Serializer
             SiloAddress a3 = (SiloAddress)SerializationManager.RoundTripSerializationForTesting(a1);
-            Assert.AreEqual(a1, a3, "Should be equal SiloAddress's");
-            Assert.AreEqual(a2, a3, "Should be equal SiloAddress's");
-            Assert.AreSame(a1, a3, "Should be same / intern'ed SiloAddress object");
-            Assert.AreSame(a2, a3, "Should be same / intern'ed SiloAddress object");
+            Assert.Equal(a1, a3); // Should be equal SiloAddress's
+            Assert.Equal(a2, a3); // Should be equal SiloAddress's
+            Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
+            Assert.Same(a2, a3); // Should be same / intern'ed SiloAddress object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -396,8 +373,8 @@ namespace UnitTests.General
         {
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
             SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2222), 12345);
-            Assert.AreNotEqual(a1, a2, "Should not be equal SiloAddress's");
-            Assert.AreNotSame(a1, a2, "Should not be same / intern'ed SiloAddress object");
+            Assert.NotEqual(a1, a2); // Should not be equal SiloAddress's
+            Assert.NotSame(a1, a2); // Should not be same / intern'ed SiloAddress object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -407,8 +384,8 @@ namespace UnitTests.General
 
             // Round-trip through Serializer
             SiloAddress a3 = (SiloAddress)SerializationManager.RoundTripSerializationForTesting(a1);
-            Assert.AreEqual(a1, a3, "Should be equal SiloAddress's");
-            Assert.AreSame(a1, a3, "Should be same / intern'ed SiloAddress object");
+            Assert.Equal(a1, a3); // Should be equal SiloAddress's
+            Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -430,12 +407,12 @@ namespace UnitTests.General
             output.WriteLine("GrainId.ToFullString={0}", grainIdToFullString);
 
             // Equal: Public APIs
-            //Assert.AreEqual(guidString, grainIdToKeyString, "GrainId.ToKeyString");
-            Assert.AreEqual(guidString, grainIdToGuidString, "GrainIdToGuidString");
+            //Assert.Equal(guidString, grainIdToKeyString); // GrainId.ToKeyString
+            Assert.Equal(guidString, grainIdToGuidString); // GrainIdToGuidString
             // Equal: Internal APIs
-            Assert.AreEqual(grainIdGuid, grainId.GetPrimaryKey(), "GetPrimaryKey Guid");
+            Assert.Equal(grainIdGuid, grainId.GetPrimaryKey()); // GetPrimaryKey Guid
             // NOT-Equal: Internal APIs
-            Assert.AreNotEqual(guidString, grainIdKeyString, "GrainId.Key.ToString");
+            Assert.NotEqual(guidString, grainIdKeyString); // GrainId.Key.ToString
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
@@ -449,7 +426,7 @@ namespace UnitTests.General
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 address1, addressStr1, addressObj1);
 
-            Assert.AreEqual(address1, addressObj1, "SiloAddress equal after To-From-ParsableString");
+            Assert.Equal(address1, addressObj1); // SiloAddress equal after To-From-ParsableString
 
             //const string addressStr2 = "127.0.0.1-11111-144611139";
             const string addressStr2 = "127.0.0.1:11111@144611139";
@@ -459,7 +436,7 @@ namespace UnitTests.General
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 addressStr2, addressStr2Out, addressObj2);
 
-            Assert.AreEqual(addressStr2, addressStr2Out, "SiloAddress equal after From-To-ParsableString");
+            Assert.Equal(addressStr2, addressStr2Out); // SiloAddress equal after From-To-ParsableString
         }
 
         internal string GrainIdToGuidString(GrainId grainId)
@@ -494,13 +471,13 @@ namespace UnitTests.General
         private void TestGrainReference(GrainReference grainRef)
         {
             GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
-            Assert.AreEqual(grainRef, roundTripped, "GrainReference.ToKeyString");
+            Assert.Equal(grainRef, roundTripped); // GrainReference.ToKeyString
 
             roundTripped = SerializationManager.RoundTripSerializationForTesting(grainRef);
-            Assert.AreEqual(grainRef, roundTripped, "GrainReference.OrleansSerializer");
+            Assert.Equal(grainRef, roundTripped); // GrainReference.OrleansSerializer
 
             roundTripped = TestingUtils.RoundTripDotNetSerializer(grainRef);
-            Assert.AreEqual(grainRef, roundTripped, "GrainReference.DotNetSerializer");
+            Assert.Equal(grainRef, roundTripped); // GrainReference.DotNetSerializer
         }
 
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)

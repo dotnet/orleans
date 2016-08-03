@@ -1,10 +1,9 @@
 ﻿using System;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -23,11 +22,11 @@ namespace UnitTests.General
             int id = 1;
             var grain = cache.Get(id);
 
-            Assert.AreEqual(1, cache.Count);
-            Assert.AreEqual(1, numGrainsCreated);
+            Assert.Equal(1, cache.Count);
+            Assert.Equal(1, numGrainsCreated);
 
-            Assert.IsNotNull(grain);
-            //Assert.AreEqual(id, grain.A.Result);
+            Assert.NotNull(grain);
+            //Assert.Equal(id, grain.A.Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
@@ -43,22 +42,22 @@ namespace UnitTests.General
             int id1 = 1;
             var grain1 = cache.Get(id1);
 
-            Assert.IsNotNull(grain1);
-            //Assert.AreEqual(id1, grain1.A.Result);
+            Assert.NotNull(grain1);
+            //Assert.Equal(id1, grain1.A.Result);
 
-            Assert.AreEqual(1, cache.Count);
-            Assert.AreEqual(1, numGrainsCreated);
+            Assert.Equal(1, cache.Count);
+            Assert.Equal(1, numGrainsCreated);
 
             int id2 = 2;
             var grain2 = cache.Get(id2);
 
-            Assert.IsNotNull(grain2);
-            //Assert.AreEqual(id2, grain2.A.Result);
+            Assert.NotNull(grain2);
+            //Assert.Equal(id2, grain2.A.Result);
 
-            Assert.AreEqual(1, cache.Count);
-            Assert.AreEqual(2, numGrainsCreated);
+            Assert.Equal(1, cache.Count);
+            Assert.Equal(2, numGrainsCreated);
 
-            //Assert.AreEqual(id1, grain1.A.Result);
+            //Assert.Equal(id1, grain1.A.Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
@@ -74,22 +73,22 @@ namespace UnitTests.General
             int id1 = 1;
             var grain1 = cache.Get(id1);
 
-            Assert.IsNotNull(grain1);
-            //Assert.AreEqual(id1, grain1.A.Result);
+            Assert.NotNull(grain1);
+            //Assert.Equal(id1, grain1.A.Result);
 
-            Assert.AreEqual(1, cache.Count);
-            Assert.AreEqual(1, numGrainsCreated);
+            Assert.Equal(1, cache.Count);
+            Assert.Equal(1, numGrainsCreated);
 
             int id2 = 2;
             var grain2 = cache.Get(id2);
 
-            Assert.IsNotNull(grain2);
-            //Assert.AreEqual(id2, grain2.A.Result);
+            Assert.NotNull(grain2);
+            //Assert.Equal(id2, grain2.A.Result);
 
-            Assert.AreEqual(2, cache.Count);
-            Assert.AreEqual(2, numGrainsCreated);
+            Assert.Equal(2, cache.Count);
+            Assert.Equal(2, numGrainsCreated);
 
-            //Assert.AreEqual(id1, grain1.A.Result);
+            //Assert.Equal(id1, grain1.A.Result);
         }
 
         private int numGrainsCreated;

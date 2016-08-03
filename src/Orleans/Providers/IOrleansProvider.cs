@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Providers
 {
-    #pragma warning disable 1574
+#pragma warning disable 1574
     /// <summary>
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>

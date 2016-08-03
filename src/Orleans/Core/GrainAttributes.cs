@@ -1,7 +1,7 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using Orleans.GrainDirectory;
-using System.Linq;
 namespace Orleans
 {
     namespace Concurrency

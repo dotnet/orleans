@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests
@@ -47,7 +46,7 @@ namespace UnitTests
             try
             {
                 finished = promise.Wait(timeout.Multiply(3));
-                Assert.Fail("Should have thrown");
+                Assert.True(false, "Should have thrown");
             }
             catch (Exception exc)
             {
@@ -55,21 +54,21 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.Fail("Should not have got here " + exc);
+                    Assert.True(false, "Should not have got here " + exc);
                 }
             }
             output.WriteLine("Waited for " + stopwatch.Elapsed);
-            Assert.IsTrue(!finished);
-            Assert.IsTrue(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
-            Assert.IsTrue(stopwatch.Elapsed <= timeout.Multiply(2), "Waited longer than " + timeout.Multiply(2) + ". Waited " + stopwatch.Elapsed);
-            Assert.IsTrue(promise.Status == TaskStatus.Faulted);
+            Assert.True(!finished);
+            Assert.True(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
+            Assert.True(stopwatch.Elapsed <= timeout.Multiply(2), "Waited longer than " + timeout.Multiply(2) + ". Waited " + stopwatch.Elapsed);
+            Assert.True(promise.Status == TaskStatus.Faulted);
 
             // try to re-use the promise and should fail immideately.
             try
             {
                 stopwatch = new Stopwatch();
                 promise.Wait();
-                Assert.Fail("Should have thrown");
+                Assert.True(false, "Should have thrown");
             }
             catch (Exception exc)
             {
@@ -77,11 +76,11 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.Fail("Should not have got here " + exc);
+                    Assert.True(false, "Should not have got here " + exc);
                 }
             }
-            Assert.IsTrue(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);
-            Assert.IsTrue(promise.Status == TaskStatus.Faulted);
+            Assert.True(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);
+            Assert.True(promise.Status == TaskStatus.Faulted);
         }
     }
 }

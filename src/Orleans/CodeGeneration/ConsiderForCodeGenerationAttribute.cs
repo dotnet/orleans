@@ -1,7 +1,7 @@
 namespace Orleans.CodeGeneration
 {
     using System;
-    
+
     /// <summary>
     /// The attribute which informs the code generator that code should be generated for this type.
     /// </summary>

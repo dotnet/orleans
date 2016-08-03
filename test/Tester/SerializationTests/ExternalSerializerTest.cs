@@ -1,10 +1,9 @@
 ﻿using System;
-using Xunit;
-
-using Orleans.Serialization;
-using Orleans.Runtime;
-using System.Reflection;
 using System.Collections.Generic;
+using System.Reflection;
+using Orleans.Runtime;
+using Orleans.Serialization;
+using Xunit;
 
 namespace UnitTests.Serialization
 {

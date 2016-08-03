@@ -1,6 +1,6 @@
-using Orleans.GrainDirectory;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {

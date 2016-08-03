@@ -1,12 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using Tester;
 using Xunit;
 
 namespace UnitTests.General
@@ -30,7 +28,7 @@ namespace UnitTests.General
             await grain.EchoAsync(42);
 
             //ClearState() also exhibits the error, even with the shorter named grain
-            //await grain.ClearState();
+            await grain.ClearState();
         }
 
         [Fact, TestCategory("Azure"), TestCategory("Functional"), TestCategory("Generics")]

@@ -1,6 +1,6 @@
 using System;
-using Orleans.Runtime;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {

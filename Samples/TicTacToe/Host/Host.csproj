@@ -61,28 +61,28 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="Orleans">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.2.0\lib\net451\Orleans.dll</HintPath>
+    <Reference Include="Orleans, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.2.3\lib\net451\Orleans.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansAzureUtils">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansAzureUtils.1.2.0\lib\net451\OrleansAzureUtils.dll</HintPath>
+    <Reference Include="OrleansAzureUtils, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansAzureUtils.1.2.3\lib\net451\OrleansAzureUtils.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansDependencyInjection">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansDependencyInjection.dll</HintPath>
+    <Reference Include="OrleansDependencyInjection, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.3\lib\net451\OrleansDependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansHost">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansHost.1.2.0\lib\net451\OrleansHost.exe</HintPath>
+    <Reference Include="OrleansHost, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.2.3\lib\net451\OrleansHost.exe</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansProviders">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansProviders.1.2.0\lib\net451\OrleansProviders.dll</HintPath>
+    <Reference Include="OrleansProviders, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.2.3\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansRuntime">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansRuntime.dll</HintPath>
+    <Reference Include="OrleansRuntime, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.3\lib\net451\OrleansRuntime.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />

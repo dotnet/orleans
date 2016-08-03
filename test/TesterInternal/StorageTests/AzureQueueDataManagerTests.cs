@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Queue;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.AzureUtils;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -45,33 +44,33 @@ namespace UnitTests.StorageTests
         {
             queueName = "Test-1-".ToLower() + Guid.NewGuid();
             AzureQueueDataManager manager = await GetTableManager(queueName);
-            Assert.AreEqual(0, await manager.GetApproximateMessageCount());
+            Assert.Equal(0, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage inMessage = new CloudQueueMessage("Hello, World");
             await manager.AddQueueMessage(inMessage);
             //Nullable<int> count = manager.ApproximateMessageCount;
-            Assert.AreEqual(1, await manager.GetApproximateMessageCount());
+            Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage outMessage1 = await manager.PeekQueueMessage();
             logger.Info("PeekQueueMessage 1: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage1));
-            Assert.AreEqual(inMessage.AsString, outMessage1.AsString);
+            Assert.Equal(inMessage.AsString, outMessage1.AsString);
 
             CloudQueueMessage outMessage2 = await manager.PeekQueueMessage();
             logger.Info("PeekQueueMessage 2: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage2));
-            Assert.AreEqual(inMessage.AsString, outMessage2.AsString);
+            Assert.Equal(inMessage.AsString, outMessage2.AsString);
 
             CloudQueueMessage outMessage3 = await manager.GetQueueMessage();
             logger.Info("GetQueueMessage 3: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage3));
-            Assert.AreEqual(inMessage.AsString, outMessage3.AsString);
-            Assert.AreEqual(1, await manager.GetApproximateMessageCount());
+            Assert.Equal(inMessage.AsString, outMessage3.AsString);
+            Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage outMessage4 = await manager.GetQueueMessage();
-            Assert.IsNull(outMessage4);
+           Assert.Null(outMessage4);
 
-            Assert.AreEqual(1, await manager.GetApproximateMessageCount());
+            Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             await manager.DeleteQueueMessage(outMessage3);
-            Assert.AreEqual(0, await manager.GetApproximateMessageCount());
+            Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
@@ -81,7 +80,7 @@ namespace UnitTests.StorageTests
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
             IEnumerable<CloudQueueMessage> msgs = await manager.GetQueueMessages();
-            Assert.IsTrue(msgs == null || msgs.Count() == 0);
+            Assert.True(msgs == null || msgs.Count() == 0);
 
             int numMsgs = 10;
             List<Task> promises = new List<Task>();
@@ -90,11 +89,11 @@ namespace UnitTests.StorageTests
                 promises.Add(manager.AddQueueMessage(new CloudQueueMessage(i.ToString())));
             }
             Task.WaitAll(promises.ToArray());
-            Assert.AreEqual(numMsgs, await manager.GetApproximateMessageCount());
+            Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
             msgs = new List<CloudQueueMessage>(await manager.GetQueueMessages(numMsgs));
-            Assert.AreEqual(numMsgs, msgs.Count());
-            Assert.AreEqual(numMsgs, await manager.GetApproximateMessageCount());
+            Assert.Equal(numMsgs, msgs.Count());
+            Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
             promises = new List<Task>();
             foreach (var msg in msgs)
@@ -102,7 +101,7 @@ namespace UnitTests.StorageTests
                 promises.Add(manager.DeleteQueueMessage(msg));
             }
             Task.WaitAll(promises.ToArray());
-            Assert.AreEqual(0, await manager.GetApproximateMessageCount());
+            Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]

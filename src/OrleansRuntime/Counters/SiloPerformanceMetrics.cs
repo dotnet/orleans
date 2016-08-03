@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Counters
 {

@@ -6,9 +6,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
-
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {

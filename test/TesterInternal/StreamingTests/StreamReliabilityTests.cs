@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
@@ -16,7 +15,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -108,8 +106,8 @@ namespace UnitTests.Streaming.Reliability
 
             CheckSilosRunning("After Restart", numExpectedSilos);
 
-            Assert.AreNotEqual(prim1, this.HostedCluster.Primary, "Should be different Primary silos after restart");
-            Assert.AreNotEqual(sec1, this.HostedCluster.Secondary, "Should be different Secondary silos after restart");
+            Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
+            Assert.NotEqual(sec1, this.HostedCluster.Secondary); // Should be different Secondary silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -918,17 +916,17 @@ namespace UnitTests.Streaming.Reliability
 
                 logger.Info("Restarted new {0} silo {1}", siloType, newSilo.Silo.SiloAddress);
 
-                Assert.AreNotEqual(oldSilo, newSilo, "Should be different silo address after Restart");
+                Assert.NotEqual(oldSilo, newSilo.Silo.SiloAddress); //"Should be different silo address after Restart"
             }
             else if (kill)
             {
                 this.HostedCluster.KillSilo(silo);
-                Assert.IsNull(silo.Silo, "Should be no {0} silo after Kill", siloType);
+               Assert.Null(silo.Silo);
             }
             else
             {
                 this.HostedCluster.StopSilo(silo);
-                Assert.IsNull(silo.Silo, "Should be no {0} silo after Stop", siloType);
+               Assert.Null(silo.Silo);
             }
 
             // WaitForLivenessToStabilize(!kill);
@@ -981,21 +979,21 @@ namespace UnitTests.Streaming.Reliability
 
             bool isProducer = await producerGrain.IsProducer();
             output.WriteLine("Grain {0} IsProducer={1}", producerGrainId, isProducer);
-            Assert.AreEqual(expectedNumProducers > 0, isProducer, "IsProducer {0}", when);
+            Assert.Equal(expectedNumProducers > 0, isProducer);
 
             bool isConsumer = await consumerGrain.IsConsumer();
             output.WriteLine("Grain {0} IsConsumer={1}", consumerGrainId, isConsumer);
-            Assert.AreEqual(expectedNumConsumers > 0, isConsumer, "IsConsumer {0}", when);
+            Assert.Equal(expectedNumConsumers > 0, isConsumer);
 
             int consumerHandleCount = await consumerGrain.GetConsumerHandlesCount();
             int consumerObserverCount = await consumerGrain.GetConsumerHandlesCount();
             output.WriteLine("Grain {0} HandleCount={1} ObserverCount={2}", consumerGrainId, consumerHandleCount, consumerObserverCount);
-            Assert.AreEqual(expectedNumConsumers, consumerHandleCount, "Consumer-HandleCount {0}", when);
-            Assert.AreEqual(expectedNumConsumers, consumerObserverCount, "Consumer-ObserverCount {0}", when);
+            Assert.Equal(expectedNumConsumers, consumerHandleCount);
+            Assert.Equal(expectedNumConsumers, consumerObserverCount);
         }
         private void CheckSilosRunning(string when, int expectedNumSilos)
         {
-            Assert.AreEqual(expectedNumSilos, this.HostedCluster.GetActiveSilos().Count(), "Should have {0} silos running {1}", expectedNumSilos, when);
+            Assert.Equal(expectedNumSilos, this.HostedCluster.GetActiveSilos().Count());
         }
         protected async Task<bool> CheckGrainCounts()
         {
@@ -1011,8 +1009,8 @@ namespace UnitTests.Streaming.Reliability
 
             var grainLocs = grainStats.Where(gs => gs.GrainType == grainType).ToArray();
 
-            Assert.IsTrue(grainLocs.Length > 0, "Found too few grains");
-            Assert.IsTrue(grainLocs.Length <= 2, "Found too many grains " + grainLocs.Length);
+            Assert.True(grainLocs.Length > 0, "Found too few grains");
+            Assert.True(grainLocs.Length <= 2, "Found too many grains " + grainLocs.Length);
 
             bool sameSilo = grainLocs.Length == 1;
             if (sameSilo)

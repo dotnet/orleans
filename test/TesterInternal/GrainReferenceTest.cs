@@ -1,11 +1,10 @@
 ﻿using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -19,12 +18,12 @@ namespace UnitTests.General
         {
             ISimpleGrain ref1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), Grains.SimpleGrain.SimpleGrainNamePrefix);
             ISimpleGrain ref2 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), Grains.SimpleGrain.SimpleGrainNamePrefix);
-            Assert.IsTrue(ref1 != ref2);
-            Assert.IsTrue(ref2 != ref1);
-            Assert.IsFalse(ref1 == ref2);
-            Assert.IsFalse(ref2 == ref1);
-            Assert.IsFalse(ref1.Equals(ref2));
-            Assert.IsFalse(ref2.Equals(ref1));
+            Assert.True(ref1 != ref2);
+            Assert.True(ref2 != ref1);
+            Assert.False(ref1 == ref2);
+            Assert.False(ref2 == ref1);
+            Assert.False(ref1.Equals(ref2));
+            Assert.False(ref2.Equals(ref1));
         }
 
         [Fact,TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -33,11 +32,11 @@ namespace UnitTests.General
             string str = "Hello TaskCompletionSource";
             TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
             Task task = tcs.Task;
-            Assert.IsFalse(task.IsCompleted, "TCS.Task not yet completed");
+            Assert.False(task.IsCompleted, "TCS.Task not yet completed");
             tcs.SetResult(str);
-            Assert.IsTrue(task.IsCompleted, "TCS.Task is now completed");
-            Assert.IsFalse(task.IsFaulted, "TCS.Task should not be in faulted state: " + task.Exception);
-            Assert.AreEqual(str, tcs.Task.Result, "Result");
+            Assert.True(task.IsCompleted, "TCS.Task is now completed");
+            Assert.False(task.IsFaulted, "TCS.Task should not be in faulted state: " + task.Exception);
+            Assert.Equal(str, tcs.Task.Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
@@ -104,12 +103,12 @@ namespace UnitTests.General
                 grain.SetA(id).Wait(); //  Resolve GR
             }
 
-            Assert.IsInstanceOfType(other, grain.GetType(), "Deserialized grain reference type = {0}", grain.GetType());
+            Assert.IsAssignableFrom(grain.GetType(), other);
             ISimpleGrain otherGrain = other as ISimpleGrain;
-            Assert.IsNotNull(otherGrain, "Other grain");
-            Assert.AreEqual(grain, otherGrain, "Deserialized grain reference equality is preserved");
+            Assert.NotNull(otherGrain);
+            Assert.Equal(grain,  otherGrain);  // "Deserialized grain reference equality is preserved"
             int res = otherGrain.GetA().Result;
-            Assert.AreEqual(id, res, "Returned values from call to deserialized grain reference");
+            Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
         }
 
         private static object DotNetSerialiseRoundtrip(object obj)

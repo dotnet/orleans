@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Collections.Generic;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Xunit;
@@ -158,10 +157,10 @@ namespace UnitTests.OrleansRuntime.Streams
                 RemoveAndCheck(block, first, last);
                 first++;
             }
-            Assert.AreEqual(TestBlockSize / 2, block.OldestMessageIndex);
-            Assert.AreEqual(TestBlockSize - 1, block.NewestMessageIndex);
-            Assert.IsFalse(block.IsEmpty);
-            Assert.IsFalse(block.HasCapacity);
+            Assert.Equal(TestBlockSize / 2, block.OldestMessageIndex);
+            Assert.Equal(TestBlockSize - 1, block.NewestMessageIndex);
+            Assert.False(block.IsEmpty);
+            Assert.False(block.HasCapacity);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -180,12 +179,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 last++;
                 sequenceNumber += 2;
             }
-            Assert.AreEqual(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(0), TestCacheDataComparer.Instance));
-            Assert.AreEqual(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(1), TestCacheDataComparer.Instance));
-            Assert.AreEqual(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 2), TestCacheDataComparer.Instance));
-            Assert.AreEqual(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 3), TestCacheDataComparer.Instance));
-            Assert.AreEqual(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2), TestCacheDataComparer.Instance));
-            Assert.AreEqual(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2 + 1), TestCacheDataComparer.Instance));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(0), TestCacheDataComparer.Instance));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(1), TestCacheDataComparer.Instance));
+            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 2), TestCacheDataComparer.Instance));
+            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 3), TestCacheDataComparer.Instance));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2), TestCacheDataComparer.Instance));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2 + 1), TestCacheDataComparer.Instance));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -217,34 +216,34 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // get index of first stream
             int streamIndex;
-            Assert.IsTrue(block.TryFindFirstMessage(streams[0], TestCacheDataComparer.Instance, out streamIndex));
-            Assert.AreEqual(0, streamIndex);
-            Assert.AreEqual(0, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+            Assert.True(block.TryFindFirstMessage(streams[0], TestCacheDataComparer.Instance, out streamIndex));
+            Assert.Equal(0, streamIndex);
+            Assert.Equal(0, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
 
             // find stream1 messages
             int iteration = 1;
             while (block.TryFindNextMessage(streamIndex + 1, streams[0], TestCacheDataComparer.Instance, out streamIndex))
             {
-                Assert.AreEqual(iteration * 2, streamIndex);
-                Assert.AreEqual(iteration * 4, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+                Assert.Equal(iteration * 2, streamIndex);
+                Assert.Equal(iteration * 4, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
                 iteration++;
             }
-            Assert.AreEqual(iteration, TestBlockSize / 2);
+            Assert.Equal(iteration, TestBlockSize / 2);
 
             // get index of first stream
-            Assert.IsTrue(block.TryFindFirstMessage(streams[1], TestCacheDataComparer.Instance, out streamIndex));
-            Assert.AreEqual(1, streamIndex);
-            Assert.AreEqual(2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+            Assert.True(block.TryFindFirstMessage(streams[1], TestCacheDataComparer.Instance, out streamIndex));
+            Assert.Equal(1, streamIndex);
+            Assert.Equal(2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
 
             // find stream1 messages
             iteration = 1;
             while (block.TryFindNextMessage(streamIndex + 1, streams[1], TestCacheDataComparer.Instance, out streamIndex))
             {
-                Assert.AreEqual(iteration * 2 + 1, streamIndex);
-                Assert.AreEqual(iteration * 4 + 2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+                Assert.Equal(iteration * 2 + 1, streamIndex);
+                Assert.Equal(iteration * 4 + 2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
                 iteration++;
             }
-            Assert.AreEqual(iteration, TestBlockSize / 2);
+            Assert.Equal(iteration, TestBlockSize / 2);
         }
 
         private void AddAndCheck(CachedMessageBlock<TestCachedMessage> block, ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter, int first, int last, int sequenceNumber = 1)
@@ -259,35 +258,35 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private void AddAndCheck(CachedMessageBlock<TestCachedMessage> block, ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter, TestQueueMessage message, int first, int last)
         {
-            Assert.AreEqual(first, block.OldestMessageIndex);
-            Assert.AreEqual(last, block.NewestMessageIndex);
-            Assert.IsTrue(block.HasCapacity);
+            Assert.Equal(first, block.OldestMessageIndex);
+            Assert.Equal(last, block.NewestMessageIndex);
+            Assert.True(block.HasCapacity);
 
             block.Add(message, DateTime.UtcNow, dataAdapter);
             last++;
 
-            Assert.AreEqual(first > last, block.IsEmpty);
-            Assert.AreEqual(last + 1 < TestBlockSize, block.HasCapacity);
-            Assert.AreEqual(first, block.OldestMessageIndex);
-            Assert.AreEqual(last, block.NewestMessageIndex);
+            Assert.Equal(first > last, block.IsEmpty);
+            Assert.Equal(last + 1 < TestBlockSize, block.HasCapacity);
+            Assert.Equal(first, block.OldestMessageIndex);
+            Assert.Equal(last, block.NewestMessageIndex);
 
-            Assert.IsTrue(block.GetSequenceToken(last, dataAdapter).Equals(message.SequenceToken));
+            Assert.True(block.GetSequenceToken(last, dataAdapter).Equals(message.SequenceToken));
         }
 
         private void RemoveAndCheck(CachedMessageBlock<TestCachedMessage> block, int first, int last)
         {
-            Assert.AreEqual(first, block.OldestMessageIndex);
-            Assert.AreEqual(last, block.NewestMessageIndex);
-            Assert.IsFalse(block.IsEmpty);
-            Assert.AreEqual(last + 1 < TestBlockSize, block.HasCapacity);
+            Assert.Equal(first, block.OldestMessageIndex);
+            Assert.Equal(last, block.NewestMessageIndex);
+            Assert.False(block.IsEmpty);
+            Assert.Equal(last + 1 < TestBlockSize, block.HasCapacity);
 
-            Assert.IsTrue(block.Remove());
+            Assert.True(block.Remove());
 
             first++;
-            Assert.AreEqual(first > last, block.IsEmpty);
-            Assert.AreEqual(last + 1 < TestBlockSize, block.HasCapacity);
-            Assert.AreEqual(first, block.OldestMessageIndex);
-            Assert.AreEqual(last, block.NewestMessageIndex);
+            Assert.Equal(first > last, block.IsEmpty);
+            Assert.Equal(last + 1 < TestBlockSize, block.HasCapacity);
+            Assert.Equal(first, block.OldestMessageIndex);
+            Assert.Equal(last, block.NewestMessageIndex);
         }
     }
 }

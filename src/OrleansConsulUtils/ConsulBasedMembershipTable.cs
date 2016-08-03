@@ -1,10 +1,10 @@
-﻿using Consul;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Consul;
+using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Host
 {

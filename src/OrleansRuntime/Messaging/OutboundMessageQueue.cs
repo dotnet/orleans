@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Threading;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging

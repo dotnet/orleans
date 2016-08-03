@@ -1,6 +1,6 @@
-﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans.Runtime;
+﻿
 using System;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests
@@ -20,9 +20,9 @@ namespace UnitTests
         {
             StatisticName name = new StatisticName(CounterName);
             ICounter<long> ctr = CounterStatistic.FindOrCreate(name);
-            Assert.AreEqual(name.ToString(), ctr.Name);
-            Assert.IsTrue(ctr.ToString().Contains(name.Name));
-            Assert.AreEqual(0, ctr.GetCurrentValue());
+            Assert.Equal(name.ToString(), ctr.Name);
+            Assert.True(ctr.ToString().Contains(name.Name));
+            Assert.Equal(0, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -32,7 +32,7 @@ namespace UnitTests
             int val = random.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
-            Assert.AreEqual(val, ctr.GetCurrentValue());
+            Assert.Equal(val, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -40,9 +40,9 @@ namespace UnitTests
         {
             StatisticName name = new StatisticName(CounterName);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
-            Assert.AreEqual(0, ctr.GetCurrentValue());
+            Assert.Equal(0, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(1, ctr.GetCurrentValue());
+            Assert.Equal(1, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -52,11 +52,11 @@ namespace UnitTests
             int val = random.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
-            Assert.AreEqual(val, ctr.GetCurrentValue());
+            Assert.Equal(val, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(val + 1, ctr.GetCurrentValue());
+            Assert.Equal(val + 1, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(val + 2, ctr.GetCurrentValue());
+            Assert.Equal(val + 2, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -66,11 +66,11 @@ namespace UnitTests
             int val = int.MinValue;
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
-            Assert.AreEqual(val, ctr.GetCurrentValue());
+            Assert.Equal(val, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(val + 1, ctr.GetCurrentValue());
+            Assert.Equal(val + 1, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(val + 2, ctr.GetCurrentValue());
+            Assert.Equal(val + 2, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -79,14 +79,14 @@ namespace UnitTests
             StatisticName name = new StatisticName(CounterName);
             int val = int.MaxValue;
             long longVal = int.MaxValue;
-            Assert.AreEqual(longVal, val);
+            Assert.Equal(longVal, val);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
-            Assert.AreEqual(val, ctr.GetCurrentValue());
+            Assert.Equal(val, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(longVal + 1, ctr.GetCurrentValue());
+            Assert.Equal(longVal + 1, ctr.GetCurrentValue());
             ctr.Increment();
-            Assert.AreEqual(longVal + 2, ctr.GetCurrentValue());
+            Assert.Equal(longVal + 2, ctr.GetCurrentValue());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]
@@ -97,9 +97,9 @@ namespace UnitTests
             int newValue = startValue - 1;
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(startValue);
-            Assert.AreEqual(startValue, ctr.GetCurrentValue());
+            Assert.Equal(startValue, ctr.GetCurrentValue());
             ctr.DecrementBy(1);
-            Assert.AreEqual(newValue, ctr.GetCurrentValue());
+            Assert.Equal(newValue, ctr.GetCurrentValue());
         }
 
         //[Fact]
@@ -113,7 +113,7 @@ namespace UnitTests
         //public void RegisterCountersWithWindows()
         //{
         //    OrleansCounterBase.RegisterAllCounters(); // Requires RunAs Administrator
-        //    Assert.IsTrue(
+        //    Assert.True(
         //        AreWindowsPerfCountersAvailable(),
         //        "Orleans perf counters are registered with Windows");
         //}

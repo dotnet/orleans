@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "Microsoft.Extensions.DependencyInjection": "1.0.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

@@ -10,7 +10,6 @@ using Xunit;
 namespace UnitTests.General
 {
     using System;
-
     using Orleans;
 
     public class InvocationInterceptTests : TestClusterPerTest

@@ -9,6 +9,7 @@ The idea is to track end-user facing changes as they occur.*
 - Removed OrleansDependencyInjection package and instead Orleans references Microsoft.Extensions.DepedencyInjection #1911 #1901 #1878
   - Now using Microsoft.Extensions.DepedencyInjection.ServiceProvider as the default service provider if the user does not override it.
   - Grains are still not being injected automatically unless the user opts in by specifying his own Startup configuration that returns a service provider.
+- Updated Azure Storage dependency to 7.0.0 #1968
 
   
 ### [v1.2.3]
@@ -22,6 +23,8 @@ The idea is to track end-user facing changes as they occur.*
   - interception works with Streams and grain extensions #1874
   - Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. #1885
   - Other minor bug fixes #1823
+- Known issues:
+  - It is not advisable for your Orleans application to depend on WindowsAzure.Storage >= 7.0 due to #1912. This new constraint applies to previously released Orleans versions too. Will be fixed in 1.3.0.
   
 ### [v1.2.2]
 - Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. #1804
