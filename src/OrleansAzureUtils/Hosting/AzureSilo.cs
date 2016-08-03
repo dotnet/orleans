@@ -5,10 +5,8 @@ using System.Net;
 using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.Azure;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.ServiceRuntime;
 
 namespace Orleans.Runtime.Host
 {
@@ -75,18 +73,19 @@ namespace Orleans.Runtime.Host
         {
             if (config.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.AzureTable)
             {
-                string deploymentId = serviceRuntimeWrapper.DeploymentId;
-                string connectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
+                string deploymentId = config.Globals.DeploymentId ?? serviceRuntimeWrapper.DeploymentId;
+                string connectionString = config.Globals.DataConnectionString ??
+                                          serviceRuntimeWrapper.GetConfigurationSettingValue(DataConnectionConfigurationSettingName);
 
                 try
                 {
-                    var manager = await OrleansSiloInstanceManager.GetManager(deploymentId, connectionString);
+                    var manager = siloInstanceManager ?? await OrleansSiloInstanceManager.GetManager(deploymentId, connectionString);
                     var instances = await manager.DumpSiloInstanceTable();
+                    logger.Verbose(instances);
                 }
                 catch (Exception exc)
                 {
-                    var error = String.Format("The connection string is incorrect. Connecting to the storage table has failed with {0}",
-                    LogFormatter.PrintException(exc));
+                    var error = String.Format("Connecting to the storage table has failed with {0}", LogFormatter.PrintException(exc));
                     Trace.TraceError(error);
                     logger.Error(ErrorCode.AzureTable_34, error, exc);
                     return false;
@@ -107,8 +106,15 @@ namespace Orleans.Runtime.Host
 
             config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             config.Globals.DeploymentId = serviceRuntimeWrapper.DeploymentId;
-            config.Globals.DataConnectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
-
+            try
+            {
+                config.Globals.DataConnectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
+            }
+            catch (RoleEnvironmentException)
+            {
+                config.Globals.DataConnectionString = null;
+            }
+            
             return config;
         }
 
