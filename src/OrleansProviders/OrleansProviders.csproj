@@ -45,6 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
+    <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterConfig.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterFactory.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessageBlock.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeObjectPool.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeBuffer.cs" />
@@ -77,6 +80,12 @@
     <Compile Include="Streams\Generator\Generators\SimpleGenerator.cs" />
     <Compile Include="Streams\Generator\Generators\SimpleGeneratorConfig.cs" />
     <Compile Include="Streams\Generator\IStreamGenerator.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterReceiver.cs" />
+    <Compile Include="Streams\Memory\MemoryBatchContainer.cs" />
+    <Compile Include="Streams\Memory\MemoryEventData.cs" />
+    <Compile Include="Streams\Memory\MemoryPooledCache.cs" />
+    <Compile Include="Streams\Memory\MemoryStreamProvider.cs" />
+    <Compile Include="Streams\Memory\MemoryStreamQueueGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
