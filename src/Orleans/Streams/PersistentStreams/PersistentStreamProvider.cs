@@ -44,12 +44,15 @@ namespace Orleans.Providers.Streams.Common
         internal const string StartupStatePropertyName = "StartupState";
         internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
         private PersistentStreamProviderState startupState;
+        private ProviderStateManager stateManager = new ProviderStateManager();
 
-        public string                   Name { get; private set; }
+        public string Name { get; private set; }
+
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
+            if(!stateManager.PresetState(ProviderState.Initialized)) return;
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
             if (providerUtilitiesManager == null) throw new ArgumentNullException("providerUtilitiesManager");
             if (config == null) throw new ArgumentNullException("config");
@@ -77,10 +80,12 @@ namespace Orleans.Providers.Streams.Common
                 queueAdapter.Name,
                 myConfig,
                 StartupStatePropertyName, startupState);
+            stateManager.CommitState();
         }
 
         public async Task Start()
         {
+            if (!stateManager.PresetState(ProviderState.Started)) return;
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
@@ -94,15 +99,18 @@ namespace Orleans.Providers.Streams.Common
                         await pullingAgentManager.StartAgents();
                 }
             }
+            stateManager.CommitState();
         }
 
         public async Task Close()
         {
+            if (!stateManager.PresetState(ProviderState.Closed)) return;
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
             {
                 await pullingAgentManager.Stop();
             }
+            stateManager.CommitState();
         }
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)

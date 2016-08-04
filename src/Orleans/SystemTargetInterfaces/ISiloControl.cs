@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -25,6 +26,8 @@ namespace Orleans
 
         Task UpdateConfiguration(string configuration);
 
+        Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations);
+  
         Task<int> GetActivationCount();
 
         Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
