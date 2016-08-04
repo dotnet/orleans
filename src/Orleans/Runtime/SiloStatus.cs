@@ -39,7 +39,7 @@
         /// </summary>
         public static bool IsTerminating(this SiloStatus siloStatus)
         {
-            return siloStatus.Equals(SiloStatus.ShuttingDown) || siloStatus.Equals(SiloStatus.Stopping) || siloStatus.Equals(SiloStatus.Dead);
+            return siloStatus == SiloStatus.ShuttingDown || siloStatus == SiloStatus.Stopping || siloStatus == SiloStatus.Dead;
         }
     }
 }

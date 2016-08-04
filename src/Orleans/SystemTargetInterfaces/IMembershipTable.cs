@@ -150,8 +150,8 @@ namespace Orleans
             list.Sort(
                (x, y) =>
                {
-                   if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
-                   if (y.Item1.Status.Equals(SiloStatus.Dead)) return -1; // put Deads at the end
+                   if (x.Item1.Status == SiloStatus.Dead) return 1; // put Deads at the end
+                   if (y.Item1.Status == SiloStatus.Dead) return -1; // put Deads at the end
                    return String.Compare(x.Item1.SiloName, y.Item1.SiloName, StringComparison.Ordinal);
                });
             Members = list.AsReadOnly();
