@@ -422,7 +422,12 @@ namespace Orleans.Runtime
         {
             const string dateFormat = "yyyy-MM-dd-HH-mm-ss-fffZ"; // Example: 2010-09-02-09-50-43-341Z
 
-            var thisAssembly = Assembly.GetEntryAssembly() ?? Assembly.GetCallingAssembly();
+            var thisAssembly = Assembly.GetEntryAssembly()
+#if !NETSTANDARD
+                ?? Assembly.GetCallingAssembly()
+#endif
+                ?? typeof(LogManager)
+                .GetTypeInfo().Assembly;
 
             var dumpFileName = $@"{thisAssembly.GetName().Name}-MiniDump-{DateTime.UtcNow.ToString(dateFormat,
                     CultureInfo.InvariantCulture)}.dmp";
