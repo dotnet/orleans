@@ -371,7 +371,7 @@ namespace Orleans.Runtime.GrainDirectory
             // This silo's status has changed
             if (Equals(updatedSilo, MyAddress))
             {
-                if (status == SiloStatus.Stopping || status.Equals(SiloStatus.ShuttingDown))
+                if (status == SiloStatus.Stopping || status == SiloStatus.ShuttingDown)
                 {
                     // QueueAction up the "Stop" to run on a system turn
                     Scheduler.QueueAction(() => Stop(true), CacheValidator.SchedulingContext).Ignore();
@@ -389,7 +389,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator.SchedulingContext).Ignore();
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
                 {
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => AddServer(updatedSilo), CacheValidator.SchedulingContext).Ignore();
