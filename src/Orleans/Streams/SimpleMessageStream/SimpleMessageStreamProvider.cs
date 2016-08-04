@@ -14,7 +14,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private bool                        fireAndForgetDelivery;
         private bool                        optimizeForImmutableData;
         private StreamPubSubType            pubSubType;
-        private ProviderStateManager        stateManager = new ProviderStateManager();
 
         internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
         internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
@@ -28,7 +27,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
-            if (!stateManager.PresetState(ProviderState.Initialized)) return TaskDone.Done;
             this.Name = name;
             providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
 
@@ -43,19 +41,16 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             logger = providerRuntime.GetLogger(this.GetType().Name);
             logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
                 "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
-            stateManager.CommitState();
             return TaskDone.Done;
         }
 
         public Task Start()
         {
-            if (stateManager.PresetState(ProviderState.Started)) stateManager.CommitState();
             return TaskDone.Done;
         }
 
         public Task Close()
         {
-            if (stateManager.PresetState(ProviderState.Closed)) stateManager.CommitState();
             return TaskDone.Done;
         }
 
