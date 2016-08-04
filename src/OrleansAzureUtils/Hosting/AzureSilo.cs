@@ -6,7 +6,6 @@ using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.ServiceRuntime;
 
 namespace Orleans.Runtime.Host
 {
@@ -112,7 +111,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception exc)
             {
-                if (exc.ToString().Contains("RoleEnvironmentException"))
+                if (exc.GetType().Name.Contains("RoleEnvironmentException"))
                 {
                     config.Globals.DataConnectionString = null;
                 }
