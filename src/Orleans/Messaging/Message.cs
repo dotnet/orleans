@@ -549,7 +549,7 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
-            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
+            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }
 
