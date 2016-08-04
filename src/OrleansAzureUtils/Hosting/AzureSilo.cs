@@ -110,9 +110,16 @@ namespace Orleans.Runtime.Host
             {
                 config.Globals.DataConnectionString = serviceRuntimeWrapper.GetConfigurationSettingValue(AzureConstants.DataConnectionConfigurationSettingName);
             }
-            catch (RoleEnvironmentException)
+            catch (Exception exc)
             {
-                config.Globals.DataConnectionString = null;
+                if (exc.ToString().Contains("RoleEnvironmentException"))
+                {
+                    config.Globals.DataConnectionString = null;
+                }
+                else
+                {
+                    throw;
+                }
             }
             
             return config;
