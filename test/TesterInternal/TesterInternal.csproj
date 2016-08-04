@@ -61,6 +61,7 @@
   <ItemGroup>
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
+    <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />

@@ -8,7 +8,7 @@ using Orleans.Streams;
 namespace Orleans.Runtime.Host
 {
     /// <summary>
-    /// Interfacse exposed by ServiceRuntimeWrapper for functionality provided 
+    /// Interface exposed by ServiceRuntimeWrapper for functionality provided 
     /// by Microsoft.WindowsAzure.ServiceRuntime.
     ///  </summary>
     public interface IServiceRuntimeWrapper
