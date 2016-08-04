@@ -6,16 +6,14 @@ using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
-using Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General

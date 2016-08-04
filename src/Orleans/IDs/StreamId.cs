@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {

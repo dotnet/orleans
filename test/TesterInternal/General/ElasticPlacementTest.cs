@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -12,7 +11,6 @@ using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using UnitTests.Tester;
 
 namespace UnitTests.General
 {

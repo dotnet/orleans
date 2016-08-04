@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Orleans;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 
 namespace Orleans.SqlUtils.StorageProvider.GrainClasses

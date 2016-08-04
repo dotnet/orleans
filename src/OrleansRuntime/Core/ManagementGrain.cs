@@ -2,12 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Xml;
-using Orleans.Runtime.MembershipService;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Management
 {
@@ -32,7 +31,7 @@ namespace Orleans.Runtime.Management
             var table = await mTable.ReadAll();
             
             var t = onlyActive ? 
-                table.Members.Where(item => item.Item1.Status.Equals(SiloStatus.Active)).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
+                table.Members.Where(item => item.Item1.Status == SiloStatus.Active).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
                 table.Members.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
             return t;
         }
@@ -47,7 +46,7 @@ namespace Orleans.Runtime.Management
             if (onlyActive)
             {
                 return table.Members
-                    .Where(item => item.Item1.Status.Equals(SiloStatus.Active))
+                    .Where(item => item.Item1.Status == SiloStatus.Active)
                     .Select(x => x.Item1)
                     .ToArray();
             }

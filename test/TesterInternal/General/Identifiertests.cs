@@ -1,12 +1,10 @@
 using System;
 using System.Globalization;
 using System.Net;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;

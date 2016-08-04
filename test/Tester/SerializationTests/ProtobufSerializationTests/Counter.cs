@@ -4,14 +4,14 @@
 #region Designer generated code
 
 using pb = global::Google.Protobuf;
-using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
-using scg = global::System.Collections.Generic;
-namespace UnitTests.Serialization {
+namespace UnitTests.Serialization
+{
 
-  namespace Proto {
+    namespace Proto
+    {
 
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     public static partial class Counter {
 
       #region Descriptor

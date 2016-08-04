@@ -6,12 +6,12 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -497,12 +497,13 @@ namespace UnitTests.Serialization
             SerializationManager.UseStandardSerializer = false;
 
             const string message = "This is a test message";
-            var source = new UnserializableException(message);
+            // throw the exception so that stack trace is populated
+            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(message); }));
             object deserialized = OrleansSerializationLoop(source);
             var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
             var expectedMessage = "Non-serializable exception of type " +
                                   typeof(UnserializableException).OrleansTypeName() + ": " + message;
-            Assert.True(result.Message.StartsWith(expectedMessage)); //Exception message is wrong after round trip of unserializable exception
+            Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
@@ -976,8 +977,26 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             Type t = typeof(Dictionary<string, object>);
             Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
             t = typeof(Dictionary<string, int>);
             Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(int);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(DateTime);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(Immutable<Dictionary<string, object>>);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(ShallowCopyableValueType);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+        }
+
+        public struct ShallowCopyableValueType
+        {
+            public int AnotherValueType;
         }
 
         private object OrleansSerializationLoop(object input, bool includeWire = true)

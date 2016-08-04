@@ -8,16 +8,13 @@ namespace Orleans.CodeGenerator
     using System.Reflection;
     using System.Runtime.Serialization;
     using System.Text.RegularExpressions;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Concurrency;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -463,7 +460,7 @@ namespace Orleans.CodeGenerator
             {
                 // Create an unformatted object.
                 Expression<Func<object>> getUninitializedObject =
-#if DNXCORE50
+#if NETSTANDARD1_6
                     () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
 #else
                     () => FormatterServices.GetUninitializedObject(default(Type));

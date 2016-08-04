@@ -1,15 +1,14 @@
 ﻿using System;
 using System.Threading.Tasks;
-
 using Orleans;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
-    
+
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         IMultifacetWriter writer;

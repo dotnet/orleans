@@ -334,10 +334,10 @@ namespace Orleans.Runtime.Configuration
 
             if (child.HasChildNodes)
             {
-                var serializerNode = child.ChildNodes.Cast<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
+                var serializerNode = child.ChildNodes.OfType<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
                 if (serializerNode != null && serializerNode.HasChildNodes)
                 {
-                    var typeNames = serializerNode.ChildNodes.Cast<XmlElement>()
+                    var typeNames = serializerNode.ChildNodes.OfType<XmlElement>()
                         .Where(n => n.Name == "Provider")
                         .Select(e => e.Attributes["type"])
                         .Where(a => a != null)

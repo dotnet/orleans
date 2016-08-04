@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-
 using Orleans.Runtime;
 
 namespace Orleans.Counter.Control

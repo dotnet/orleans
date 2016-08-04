@@ -1,6 +1,5 @@
-﻿using System.Threading;
-
-using System;
+﻿using System;
+using System.Threading;
 using Orleans.Runtime;
 using Xunit;
 

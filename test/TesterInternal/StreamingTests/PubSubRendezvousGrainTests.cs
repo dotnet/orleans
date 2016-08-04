@@ -1,13 +1,13 @@
 ﻿
 using System;
 using System.Threading.Tasks;
-using Xunit;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {

@@ -4,12 +4,11 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Streams;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime.Host
 {
     /// <summary>
-    /// Interfacse exposed by ServiceRuntimeWrapper for functionality provided 
+    /// Interface exposed by ServiceRuntimeWrapper for functionality provided 
     /// by Microsoft.WindowsAzure.ServiceRuntime.
     ///  </summary>
     public interface IServiceRuntimeWrapper

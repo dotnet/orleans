@@ -6,7 +6,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -14,7 +13,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable

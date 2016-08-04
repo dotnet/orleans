@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 namespace UnitTests.General
 {

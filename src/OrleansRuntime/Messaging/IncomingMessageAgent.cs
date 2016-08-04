@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging

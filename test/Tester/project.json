@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "Bond.Runtime.CSharp": "3.0.7",
+    "FluentAssertions": "4.0.0",
+    "FSharp.Core": "4.0.0.1",
+    "Google.Protobuf": "3.0.0-alpha4",
+    "Microsoft.Extensions.DependencyInjection": "1.0.0",
+    "Newtonsoft.Json": "7.0.1",
+    "WindowsAzure.ServiceBus": "3.2.2",
+    "WindowsAzure.Storage": "7.0.0",
+    "xunit": "2.1.0",
+    "xunit.runner.visualstudio": "2.1.0",
+    "Xunit.SkippableFact": "1.2.14"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

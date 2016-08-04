@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using System.Threading.Tasks;
 
 
 namespace Orleans.Streams
