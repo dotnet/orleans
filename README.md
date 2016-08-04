@@ -1,7 +1,9 @@
-Orleans - Distributed Actor Model
+<p align="center">
+  <img src="https://github.com/dotnet/orleans/blob/gh-pages/assets/logo_full.png" alt="Orleans logo" width="600px"> 
+</p>
 =======
 
-![Orleans logo](https://github.com/dotnet/orleans/blob/gh-pages/assets/logo_128.png)
+
 
 
 [![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/innerloop)
