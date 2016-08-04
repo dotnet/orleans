@@ -6,7 +6,6 @@ using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.ServiceRuntime;
 
 namespace Orleans.Runtime.Host
 {
