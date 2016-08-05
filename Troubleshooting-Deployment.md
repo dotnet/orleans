@@ -53,12 +53,6 @@ Programmatic configuration:
 - When creating a `ClientConfiguration` object, set `config.DefaultTraceLevel = Severity.Info`.
 
 Declarative configuration:
-
-Add the following XML tag to the `OrleansConfiguration.xml` and/or the `ClientConfiguration.xml` files.
-``` xml
-<Tracing DefaultTraceLevel="Info" >
-  <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
-</Tracing>
-```
+- Add `<Tracing DefaultTraceLevel="Info" />` to the `OrleansConfiguration.xml` and/or the `ClientConfiguration.xml` files.
 
 You can find more information about this in the [Orleans Configuration Guide] (Orleans-Configuration-Guide/).
