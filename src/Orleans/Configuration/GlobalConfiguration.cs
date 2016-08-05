@@ -506,7 +506,7 @@ namespace Orleans.Runtime.Configuration
             BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
             ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
             ServiceId = Guid.Empty;
-            DeploymentId = Environment.UserName;
+            DeploymentId = "";
             DataConnectionString = "";
 
             // Assume the ado invariant is for sql server storage if not explicitly specified

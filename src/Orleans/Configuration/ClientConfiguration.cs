@@ -175,7 +175,7 @@ namespace Orleans.Runtime.Configuration
             NetInterface = null;
             Port = 0;
             DNSHostName = Dns.GetHostName();
-            DeploymentId = Environment.UserName;
+            DeploymentId = "";
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
