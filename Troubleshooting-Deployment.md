@@ -55,4 +55,6 @@ Programmatic configuration:
 Declarative configuration:
 - Add `<Tracing DefaultTraceLevel="Info" />` to the `OrleansConfiguration.xml` and/or the `ClientConfiguration.xml` files.
 
+In the `diagnostics.wadcfgx` file for the web role and worker role, change the `scheduledTransferLogLevelFilter` attribute in the `Logs` tag to Information instead of Error to get informational logs in the Azure storage table.
+
 You can find more information about this in the [Orleans Configuration Guide] (Orleans-Configuration-Guide/).
