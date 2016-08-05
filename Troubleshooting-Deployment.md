@@ -46,4 +46,19 @@ role recycling. Check the logs for more information. Visual Studio provides some
 
 ## How to Check Logs
 - Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.
-- You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level. You can find more information about this in the [Orleans Configuration Guide] (http://dotnet.github.io/orleans/Orleans-Configuration-Guide/).
+- You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level. 
+
+Programmatic configuration:
+- When creating a `ClusterConfiguration` object, set `config.Defaults.DefaultTraceLevel = Severity.Info`.
+- When creating a `ClientConfiguration` object, set `config.DefaultTraceLevel = Severity.Info`.
+
+Declarative configuration:
+
+Add the following XML tag to the `OrleansConfiguration.xml` and/or the `ClientConfiguration.xml` files.
+``` xml
+<Tracing DefaultTraceLevel="Info" >
+  <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
+</Tracing>
+```
+
+You can find more information about this in the [Orleans Configuration Guide] (Orleans-Configuration-Guide/).
