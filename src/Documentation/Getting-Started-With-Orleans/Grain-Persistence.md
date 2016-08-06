@@ -6,7 +6,7 @@ title: Grain Persistence
 
 ## Grain Persistence Goals
 
-1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses SQL Azure) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2)
+1. Allow different grain types to use different types of storage providers (e.g., one uses Azure table, and one uses an ADO.NET one) or the same type of storage provider but with different configurations (e.g., both use Azure table, but one uses storage account #1 and one uses storage account #2)
 2. Allow configuration of a storage provider instance to be swapped (e.g., Dev-Test-Prod) with just config file changes, and no code changes required.
 3. Provide a framework to allow additional storage providers to be written later, either by the Orleans team or others.
 4. Provide a minimal set of production-grade storage providers
@@ -122,6 +122,34 @@ The following attributes can be added to the `<Provider />` element to configure
 > __Note:__ This provider persists state to volatile memory which is erased at silo shut down. Use only for testing.
 
 * __`NumStorageGrains="10"`__ (optional) - The number of grains to use to store the state, defaults to `10`
+
+### ADO.NET Persistence
+
+Initializing the database structures needs table named `Storage` from the database scripts and `OrleansQuery` with its contents (or the queries that use `Storage` table).
+The scripts are located in the Nuget library, the path is in projects close to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version. Deploying
+the whole script to the database should not cause problems.
+
+In addition to deploying the script to the database, the following is an example of programmatic configuration. A quick way to test this is to
+
+1. Open `\Samples\StorageProviders`.
+2. On the package manager console, run: `Install-Package Microsoft.Orleans.OrleansSqlUtils -project Test.Client`.
+3. Update all the Orleans packages in the solution, run: `Get-Package | where Id -like 'Microsoft.Orleans.*' | foreach { update-package $_.Id }` (this is a precaution to make sure the packages are on same version).
+4. Go to `OrleansHostWrapper.cs` and to the following
+
+``` csharp
+//props["RootDirectory"] = @".\Samples.FileStorage";
+//config.Globals.RegisterStorageProvider<Samples.StorageProviders.OrleansFileStorage>("TestStore", props);
+props[Orleans.Storage.AdoNetStorageProvider.DataConnectionStringPropertyName] = @"Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;";
+props[Orleans.Storage.AdoNetStorageProvider.UseJsonFormatPropertyName] = "true"; //Binary, the default option, is more efficient. This is for illustrative purposes.
+config.Globals.RegisterStorageProvider<Orleans.Storage.AdoNetStorageProvider>("TestStore", props);
+```
+
+This is a simple configuration that stores data to the database in JSON format. Other built-in formats are
+`Storage.AdoNetStorageProvider.UseXmlFormatPropertyName` for XML and the default, `Storage.AdoNetStorageProvider.UseBinaryFormatPropertyName` for Orleans binary serialization format.
+Do observe `Max Pool Size = 200` is insufficient for large deployments.
+
+The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
+there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
 
 ### ShardedStorageProvider
 
@@ -314,3 +342,34 @@ Any other failure conditions from a write operation _should_ cause the write `Ta
 Individual storage providers should decide how best to store grain state – blob (various formats / serialized forms) or column-per-field are obvious choices.
 
 The basic storage provider for Azure Table encodes state data fields into a single table column using Orleans binary serialization.
+
+
+## ADO.NET Persistence Rationale <a name="ADONETPersistenceRationale"></a>
+
+The principles for ADO.NET backed persistence storage are:
+
+1. Keep business critical data safe an accessible while data, the format of data and code evolve.
+2. Take advantenge of vendor and storage specific functionality.
+
+In practice this means adhering to [ADO.NET implementation goals](../Runtime-Implementation-Details/Relational-Storage)
+and some added twists in ADO.NET specific storage provider that allow evolving the shape of the data in the storage.
+
+In addition to the usual storage provider capabilities, the ADO.NET provider has built-in capability to
+
+1. Change storage data format from one format to another format (e.g. from JSON to binary) when roundtripping state.
+2. Shape the type to be saved or read from the storage in arbitrary ways. This helps to evolve the version state.
+3. Stream data out of the database.
+
+Both `1.` and `2.` can be applied on arbitrary decision parameters, such as *grain ID*, *grain type*, *payload data*.
+
+This happen so that one chooses a format, e.g. [Simple Binary Encoding (SBE)](https://github.com/real-logic/simple-binary-encoding) and implements
+(IStorageDeserializer)[https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageDeserializer.cs] and [IStorageSerializer](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializer.cs).
+The built-in (de)serializers have been built using this method. The [OrleansStorageDefault<format>(De)Serializer](https://github.com/dotnet/orleans/tree/master/src/OrleansSQLUtils/Storage/Provider) can be used as examples
+on how to implement other formats.
+
+When the (de)serializers have been implemented, they need to ba added to the `StorageSerializationPicker` property in [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs).
+This is an implementation of [IStorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/IStorageSerializationPicker.cs). By default
+[StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
+or using (de)serializers can be seen at [RelationalStorageTests]https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs).
+
+Unfortunately currently there is no method to expose this to Orleans application consumption as there there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
