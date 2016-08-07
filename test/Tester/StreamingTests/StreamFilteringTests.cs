@@ -240,6 +240,9 @@ namespace Tester.StreamingTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
+                options.ClusterConfiguration.Defaults.Assemblies = TestUtils.GetTestSiloAssemblyList();
+                options.ClientConfiguration.Assemblies = TestUtils.GetTestClientAssemblyList();
+
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
                 return new TestCluster(options);

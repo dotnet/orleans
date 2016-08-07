@@ -29,6 +29,16 @@
       <TraceLevelOverride LogPrefix="PubSubRendezvousGrain" TraceLevel="Verbose" />
     </Tracing>
     <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s"/>
+    <Assemblies>
+      <Assembly Path=".\TestGrainInterfaces.dll"/>
+      <Assembly Path=".\TestGrains.dll"/>
+      <Assembly Path=".\TestFSharpInterfaces.dll"/>
+      <Assembly Path=".\TestFSharp.dll"/>
+      <Assembly Path=".\Orleans.dll"/>
+      <Assembly Path=".\OrleansRuntime.dll"/>
+      <Assembly Path=".\TestInternalGrainInterfaces.dll"/>
+      <Assembly Path=".\TestInternalGrains.dll"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />
