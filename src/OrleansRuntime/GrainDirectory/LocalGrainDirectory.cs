@@ -744,10 +744,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressesAndTag GetLocalDirectoryData(GrainId grain)
         {
-            var result = DirectoryPartition.LookUpGrain(grain);
-            if (result.Addresses != null)
-                result.Addresses = result.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
-            return result;
+            return DirectoryPartition.LookUpGrain(grain);
         }
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)
@@ -786,7 +783,6 @@ namespace Orleans.Runtime.GrainDirectory
                     localResult.VersionTag = GrainInfo.NO_ETAG;
                     return localResult;
                 }
-                localResult.Addresses = localResult.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
 
                 if (log.IsVerbose2) log.Verbose2("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
                 LocalDirectorySuccesses.Increment();
