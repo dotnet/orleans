@@ -6,7 +6,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Orleans.Runtime;
 
-#if !NETSTANDARD1_6
+#if !NETSTANDARD
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
