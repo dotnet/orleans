@@ -4,6 +4,8 @@ title: Handling Failures
 ---
 {% include JB/setup %}
 
+> **Note:** All of the containing guidance in this document is provided to serve as examples and warm your mind up. You should not think them as prescriptive solutions to your problems since failure handling is a rather application specific subject and these patterns and others are only useful if applied with a good knowledge of the specific case being worked on.
+
 The hardest thing in programming a distributed system is handling failures. The actor model and the way it works makes it much easier to deal with different kinds of failures but still as the developer you are responsible to deal with the failure possibilities and handle them in an appropriate way.
 
 ## Types of failures
@@ -37,13 +39,13 @@ If you have a grain responsible for database saves and database is not available
 
 ## Strategy parameters and choosing a good strategy
 
-As described in the section above, choosing a strategy is application and context dependent and strategies usually have parameters which again have to be decided at the application level. For example you might want to retry a request maximum 5 times per minute and can deal with it being done eventually but for some other action you might not be able to continue if something is resolved. If your Login grain fails , you can not process any other requests from the user as an example. 
+As described in the section above, choosing a strategy is application and context dependent and strategies usually have parameters which again have to be decided at the application level. For example you might want to retry a request maximum 5 times per minute and can deal with it being done eventually but for some other action you might not be able to continue if something is not working. If your Login grain fails , you can not process any other requests from the user as an example. 
 
 There is a guide [on MSDN](https://msdn.microsoft.com/en-us/library/dn568099.aspx) about good patterns and practices for the cloud which applies to Orleans in most cases as well.
 
-## A note about supervision trees
+## A fairly complex example
 
-Developers used to Erlang/Akka/Akka.Net might be surprised to see that there is no supervision tree in Orleans and wonder how they can recover from failures. The point is that in Orleans since actors are reactivated automatically and you don't handle their life-cycle, you usually only deal with making sure that actor state is correct. If you need to store relations between grains, you can simply do it and it is a widely done practice. 
+Since in Orleans grainss are activated and deactivated automatically and you don't handle their life-cycle, you usually only deal with making sure that actor state is correct and actions are being started and finished correctly in relation to each other. Knowing the dependencies between grains and actions they perform is a big step toward understanding how to handle failure in any complex system. If you need to store relations between grains, you can simply do it and it is a widely done practice. 
 
 As an example let's say we have a `GameManager` grain which starts and stops `Game` grains and adds `Player` grains to the games.  if my `GameManager`grain fails to do its action regarding starting a game, the related game belonging to it should fail to do its `Start()` as well and the manager can do this for the game by doing orchestration. In Erlang the point of killing an actor (process) is to clean its state and reset it and also to manage memory. Managing memory in Orleans is automatic and the system deals with it, you only need to make sure that the game starts only and only if manager can do its `Start()` as well. You can do this by either calling the related methods in a sequencial manner or doing them in parallel and reset the state of all involved grains if any of them fails.
 
@@ -65,10 +67,6 @@ So the game start example can be summarized like this:
 Now if say a player fails to add the game to itself, you don't need to kill all players and the game and start from scratch, you simply reset the state of other players which added the game to themselves and reset the state of the `Game` and `GameManager` if required and redo your work or declare failure. If you can deal with adding the game to the player later on, you can continue and retry doing that again in a reminder or at some other game call like `Finish()` method of the game.
 
 This is faster since you are not recreating any actors and state resets can be very fast and easy if you do them in memory, even if you read it from storage you are at least saving the time which is spent on killing and recreating the actors.
-
-All this said, It is possible to create supervisors and even other OTP concepts for Orleans if you use a unified interface and messages to communicate like how its done in [Orleankka](https://github.com/OrleansContrib/Orleankka) and also server side interseptors can be used to implement some of them even without unified interfaces. It comes to your preference of the model to use.
-
-As an example if you want to create something like GenServer of Erlang/OTP in Orleans to manage resources, you need to define the callbacks in some way and since we can not serialize lambda expressions across silos yet, you either have to register and find the methods using reflection or use functional interfaces like those in Orleankka.
 
 ## A note on grain storage
 
