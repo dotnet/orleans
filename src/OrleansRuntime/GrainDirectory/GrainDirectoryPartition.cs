@@ -332,19 +332,22 @@ namespace Orleans.Runtime.GrainDirectory
         internal AddressesAndTag LookUpGrain(GrainId grain)
         {
             var result = new AddressesAndTag();
+            IGrainInfo grainInfo;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                if (!partitionData.TryGetValue(grain, out grainInfo))
                 {
-                    result.Addresses = new List<ActivationAddress>();
-                    result.VersionTag = partitionData[grain].VersionTag;
-
-                    foreach (var route in partitionData[grain].Instances.Where(route => IsValidSilo(route.Value.SiloAddress)))
-                    {
-                        result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key, route.Value.RegistrationStatus));
-                    }
+                    return result;
                 }
             }
+
+            result.Addresses = new List<ActivationAddress>();
+            result.VersionTag = grainInfo.VersionTag;
+            foreach (var route in grainInfo.Instances.Where(route => IsValidSilo(route.Value.SiloAddress)))
+            {
+                result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key, route.Value.RegistrationStatus));
+            }
+
             return result;
         }
 
