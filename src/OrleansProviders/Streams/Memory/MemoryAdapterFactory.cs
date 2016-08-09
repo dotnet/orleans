@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams.Common;
-using Orleans.Providers.Streams.Memory;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -76,10 +75,11 @@ namespace Orleans.Providers.Streams.Memory
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             // provider name hash code
-            int providerNameGuidHash = providerName.GetHashCode();
+            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
+            int providerNameGuidHash = (int)jenkinsHash.ComputeHash(providerName);
 
             // get queueId hash code
-            int queueIdHash = queueId.GetHashCode();
+            uint queueIdHash = queueId.GetUniformHashCode();
             byte[] queIdHashByes = BitConverter.GetBytes(queueIdHash);
             short s1 = BitConverter.ToInt16(queIdHashByes, 0);
             short s2 = BitConverter.ToInt16(queIdHashByes, 2);
@@ -109,7 +109,7 @@ namespace Orleans.Providers.Streams.Memory
             }
             catch (Exception exc)
             {
-                logger.Error((int)ProviderErrorCode.ProvidersBase, "Exception thrown in MemoryAdapterFactory.QueueMessageBatchAsync.", exc);
+                logger.Error((int)ProviderErrorCode.MemoryStreamProviderBase_QueueMessageBatchAsync, "Exception thrown in MemoryAdapterFactory.QueueMessageBatchAsync.", exc);
                 throw;
             }
         }

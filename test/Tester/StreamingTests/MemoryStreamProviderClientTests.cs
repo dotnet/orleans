@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Providers.Streams.Memory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,23 +12,31 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
-    public class MemoryStreamProviderClientTests : TestClusterPerTest
+    public class MemoryStreamProviderClientTests : OrleansTestingBase
     {
         private const string StreamProviderName = "MemoryStreamProvider";
         private const string StreamNamespace = "StreamNamespace";
 
         private static readonly MemoryAdapterConfig ProviderConfig = new MemoryAdapterConfig(StreamProviderName, 1);
 
+        protected TestCluster HostedCluster { get; private set; }
         private readonly ITestOutputHelper output;
         private readonly ClientStreamTestRunner runner;
 
         public MemoryStreamProviderClientTests(ITestOutputHelper output)
         {
+            GrainClient.Uninitialize();
+            var testCluster = this.CreateTestCluster();
+            if (testCluster.Primary == null)
+            {
+                testCluster.Deploy();
+            }
+            this.HostedCluster = testCluster;
             this.output = output;
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        public override TestCluster CreateTestCluster()
+        public TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(1);
             AdjustConfig(options.ClusterConfiguration);

@@ -33,12 +33,15 @@ namespace Orleans.Providers.Streams.Memory
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
                 eventData = await task;
-                awaitingTasks.Remove(task);
                 batches = eventData.Select(data => (IBatchContainer) MemoryBatchContainer.FromMemoryEventData<object>(data, ++sequenceId)).ToList();
             }
             catch (Exception exc)
             {
                 throw;
+            }
+            finally
+            {
+                awaitingTasks.Remove(task);
             }
             return batches;
         }
@@ -50,9 +53,16 @@ namespace Orleans.Providers.Streams.Memory
 
         public async Task Shutdown(TimeSpan timeout)
         {
-            if (awaitingTasks.Count != 0)
+            try
             {
-                await Task.WhenAll(awaitingTasks);
+                if (awaitingTasks.Count != 0)
+                {
+                    await Task.WhenAll(awaitingTasks);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
     }

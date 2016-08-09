@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Orleans.Providers.Streams.Memory
@@ -8,23 +7,15 @@ namespace Orleans.Providers.Streams.Memory
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
     {
         public const String TypeName = "MemoryStreamQueueGrain";
-        private Queue<MemoryEventData> eventQueue;
+        private Queue<MemoryEventData> eventQueue = new Queue<MemoryEventData>();
         private int maxEventCount = 16384;
-
-        public override Task OnActivateAsync()
-        {
-            eventQueue = new Queue<MemoryEventData>();
-            return TaskDone.Done;
-        }
-
-        public override Task OnDeactivateAsync()
-        {
-            eventQueue = null;
-            return TaskDone.Done;
-        }
 
         public Task SetMaxEventCount(int maxEventCount)
         {
+            if (maxEventCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxEventCount), "maxEventCount must be larger than 0");
+            }
             this.maxEventCount = maxEventCount;
             return TaskDone.Done;
         }
@@ -33,7 +24,7 @@ namespace Orleans.Providers.Streams.Memory
         {
             if (eventQueue.Count >= maxEventCount)
             {
-                throw new Exception("MemoryStreamQueueGrain.Enqueue: Count has reached maxEventCount ("+ maxEventCount+")");
+                throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of { maxEventCount }");
             }
             eventQueue.Enqueue(eventData);
             return TaskDone.Done;

@@ -9,10 +9,10 @@ namespace Orleans.Providers.Streams.Memory
     [Serializable]
     internal class MemoryBatchContainer : IBatchContainer
     {
+        private readonly EventSequenceToken realToken;
         public Guid StreamGuid => EventData.StreamGuid;
         public string StreamNamespace => EventData.StreamNamespace;
         public StreamSequenceToken SequenceToken => realToken;
-        private readonly EventSequenceToken realToken;
         public MemoryEventData EventData { get; set; }
         public long SequenceNumber{ get { return realToken.SequenceNumber; } }
 
@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.Memory
 
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
-            return EventData != null && EventData.Events != null && EventData.Events.Count > 0;
+            return EventData?.Events?.Count > 0;
         }
 
         internal static MemoryEventData ToMemoryEventData<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)

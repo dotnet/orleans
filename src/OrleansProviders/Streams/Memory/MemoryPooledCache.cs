@@ -19,11 +19,11 @@ namespace Orleans.Providers.Streams.Memory
             dataAdapter.PurgeAction = cache.Purge;
         }
 
-        // For fast GC this struct should contain only value types.  "I included streamNamespace because I'm lasy and this is test code, but it should not be in here." -- Jason
+        // For fast GC this struct should contain only value types. 
         private struct CachedMessage
         {
             public Guid StreamGuid;
-            public string StreamNamespace;
+            public uint StreamNamespaceHash;
             public long SequenceNumber;
             public ArraySegment<byte> Payload;
         }
@@ -31,6 +31,7 @@ namespace Orleans.Providers.Streams.Memory
         private class CacheDataComparer : ICacheDataComparer<CachedMessage>
         {
             public static readonly ICacheDataComparer<CachedMessage> Instance = new CacheDataComparer();
+            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
 
             public int Compare(CachedMessage cachedMessage, StreamSequenceToken token)
             {
@@ -43,7 +44,8 @@ namespace Orleans.Providers.Streams.Memory
             public bool Equals(CachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
                 int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                return results != 0 ? false : String.Equals(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal);
+                jenkinsHash.ComputeHash(streamIdentity.Namespace);
+                return results != 0 ? false : cachedMessage.StreamNamespaceHash == jenkinsHash.ComputeHash(streamIdentity.Namespace);
             }
         }
 
@@ -51,6 +53,7 @@ namespace Orleans.Providers.Streams.Memory
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
             private FixedSizeBuffer currentBuffer;
+            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
 
             public Action<IDisposable> PurgeAction { private get; set; }
 
@@ -68,7 +71,7 @@ namespace Orleans.Providers.Streams.Memory
             {
                 StreamPosition setreamPosition = GetStreamPosition(queueMessage);
                 cachedMessage.StreamGuid = setreamPosition.StreamIdentity.Guid;
-                cachedMessage.StreamNamespace = setreamPosition.StreamIdentity.Namespace;
+                cachedMessage.StreamNamespaceHash = jenkinsHash.ComputeHash(setreamPosition.StreamIdentity.Namespace);
                 cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
                 return setreamPosition;
@@ -93,7 +96,7 @@ namespace Orleans.Providers.Streams.Memory
                     {
                         string errmsg = String.Format(CultureInfo.InvariantCulture,
                             "Message size is too big. MessageSize: {0}", size);
-                        throw new ArgumentOutOfRangeException("queueMessage", errmsg);
+                        throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }
                 }
                 Buffer.BlockCopy(serializedPayload, 0, segment.Array, segment.Offset, size);

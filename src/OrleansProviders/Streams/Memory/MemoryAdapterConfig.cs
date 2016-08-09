@@ -16,16 +16,23 @@ namespace Orleans.Providers.Streams.Memory
         private const int TotalQueueCountDefault = 4;
         private static int cacheSizeMbDefault = 10;
         public int TotalQueueCount { get; set; }
+        /// <summary>
+        /// Cache size of FixedSizeObjectPool measured in Mb
+        /// </summary>
         public int CacheSizeMb { get; set; } = cacheSizeMbDefault;
 
-        public MemoryAdapterConfig(string streamProviderName, int totalQueueCount = 0)
+        public MemoryAdapterConfig(string streamProviderName, int totalQueueCount = TotalQueueCountDefault)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
+                throw new ArgumentNullException(nameof(streamProviderName), "streamProviderName not set.");
+            }
+            if (totalQueueCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(totalQueueCount), "totalQueueCount must be larger than 0.");
             }
             this.StreamProviderName = streamProviderName;
-            this.TotalQueueCount = totalQueueCount <= 0 ? TotalQueueCountDefault : totalQueueCount;
+            this.TotalQueueCount = totalQueueCount;
         }
 
         /// <summary>
