@@ -6,17 +6,17 @@ using System.Threading.Tasks;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 
-namespace SerializationBenchmarks
+namespace SerializationBenchmarks.MapReduce
 {
-    public class SerializerBenchmarkConfig : ManualConfig
+    public class MapReduceBenchmarkConfig : ManualConfig
     {
-        public SerializerBenchmarkConfig()
+        public MapReduceBenchmarkConfig()
         {
             Add(new Job
             {
                 LaunchCount = 1,
-                TargetCount = 3,
-                WarmupCount = 1
+                TargetCount = 2,
+                WarmupCount = 0
             });
         }
     }

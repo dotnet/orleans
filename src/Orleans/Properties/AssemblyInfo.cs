@@ -32,5 +32,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("SerializationBenchmarks")]
-
+[assembly: InternalsVisibleTo("OrleansBenchmarks")]

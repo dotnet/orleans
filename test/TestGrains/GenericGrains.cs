@@ -514,7 +514,8 @@ namespace UnitTests.Grains
     }
 
     [Reentrant]
-    public class PingSelfGrain<T> : Grain, IGenericPingSelf<T>
+    public class 
+        PingSelfGrain<T> : Grain, IGenericPingSelf<T>
     {
         private T _lastValue;
 

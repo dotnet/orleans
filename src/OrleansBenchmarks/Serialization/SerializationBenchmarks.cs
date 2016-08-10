@@ -13,12 +13,12 @@ using Orleans.Serialization;
 
 namespace SerializationBenchmarks
 {
-    [Config(typeof(SerializerBenchmarkConfig))]
+    [Config(typeof(SerializationBenchmarkConfig))]
     public class SerializationBenchmarks
     {
         private PocoState poco;
 
-        [Params(300000)]
+        [Params(30000)]
         public int Repeats { get; set; }
 
         [Setup]
