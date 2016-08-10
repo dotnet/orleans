@@ -36,8 +36,6 @@ namespace SerializationBenchmarks
 
         static void Main(string[] args)
         {
-            _benchmarks["MapReduce"]();
-            return;
             if (args.Length == 0 || !_benchmarks.ContainsKey(args[0]))
             {
                 Console.WriteLine("Running full benchmarks suite");
