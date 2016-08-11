@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using GrainInterfaces;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
@@ -18,7 +20,8 @@ namespace SerializationBenchmarks.MapReduce
         private static SiloHost _siloHost;
         private readonly int _intermediateStagesCount = 15;
         private readonly int _pipelineParallelization = 4;
-        private readonly int _repeats = 15000;
+        private readonly int _repeats = 50000;
+        private int _currentRepeat = 0;
 
         [Setup]
         public void BenchmarkSetup()
@@ -35,10 +38,14 @@ namespace SerializationBenchmarks.MapReduce
         [Benchmark]
         public async Task Bench()
         {
-            var pipelines =Enumerable.Range(0, _pipelineParallelization).AsParallel().Select(async i =>
-            {
-                await BenchCore();
-            });
+            var pipelines = Enumerable
+                .Range(0, _pipelineParallelization)
+                .AsParallel()
+                .WithDegreeOfParallelism(2)
+                .Select(async i =>
+                {
+                    await BenchCore();
+                });
 
             await Task.WhenAll(pipelines);
         }
@@ -53,14 +60,16 @@ namespace SerializationBenchmarks.MapReduce
             initializationTasks.Add(reducer.Initialize(new ReduceProcessor()));
 
             // used for imitation of complex processing pipelines
-            var intermediateGrains = Enumerable.Range(0, _intermediateStagesCount).Select(i =>
-            {
-                var intermediateProcessor =
-                    GrainClient.GrainFactory.GetGrain<ITransformGrain<Dictionary<string, int>, Dictionary<string, int>>>
-                        (Guid.NewGuid());
-                initializationTasks.Add(intermediateProcessor.Initialize(new EmptyProcessor()));
-                return intermediateProcessor;
-            });
+            var intermediateGrains = Enumerable
+                .Range(0, _intermediateStagesCount)
+                .Select(i =>
+                {
+                    var intermediateProcessor =
+                        GrainClient.GrainFactory.GetGrain<ITransformGrain<Dictionary<string, int>, Dictionary<string, int>>>
+                            (Guid.NewGuid());
+                    initializationTasks.Add(intermediateProcessor.Initialize(new EmptyProcessor()));
+                    return intermediateProcessor;
+                });
 
             initializationTasks.Add(mapper.LinkTo(reducer));
             var collector = GrainClient.GrainFactory.GetGrain<IBufferGrain<Dictionary<string, int>>>(Guid.NewGuid());
@@ -85,7 +94,8 @@ namespace SerializationBenchmarks.MapReduce
             await Task.WhenAll(initializationTasks);
 
             List<Dictionary<string, int>> resultList = new List<Dictionary<string, int>>();
-            for (int i = 0; i < _repeats; i++)
+
+            while (Interlocked.Increment(ref _currentRepeat) < _repeats)
             {
                 await mapper.SendAsync(_text);
                 while (!resultList.Any() || resultList.First().Count < 84) // rough way of checking of pipeline completition.

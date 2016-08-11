@@ -19,7 +19,7 @@ namespace BenchmarkGrains.MapReduce
         // it should be list
         private ITargetGrain<TOutput> _target;
 
-        // BlockingCollection has shown worse perf results for this type of workload
+        // BlockingCollection has shown worse perf results for this workload types
         private readonly ConcurrentQueue<TInput> _input = new ConcurrentQueue<TInput>();
 
         public Task Initialize(ITransformProcessor<TInput, TOutput> processor)
@@ -32,11 +32,6 @@ namespace BenchmarkGrains.MapReduce
         public Task<TOutput> ConsumeMessage()
         {
             throw new NotImplementedException();
-        }
-
-        public Task Foo()
-        {
-            return TaskDone.Done;
         }
 
         public Task LinkTo(ITargetGrain<TOutput> t)
