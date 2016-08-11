@@ -1,6 +1,9 @@
-{
+﻿{
   "dependencies": {
     "FSharp.Core": "4.0.0.1",
+    "Microsoft.Extensions.Configuration.Binder": "1.0.0",
+    "Microsoft.Extensions.Configuration.Json": "1.0.0",
+    "Microsoft.Extensions.Configuration.Xml": "1.0.0",
     "Newtonsoft.Json": "7.0.1",
     "WindowsAzure.Storage": "7.0.0",
     "xunit": "2.1.0",

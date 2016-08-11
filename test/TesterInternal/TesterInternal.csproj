@@ -297,6 +297,12 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="ReadMe.md" />
+    <None Include="ClientConfig_StreamProviders_New.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Content Include="ClientConfig_StreamProviders_New.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config_AdditionalAssemblies.xml">
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

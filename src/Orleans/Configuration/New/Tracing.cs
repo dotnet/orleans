@@ -16,7 +16,6 @@ namespace Orleans.Runtime.Configuration.New
         public Tracing()
         {
             DefaultTraceLevel = Severity.Info;
-            TraceLevelOverrides = new List<Tuple<string, Severity>>();
             TraceToConsole = true;
             TraceFilePattern = "{0}-{1}.log";
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
@@ -53,7 +52,7 @@ namespace Orleans.Runtime.Configuration.New
         /// TraceLevelOverrides are applied in length order; that is, the override with the longest matching
         /// LogPrefix takes precedence and specifies the tracing level for all matching loggers.
         /// </summary>
-        public  IList<Tuple<string, Severity>> TraceLevelOverrides { get; set; } = new List<Tuple<string, Severity>>();
+        public  List<TraceLevelOverride> TraceLevelOverrides { get; set; } = new List<TraceLevelOverride>();
         /// <summary>
         /// The TraceToConsole attribute specifies whether trace output should be written to the console.
         /// The default is not to write trace data to the console.
@@ -83,7 +82,7 @@ namespace Orleans.Runtime.Configuration.New
                 sb.Append("     TraceLevelOverrides:").AppendLine();
                 foreach (var over in TraceLevelOverrides)
                 {
-                    sb.Append("         ").Append(over.Item1).Append(" ==> ").Append(over.Item2.ToString()).AppendLine();
+                    sb.Append("         ").Append(over.LogPrefix).Append(" ==> ").Append(over.TraceLevel.ToString()).AppendLine();
                 }
             }
             else

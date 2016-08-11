@@ -1,0 +1,64 @@
+﻿{
+    "ClientConfiguration": {
+        "Gateways": [
+            {
+                "-Address": "localhost",
+                "-Port": "40000",
+                "-Proxied": "true"
+            },
+            {
+                "-Address": "localhost",
+                "-Port": "40001",
+                "-Proxied": "true"
+            }
+        ],
+        "Tracing": {
+            "DefaultTraceLevel": "Info",
+            "TraceToConsole": "false",
+            "TraceToFile": "{0}-{1}.log",
+            "BulkMessageLimit": "1000",
+            "TraceLevelOverrides": [
+                {
+                    "LogPrefix": "Runtime",
+                    "TraceLevel": "Info"
+                },
+                {
+                    "LogPrefix": "Application",
+                    "TraceLevel": "Info"
+                },
+                {
+                    "LogPrefix": "Tetris",
+                    "TraceLevel": "Info"
+                },
+                {
+                    "LogPrefix": "AssemblyLoader",
+                    "TraceLevel": "Warning"
+                }
+            ]
+        },
+        "Statistics": {
+            "MetricsTableWriteInterval": "00:05:00",
+            "PerfCounterWriteInterval": "00:00:30",
+            "LogWriteInterval": "00:05:00",
+            "CollectionLevel": "Info"
+        },
+        "Messaging": {
+            "ResponseTimeout": "00:00:30",
+            "ClientSenderBuckets": "8192",
+            "MaxResendCount": "0",
+            "UseMessageBatching": "false",
+            "MaxMessageBatchingSize": "100"
+        },
+        "StreamProviders": [
+            {
+                "-Type": "Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider",
+                "-Name": "SMSProvider",
+                "-FireAndForgetDelivery": "false"
+            },
+            {
+                "-Type": "Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider",
+                "-Name": "AzureQueueProvider"
+            }
+        ]
+    }
+}

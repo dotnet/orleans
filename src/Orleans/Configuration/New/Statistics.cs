@@ -14,35 +14,35 @@ namespace Orleans.Runtime.Configuration.New
 
         public Statistics()
         {
-            StatisticsProviderName = null;
-            StatisticsMetricsTableWriteInterval = DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD;
-            StatisticsPerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
-            StatisticsLogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
-            StatisticsWriteLogStatisticsToTable = true;
-            StatisticsCollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
+            ProviderName = null;
+            MetricsTableWriteInterval = DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD;
+            PerfCountersWriteInterval = DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD;
+            LogWriteInterval = DEFAULT_STATS_LOG_WRITE_PERIOD;
+            WriteLogStatisticsToTable = true;
+            CollectionLevel = NodeConfiguration.DEFAULT_STATS_COLLECTION_LEVEL;
         }
-        public TimeSpan StatisticsMetricsTableWriteInterval { get; set; }
-        public TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
-        public TimeSpan StatisticsLogWriteInterval { get; set; }
-        public bool StatisticsWriteLogStatisticsToTable { get; set; }
-        public StatisticsLevel StatisticsCollectionLevel { get; set; }
+        public TimeSpan MetricsTableWriteInterval { get; set; }
+        public TimeSpan PerfCountersWriteInterval { get; set; }
+        public TimeSpan LogWriteInterval { get; set; }
+        public bool WriteLogStatisticsToTable { get; set; }
+        public StatisticsLevel CollectionLevel { get; set; }
 
-        public string StatisticsProviderName { get; set; }
+        public string ProviderName { get; set; }
 
         public override string ToString()
         {
             var sb = new StringBuilder();
             sb.Append("   Statistics: ").AppendLine();
-            sb.Append("     MetricsTableWriteInterval: ").Append(StatisticsMetricsTableWriteInterval).AppendLine();
-            sb.Append("     PerfCounterWriteInterval: ").Append(StatisticsPerfCountersWriteInterval).AppendLine();
-            sb.Append("     LogWriteInterval: ").Append(StatisticsLogWriteInterval).AppendLine();
-            sb.Append("     WriteLogStatisticsToTable: ").Append(StatisticsWriteLogStatisticsToTable).AppendLine();
-            sb.Append("     StatisticsCollectionLevel: ").Append(StatisticsCollectionLevel).AppendLine();
+            sb.Append("     MetricsTableWriteInterval: ").Append(MetricsTableWriteInterval).AppendLine();
+            sb.Append("     PerfCounterWriteInterval: ").Append(PerfCountersWriteInterval).AppendLine();
+            sb.Append("     LogWriteInterval: ").Append(LogWriteInterval).AppendLine();
+            sb.Append("     WriteLogStatisticsToTable: ").Append(WriteLogStatisticsToTable).AppendLine();
+            sb.Append("     StatisticsCollectionLevel: ").Append(CollectionLevel).AppendLine();
 #if TRACK_DETAILED_STATS
             sb.Append("     TRACK_DETAILED_STATS: true").AppendLine();
 #endif
-            if (!string.IsNullOrEmpty(StatisticsProviderName))
-                sb.Append("     StatisticsProviderName:").Append(StatisticsProviderName).AppendLine();
+            if (!string.IsNullOrEmpty(ProviderName))
+                sb.Append("     StatisticsProviderName:").Append(ProviderName).AppendLine();
             return sb.ToString();
         }
     }

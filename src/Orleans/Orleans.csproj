@@ -83,6 +83,7 @@
     <Compile Include="Configuration\New\Messaging.cs" />
     <Compile Include="Configuration\New\Statistics.cs" />
     <Compile Include="Configuration\New\SystemStore.cs" />
+    <Compile Include="Configuration\New\TraceLevelOverride.cs" />
     <Compile Include="Configuration\New\Tracing.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />

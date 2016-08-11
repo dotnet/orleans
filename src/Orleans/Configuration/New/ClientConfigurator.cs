@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Configuration.New
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
-    public class ClientConfigurator
+    public class ClientFactoryBuilder
     {
         /// <summary>
         /// The name of this client.
@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Configuration.New
         
         /// <summary>
         /// </summary>
-        public ClientConfigurator()
+        public ClientFactoryBuilder()
         {
             creationTimestamp = DateTime.UtcNow;
             SourceFile = null;
@@ -97,9 +97,9 @@ namespace Orleans.Runtime.Configuration.New
         }
         
         
-        public ClientSettings Settings { get; private set; }
+        public ClientFactorySettings Settings { get; private set; }
 
-        public void Build(ClientSettings client)
+        public void Build(ClientFactorySettings client)
         {
             Settings = client;
 

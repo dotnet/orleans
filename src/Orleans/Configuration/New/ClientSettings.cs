@@ -3,7 +3,7 @@ using Orleans.Configuration.New;
 
 namespace Orleans.Runtime.Configuration.New
 {
-    public class ClientSettings
+    public class ClientFactorySettings
     {
 
         public Messaging Messaging { get; set; } = new Messaging();
