@@ -3,10 +3,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Configuration.New;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost;
 using UnitTests.StorageTests;
@@ -342,6 +344,60 @@ namespace UnitTests
             cfg.TraceFilePattern = null;
             output.WriteLine(cfg.ToString());
            Assert.Null(cfg.TraceFileName); // TraceFileName should be null
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        public void ClientConfig_StreamProviders_New_Xml()
+        {
+            LogManager.UnInitialize();
+
+            string filename = "ClientConfig_StreamProviders_New.xml";
+
+            var settings = new ClientFactorySettings();
+            var configBuilder = new ConfigurationBuilder();
+            configBuilder.AddXmlFile(filename);
+            var config = configBuilder.Build();
+            config.Bind(settings);
+
+            ValidateSettings(settings);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
+        public void ClientConfig_StreamProviders_New_Json()
+        {
+            LogManager.UnInitialize();
+
+            string filename = "ClientConfig_StreamProviders_New.json";
+
+            var settings = new ClientFactorySettings();
+            var configBuilder = new ConfigurationBuilder();
+            configBuilder.AddJsonFile(filename);
+            var config = configBuilder.Build();
+            config.Bind(settings);
+
+            ValidateSettings(settings);
+        }
+
+        private void ValidateSettings(ClientFactorySettings settings)
+        {
+            Assert.Equal("localhost", settings.Gateways[0].Address);
+            Assert.Equal(40000, settings.Gateways[0].Port);
+            Assert.Equal("localhost", settings.Gateways[1].Address);
+            Assert.Equal(40001, settings.Gateways[1].Port);
+
+            Assert.Equal(Severity.Info, settings.Tracing.DefaultTraceLevel);
+            Assert.Equal(false, settings.Tracing.TraceToConsole);
+            Assert.Equal("{0}-{1}.log", settings.Tracing.TraceFileName);
+            Assert.Equal(1000, settings.Tracing.BulkMessageLimit);
+
+            Assert.Equal("Tetris", settings.Tracing.TraceLevelOverrides[2].LogPrefix);
+            Assert.Equal(Severity.Info, settings.Tracing.TraceLevelOverrides[2].TraceLevel);
+
+
+            Assert.Equal(TimeSpan.FromMinutes(5), settings.Statistics.MetricsTableWriteInterval);
+            Assert.Equal(TimeSpan.FromMinutes(5), settings.Statistics.LogWriteInterval);
+
+            Assert.Equal(100, settings.Messaging.MaxMessageBatchingSize);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
