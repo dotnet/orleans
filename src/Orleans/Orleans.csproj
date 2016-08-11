@@ -76,8 +76,8 @@
     <Compile Include="Async\TaskUtility.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
-    <Compile Include="Configuration\New\ClientConfigurator.cs" />
-    <Compile Include="Configuration\New\ClientSettings.cs" />
+    <Compile Include="Configuration\New\ClientFactoryBuilder.cs" />
+    <Compile Include="Configuration\New\ClientFactorySettings.cs" />
     <Compile Include="Configuration\New\Gateway.cs" />
     <Compile Include="Configuration\New\LocalAddress.cs" />
     <Compile Include="Configuration\New\Messaging.cs" />
