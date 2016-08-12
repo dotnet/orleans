@@ -59,7 +59,8 @@
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
-    <Compile Include="Startup\ConfigureServicesBuilder.cs" />
+    <Compile Include="Startup\ISiloHostBuilder.cs" />
+    <Compile Include="Startup\SiloHostBuilder.cs" />
     <Compile Include="Startup\StartupBuilder.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />
@@ -107,7 +108,6 @@
     </Compile>
     <Compile Include="ReminderService\MockReminderTable.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
-    <Compile Include="Silo\IStartupBuilder.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />
     <Compile Include="Silo\SiloHost.cs" />
     <Compile Include="Scheduler\TaskSchedulerUtils.cs" />

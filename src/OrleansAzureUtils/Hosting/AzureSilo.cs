@@ -6,6 +6,7 @@ using System.Threading;
 using Orleans.AzureUtils;
 using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
+using Orleans.Runtime.Startup;
 
 namespace Orleans.Runtime.Host
 {
@@ -154,21 +155,20 @@ namespace Orleans.Runtime.Host
             // Read endpoint info for this instance from Azure config
             string instanceName = serviceRuntimeWrapper.InstanceName;
 
+            var builder = new SiloHostBuilder();
+
             // Configure this Orleans silo instance
             if (config == null)
             {
-                host = new SiloHost(instanceName);
-                host.LoadOrleansConfig(); // Load config from file + Initializes logger configurations
-            }
-            else
-            {
-                host = new SiloHost(instanceName, config); // Use supplied config data + Initializes logger configurations
+                builder.UseClusterConfiguration(config); // Use supplied config data + Initializes logger configurations
             }
 
+            builder.ConfigureSilo(silo => 
+            {
             IPEndPoint myEndpoint = serviceRuntimeWrapper.GetIPEndpoint(SiloEndpointConfigurationKeyName);
             IPEndPoint proxyEndpoint = serviceRuntimeWrapper.GetIPEndpoint(ProxyEndpointConfigurationKeyName);
 
-            host.SetSiloType(Silo.SiloType.Secondary);
+            silo.SetSiloType(Silo.SiloType.Secondary);
 
             int generation = SiloAddress.AllocateNewGeneration();
 
@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Host
                 Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
 
-                HostName = host.Config.GetOrCreateNodeConfigurationForSilo(host.Name).DNSHostName,
+                HostName = silo.Config.GetOrCreateNodeConfigurationForSilo(silo.Name).DNSHostName,
                 ProxyPort = (proxyEndpoint != null ? proxyEndpoint.Port : 0).ToString(CultureInfo.InvariantCulture),
 
                 RoleName = serviceRuntimeWrapper.RoleName,
@@ -212,21 +212,22 @@ namespace Orleans.Runtime.Host
             }
 
             // Always use Azure table for membership when running silo in Azure
-            host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
-            if (host.Config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.NotSpecified ||
-                host.Config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain)
+            silo.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
+            if (silo.Config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.NotSpecified ||
+                silo.Config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain)
             {
-                host.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
+                silo.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.AzureTable);
             }
-            host.SetExpectedClusterSize(serviceRuntimeWrapper.RoleInstanceCount);
+            silo.SetExpectedClusterSize(serviceRuntimeWrapper.RoleInstanceCount);
             siloInstanceManager.RegisterSiloInstance(myEntry);
 
             // Initialize this Orleans silo instance
-            host.SetDeploymentId(deploymentId, connectionString);
-            host.SetSiloEndpoint(myEndpoint, generation);
-            host.SetProxyEndpoint(proxyEndpoint);
-
-            host.InitializeOrleansSilo();
+            silo.SetDeploymentId(deploymentId, connectionString);
+            silo.SetSiloEndpoint(myEndpoint, generation);
+            silo.SetProxyEndpoint(proxyEndpoint);
+            });
+            
+            host = builder.Build(instanceName);
             return StartSilo();
         }
 
