@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks.Dataflow;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
 
@@ -182,9 +183,9 @@ namespace Orleans.Runtime.Messaging
             InboundQueue.PostMessage(error);
         }
 
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
+        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
         {
-            return InboundQueue.WaitMessage(type);
+           InboundQueue.LinkActionBlock(type, actionBlock);
         }
 
         public void Dispose()

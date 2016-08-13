@@ -1,11 +1,13 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAgent : AsynchAgent
     {
+        ActionBlock<Message> _actionBlock;
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
@@ -21,6 +23,7 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             OnFault = FaultBehavior.RestartOnFault;
+            _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message));
         }
 
         public override void Start()
@@ -40,10 +43,14 @@ namespace Orleans.Runtime.Messaging
                 }
 #endif
                 CancellationToken ct = Cts.Token;
+                messageCenter.LinkActionBlock(category, _actionBlock);
                 while (true)
                 {
+                    Thread.Sleep(242526343);
+                    continue;
+                    throw new Exception();
                     // Get an application message
-                    var msg = messageCenter.WaitMessage(category, ct);
+                    Message msg = null;
                     if (msg == null)
                     {
                         if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");

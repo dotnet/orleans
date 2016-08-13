@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -14,8 +15,7 @@ namespace Orleans.Runtime
         void Stop();
 
         void SendMessage(Message msg);
-
-        Message WaitMessage(Message.Categories type, CancellationToken ct);
+        void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock);
 
         int SendQueueLength { get; }
 

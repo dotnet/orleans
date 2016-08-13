@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -291,41 +292,28 @@ namespace Orleans
             StreamingInitialize();
         }
 
+             ActionBlock<Message> _ApplicationactionBlock;
+
         private void RunClientMessagePump(CancellationToken ct)
         {
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 incomingMessagesThreadTimeTracking.OnStartExecution();
             }
-            while (listenForMessages)
+            if (listenForMessages)
             {
-                var message = transport.WaitMessage(Message.Categories.Application, ct);
+                _ApplicationactionBlock = new ActionBlock<Message>(m => HandleMessage(m));
+                transport.LinkActionBlock(Message.Categories.Application, _ApplicationactionBlock);
+                Thread.Sleep(22224245);
+                throw new Exception("ss");
+                return;
 
-                if (message == null) // if wait was cancelled
-                    break;
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectThreadTimeTrackingStats)
                         {
                             incomingMessagesThreadTimeTracking.OnStartProcessing();
                         }
 #endif
-                switch (message.Direction)
-                {
-                    case Message.Directions.Response:
-                        {
-                            ReceiveResponse(message);
-                            break;
-                        }
-                    case Message.Directions.OneWay:
-                    case Message.Directions.Request:
-                        {
-                            this.DispatchToLocalObject(message);
-                            break;
-                        }
-                    default:
-                        logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
-                        break;
-                }
 #if TRACK_DETAILED_STATS
                         if (StatisticsCollector.CollectThreadTimeTrackingStats)
                         {
@@ -337,6 +325,27 @@ namespace Orleans
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 incomingMessagesThreadTimeTracking.OnStopExecution();
+            }
+        }
+
+        private void HandleMessage(Message message)
+        {
+            switch (message.Direction)
+            {
+                case Message.Directions.Response:
+                {
+                    ReceiveResponse(message);
+                    break;
+                }
+                case Message.Directions.OneWay:
+                case Message.Directions.Request:
+                {
+                    this.DispatchToLocalObject(message);
+                    break;
+                }
+                default:
+                    logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
+                    break;
             }
         }
 

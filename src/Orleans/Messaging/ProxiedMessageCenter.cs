@@ -6,6 +6,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -68,7 +69,7 @@ namespace Orleans.Messaging
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
-        internal readonly BlockingCollection<Message> PendingInboundMessages;
+        internal readonly BufferBlock<Message> PendingInboundMessages;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -91,7 +92,7 @@ namespace Orleans.Messaging
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
-            PendingInboundMessages = new BlockingCollection<Message>();
+            PendingInboundMessages = new BufferBlock<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
@@ -131,7 +132,7 @@ namespace Orleans.Messaging
             
             Utils.SafeExecute(() =>
             {
-                PendingInboundMessages.CompleteAdding();
+                PendingInboundMessages.Complete();
             });
 
             if (StatisticsCollector.CollectQueueStats)
@@ -286,53 +287,58 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
-        {
-            try
-            {
-                if (ct.IsCancellationRequested)
-                {
-                    return null;
-                }
+//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
+//        public Message WaitMessage(Message.Categories type, CancellationToken ct)
+//        {
+//            try
+//            {
+//                if (ct.IsCancellationRequested)
+//                {
+//                    return null;
+//                }
 
-                // Don't pass CancellationToken to Take. It causes too much spinning.
-                Message msg = PendingInboundMessages.Take();
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
-            }
-            catch (ThreadAbortException exc)
-            {
-                // Silo may be shutting-down, so downgrade to verbose log
-                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
-                Thread.ResetAbort();
-                return null;
-            }
-            catch (OperationCanceledException exc)
-            {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (ObjectDisposedException exc)
-            {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (InvalidOperationException exc)
-            {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
-                return null;
-            }
+//                // Don't pass CancellationToken to Take. It causes too much spinning.
+//                Message msg = null;//= PendingInboundMessages.Take(); // todo
+//#if TRACK_DETAILED_STATS
+//                if (StatisticsCollector.CollectQueueStats)
+//                {
+//                    queueTracking.OnDeQueueRequest(msg);
+//                }
+//#endif
+//                return msg;
+//            }
+//            catch (ThreadAbortException exc)
+//            {
+//                // Silo may be shutting-down, so downgrade to verbose log
+//                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
+//                Thread.ResetAbort();
+//                return null;
+//            }
+//            catch (OperationCanceledException exc)
+//            {
+//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
+//                return null;
+//            }
+//            catch (ObjectDisposedException exc)
+//            {
+//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
+//                return null;
+//            }
+//            catch (InvalidOperationException exc)
+//            {
+//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
+//                return null;
+//            }
+//            catch (Exception ex)
+//            {
+//                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
+//                return null;
+//            }
+//        }
+
+        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
+        {
+            PendingInboundMessages.LinkTo(actionBlock);
         }
 
         internal void QueueIncomingMessage(Message msg)
@@ -343,7 +349,7 @@ namespace Orleans.Messaging
                 queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
             }
 #endif
-            PendingInboundMessages.Add(msg);
+            PendingInboundMessages.Post(msg);
         }
 
         private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)

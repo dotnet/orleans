@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading.Tasks.Dataflow;
 
 
 namespace Orleans.Runtime.Messaging
@@ -7,7 +8,7 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly BlockingCollection<Message>[] messageQueues;
+        private readonly BufferBlock<Message>[] messageQueues;
         private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
@@ -26,12 +27,12 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue()
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            messageQueues = new BlockingCollection<Message>[n];
+            messageQueues = new BufferBlock<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
-                messageQueues[i] = new BlockingCollection<Message>();
+                messageQueues[i] = new BufferBlock<Message>();
                 if (StatisticsCollector.CollectQueueStats)
                 {
                     var queueName = "IncomingMessageAgent." + category;
@@ -47,7 +48,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (messageQueues == null) return;
             foreach (var q in messageQueues)
-                q.CompleteAdding();
+                q.Complete();
             
             if (!StatisticsCollector.CollectQueueStats) return;
 
@@ -63,16 +64,21 @@ namespace Orleans.Runtime.Messaging
                 queueTracking[(int)msg.Category].OnEnQueueRequest(1, messageQueues[(int)msg.Category].Count, msg);
             }
 #endif
-            messageQueues[(int)msg.Category].Add(msg);
+            messageQueues[(int)msg.Category].Post(msg);
            
             if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
+        }
+
+        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
+        {
+            messageQueues[(int) type].LinkTo(actionBlock);
         }
 
         public Message WaitMessage(Message.Categories type)
         {
             try
             {
-                Message msg = messageQueues[(int)type].Take();
+                Message msg = null;
 
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
