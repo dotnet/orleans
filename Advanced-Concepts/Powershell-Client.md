@@ -78,15 +78,25 @@ This module is a wrapper around `GrainClient.Initialize()` and its overloads.
 
 **Usage**:
 * __`Start-GrainClient`__ 
+
   * The same as call `GrainClient.Initialize()` which will look for the known Orleans Client configuration file names
+  
 * __`Start-GrainClient [-ConfigFilePath] <string> [[-Timeout] <timespan>]`__
+
   * Will use the provided file path as in `GrainClient.Initialize(filePath)`
+
 * __`Start-GrainClient [-ConfigFile] <FileInfo> [[-Timeout] <timespan>]`__
+
   * Use an instance of the `System.FileInfo` class representing the config file just as `GrainClient.Initialize(fileInfo)`
+
 * __`Start-GrainClient [-Config] <ClientConfiguration> [[-Timeout] <timespan>]`__
+
   * Use an instance of a `Orleans.Runtime.Configuration.ClientConfiguration` like in `GrainClient.Initialize(config)`
+
 * __`Start-GrainClient [-GatewayAddress] <IPEndPoint> [[-OverrideConfig] <bool>] [[-Timeout] <timespan>]`__
+
   * Takes a Orleans Cluster Gateway Address Endpoint
+
 
 **Note**:
 The `Timeout` parameter is optional and if it is informed and greater than `System.TimeSpan.Zero`, it will call `Orleans.GrainClient.SetResponseTimeout(Timeout)` internally.
