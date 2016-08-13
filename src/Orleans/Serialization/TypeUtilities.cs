@@ -5,8 +5,8 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -71,13 +71,18 @@ namespace Orleans.Serialization
 
             if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
             {
-                result = typeInfo.GetFields().All(f => !(f.FieldType == t) && IsOrleansShallowCopyable(f.FieldType));
+                result = IsValueTypeFieldsShallowCopyable(typeInfo);
                 shallowCopyableTypes[t] = result;
                 return result;
             }
 
             shallowCopyableTypes[t] = false;
             return false;
+        }
+
+        private static bool IsValueTypeFieldsShallowCopyable(TypeInfo typeInfo)
+        {
+            return typeInfo.GetFields().All(f => f.FieldType != typeInfo.AsType() && IsOrleansShallowCopyable(f.FieldType));
         }
 
         internal static bool IsSpecializationOf(this Type t, Type match)

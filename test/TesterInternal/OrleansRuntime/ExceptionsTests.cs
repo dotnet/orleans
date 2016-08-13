@@ -1,11 +1,7 @@
-using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Xunit;
 
@@ -28,9 +24,9 @@ namespace UnitTests.OrleansRuntime
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
             Catalog.DuplicateActivationException output = TestingUtils.RoundTripDotNetSerializer(original);
 
-            Assert.AreEqual(original.Message, output.Message);
-            Assert.AreEqual(original.ActivationToUse, output.ActivationToUse);
-            Assert.AreEqual(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
+            Assert.Equal(original.Message, output.Message);
+            Assert.Equal(original.ActivationToUse, output.ActivationToUse);
+            Assert.Equal(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -42,9 +38,9 @@ namespace UnitTests.OrleansRuntime
             Catalog.DuplicateActivationException original = new Catalog.DuplicateActivationException(activationAddress, primaryDirectoryForGrain);
             Catalog.DuplicateActivationException output = SerializationManager.RoundTripSerializationForTesting(original);
 
-            Assert.AreEqual(original.Message, output.Message);
-            Assert.AreEqual(original.ActivationToUse, output.ActivationToUse);
-            Assert.AreEqual(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
+            Assert.Equal(original.Message, output.Message);
+            Assert.Equal(original.ActivationToUse, output.ActivationToUse);
+            Assert.Equal(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
         }
     }
 }

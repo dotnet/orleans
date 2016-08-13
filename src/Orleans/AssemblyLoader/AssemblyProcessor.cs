@@ -2,9 +2,8 @@ namespace Orleans.Runtime
 {
     using System;
     using System.Collections.Generic;
-    using System.Reflection;
     using System.Linq;
-
+    using System.Reflection;
     using Orleans.CodeGeneration;
     using Orleans.Serialization;
 

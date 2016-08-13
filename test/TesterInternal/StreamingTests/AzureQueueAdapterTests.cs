@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
@@ -15,7 +14,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -106,10 +104,8 @@ namespace UnitTests.StorageTests
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
-                            Assert.AreEqual(NumMessagesPerBatch / 2, message.GetEvents<int>().Count(),
-                                "Half the events were ints");
-                            Assert.AreEqual(NumMessagesPerBatch / 2, message.GetEvents<string>().Count(),
-                                "Half the events were strings");
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                         }
                         Interlocked.Add(ref receivedBatches, messages.Length);
                         qCache.AddToCache(messages);
@@ -129,7 +125,7 @@ namespace UnitTests.StorageTests
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
-            Assert.AreEqual(NumBatches, receivedBatches);
+            Assert.Equal(NumBatches, receivedBatches);
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceToken(0);
@@ -151,7 +147,7 @@ namespace UnitTests.StorageTests
                         messageCount++;
                         IBatchContainer batch = cursor.GetCurrent(out ex);
                         output.WriteLine("Token: {0}", batch.SequenceToken);
-                        Assert.IsTrue(batch.SequenceToken.CompareTo(lastToken) >= 0, "order check for event {0}", messageCount);
+                        Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
                         if (messageCount == 10)
                         {
@@ -159,8 +155,8 @@ namespace UnitTests.StorageTests
                         }
                     }
                     output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    Assert.AreEqual(NumBatches / 2, messageCount);
-                    Assert.IsNotNull(tenthInCache);
+                    Assert.Equal(NumBatches / 2, messageCount);
+                    Assert.NotNull(tenthInCache);
 
                     // read all messages from the 10th
                     cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
@@ -171,7 +167,7 @@ namespace UnitTests.StorageTests
                     }
                     output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
-                    Assert.AreEqual(expected, messageCount);
+                    Assert.Equal(expected, messageCount);
                 }
             }
         }

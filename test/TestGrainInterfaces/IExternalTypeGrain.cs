@@ -1,8 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Threading.Tasks;
 using Orleans;
-using System.Collections.Specialized;
-using System;
 
 namespace UnitTests.GrainInterfaces
 {

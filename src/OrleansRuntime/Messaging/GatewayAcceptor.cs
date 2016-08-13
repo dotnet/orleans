@@ -1,7 +1,5 @@
-using System;
 using System.Net;
 using System.Net.Sockets;
-
 using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging

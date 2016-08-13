@@ -3,16 +3,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Security.Principal;
-
 using Orleans.Runtime;
-using Orleans.Runtime.Counters;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Counters;
 
 
 namespace Orleans.Counter.Control
 {
-    using Orleans.Serialization;
     using System.Collections.Generic;
+    using Orleans.Serialization;
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>

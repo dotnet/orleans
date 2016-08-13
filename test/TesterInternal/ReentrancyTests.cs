@@ -2,14 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 #pragma warning disable 618
@@ -33,11 +32,11 @@ namespace UnitTests
             reentrant.SetSelf(reentrant).Wait();
             try
             {
-                Assert.IsTrue(reentrant.Two().Wait(2000), "Grain should reenter");
+                Assert.True(reentrant.Two().Wait(2000), "Grain should reenter");
             }
             catch (Exception ex)
             {
-                Assert.Fail("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace);
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             logger.Info("Reentrancy ReentrantGrain Test finished OK.");
         }
@@ -62,16 +61,16 @@ namespace UnitTests
                 }
                 else
                 {
-                    Assert.Fail("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace);
+                    Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
             if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
             {
-                Assert.IsTrue(deadlock, "Non-reentrant grain should deadlock");
+                Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
             else
             {
-                Assert.IsTrue(timeout, "Non-reentrant grain should timeout");
+                Assert.True(timeout, "Non-reentrant grain should timeout");
             }
             logger.Info("Reentrancy NonReentrantGrain Test finished OK.");
         }
@@ -96,16 +95,16 @@ namespace UnitTests
                 }
                 else
                 {
-                    Assert.Fail("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace);
+                    Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
                 }
             }
             if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
             {
-                Assert.IsTrue(deadlock, "Non-reentrant grain should deadlock");
+                Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
             else
             {
-                Assert.IsTrue(timeout, "Non-reentrant grain should timeout");
+                Assert.True(timeout, "Non-reentrant grain should timeout");
             }
 
             logger.Info("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
@@ -117,11 +116,11 @@ namespace UnitTests
             IReentrantTestSupportGrain grain = GrainClient.GrainFactory.GetGrain<IReentrantTestSupportGrain>(0);
 
             var grainFullName = typeof(ReentrantGrain).FullName;
-            Assert.IsTrue(await grain.IsReentrant(grainFullName));
+            Assert.True(await grain.IsReentrant(grainFullName));
             grainFullName = typeof(NonRentrantGrain).FullName;
-            Assert.IsFalse(await grain.IsReentrant(grainFullName));
+            Assert.False(await grain.IsReentrant(grainFullName));
             grainFullName = typeof(UnorderedNonRentrantGrain).FullName;
-            Assert.IsFalse(await grain.IsReentrant(grainFullName));
+            Assert.False(await grain.IsReentrant(grainFullName));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -340,7 +339,7 @@ namespace UnitTests
                 output.WriteLine("End loop {0} Elapsed={1}", i, loopClock.Elapsed);
             }
             TimeSpan elapsed = totalTime.Elapsed;
-            Assert.IsTrue(elapsed < MaxStressExecutionTime, "Stress test execution took too long: {0}", elapsed);
+            Assert.True(elapsed < MaxStressExecutionTime, $"Stress test execution took too long: {elapsed}");
         }
     }
 }

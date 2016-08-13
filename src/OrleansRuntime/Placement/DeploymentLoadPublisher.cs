@@ -3,9 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 
 namespace Orleans.Runtime
@@ -91,7 +90,7 @@ namespace Orleans.Runtime
         public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
             if (logger.IsVerbose) logger.Verbose("UpdateRuntimeStatistics from {0}", siloAddress);
-            if (!silo.LocalSiloStatusOracle.GetApproximateSiloStatus(siloAddress).Equals(SiloStatus.Active))
+            if (silo.LocalSiloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 return TaskDone.Done;
 
             SiloRuntimeStatistics old;

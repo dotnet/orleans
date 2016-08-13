@@ -10,6 +10,12 @@ namespace Orleans.Runtime
     /// </summary>
     internal class SafeTimerBase : IDisposable
     {
+        private const string asyncTimerName = "asynTask.SafeTimerBase";
+        private const string syncTimerName = "sync.SafeTimerBase";
+
+        private static readonly Logger asyncLogger = LogManager.GetLogger(asyncTimerName, LoggerType.Runtime);
+        private static readonly Logger syncLogger = LogManager.GetLogger(syncTimerName, LoggerType.Runtime);
+
         private Timer               timer;
         private Func<object, Task>  asynTaskCallback;
         private TimerCallback       syncCallbackFunc;
@@ -67,8 +73,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
 
-            logger = LogManager.GetLogger(GetFullName(), LoggerType.Runtime);
-
+            logger = syncCallbackFunc != null ? syncLogger : asyncLogger;
             if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
@@ -119,9 +124,9 @@ namespace Orleans.Runtime
         {
             // the type information is really useless and just too long. 
             if (syncCallbackFunc != null)
-                return "sync.SafeTimerBase";
+                return syncTimerName;
             if (asynTaskCallback != null)
-                return "asynTask.SafeTimerBase";
+                return asyncTimerName;
 
             throw new InvalidOperationException("invalid SafeTimerBase state");
         }

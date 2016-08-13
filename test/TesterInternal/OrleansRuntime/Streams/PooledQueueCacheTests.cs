@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -236,28 +235,28 @@ namespace UnitTests.OrleansRuntime.Streams
             int stream1EventCount = 0;
             while (cache.TryGetNextMessage(stream1Cursor, out batch))
             {
-                Assert.IsNotNull(stream1Cursor);
-                Assert.IsNotNull(batch);
-                Assert.AreEqual(stream1.Guid, batch.StreamGuid);
-                Assert.AreEqual(StreamNamespace, batch.StreamNamespace);
-                Assert.IsNotNull(batch.SequenceToken);
+                Assert.NotNull(stream1Cursor);
+                Assert.NotNull(batch);
+                Assert.Equal(stream1.Guid, batch.StreamGuid);
+                Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                Assert.NotNull(batch.SequenceToken);
                 stream1EventCount++;
             }
-            Assert.AreEqual((sequenceNumber - startOfCache) / 2, stream1EventCount);
+            Assert.Equal((sequenceNumber - startOfCache) / 2, stream1EventCount);
 
             // get cursor for stream2, walk all the events in the stream using the cursor
             object stream2Cursor = cache.GetCursor(stream2, new EventSequenceToken(startOfCache));
             int stream2EventCount = 0;
             while (cache.TryGetNextMessage(stream2Cursor, out batch))
             {
-                Assert.IsNotNull(stream2Cursor);
-                Assert.IsNotNull(batch);
-                Assert.AreEqual(stream2.Guid, batch.StreamGuid);
-                Assert.AreEqual(StreamNamespace, batch.StreamNamespace);
-                Assert.IsNotNull(batch.SequenceToken);
+                Assert.NotNull(stream2Cursor);
+                Assert.NotNull(batch);
+                Assert.Equal(stream2.Guid, batch.StreamGuid);
+                Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                Assert.NotNull(batch.SequenceToken);
                 stream2EventCount++;
             }
-            Assert.AreEqual((sequenceNumber - startOfCache) / 2, stream2EventCount);
+            Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
 
             // Add a blocks worth of events to the cache, then walk each cursor.  Do this enough times to fill the cache twice.
             for (int j = 0; j < PooledBufferCount*2; j++)
@@ -275,26 +274,26 @@ namespace UnitTests.OrleansRuntime.Streams
                 // walk all the events in the stream using the cursor
                 while (cache.TryGetNextMessage(stream1Cursor, out batch))
                 {
-                    Assert.IsNotNull(stream1Cursor);
-                    Assert.IsNotNull(batch);
-                    Assert.AreEqual(stream1.Guid, batch.StreamGuid);
-                    Assert.AreEqual(StreamNamespace, batch.StreamNamespace);
-                    Assert.IsNotNull(batch.SequenceToken);
+                    Assert.NotNull(stream1Cursor);
+                    Assert.NotNull(batch);
+                    Assert.Equal(stream1.Guid, batch.StreamGuid);
+                    Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                    Assert.NotNull(batch.SequenceToken);
                     stream1EventCount++;
                 }
-                Assert.AreEqual((sequenceNumber - startOfCache) / 2, stream1EventCount);
+                Assert.Equal((sequenceNumber - startOfCache) / 2, stream1EventCount);
 
                 // walk all the events in the stream using the cursor
                 while (cache.TryGetNextMessage(stream2Cursor, out batch))
                 {
-                    Assert.IsNotNull(stream2Cursor);
-                    Assert.IsNotNull(batch);
-                    Assert.AreEqual(stream2.Guid, batch.StreamGuid);
-                    Assert.AreEqual(StreamNamespace, batch.StreamNamespace);
-                    Assert.IsNotNull(batch.SequenceToken);
+                    Assert.NotNull(stream2Cursor);
+                    Assert.NotNull(batch);
+                    Assert.Equal(stream2.Guid, batch.StreamGuid);
+                    Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                    Assert.NotNull(batch.SequenceToken);
                     stream2EventCount++;
                 }
-                Assert.AreEqual((sequenceNumber - startOfCache) / 2, stream2EventCount);
+                Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
             }
             return sequenceNumber;
         }
@@ -313,12 +312,12 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // No data in cache, cursors should not throw.
             object cursor = cache.GetCursor(streamId, new EventSequenceToken(sequenceNumber++));
-            Assert.IsNotNull(cursor);
+            Assert.NotNull(cursor);
 
             // try to iterate, should throw
             bool gotNext = cache.TryGetNextMessage(cursor, out batch);
-            Assert.IsNotNull(cursor);
-            Assert.IsFalse(gotNext);
+            Assert.NotNull(cursor);
+            Assert.False(gotNext);
 
             // now add messages into cache newer than cursor
             // Adding enough to fill the pool
@@ -342,7 +341,7 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 ex = cacheMissException;
             }
-            Assert.IsNotNull(ex);
+            Assert.NotNull(ex);
 
             // Try getting new cursor into cache from data before the cache.  Should throw
             ex = null;
@@ -354,14 +353,14 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 ex = cacheMissException;
             }
-            Assert.IsNotNull(ex);
+            Assert.NotNull(ex);
 
             // Get valid cursor into cache
             cursor = cache.GetCursor(streamId, new EventSequenceToken(13));
             // query once, to make sure cursor is good
             gotNext = cache.TryGetNextMessage(cursor, out batch);
-            Assert.IsNotNull(cursor);
-            Assert.IsTrue(gotNext);
+            Assert.NotNull(cursor);
+            Assert.True(gotNext);
             // Since pool should be full, adding one more message should trigger the cache to purge.  
             cache.Add(new TestQueueMessage
             {
@@ -379,7 +378,7 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 ex = cacheMissException;
             }
-            Assert.IsNotNull(ex);
+            Assert.NotNull(ex);
         }
     }
 }

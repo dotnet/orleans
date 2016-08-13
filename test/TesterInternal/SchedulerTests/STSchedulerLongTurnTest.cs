@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -44,7 +43,7 @@ namespace UnitTests.SchedulerTests
             {
                 if (ex.GetBaseException() is TimeoutException)
                 {
-                    Assert.Fail("Long turns queued up and caused a timeout");
+                    Assert.True(false, "Long turns queued up and caused a timeout");
                 }
                 else
                 {
@@ -53,7 +52,7 @@ namespace UnitTests.SchedulerTests
             }
             timer.Stop();
 
-            Assert.IsTrue(timer.Elapsed.TotalSeconds < 40, "Long turns queued up and caused an extended runtime");
+            Assert.True(timer.Elapsed.TotalSeconds < 40, "Long turns queued up and caused an extended runtime");
         }
     }
 }

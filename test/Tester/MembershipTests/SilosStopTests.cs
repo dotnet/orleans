@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.MembershipTests
 {

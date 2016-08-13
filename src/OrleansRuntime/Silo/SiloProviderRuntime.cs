@@ -2,13 +2,12 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers

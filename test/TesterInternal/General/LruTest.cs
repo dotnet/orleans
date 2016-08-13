@@ -1,6 +1,5 @@
-﻿using System.Threading;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using System;
+﻿using System;
+using System.Threading;
 using Orleans.Runtime;
 using Xunit;
 
@@ -20,13 +19,13 @@ namespace UnitTests
             LRU<string, string>.FetchValueDelegate f = null;
 
             var target = new LRU<string, string>(maxSize, maxAge, f);
-            Assert.AreEqual(0, target.Count, "Count wrong after construction");
+            Assert.Equal(0, target.Count);  // "Count wrong after construction"
 
             target.Add("1", "one");
-            Assert.AreEqual(1, target.Count, "Count wrong after adding one item");
+            Assert.Equal(1, target.Count);  // "Count wrong after adding one item"
             
             target.Add("2", "two");
-            Assert.AreEqual(2, target.Count, "Count wrong after adding two items");
+            Assert.Equal(2, target.Count);  // "Count wrong after adding two items"
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
@@ -44,11 +43,11 @@ namespace UnitTests
                 Thread.Sleep(10);                
             }
 
-            Assert.AreEqual(maxSize, target.Count, "LRU grew larger than maximum size");
+            Assert.Equal(maxSize, target.Count);  // "LRU grew larger than maximum size"
             for (var i = 1; i <= 5; i++)
             {
                 var s = i.ToString();
-                Assert.IsFalse(target.ContainsKey(s), "'Older' entry is still in cache");
+                Assert.False(target.ContainsKey(s), "'Older' entry is still in cache");
             }
         }
 
@@ -81,13 +80,13 @@ namespace UnitTests
             var s1 = (maxSize + 1).ToString();
             target.Add(s1, "item " + s1);
 
-            Assert.AreEqual(maxSize, target.Count, "Cache has exceeded maximum size");
+            Assert.Equal(maxSize, target.Count);  // "Cache has exceeded maximum size"
             var s0 = maxSize.ToString();
-            Assert.IsFalse(target.ContainsKey(s0), "Least recently used item was not expelled");
+            Assert.False(target.ContainsKey(s0), "Least recently used item was not expelled");
             for (var i = 1; i < maxSize; i++)
             {
                 var s = i.ToString();
-                Assert.IsTrue(target.ContainsKey(s), "Recently used item " + s + " was incorrectly expelled");
+                Assert.True(target.ContainsKey(s), "Recently used item " + s + " was incorrectly expelled");
             }
         }
     }

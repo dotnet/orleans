@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
@@ -39,11 +38,11 @@ namespace UnitTests.MessageCenterTests
             TestAgent t = new TestAgent(output);
 
             t.Start();
-            Assert.AreEqual<ThreadState>(ThreadState.Running, t.State, "Agent state is wrong after initial start");
+            Assert.Equal(ThreadState.Running, t.State); // "Agent state is wrong after initial start"
             Thread.Sleep(100);
 
             t.Stop();
-            Assert.AreEqual<ThreadState>(ThreadState.Stopped, t.State, "Agent state is wrong after initial stop");
+            Assert.Equal(ThreadState.Stopped, t.State); // "Agent state is wrong after initial stop"
             Thread.Sleep(100);
 
             try
@@ -52,14 +51,14 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception ex)
             {
-                Assert.Fail("Exception while restarting agent: " + ex.ToString());
+                Assert.True(false, "Exception while restarting agent: " + ex);
                 throw;
             }
-            Assert.AreEqual<ThreadState>(ThreadState.Running, t.State, "Agent state is wrong after restart");
+            Assert.Equal(ThreadState.Running, t.State); // "Agent state is wrong after restart"
             Thread.Sleep(100);
 
             t.Stop();
-            Assert.AreEqual<ThreadState>(ThreadState.Stopped, t.State, "Agent state is wrong after final stop");
+            Assert.Equal(ThreadState.Stopped, t.State); // "Agent state is wrong after final stop"
             Thread.Sleep(100);
         }
 
@@ -77,7 +76,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception ex)
             {
-                Assert.Fail("Exception while starting agent that is already started: " + ex.ToString());
+                Assert.True(false,"Exception while starting agent that is already started: " + ex.ToString());
                 throw;
             }
 
@@ -101,7 +100,7 @@ namespace UnitTests.MessageCenterTests
             }
             catch (Exception ex)
             {
-                Assert.Fail("Exception while stopping agent that is already stopped: " + ex.ToString());
+                Assert.True(false,"Exception while stopping agent that is already stopped: " + ex.ToString());
                 throw;
             }
         }

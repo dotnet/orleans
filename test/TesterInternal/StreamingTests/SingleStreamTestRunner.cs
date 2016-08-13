@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
@@ -398,11 +396,11 @@ namespace UnitTests.StreamingTests
             await itemProducer.SetTestObjectStringProperty("VALUE_IN_IMMUTABLE_STREAM");
             await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME);
 
-            Assert.AreEqual("VALUE_IN_IMMUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+            Assert.Equal("VALUE_IN_IMMUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
 
             // Now violate immutability by updating the property in the consumer.
             await consumerSameSilo.SetTestObjectStringProperty("ILLEGAL_CHANGE");
-            Assert.AreEqual("ILLEGAL_CHANGE", await itemProducer.GetTestObjectStringProperty());
+            Assert.Equal("ILLEGAL_CHANGE", await itemProducer.GetTestObjectStringProperty());
 
             await consumerSameSilo.UnsubscribeFromStream();
 
@@ -414,12 +412,12 @@ namespace UnitTests.StreamingTests
             await itemProducer.SetTestObjectStringProperty("VALUE_IN_MUTABLE_STREAM");
             await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
 
-            Assert.AreEqual("VALUE_IN_MUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+            Assert.Equal("VALUE_IN_MUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
 
             // Modify the items property and check it has no impact
             await consumerSameSilo.SetTestObjectStringProperty("ALLOWED_CHANGE");
-            Assert.AreEqual("ALLOWED_CHANGE", await consumerSameSilo.GetTestObjectStringProperty());
-            Assert.AreEqual("VALUE_IN_MUTABLE_STREAM", await itemProducer.GetTestObjectStringProperty());
+            Assert.Equal("ALLOWED_CHANGE", await consumerSameSilo.GetTestObjectStringProperty());
+            Assert.Equal("VALUE_IN_MUTABLE_STREAM", await itemProducer.GetTestObjectStringProperty());
 
             await consumerSameSilo.UnsubscribeFromStream();
         }
@@ -459,7 +457,7 @@ namespace UnitTests.StreamingTests
         private async Task<bool> CheckCounters(ProducerProxy producer, ConsumerProxy consumer, bool assertAreEqual = true)
         {
             var consumerCount = await consumer.ConsumerCount;
-            Assert.AreNotEqual(0, consumerCount, "no consumers were detected.");
+            Assert.NotEqual(0,  consumerCount);  // "no consumers were detected."
             var producerCount = await producer.ProducerCount;
             var numProduced = await producer.ExpectedItemsProduced;
             var expectConsumed = numProduced * consumerCount;
@@ -467,7 +465,7 @@ namespace UnitTests.StreamingTests
             logger.Info("Test {0} CheckCounters: numProduced = {1}, expectConsumed = {2}, numConsumed = {3}", testNumber, numProduced, expectConsumed, numConsumed);
             if (assertAreEqual)
             {
-                Assert.AreEqual(expectConsumed, numConsumed, String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
+                Assert.Equal(expectConsumed,  numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
                 return true;
             }
             else
@@ -483,7 +481,7 @@ namespace UnitTests.StreamingTests
             {
                 var actualCount = await StreamTestUtils.GetStreamPubSub().ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
-                Assert.AreEqual(expectedCount, actualCount);
+                Assert.Equal(expectedCount, actualCount);
             }
         }
 
@@ -511,7 +509,7 @@ namespace UnitTests.StreamingTests
             logger.Info("Test {0} CheckGrainsDeactivated: {1}ActivationCount = {2}, Expected{1}ActivationCount = {3}", testNumber, str, activationCount, expectActivationCount);
             if (assertAreEqual)
             {
-                Assert.AreEqual(expectActivationCount, activationCount, String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
+                Assert.Equal(expectActivationCount,  activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
             }
             return expectActivationCount == activationCount;
         }
@@ -582,13 +580,13 @@ namespace UnitTests.StreamingTests
 //    await producer.ProduceSequentialSeries(0, ItemsPerSeries);
 //    var numProduced = await producer.NumberProduced;
 //    logger.Info("numProduced = " + numProduced);
-//    Assert.AreEqual(numProduced, ItemsPerSeries);
+//    Assert.Equal(numProduced, ItemsPerSeries);
 
 //    // note that the value returned from successive calls to Do...Production() methods is a cumulative total.
 //    await producer.ProduceParallelSeries(ItemsPerSeries, ItemsPerSeries);
 //    numProduced = await producer.NumberProduced;
 //    logger.Info("numProduced = " + numProduced);
-//    Assert.AreEqual(numProduced, ItemsPerSeries * 2);
+//    Assert.Equal(numProduced, ItemsPerSeries * 2);
 //}
 
 

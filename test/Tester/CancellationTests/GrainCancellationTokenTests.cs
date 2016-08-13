@@ -5,8 +5,8 @@ using Orleans;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.CancellationTests
 {

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
@@ -372,7 +371,7 @@ namespace Orleans.Runtime.GrainDirectory
             // This silo's status has changed
             if (Equals(updatedSilo, MyAddress))
             {
-                if (status == SiloStatus.Stopping || status.Equals(SiloStatus.ShuttingDown))
+                if (status == SiloStatus.Stopping || status == SiloStatus.ShuttingDown)
                 {
                     // QueueAction up the "Stop" to run on a system turn
                     Scheduler.QueueAction(() => Stop(true), CacheValidator.SchedulingContext).Ignore();
@@ -390,7 +389,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator.SchedulingContext).Ignore();
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
                 {
                     // QueueAction up the "Remove" to run on a system turn
                     Scheduler.QueueAction(() => AddServer(updatedSilo), CacheValidator.SchedulingContext).Ignore();
@@ -745,10 +744,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressesAndTag GetLocalDirectoryData(GrainId grain)
         {
-            var result = DirectoryPartition.LookUpGrain(grain);
-            if (result.Addresses != null)
-                result.Addresses = result.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
-            return result;
+            return DirectoryPartition.LookUpGrain(grain);
         }
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)
@@ -787,7 +783,6 @@ namespace Orleans.Runtime.GrainDirectory
                     localResult.VersionTag = GrainInfo.NO_ETAG;
                     return localResult;
                 }
-                localResult.Addresses = localResult.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
 
                 if (log.IsVerbose2) log.Verbose2("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
                 LocalDirectorySuccesses.Increment();

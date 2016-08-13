@@ -1,9 +1,9 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Runtime.CompilerServices;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains

@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -69,20 +68,20 @@ namespace UnitTests.TimerTests
             await table.Init(config, log);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
-            Assert.AreEqual(0, rows.Count(), "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);
+            Assert.Equal(0,  rows.Count()); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, deploymentId);
 
             ReminderEntry expected = NewReminderEntry();
             await table.UpsertRow(expected);
             rows = (await GetAllRows(table)).ToArray();
 
-            Assert.AreEqual(1, rows.Count(), "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, deploymentId);
+            Assert.Equal(1,  rows.Count()); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, deploymentId);
             ReminderEntry actual = rows[0];
-            Assert.AreEqual(expected.GrainRef, actual.GrainRef, "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, deploymentId);
-            Assert.AreEqual(expected.ReminderName, actual.ReminderName, "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, deploymentId);
-            Assert.AreEqual(expected.Period, actual.Period, "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, deploymentId);
+            Assert.Equal(expected.GrainRef,  actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, deploymentId);
+            Assert.Equal(expected.ReminderName,  actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, deploymentId);
+            Assert.Equal(expected.Period,  actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, deploymentId);
             // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
-            /*Assert.AreEqual(expected.StartAt, actual.StartAt, "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, deploymentId);*/
-            Assert.IsFalse(string.IsNullOrWhiteSpace(actual.ETag), "The newly inserted reminder table (sid={0}, did={1}) row contains an invalid etag.", ServiceId, deploymentId);
+            /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, deploymentId);*/
+            Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={ServiceId}, did={deploymentId}) row contains an invalid etag.");
         }
 
         private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)

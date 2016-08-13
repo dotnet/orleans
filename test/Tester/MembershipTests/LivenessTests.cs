@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Orleans.SqlUtils;
+using Orleans.TestingHost;
 using Tester;
 using UnitTests.General;
+using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -59,9 +59,9 @@ namespace UnitTests.MembershipTests
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
-                    Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
-                        || pair.Value.Equals(SiloStatus.Stopping)
-                        || pair.Value.Equals(SiloStatus.Dead),
+                    Assert.True(pair.Value == SiloStatus.ShuttingDown
+                        || pair.Value == SiloStatus.Stopping
+                        || pair.Value == SiloStatus.Dead,
                         string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else

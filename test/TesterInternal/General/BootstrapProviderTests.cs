@@ -1,18 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Xunit;
 using UnitTests.Tester;
-using Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General
@@ -52,8 +49,8 @@ namespace UnitTests.General
         {
             string providerName = "bootstrap1";
             MockBootstrapProvider bootstrapProvider = FindBootstrapProvider(providerName);
-            Assert.IsNotNull(bootstrapProvider, "Found bootstrap provider {0}", providerName);
-            Assert.AreEqual(1, bootstrapProvider.InitCount, "Init count");
+            Assert.NotNull(bootstrapProvider);
+            Assert.Equal(1, bootstrapProvider.InitCount); // Init count
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
@@ -61,15 +58,15 @@ namespace UnitTests.General
         {
             string providerName = "bootstrap2";
             GrainCallBootstrapper bootstrapProvider = (GrainCallBootstrapper) FindBootstrapProvider(providerName);
-            Assert.IsNotNull(bootstrapProvider, "Found bootstrap provider {0}", providerName);
-            Assert.AreEqual(1, bootstrapProvider.InitCount, "Init count");
+            Assert.NotNull(bootstrapProvider);
+            Assert.Equal(1, bootstrapProvider.InitCount); // Init count
 
             long grainId = GrainCallBootstrapTestConstants.GrainId;
             int a = GrainCallBootstrapTestConstants.A;
             int b = GrainCallBootstrapTestConstants.B;
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(grainId, SimpleGrain.SimpleGrainNamePrefix);
             int axb = await grain.GetAxB();
-            Assert.AreEqual((a * b), axb, "Returned value from {0}", grainId);
+            Assert.Equal((a * b), axb);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("Bootstrap")]
@@ -81,7 +78,7 @@ namespace UnitTests.General
                 object content = await grain.FetchContentFromLocalGrain();
                 logger.Info(content.ToString());
                 string testGrainSiloId = await grain.GetRuntimeInstanceId();
-                Assert.AreEqual(testGrainSiloId, content);
+                Assert.Equal(testGrainSiloId, content);
             }
         }
 
@@ -104,10 +101,10 @@ namespace UnitTests.General
                     providers.Count, silo.Name, Utils.EnumerableToString(
                         providers.Select(pr => pr.Name + "=" + pr.GetType().FullName)));
 
-                Assert.AreEqual(4, providers.Count, "Found correct number of bootstrap providers");
+                Assert.Equal(4, providers.Count); // Found correct number of bootstrap providers
                 
-                Assert.IsTrue(providers.Any(bp => bp.Name.Equals(controllerName)), "Name found");
-                Assert.IsTrue(providers.Any(bp => bp.GetType().FullName.Equals(controllerType)), "Typefound");
+                Assert.True(providers.Any(bp => bp.Name.Equals(controllerName)), "Name found");
+                Assert.True(providers.Any(bp => bp.GetType().FullName.Equals(controllerType)), "Typefound");
             }
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
@@ -115,15 +112,15 @@ namespace UnitTests.General
             object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
-            Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
+            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
 
             command += 1;
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.AreEqual(numSilos, replies.Length, "Expected to get {0} replies to command {1}", numSilos, command);
-            Assert.IsTrue(replies.All(reply => reply.ToString().Equals(command.ToString())), "Got command {0}", command);
+            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
         }
 
         private MockBootstrapProvider FindBootstrapProvider(string providerName)
@@ -133,12 +130,12 @@ namespace UnitTests.General
             foreach (var siloHandle in silos)
             {
                 MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHook.GetBootstrapProvider(providerName);
-                Assert.IsNotNull(provider, "No storage provider found: Name={0} Silo={1}", providerName, siloHandle.Silo.SiloAddress);
+                Assert.NotNull(provider);
                 providerInUse = provider;
             }
             if (providerInUse == null)
             {
-                Assert.Fail("Cannot find active storage provider currently in use, Name={0}", providerName);
+                Assert.True(false, $"Cannot find active storage provider currently in use, Name={providerName}");
             }
             return providerInUse;
         }

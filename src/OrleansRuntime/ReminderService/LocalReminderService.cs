@@ -1,12 +1,12 @@
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Scheduler;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
 {

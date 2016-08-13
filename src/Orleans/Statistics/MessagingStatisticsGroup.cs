@@ -1,6 +1,6 @@
 using System;
-using Orleans.Messaging;
 using System.Collections.Concurrent;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime
 {

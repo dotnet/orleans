@@ -6,10 +6,8 @@ namespace Orleans.CodeGenerator
     using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
     /// <summary>

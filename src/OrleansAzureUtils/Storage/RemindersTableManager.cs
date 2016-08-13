@@ -5,12 +5,12 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.AzureUtils;
 using Microsoft.WindowsAzure.Storage.Table;
-                                     
+using Orleans.AzureUtils;
+
 
 namespace Orleans.Runtime.ReminderService
-{    
+{
     internal class ReminderTableEntry : TableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey

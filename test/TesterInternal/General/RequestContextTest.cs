@@ -6,16 +6,14 @@ using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
-using Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General
@@ -90,7 +88,7 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsFalse(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
+            Assert.False(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = activityId;
@@ -100,11 +98,11 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsTrue(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
+            Assert.True(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
             object result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
-            Assert.IsNotNull(result, "ActivityId #1 should not be null");
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly");
-            Assert.AreEqual(activityId, Trace.CorrelationManager.ActivityId, "Original E2E ActivityId #1 should not have changed");
+            Assert.NotNull(result);// ActivityId #1 should not be null
+            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
+            Assert.Equal(activityId,  Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #1 should not have changed"
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
@@ -114,7 +112,7 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsFalse(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
+            Assert.False(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = activityId2;
@@ -124,11 +122,11 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsTrue(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
+            Assert.True(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
             result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
-            Assert.IsNotNull(result, "ActivityId #2 should not be null");
-            Assert.AreEqual(activityId2, result, "E2E ActivityId #2 not propagated correctly");
-            Assert.AreEqual(activityId2, Trace.CorrelationManager.ActivityId, "Original E2E ActivityId #2 should not have changed");
+            Assert.NotNull(result); // ActivityId #2 should not be null
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 not propagated correctly"
+            Assert.Equal(activityId2,  Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #2 should not have changed"
             TestCleanup();
         }
 
@@ -144,7 +142,7 @@ namespace UnitTests.General
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             var actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
-            Assert.IsNull(actId, "ActivityId should not be be present " + headers.ToStrings(separator: ","));
+            Assert.Null(actId);
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = activityId;
@@ -157,11 +155,11 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsNotNull(actId, "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
+            Assert.NotNull(actId); // "ActivityId #1 should be present " + headers.ToStrings(separator: ",")
             object result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
-            Assert.IsNotNull(result, "ActivityId #1 should not be null");
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly");
-            Assert.AreEqual(activityId, Trace.CorrelationManager.ActivityId, "Original E2E ActivityId #1 should not have changed");
+            Assert.NotNull(result);// "ActivityId #1 should not be null"
+            Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
+            Assert.Equal(activityId,  Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #1 should not have changed"
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
@@ -170,7 +168,7 @@ namespace UnitTests.General
             RequestContext.Clear();
             RequestContext.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
-            Assert.IsNull(actId, "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
+            Assert.Null(actId);
             TestCleanup();
 
             Trace.CorrelationManager.ActivityId = activityId2;
@@ -183,11 +181,11 @@ namespace UnitTests.General
             {
                 headers.Add(kvp.Key, kvp.Value);
             };
-            Assert.IsNotNull(actId, "ActivityId #2 should be present " + headers.ToStrings(separator: ","));
+            Assert.NotNull(actId); // "ActivityId #2 should be present " + headers.ToStrings(separator: ",")
             result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
-            Assert.IsNotNull(result, "ActivityId #2 should not be null");
-            Assert.AreEqual(activityId2, result, "E2E ActivityId #2 not propagated correctly");
-            Assert.AreEqual(activityId2, Trace.CorrelationManager.ActivityId, "Original E2E ActivityId #2 should not have changed");
+            Assert.NotNull(result); // "ActivityId #2 should not be null"
+            Assert.Equal(activityId2, result);// "E2E ActivityId #2 not propagated correctly
+            Assert.Equal(activityId2, Trace.CorrelationManager.ActivityId); // "Original E2E ActivityId #2 should not have changed"
             TestCleanup();
         }
 
@@ -200,11 +198,11 @@ namespace UnitTests.General
 
             CallContext.LogicalSetData(name1, data1);
 
-            Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main");
+            Assert.Equal(data1, CallContext.LogicalGetData(name1));
 
             Task t = Task.Run(() =>
             {
-                Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Task.Run");
+                Assert.Equal(data1, CallContext.LogicalGetData(name1));
             });
             await t;
             
@@ -218,7 +216,7 @@ namespace UnitTests.General
 
                     await Task.Delay(10);
                     
-                    Assert.AreEqual(str, CallContext.LogicalGetData(name1), "LCC.GetData-Task.Run-"+str);
+                    Assert.Equal(str,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Task.Run-"+str
                 });
             }
             await Task.WhenAll(promises);
@@ -235,13 +233,13 @@ namespace UnitTests.General
             CallContext.LogicalSetData(name1, dict);
 
             var result1 = (Dictionary<string,string>) CallContext.LogicalGetData(name1);
-            Assert.AreEqual(data1, result1[name1], "LCC.GetData-Main");
+            Assert.Equal(data1,  result1[name1]);  // "LCC.GetData-Main"
 
             Task t = Task.Run(() =>
             {
                 var result2 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                Assert.AreEqual(data1, result2[name1], "LCC.GetData-Task.Run");
-                Assert.AreSame(dict, result2, "Same object LCC.GetData-Task.Run");
+                Assert.Equal(data1,  result2[name1]);  // "LCC.GetData-Task.Run"
+                Assert.Same(dict,  result2);  // "Same object LCC.GetData-Task.Run"
             });
             await t;
 
@@ -252,8 +250,8 @@ namespace UnitTests.General
                 promises[i] = Task.Run(async () =>
                 {
                     var dict2 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreEqual(data1, dict2[name1], "LCC.GetData-Task.Run-Get-" + str);
-                    Assert.AreSame(dict, dict2, "Same object LCC.GetData-Task.Run-Get" + str);
+                    Assert.Equal(data1,  dict2[name1]);  // "LCC.GetData-Task.Run-Get-" + str
+                    Assert.Same(dict,  dict2);  // "Same object LCC.GetData-Task.Run-Get" + str
                     
                     var dict3 = new Dictionary<string, string>();
                     dict3[name1] = str;
@@ -262,9 +260,9 @@ namespace UnitTests.General
                     await Task.Delay(10);
                     
                     var result3 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreEqual(str, result3[name1], "LCC.GetData-Task.Run-Set-" + str);
-                    Assert.AreSame(dict3, result3, "Same object LCC.GetData-Task.Run-Set-" + str);
-                    Assert.AreNotSame(dict2, result3, "Differebntobject LCC.GetData-Task.Run-Set-" + str);
+                    Assert.Equal(str,  result3[name1]);  // "LCC.GetData-Task.Run-Set-" + str
+                    Assert.Same(dict3,  result3);  // "Same object LCC.GetData-Task.Run-Set-" + str
+                    Assert.NotSame(dict2,  result3);  // "Different object LCC.GetData-Task.Run-Set-" + str
                 });
             }
             await Task.WhenAll(promises);
@@ -279,7 +277,7 @@ namespace UnitTests.General
             string data1 = "Main";
             
             CallContext.LogicalSetData(name1, data1);
-            Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main");
+            Assert.Equal(data1,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Main"
 
             Task[] promises = new Task[NumLoops];
             for (int i = 0; i < NumLoops; i++)
@@ -288,18 +286,18 @@ namespace UnitTests.General
                 promises[i] = Task.Run(async () =>
                 {
                     await Task.Delay(5);
-                    Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main");
+                    Assert.Equal(data1,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Main"
                     await Task.Delay(5);
                     CallContext.LogicalSetData(name1, str);
-                    Assert.AreEqual(str, CallContext.LogicalGetData(name1), "LCC.GetData-Task.Run-1-" + str);
+                    Assert.Equal(str,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Task.Run-1-" + str
                     await Task.Delay(5);
-                    Assert.AreEqual(str, CallContext.LogicalGetData(name1), "LCC.GetData-Task.Run-1-" + str);
+                    Assert.Equal(str,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Task.Run-1-" + str
                     await Task.Delay(5);
-                    Assert.AreEqual(str, CallContext.LogicalGetData(name1), "LCC.GetData-Task.Run-2-" + str);
+                    Assert.Equal(str,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Task.Run-2-" + str
                 });
             }
             await Task.WhenAll(promises);
-            Assert.AreEqual(data1, CallContext.LogicalGetData(name1), "LCC.GetData-Main-Final");
+            Assert.Equal(data1,  CallContext.LogicalGetData(name1));  // "LCC.GetData-Main-Final"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -315,7 +313,7 @@ namespace UnitTests.General
             CallContext.LogicalSetData(name1, dict);
 
             var result0 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-            Assert.AreEqual(data1, result0[name1], "LCC.GetData-Main");
+            Assert.Equal(data1,  result0[name1]);  // "LCC.GetData-Main"
             
             Task[] promises = new Task[NumLoops];
             for (int i = 0; i < NumLoops; i++)
@@ -324,14 +322,14 @@ namespace UnitTests.General
                 promises[i] = Task.Run(async () =>
                 {
                     var result1 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreSame(dict, result1, "Same object LCC.GetData-Task.Run-Get" + str);
-                    Assert.AreEqual(data1, result1[name1], "LCC.GetData-Task.Run-Get-" + str);
+                    Assert.Same(dict,  result1);  // "Same object LCC.GetData-Task.Run-Get" + str
+                    Assert.Equal(data1,  result1[name1]);  // "LCC.GetData-Task.Run-Get-" + str
 
                     await Task.Delay(5);
 
                     var dict2 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreSame(dict, dict2, "Same object LCC.GetData-Task.Run-Get" + str);
-                    Assert.AreEqual(data1, dict2[name1], "LCC.GetData-Task.Run-Get-" + str);
+                    Assert.Same(dict,  dict2);  // "Same object LCC.GetData-Task.Run-Get" + str
+                    Assert.Equal(data1,  dict2[name1]);  // "LCC.GetData-Task.Run-Get-" + str
 
                     // Set New Dictionary
                     var dict3 = new Dictionary<string, string>();
@@ -339,25 +337,25 @@ namespace UnitTests.General
                     CallContext.LogicalSetData(name1, dict3);
 
                     var result3 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreSame(dict3, result3, "Same object LCC.GetData-Task.Run-Set-1-" + str);
-                    Assert.AreEqual(str, result3[name1], "LCC.GetData-Task.Run-Set-" + str);
+                    Assert.Same(dict3,  result3);  // "Same object LCC.GetData-Task.Run-Set-1-" + str
+                    Assert.Equal(str,  result3[name1]);  // "LCC.GetData-Task.Run-Set-" + str
 
                     await Task.Delay(5);
 
                     result3 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreSame(dict3, result3, "Same object LCC.GetData-Task.Run-Set-1-" + str);
-                    Assert.AreEqual(str, result3[name1], "LCC.GetData-Task.Run-Set-" + str);
+                    Assert.Same(dict3,  result3);  // "Same object LCC.GetData-Task.Run-Set-1-" + str
+                    Assert.Equal(str,  result3[name1]);  // "LCC.GetData-Task.Run-Set-" + str
                     
                     await Task.Delay(5);
                     result3 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-                    Assert.AreSame(dict3, result3, "Same object LCC.GetData-Task.Run-Set-2-" + str);
-                    Assert.AreEqual(str, result3[name1], "LCC.GetData-Task.Run-Set-" + str);
+                    Assert.Same(dict3, result3);  // "Same object LCC.GetData-Task.Run-Set-2-" + str
+                    Assert.Equal(str,  result3[name1]);  // "LCC.GetData-Task.Run-Set-" + str
                 });
             }
             await Task.WhenAll(promises);
             result0 = (Dictionary<string, string>)CallContext.LogicalGetData(name1);
-            Assert.AreSame(dict, result0, "Same object LCC.GetData-Task.Run-Get");
-            Assert.AreEqual(data1, result0[name1], "LCC.GetData-Main-Final");
+            Assert.Same(dict,  result0);  // "Same object LCC.GetData-Task.Run-Get"
+            Assert.Equal(data1,  result0[name1]);  // "LCC.GetData-Main-Final"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -369,7 +367,7 @@ namespace UnitTests.General
             string data1 = "Main";
 
             RequestContext.Set(name1, data1);
-            Assert.AreEqual(data1, RequestContext.Get(name1), "RC.GetData-Main");
+            Assert.Equal(data1,  RequestContext.Get(name1));  // "RC.GetData-Main"
 
             Task[] promises = new Task[NumLoops];
             for (int i = 0; i < NumLoops; i++)
@@ -378,19 +376,19 @@ namespace UnitTests.General
                 promises[i] = Task.Run(async () =>
                 {
                     await Task.Delay(5);
-                    Assert.AreEqual(data1, RequestContext.Get(name1), "RC.GetData-Task.Run-0");
+                    Assert.Equal(data1,  RequestContext.Get(name1));  // "RC.GetData-Task.Run-0"
                     await Task.Delay(5);
                     // Set New value
                     RequestContext.Set(name1, str);
-                    Assert.AreEqual(str, RequestContext.Get(name1), "RC.GetData-Task.Run-1-" + str);
+                    Assert.Equal(str,  RequestContext.Get(name1));  // "RC.GetData-Task.Run-1-" + str
                     await Task.Delay(5);
-                    Assert.AreEqual(str, RequestContext.Get(name1), "RC.GetData-Task.Run-2-" + str);
+                    Assert.Equal(str,  RequestContext.Get(name1));  // "RC.GetData-Task.Run-2-" + str
                     await Task.Delay(5);
-                    Assert.AreEqual(str, RequestContext.Get(name1), "RC.GetData-Task.Run-3-" + str);
+                    Assert.Equal(str,  RequestContext.Get(name1));  // "RC.GetData-Task.Run-3-" + str
                 });
             }
             await Task.WhenAll(promises);
-            Assert.AreEqual(data1, RequestContext.Get(name1), "RC.GetData-Main-Final");
+            Assert.Equal(data1,  RequestContext.Get(name1));  // "RC.GetData-Main-Final"
         }
 
     }
@@ -435,7 +433,7 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
             Trace.CorrelationManager.ActivityId = activityId;
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -450,19 +448,19 @@ namespace UnitTests.General
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
-            Assert.AreEqual(val, result, "Immediate RequestContext echo was not correct");
+            Assert.Equal(val,  result);  // "Immediate RequestContext echo was not correct"
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDoubleEcho();
-            Assert.AreEqual(val2, result, "Transitive RequestContext echo was not correct");
+            Assert.Equal(val2,  result);  // "Transitive RequestContext echo was not correct"
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEcho1();
-            Assert.AreEqual(val, result, "Delayed (StartNew) RequestContext echo was not correct");
+            Assert.Equal(val,  result); // "Delayed (StartNew) RequestContext echo was not correct");
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDelayedEcho2();
-            Assert.AreEqual(val2, result, "Delayed (ContinueWith) RequestContext echo was not correct");
+            Assert.Equal(val2,  result); // "Delayed (ContinueWith) RequestContext echo was not correct");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -477,28 +475,28 @@ namespace UnitTests.General
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
-            Assert.AreEqual(val, result, "Immediate RequestContext echo was not correct");
+            Assert.Equal(val,  result);  // "Immediate RequestContext echo was not correct"
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDoubleEcho();
-            Assert.AreEqual(val2, result, "Transitive RequestContext echo was not correct");
+            Assert.Equal(val2,  result);  // "Transitive RequestContext echo was not correct"
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEcho1();
-            Assert.AreEqual(val, result, "Delayed (StartNew) RequestContext echo was not correct");
+            Assert.Equal(val,  result); // "Delayed (StartNew) RequestContext echo was not correct");
 
             RequestContext.Set(key, val2);
             result = await grain.TraceIdDelayedEcho2();
-            Assert.AreEqual(val2, result, "Delayed (ContinueWith) RequestContext echo was not correct");
+            Assert.Equal(val2,  result); // "Delayed (ContinueWith) RequestContext echo was not correct");
 
             RequestContext.Set(key, val);
             result = await grain.TraceIdDelayedEchoAwait();
-            Assert.AreEqual(val, result, "Delayed (Await) RequestContext echo was not correct");
+            Assert.Equal(val,  result); // "Delayed (Await) RequestContext echo was not correct");
 
             // Expected behaviour is this won't work, because Task.Run by design does not use Orleans task scheduler
             //RequestContext.Set(key, val2);
             //result = await grain.TraceIdDelayedEchoTaskRun();
-            //Assert.AreEqual(val2, result, "Delayed (Task.Run) RequestContext echo was not correct");
+            //Assert.Equal(val2,  result); // "Delayed (Task.Run) RequestContext echo was not correct");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -507,8 +505,8 @@ namespace UnitTests.General
             var grain = GrainClient.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
             Tuple<string, string> requestContext = await grain.TestRequestContext();
             logger.Info("Request Context is: " + requestContext);
-            Assert.AreEqual("binks", requestContext.Item1, "Item1=" + requestContext.Item1);
-            Assert.AreEqual("binks", requestContext.Item2, "Item2=" + requestContext.Item2);
+            Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
+            Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -522,17 +520,17 @@ namespace UnitTests.General
 
             RequestContext.Set(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, activityId);
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.Set(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, nullActivityId);
             result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             RequestContext.Set(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, activityId2);
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId2, result, "E2E ActivityId 2 not propagated correctly");
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -546,24 +544,24 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Trace.CorrelationManager.ActivityId = activityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = activityId2;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId2, result, "E2E ActivityId 2 not propagated correctly");
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -577,24 +575,24 @@ namespace UnitTests.General
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             Trace.CorrelationManager.ActivityId = activityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = activityId2;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId2, result, "E2E ActivityId 2 not propagated correctly");
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId 2 not propagated correctly"
             RequestContext.Clear();
         }
 
@@ -608,23 +606,23 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "E2E ActivityId should not exist");
+            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "E2E ActivityId 2 should not exist");
-            Assert.AreEqual(null, RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId 2 should not exist"
+            Assert.Equal(null,  RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
 
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
-                Assert.AreEqual(null, RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+                Assert.Equal(null,  RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));  // "No ActivityId context should be set"
 
                 result = await grain.E2EActivityId();
 
-                Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
 
                 RequestContext.Clear();
             }
@@ -638,27 +636,27 @@ namespace UnitTests.General
             IRequestContextTestGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = grain.E2EActivityId().Result;
-            Assert.AreEqual(nullActivityId, result, "E2E ActivityId should not exist");
+            Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
-                Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+                Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             }
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = nullActivityId;
-            Assert.IsNull(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "No ActivityId context should be set");
+           Assert.Null(RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER));
             result = await grain.E2EActivityId();
-            Assert.AreEqual(nullActivityId, result, "Null ActivityId propagated E2E incorrectly");
+            Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
             RequestContext.Clear();
         }
 
@@ -672,7 +670,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId;
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = false;
@@ -680,7 +678,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.AreEqual(Guid.Empty, result, "E2E ActivityId #2 not not have been propagated");
+            Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 not not have been propagated"
             RequestContext.Clear();
 
             RequestContext.PropagateActivityId = true;
@@ -688,12 +686,12 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId2, result, "E2E ActivityId #2 should have been propagated");
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = activityId;
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly after #2");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
         }
 
@@ -713,7 +711,7 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId;
             Guid result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.FalseString;
@@ -722,8 +720,8 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.AreNotEqual(activityId2, result, "E2E ActivityId #2 should not have been propagated");
-            Assert.AreEqual(Guid.Empty, result, "E2E ActivityId #2 should not have been propagated");
+            Assert.NotEqual(activityId2, result);  // "E2E ActivityId #2 should not have been propagated"
+            Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 should not have been propagated"
             RequestContext.Clear();
 
             changeConfig[PropagateActivityIdConfigKey] = Boolean.TrueString;
@@ -732,12 +730,12 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = activityId2;
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId2, result, "E2E ActivityId #2 should have been propagated");
+            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
             RequestContext.Clear();
 
             Trace.CorrelationManager.ActivityId = activityId;
             result = await grain.E2EActivityId();
-            Assert.AreEqual(activityId, result, "E2E ActivityId #1 not propagated correctly after #2");
+            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
         }
 
@@ -750,13 +748,13 @@ namespace UnitTests.General
 
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             Guid activityId = await grain.E2EActivityId();
-            Assert.AreEqual(Guid.Empty, activityId, "E2EActivityId Call#1");
-            Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks");
+            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#1"
+            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
 
             GrainClient.ClientInvokeCallback = null;
             activityId = await grain.E2EActivityId();
-            Assert.AreEqual(Guid.Empty, activityId, "E2EActivityId Call#2");
-            Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
+            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2"
+            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks - should be unchanged"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -772,16 +770,16 @@ namespace UnitTests.General
             IRequestContextProxyGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             Guid activityId = await grain.E2EActivityId();
-            Assert.AreEqual(setActivityId, activityId, "E2EActivityId Call#1");
-            Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks");
+            Assert.Equal(setActivityId,  activityId);  // "E2EActivityId Call#1"
+            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
 
             Trace.CorrelationManager.ActivityId = Guid.Empty;
             RequestContext.Clear(); // Need this to clear out any old ActivityId value cached in RequestContext. Code optimization in RequestContext does not unset entry if Trace.CorrelationManager.ActivityId == Guid.Empty [which is the "normal" case]
             GrainClient.ClientInvokeCallback = null;
 
             activityId = await grain.E2EActivityId();
-            Assert.AreEqual(Guid.Empty, activityId, "E2EActivityId Call#2 == Zero");
-            Assert.AreEqual(1, callback.TotalCalls, "Number of callbacks - should be unchanged");
+            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2 == Zero"
+            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks - should be unchanged"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
@@ -795,7 +793,7 @@ namespace UnitTests.General
             ISimpleGrainObserver reference = await GrainClient.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
 
             GC.KeepAlive(observer);
-            Assert.AreEqual(0, callback.TotalCalls, "Number of callbacks");
+            Assert.Equal(0,  callback.TotalCalls);  // "Number of callbacks"
         }
     }
 
@@ -862,7 +860,7 @@ namespace UnitTests.General
                 await Task.Delay(10);
                 int contextId = (int)(RequestContext.Get("threadId") ?? -1);
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
-                Assert.AreEqual(id, contextId);
+                Assert.Equal(id, contextId);
             }
         }
     }
@@ -907,7 +905,7 @@ namespace UnitTests.General
                 await Task.Delay(10);
                 int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
-                Assert.AreEqual(id, contextId);
+                Assert.Equal(id, contextId);
             }
         }
     }

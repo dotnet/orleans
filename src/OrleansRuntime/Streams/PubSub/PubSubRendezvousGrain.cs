@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -9,8 +9,8 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubGrainState
     {
-        public HashSet<PubSubPublisherState> Producers { get; set; }
-        public HashSet<PubSubSubscriptionState> Consumers { get; set; }
+        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+        public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
 
     [Providers.StorageProvider(ProviderName = "PubSubStore")]
@@ -40,11 +40,6 @@ namespace Orleans.Streams
         {
             logger = GetLogger(GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
             LogPubSubCounts("OnActivateAsync");
-
-            if (State.Consumers == null)
-                State.Consumers = new HashSet<PubSubSubscriptionState>();
-            if (State.Producers == null)
-                State.Producers = new HashSet<PubSubPublisherState>();
 
             int numRemoved = RemoveDeadProducers();
             if (numRemoved > 0)
@@ -83,7 +78,7 @@ namespace Orleans.Streams
         {
             var grainRef = producer as GrainReference;
             if (grainRef !=null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Active);
+                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
             
             return true;
         }
@@ -92,7 +87,7 @@ namespace Orleans.Streams
         {
             var grainRef = producer as GrainReference;
             if (grainRef != null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Dead);
+                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
             
             return false;
         }

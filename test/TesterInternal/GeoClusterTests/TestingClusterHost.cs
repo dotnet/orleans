@@ -1,16 +1,16 @@
-﻿using Orleans.Runtime;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans.TestingHost;
-using System.Reflection;
 using System.Globalization;
-using Orleans.Runtime.Configuration;
+using System.Linq;
 using System.Net;
+using System.Reflection;
+using System.Threading.Tasks;
 using Orleans;
-using Assert = Xunit.Assert;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost;
 using Tester;
+using Xunit;
 
 namespace Tests.GeoClusterTests
 {

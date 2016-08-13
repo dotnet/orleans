@@ -5,7 +5,7 @@
     using UnitTests.GrainInterfaces;
     using UnitTests.Tester;
     using Xunit;
-    
+
     public class MethodInterceptionTests : HostedTestClusterEnsureDefaultStarted
     {
         [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]

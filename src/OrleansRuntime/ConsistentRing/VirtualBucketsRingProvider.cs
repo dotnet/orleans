@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 
 
 namespace Orleans.Runtime.ConsistentRing
@@ -232,7 +232,7 @@ namespace Orleans.Runtime.ConsistentRing
                 {
                     RemoveServer(updatedSilo);
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
                 {
                     AddServer(updatedSilo);
                 }

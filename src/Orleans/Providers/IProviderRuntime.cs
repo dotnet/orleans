@@ -1,8 +1,8 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Orleans.CodeGeneration;
 
 
 namespace Orleans.EventSourcing
