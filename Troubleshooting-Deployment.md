@@ -43,3 +43,18 @@ role recycling. Check the logs for more information. Visual Studio provides some
 - Check the logs to see if there is an unhandled exception while initializing.
 - Make sure that the connections strings are correct.
 - Check the Azure Cloud Services troubleshooting pages for more information.
+
+## How to Check Logs
+- Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.
+- You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level. 
+
+Programmatic configuration:
+- When creating a `ClusterConfiguration` object, set `config.Defaults.DefaultTraceLevel = Severity.Info`.
+- When creating a `ClientConfiguration` object, set `config.DefaultTraceLevel = Severity.Info`.
+
+Declarative configuration:
+- Add `<Tracing DefaultTraceLevel="Info" />` to the `OrleansConfiguration.xml` and/or the `ClientConfiguration.xml` files.
+
+In the `diagnostics.wadcfgx` file for the web and worker roles, make sure to set the `scheduledTransferLogLevelFilter` attribute in the `Logs` element to `Information`, as this is an additional layer of trace filtering that defines which traces are sent to the `WADLogsTable` in Azure Storage.
+
+You can find more information about this in the [Orleans Configuration Guide] (Orleans-Configuration-Guide/).
