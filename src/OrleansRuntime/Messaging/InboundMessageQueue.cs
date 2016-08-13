@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly BufferBlock<Message>[] messageQueues;
+        private readonly ITargetBlock<Message>[] messageQueues;
         private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
@@ -17,8 +17,8 @@ namespace Orleans.Runtime.Messaging
             get
             {
                 int n = 0;
-                foreach (var queue in messageQueues)
-                    n += queue.Count;
+                //foreach (var queue in messageQueues)
+                //    n += queue.Count;
                 
                 return n;
             }
@@ -71,7 +71,8 @@ namespace Orleans.Runtime.Messaging
 
         public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
         {
-            messageQueues[(int) type].LinkTo(actionBlock);
+            (messageQueues[(int) type] as BufferBlock<Message>).LinkTo(actionBlock);
+            messageQueues[(int) type] = actionBlock;
         }
 
         public Message WaitMessage(Message.Categories type)
