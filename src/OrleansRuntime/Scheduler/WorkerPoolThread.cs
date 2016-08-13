@@ -103,13 +103,17 @@ namespace Orleans.Runtime.Scheduler
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
             executor = new ActionBlock<IWorkItem>(item =>
             {
-                 try
-                 {
-                   //  CurrentWorkerThread = Thread.CurrentThread;
-                    RuntimeContext.Current = new RuntimeContext
+                try
+                {
+                    //  CurrentWorkerThread = Thread.CurrentThread;
+                    if (RuntimeContext.Current == null)
                     {
-                        Scheduler = TaskScheduler.Current
-                    };
+                        RuntimeContext.Current = new RuntimeContext
+                        {
+                            Scheduler = scheduler
+                        };
+                    }
+
                     RuntimeContext.SetExecutionContext(item.SchedulingContext, scheduler);
 
 
@@ -120,6 +124,10 @@ namespace Orleans.Runtime.Scheduler
                 {
                     var b = ex;
                 }
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 16
             });
         }
 

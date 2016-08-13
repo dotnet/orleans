@@ -39,6 +39,10 @@ namespace Orleans.Runtime
                     threadTracking.IncrementNumberOfProcessed();
                 }
 #endif
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 16
             });
             if (StatisticsCollector.CollectQueueStats)
             {

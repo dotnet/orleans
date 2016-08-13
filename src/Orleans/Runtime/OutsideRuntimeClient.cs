@@ -302,7 +302,11 @@ namespace Orleans
             }
             if (listenForMessages)
             {
-                _ApplicationactionBlock = new ActionBlock<Message>(m => HandleMessage(m));
+                _ApplicationactionBlock = new ActionBlock<Message>(m => HandleMessage(m),
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 16
+            });
                 transport.LinkActionBlock(Message.Categories.Application, _ApplicationactionBlock);
                 Thread.Sleep(22224245);
                 throw new Exception("ss");

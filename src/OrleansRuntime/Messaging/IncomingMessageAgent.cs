@@ -23,7 +23,11 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             OnFault = FaultBehavior.RestartOnFault;
-            _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message));
+            _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message),
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 16
+            });
         }
 
         public override void Start()

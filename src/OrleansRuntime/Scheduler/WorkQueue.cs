@@ -38,7 +38,12 @@ namespace Orleans.Runtime.Scheduler
                 catch (Exception ex)
                 {
                     var b = ex;
+                    //throw new Exception("QQQ");
                 }
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 16
             });
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
