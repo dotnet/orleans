@@ -56,6 +56,14 @@
     <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
+    <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
+    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />
+    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTestFixture.cs" />
+    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageStressTests.cs" />
+    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTests.cs" />
+    <Compile Include="StorageTests\AWSUtils\PersistenceGrainTests_AWSDynamoDBStore.cs" />
+    <Compile Include="StorageTests\AWSUtils\UnitTestDynamoDBStorage.cs" />
     <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
     <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
@@ -214,6 +222,10 @@
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj">
+      <Project>{67738E6C-F292-46A2-994D-5B52E745205B}</Project>
+      <Name>OrleansAWSUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
@@ -299,6 +311,9 @@
     <None Include="ReadMe.md" />
     <Content Include="Config_AdditionalAssemblies.xml">
       <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="TesterInternal.xunit.runner.json">
