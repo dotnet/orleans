@@ -43,20 +43,21 @@
   <ItemGroup>
     <Compile Include="MapReduce\BufferGrain.cs" />
     <Compile Include="MapReduce\DataflowGrain.cs" />
+    <Compile Include="MapReduce\Processors.cs" />
     <Compile Include="MapReduce\TransformGrain.cs" />
     <Compile Include="MapReduce\TargetGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.csproj">
+    <ProjectReference Include="..\OrleansBenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.csproj">
       <Project>{936397df-8d11-4244-a493-767d31f9d727}</Project>
       <Name>OrleansBenchmarkGrainInterfaces</Name>
     </ProjectReference>
-    <ProjectReference Include="..\ClientGenerator\ClientGenerator.csproj">
+    <ProjectReference Include="..\..\..\src\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Orleans\Orleans.csproj">
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>

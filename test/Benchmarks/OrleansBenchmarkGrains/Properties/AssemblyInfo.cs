@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
+using OrleansBenchmarkGrains.MapReduce;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -16,3 +18,7 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("071cb148-eaa3-4f85-a1f7-52d1b7fdaf82")]
+
+[assembly: GenerateSerializer(typeof(MapProcessor))]
+[assembly: GenerateSerializer(typeof(ReduceProcessor))]
+[assembly: GenerateSerializer(typeof(EmptyProcessor))]

@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
 using Orleans.CodeGeneration;
+using OrleansBenchmarkGrains.MapReduce;
+using OrleansBenchmarks.MapReduce;
 using SerializationBenchmarks;
 
 // General Information about an assembly is controlled through the following 

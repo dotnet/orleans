@@ -18,7 +18,7 @@ namespace SerializationBenchmarks
     {
         private PocoState poco;
 
-        [Params(30000)]
+        [Params(60000)]
         public int Repeats { get; set; }
 
         [Setup]

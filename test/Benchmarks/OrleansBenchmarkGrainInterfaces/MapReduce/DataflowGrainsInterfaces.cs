@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
-namespace GrainInterfaces
+namespace OrleansGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrainWithGuidKey
     {
@@ -49,6 +46,7 @@ namespace GrainInterfaces
 
     public interface IPropagatorGrain<in TInput, TOutput> : ITargetGrain<TInput>, ISourceGrain<TOutput>
     {
+        Task<List<TOutput>> ReceiveAll();
     }
     
     public interface ITransformGrain<TInput, TOutput> : IPropagatorGrain<TInput, TOutput>, IProcessor<ITransformProcessor<TInput, TOutput>>
@@ -57,13 +55,5 @@ namespace GrainInterfaces
 
     public interface IBufferGrain<T> : IPropagatorGrain<T, T>
     {
-        Task<List<T>> ReceiveAll();
-    }
-
-    public enum GrainDataflowMessageStatus
-    {
-        Accepted,
-        Declined,
-        DecliningPermanently
     }
 }

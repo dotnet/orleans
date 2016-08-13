@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using GrainInterfaces;
 using Orleans;
+using OrleansGrainInterfaces.MapReduce;
 
-namespace BenchmarkGrains.MapReduce
+namespace OrleansBenchmarkGrains.MapReduce
 {
     public class BufferGrain<T> : DataflowGrain, IBufferGrain<T>
     {

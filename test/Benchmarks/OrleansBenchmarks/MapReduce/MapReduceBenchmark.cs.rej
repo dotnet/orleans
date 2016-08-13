@@ -1,0 +1,23 @@
+diff a/src/OrleansBenchmarks/MapReduce/MapReduceBenchmark.cs b/src/OrleansBenchmarks/MapReduce/MapReduceBenchmark.cs	(rejected hunks)
+@@ -42,14 +42,21 @@
+          [Benchmark]
+          public async Task Bench()
+          {
+++<<<<<<< Updated upstream
+ +            var pipelines = Enumerable
+ +                .Range(0, _pipelineParallelization)
+ +                .AsParallel()
+ +                .WithDegreeOfParallelism(2)
+ +                .Select(async i =>
+ +                {
+ +                    await BenchCore();
+ +                });
+++=======
++             var pipelines =Enumerable.Range(0, _pipelineParallelization).AsParallel().WithDegreeOfParallelism(4).Select(async i =>
++             {
++                 await BenchCore();
++             });
+++>>>>>>> Stashed changes
+  
+              await Task.WhenAll(pipelines);
+          }

@@ -1,23 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using GrainInterfaces;
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
-using Orleans.Serialization;
+using Orleans.TestingHost;
+using OrleansBenchmarkGrains.MapReduce;
+using OrleansGrainInterfaces.MapReduce;
 
-namespace SerializationBenchmarks.MapReduce
+namespace OrleansBenchmarks.MapReduce
 {
     public class MapReduceBenchmark
     {
-        private static SiloHost _siloHost;
+        private static SiloHandle _siloHandle;
         private readonly int _intermediateStagesCount = 15;
         private readonly int _pipelineParallelization = 4;
         private readonly int _repeats = 50000;
@@ -26,13 +25,23 @@ namespace SerializationBenchmarks.MapReduce
         [Setup]
         public void BenchmarkSetup()
         {
-            AppDomain hostDomain = AppDomain.CreateDomain("OrleansHost", null, new AppDomainSetup
+            var nodeConfig = new NodeConfiguration
             {
-                AppDomainInitializer = InitSilo,
-                AppDomainInitializerArguments = new string[] { "Primary", "BenchServerConfiguration.xml" },
-            });
+                TraceToConsole = false,
+                DefaultTraceLevel = Severity.Warning
+            };
 
-            GrainClient.Initialize("BenchClientConfiguration.xml");
+            var clusterConfig = ClusterConfiguration.LocalhostPrimarySilo();
+            clusterConfig.Defaults.TraceToConsole = false;
+            _siloHandle = TestCluster.StartOrleansSilo(
+                new TestCluster(),
+                Silo.SiloType.Primary,
+                clusterConfig,
+                nodeConfig);
+
+            var clientConfig = ClientConfiguration.LocalhostSilo();
+            clientConfig.TraceToConsole = false;
+            GrainClient.Initialize(clientConfig);
         }
 
         [Benchmark]
@@ -41,7 +50,7 @@ namespace SerializationBenchmarks.MapReduce
             var pipelines = Enumerable
                 .Range(0, _pipelineParallelization)
                 .AsParallel()
-                .WithDegreeOfParallelism(2)
+                .WithDegreeOfParallelism(4)
                 .Select(async i =>
                 {
                     await BenchCore();
@@ -105,14 +114,6 @@ namespace SerializationBenchmarks.MapReduce
             }
         }
 
-        private static void InitSilo(string[] args)
-        {
-            _siloHost = new SiloHost("Primary");
-            _siloHost.ConfigFileName = "BenchServerConfiguration.xml";
-            _siloHost.InitializeOrleansSilo();
-            _siloHost.StartOrleansSilo();
-        }
-
         private string _text = @"Historically, the world of data and the world of objects" +
           @" have not been well integrated. Programmers work in C# or Visual Basic" +
           @" and also in SQL or XQuery. On the one side are concepts such as classes," +
@@ -134,42 +135,4 @@ namespace SerializationBenchmarks.MapReduce
           @" objects in memory is often tedious and error-prone.";
     }
 
-    #region Processors
-
-    [Serializable]
-    public class MapProcessor : ITransformProcessor<string, List<string>>
-    {
-        private static readonly char[] _delimiters = { '.', '?', '!', ' ', ';', ':', ',' };
-
-        public List<string> Process(string input)
-        {
-            return input
-                 .Split(_delimiters, StringSplitOptions.RemoveEmptyEntries)
-                 .ToList();
-        }
-    }
-
-    [Serializable]
-    public class ReduceProcessor : ITransformProcessor<List<string>, Dictionary<string, int>>
-    {
-        public Dictionary<string, int> Process(List<string> input)
-        {
-            return input.GroupBy(v => v.ToLowerInvariant()).Select(v => new
-            {
-                key = v.Key,
-                count = v.Count()
-            }).ToDictionary(arg => arg.key, arg => arg.count);
-        }
-    }
-
-    [Serializable]
-    public class EmptyProcessor : ITransformProcessor<Dictionary<string, int>, Dictionary<string, int>>
-    {
-        public Dictionary<string, int> Process(Dictionary<string, int> input)
-        {
-            return input;
-        }
-    }
-
-    #endregion
 }
