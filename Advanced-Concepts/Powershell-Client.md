@@ -76,7 +76,9 @@ After the module is imported (which means it is loaded on PowerShell session), y
 
 This module is a wrapper around `GrainClient.Initialize()` and its overloads.
 
-**Usage**:
+**Usage**:     
+
+
 
 * __`Start-GrainClient`__ 
 
