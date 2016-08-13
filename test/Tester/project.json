@@ -10,7 +10,8 @@
     "WindowsAzure.Storage": "7.0.0",
     "xunit": "2.1.0",
     "xunit.runner.visualstudio": "2.1.0",
-    "Xunit.SkippableFact": "1.2.14"
+    "Xunit.SkippableFact": "1.2.14",
+    "System.Management.Automation.dll": "10.0.10586"
   },
   "frameworks": {
     "net451": {}
