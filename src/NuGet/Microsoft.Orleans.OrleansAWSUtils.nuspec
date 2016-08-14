@@ -23,6 +23,7 @@
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
 
       <dependency id="AWSSDK.DynamoDBv2" version="3.1.5.2" />
+      <dependency id="AWSSDK.SQS" version="3.1.0.9" />
     </dependencies>
   </metadata>
   <files>
