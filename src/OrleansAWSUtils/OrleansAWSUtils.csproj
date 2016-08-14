@@ -47,6 +47,12 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AWSUtils.cs" />
+    <Compile Include="Membership\DynamoDBGatewayListProvider.cs" />
+    <Compile Include="Membership\DynamoDBMembershipTable.cs" />
+    <Compile Include="Membership\SiloInstanceRecord.cs" />
+    <Compile Include="Statistics\DynamoDBClientMetricsPublisher.cs" />
+    <Compile Include="Statistics\DynamoDBSiloMetricsPublisher.cs" />
+    <Compile Include="Statistics\DynamoDBStatisticsPublisher.cs" />
     <Compile Include="Storage\DynamoDBStorage.cs" />
     <Compile Include="Storage\Provider\DynamoDBStorageProvider.cs" />
   </ItemGroup>
