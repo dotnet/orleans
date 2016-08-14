@@ -70,7 +70,8 @@ namespace Orleans.Runtime
                         return;
                     }
                     _logOutput.Flush();
-                    _logOutput.Close();
+                    _logOutput.Dispose();
+                    _logOutput = null;
                 }
             }
             catch (Exception exc)

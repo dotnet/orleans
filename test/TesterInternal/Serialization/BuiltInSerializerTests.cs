@@ -977,8 +977,26 @@ namespace UnitTests.Serialization
             InitializeSerializer(serializerToUse);
             Type t = typeof(Dictionary<string, object>);
             Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
             t = typeof(Dictionary<string, int>);
             Assert.False(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(int);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(DateTime);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(Immutable<Dictionary<string, object>>);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+
+            t = typeof(ShallowCopyableValueType);
+            Assert.True(t.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {t.Name}");
+        }
+
+        public struct ShallowCopyableValueType
+        {
+            public int AnotherValueType;
         }
 
         private object OrleansSerializationLoop(object input, bool includeWire = true)
