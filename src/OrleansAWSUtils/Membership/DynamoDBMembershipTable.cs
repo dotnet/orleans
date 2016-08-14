@@ -17,6 +17,7 @@ namespace Orleans.Runtime.MembershipService
 
         private const string TABLE_NAME_DEFAULT_VALUE = "OrleansSiloInstances";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
+        private const int MAX_BATCH_SIZE = 25;
 
         private Logger logger;
         private DynamoDBStorage storage;
@@ -54,19 +55,12 @@ namespace Orleans.Runtime.MembershipService
                     toDelete.Add(record.GetKeys());
                 }
 
-                if (records.Count <= 25)
+                List<Task> tasks = new List<Task>();
+                foreach (var batch in toDelete.BatchIEnumerable(MAX_BATCH_SIZE))
                 {
-                    await storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, toDelete);
+                    tasks.Add(storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, batch));
                 }
-                else
-                {
-                    List<Task> tasks = new List<Task>();
-                    foreach (var batch in toDelete.BatchIEnumerable(25))
-                    {
-                        tasks.Add(storage.DeleteEntriesAsync(TABLE_NAME_DEFAULT_VALUE, batch));
-                    }
-                    await Task.WhenAll(tasks);
-                }
+                await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
@@ -137,11 +131,10 @@ namespace Orleans.Runtime.MembershipService
                 catch (ConditionalCheckFailedException)
                 {
                     result = false;
-                }
-
-                if (result == false)
                     logger.Warn(ErrorCode.MembershipBase,
                         $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
+                }
+                    
                 return result;
             }
             catch (Exception exc)
@@ -159,29 +152,33 @@ namespace Orleans.Runtime.MembershipService
                 if (logger.IsVerbose) logger.Verbose("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
                 var siloEntry = Convert(entry);
                 int currentEtag = 0;
-                int.TryParse(etag, out currentEtag);
-                siloEntry.ETag = currentEtag;
-                siloEntry.ETag++;
+                if (!int.TryParse(etag, out currentEtag))
+                {
+                    logger.Warn(ErrorCode.MembershipBase,
+                        $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
+                    return false;
+                }
+
+                siloEntry.ETag = currentEtag + 1;
 
                 bool result;
 
                 try
                 {
                     var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = etag } } };
-                    var expression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
+                    var etagConditionalExpression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     await storage.UpsertEntryAsync(TABLE_NAME_DEFAULT_VALUE, siloEntry.GetKeys(),
-                        siloEntry.GetFields(), expression, conditionalValues);
+                        siloEntry.GetFields(), etagConditionalExpression, conditionalValues);
 
                     result = true;
                 }
                 catch (ConditionalCheckFailedException)
                 {
                     result = false;
-                }
-
-                if (result == false)
                     logger.Warn(ErrorCode.MembershipBase,
                         $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
+                }
+                    
                 return result;
             }
             catch (Exception exc)
@@ -198,9 +195,9 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (logger.IsVerbose) logger.Verbose("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry);
-                siloEntry.ETag++;
+                var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
-                await storage.UpsertEntryAsync(TABLE_NAME_DEFAULT_VALUE, siloEntry.GetKeys(), siloEntry.GetFields(), expression);
+                await storage.UpsertEntryAsync(TABLE_NAME_DEFAULT_VALUE, siloEntry.GetKeys(),fields, expression);
             }
             catch (Exception exc)
             {

@@ -38,13 +38,13 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_GetGateways()
         {
-            await MembershipTable_GetGateways(false);
+            await MembershipTable_GetGateways();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable()
         {
-            await MembershipTable_ReadAll_EmptyTable(false);
+            await MembershipTable_ReadAll_EmptyTable();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]

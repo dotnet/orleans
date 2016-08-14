@@ -19,7 +19,7 @@ namespace UnitTests.GrainInterfaces
     }
 
 
-    public interface IPersistenceTestGenericGrain<T> : IPersistenceTestGrain // IGrainWithGuidKeyaws
+    public interface IPersistenceTestGenericGrain<T> : IPersistenceTestGrain // IGrainWithGuidKey
     { }
     //    Task<bool> CheckStateInit();
     //    Task<string> CheckProviderType();

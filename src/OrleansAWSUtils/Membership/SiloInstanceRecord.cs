@@ -1,7 +1,6 @@
 ﻿using Amazon.DynamoDBv2.Model;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Net;
 using System.Text;
 
@@ -25,6 +24,21 @@ namespace Orleans.Runtime.MembershipService
         public const string START_TIME_PROPERTY_NAME = "StartTime";
         public const string I_AM_ALIVE_TIME_PROPERTY_NAME = "IAmAliveTime";
         internal const char Seperator = '-';
+
+        public string DeploymentId { get; set; }
+        public string SiloIdentity { get; set; }
+        public string Address { get; set; }
+        public int Port { get; set; }
+        public int Generation { get; set; }
+        public string HostName { get; set; }
+        public int Status { get; set; }
+        public int ProxyPort { get; set; }
+        public string SiloName { get; set; }
+        public string SuspectingSilos { get; set; }
+        public string SuspectingTimes { get; set; }
+        public string StartTime { get; set; }
+        public string IAmAliveTime { get; set; }
+        public int ETag { get; set; }
 
         public SiloInstanceRecord() { }
 
@@ -82,43 +96,16 @@ namespace Orleans.Runtime.MembershipService
                 int.TryParse(fields[ETAG_PROPERTY_NAME].N, out etag))
                 ETag = etag;
         }
-        
-        public string DeploymentId { get; set; }
-        public string SiloIdentity { get; set; }
-        public string Address { get; set; }
-        public int Port { get; set; }
-        public int Generation { get; set; }
-        public string HostName { get; set; }
-        public int Status { get; set; }
-        public int ProxyPort { get; set; }
-        public string SiloName { get; set; }
-        public string SuspectingSilos { get; set; }
-        public string SuspectingTimes { get; set; }
-        public string StartTime { get; set; }
-        public string IAmAliveTime { get; set; }
-        public int ETag { get; set; }        
 
         internal static SiloAddress UnpackRowKey(string rowKey)
         {
-            var debugInfo = "UnpackRowKey";
             try
             {
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0}", rowKey);
-                Trace.TraceInformation(debugInfo);
-#endif
                 int idx1 = rowKey.IndexOf(Seperator);
                 int idx2 = rowKey.LastIndexOf(Seperator);
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
-#endif
                 var addressStr = rowKey.Substring(0, idx1);
                 var portStr = rowKey.Substring(idx1 + 1, idx2 - idx1 - 1);
                 var genStr = rowKey.Substring(idx2 + 1);
-#if DEBUG
-                debugInfo = String.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}", rowKey, addressStr, portStr, genStr);
-                Trace.TraceInformation(debugInfo);
-#endif
                 IPAddress address = IPAddress.Parse(addressStr);
                 int port = Int32.Parse(portStr);
                 int generation = Int32.Parse(genStr);
@@ -126,7 +113,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                throw new AggregateException("Error from " + debugInfo, exc);
+                throw new AggregateException("Error from UnpackRowKey", exc);
             }
         }
 
