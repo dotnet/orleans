@@ -17,9 +17,6 @@
     <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider" DataConnectionString="UseDevelopmentStorage=true"/>
   </StreamProviders>
   <Assemblies>
-    <Assembly Path=".\TestGrainInterfaces.dll"/>
-    <Assembly Path=".\TestFSharpInterfaces.dll"/>
-    <Assembly Path=".\Orleans.dll"/>
-    <Assembly Path=".\TestInternalGrainInterfaces.dll"/>
+    <Assembly Name="TesterInternal"/>
   </Assemblies>
 </ClientConfiguration>

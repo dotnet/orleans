@@ -145,15 +145,15 @@ namespace Orleans
 
                 if (AssemblyCatalog == null)
                 {
-                    if (config.Assemblies == null ||
-                        config.Assemblies.Count == 0)
-                        throw new InvalidOperationException("No IAssemblyCatalog implementation or assembly list were provided.");
-
                     var catalog = new AssemblyCatalog();
 
-                    foreach (var asmPath in config.Assemblies)
+                    if (config.Assemblies == null ||
+                        config.Assemblies.Count == 0)
+                        catalog.WithAssembly(Assembly.GetEntryAssembly().FullName);
+
+                    foreach (var asmName in config.Assemblies)
                     {
-                        catalog.WithAssembly(asmPath);
+                        catalog.WithAssembly(asmName);
                     }
                     AssemblyCatalog = catalog;
                 }

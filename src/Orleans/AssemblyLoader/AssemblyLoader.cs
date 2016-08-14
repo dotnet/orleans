@@ -13,16 +13,18 @@ namespace Orleans.Runtime
 
         private AssemblyLoader(IAssemblyCatalog catalog)
         {
-            AssemblyCatalog = catalog;
-
-            AssemblyProcessor.ProcessAssemblies(catalog.GetAssemblies());
+            AssemblyCatalog = catalog;            
         }
 
         internal static AssemblyLoader NewAssemblyLoader(IAssemblyCatalog catalog)
         {
             if (catalog == null) throw new ArgumentNullException(nameof(catalog));
 
-            return new AssemblyLoader(catalog);
+            var loader =  new AssemblyLoader(catalog);
+
+            AssemblyProcessor.ProcessAssemblies(loader.AssemblyCatalog.GetAssemblies());
+
+            return loader;
         }
 
         public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class

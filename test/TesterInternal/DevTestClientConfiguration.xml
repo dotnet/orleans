@@ -10,9 +10,6 @@
   </Tracing>
   <Statistics MetricsTableWriteInterval="10s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true"/>
   <Assemblies>
-    <Assembly Path=".\TestGrainInterfaces.dll"/>
-    <Assembly Path=".\TestFSharpInterfaces.dll"/>
-    <Assembly Path=".\Orleans.dll"/>
-    <Assembly Path=".\TestInternalGrainInterfaces.dll"/>
+    <Assembly Name="TesterInternal"/>
   </Assemblies>
 </ClientConfiguration>

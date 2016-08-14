@@ -406,10 +406,10 @@ namespace Orleans.Runtime.Configuration
                     if (grandchild.LocalName != "Assembly")
                         throw new FormatException("Invalid element in Assemblies list");
 
-                    if (!grandchild.HasAttribute("Path"))
-                        throw new FormatException("Missing 'Path' attribute on Assembly element.");
+                    if (!grandchild.HasAttribute("Name"))
+                        throw new FormatException("Missing 'Name' attribute on Assembly element.");
 
-                    var asmPath = grandchild.Attributes["Path"].Value;
+                    var asmPath = grandchild.Attributes["Name"].Value;
                     assemblies.Add(asmPath);
                 }
             }

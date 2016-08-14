@@ -22,14 +22,7 @@
       <Directory Path="c:\" IncludeSubFolders="false" />
     </AdditionalAssemblyDirectories>
     <Assemblies>
-      <Assembly Path=".\TestGrainInterfaces.dll"/>
-      <Assembly Path=".\TestGrains.dll"/>
-      <Assembly Path=".\TestFSharpInterfaces.dll"/>
-      <Assembly Path=".\TestFSharp.dll"/>
-      <Assembly Path=".\Orleans.dll"/>
-      <Assembly Path=".\OrleansRuntime.dll"/>
-      <Assembly Path=".\TestInternalGrainInterfaces.dll"/>
-      <Assembly Path=".\TestInternalGrains.dll"/>
+      <Assembly Name="TesterInternal"/>
     </Assemblies>
   </Defaults>
   <Override Node="Primary">

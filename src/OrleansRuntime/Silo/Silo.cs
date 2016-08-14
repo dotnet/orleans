@@ -29,6 +29,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -243,11 +244,11 @@ namespace Orleans.Runtime
 
             if (AssemblyCatalog == null)
             {
+                var catalog = new AssemblyCatalog();
+
                 if (config.Defaults.Assemblies == null ||
                     config.Defaults.Assemblies.Count == 0)
-                    throw new InvalidOperationException("No IAssemblyCatalog implementation or assembly list were provided.");
-
-                var catalog = new AssemblyCatalog();
+                    catalog.WithAssembly(Assembly.GetEntryAssembly().FullName);
 
                 foreach (var asmPath in config.Defaults.Assemblies)
                 {

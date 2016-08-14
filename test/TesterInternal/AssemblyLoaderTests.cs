@@ -24,7 +24,7 @@ namespace UnitTests
         public void PathBasedAssemblyCatalogTest()
         {
             var catalog = NewCatalog()
-                .WithAssembly(@".\TestInternalGrainInterfaces.dll");
+                .WithAssembly("TestInternalGrainInterfaces");
 
             Assert.True(catalog.GetAssemblies().Count == 4);
         }
@@ -39,10 +39,7 @@ namespace UnitTests
         private AssemblyCatalog NewCatalog()
         {
             return new AssemblyCatalog()
-                .WithAssembly(@".\TestGrainInterfaces.dll")
-                .WithAssembly(@".\TestGrains.dll")
-                .WithAssembly(@".\TestInternalGrainInterfaces.dll")
-                .WithAssembly(@".\TestInternalGrains.dll");
+                .WithAssembly("TestInternalGrains");
         }
     }
 }
