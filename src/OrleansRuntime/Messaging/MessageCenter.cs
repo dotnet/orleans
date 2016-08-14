@@ -183,9 +183,9 @@ namespace Orleans.Runtime.Messaging
             InboundQueue.PostMessage(error);
         }
 
-        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
+        public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
         {
-           InboundQueue.LinkActionBlock(type, actionBlock);
+           InboundQueue.AddTargetBlock(type, actionBlock);
         }
 
         public void Dispose()

@@ -7,12 +7,12 @@ namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAgent : AsynchAgent
     {
-        ActionBlock<Message> _actionBlock;
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Dispatcher dispatcher;
         private readonly Message.Categories category;
+        private ActionBlock<Message> _actionBlock;
 
         internal IncomingMessageAgent(Message.Categories cat, IMessageCenter mc, ActivationDirectory ad, OrleansTaskScheduler sched, Dispatcher dispatcher) :
             base(cat.ToString())
@@ -23,11 +23,7 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             OnFault = FaultBehavior.RestartOnFault;
-            _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message),
-            new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = 16
-            });
+
         }
 
         public override void Start()
@@ -46,37 +42,15 @@ namespace Orleans.Runtime.Messaging
                     threadTracking.OnStartExecution();
                 }
 #endif
-                CancellationToken ct = Cts.Token;
-                messageCenter.LinkActionBlock(category, _actionBlock);
-                while (true)
-                {
-                    Thread.Sleep(242526343);
-                    continue;
-                    throw new Exception();
-                    // Get an application message
-                    Message msg = null;
-                    if (msg == null)
+                _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message),
+                    new ExecutionDataflowBlockOptions
                     {
-                        if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
-                        // Null return means cancelled
-                        break;
-                    }
+                        MaxDegreeOfParallelism = scheduler.MaximumConcurrencyLevel,
+                        CancellationToken = Cts.Token
+                    });
 
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStartProcessing();
-                    }
-#endif
-                    ReceiveMessage(msg);
-#if TRACK_DETAILED_STATS
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        threadTracking.OnStopProcessing();
-                        threadTracking.IncrementNumberOfProcessed();
-                    }
-#endif
-                }
+                messageCenter.AddTargetBlock(category, _actionBlock);
+                _actionBlock.Completion.Wait();
             }
             finally
             {
@@ -91,6 +65,20 @@ namespace Orleans.Runtime.Messaging
 
         private void ReceiveMessage(Message msg)
         {
+            if (msg == null)
+            {
+                if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
+                // Null return means cancelled
+                return;
+            }
+
+#if TRACK_DETAILED_STATS
+                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                    {
+                        threadTracking.OnStartProcessing();
+                    }
+#endif
+
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
 
             ISchedulingContext context;
@@ -163,6 +151,14 @@ namespace Orleans.Runtime.Messaging
                     EnqueueReceiveMessage(msg, null, null);
                 }
             }
+
+#if TRACK_DETAILED_STATS
+                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                    {
+                        threadTracking.OnStopProcessing();
+                        threadTracking.IncrementNumberOfProcessed();
+                    }
+#endif
         }
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)

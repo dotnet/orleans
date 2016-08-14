@@ -51,6 +51,8 @@ namespace Orleans
 
         private readonly GrainFactory grainFactory;
 
+        private ActionBlock<Message> _messageHandler;
+
         public GrainFactory InternalGrainFactory
         {
             get { return grainFactory; }
@@ -292,40 +294,23 @@ namespace Orleans
             StreamingInitialize();
         }
 
-             ActionBlock<Message> _ApplicationactionBlock;
-
         private void RunClientMessagePump(CancellationToken ct)
         {
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 incomingMessagesThreadTimeTracking.OnStartExecution();
             }
-            if (listenForMessages)
-            {
-                _ApplicationactionBlock = new ActionBlock<Message>(m => HandleMessage(m),
-            new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = 16
-            });
-                transport.LinkActionBlock(Message.Categories.Application, _ApplicationactionBlock);
-                Thread.Sleep(22224245);
-                throw new Exception("ss");
-                return;
 
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStartProcessing();
-                        }
-#endif
-#if TRACK_DETAILED_STATS
-                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                        {
-                            incomingMessagesThreadTimeTracking.OnStopProcessing();
-                            incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
-                        }
-#endif
-            }
+            _messageHandler = new ActionBlock<Message>(m => HandleMessage(m),
+                new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = 1,
+                    CancellationToken = ct
+                });
+
+            transport.AddTargetBlock(Message.Categories.Application, _messageHandler);
+            _messageHandler.Completion.Wait();
+
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {
                 incomingMessagesThreadTimeTracking.OnStopExecution();
@@ -334,6 +319,17 @@ namespace Orleans
 
         private void HandleMessage(Message message)
         {
+            if (!listenForMessages)
+            {
+                _messageHandler.Complete();
+            }
+
+#if TRACK_DETAILED_STATS
+                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                        {
+                            incomingMessagesThreadTimeTracking.OnStartProcessing();
+                        }
+#endif
             switch (message.Direction)
             {
                 case Message.Directions.Response:
@@ -351,6 +347,14 @@ namespace Orleans
                     logger.Error(ErrorCode.Runtime_Error_100327, String.Format("Message not supported: {0}.", message));
                     break;
             }
+
+#if TRACK_DETAILED_STATS
+                        if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                        {
+                            incomingMessagesThreadTimeTracking.OnStopProcessing();
+                            incomingMessagesThreadTimeTracking.IncrementNumberOfProcessed();
+                        }
+#endif
         }
 
         private void DispatchToLocalObject(Message message)

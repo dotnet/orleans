@@ -79,6 +79,7 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="taskWasPreviouslyQueued">A Boolean denoting whether or not task has previously been queued. If this parameter is True, then the task may have been previously queued (scheduled); if False, then the task is known not to have been queued, and this call is being made in order to execute the task inline without queuing it.</param>
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
+            // todo
             bool canExecuteInline = WorkerPoolThread.CurrentWorkerThread != null;
 
             RuntimeContext ctx = RuntimeContext.Current;

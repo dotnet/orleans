@@ -127,24 +127,27 @@ namespace UnitTests.SchedulerTests
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
+            for (int j = 0; j < 15; j++)
+            {
+                int n = 0;
 
-            int n = 0;
+                // ReSharper disable AccessToModifiedClosure
+                Task task1 = new Task(() => { Thread.Sleep(105); n = n + 5; });
+                Task task2 = new Task(async () =>{ n = n + 3; await Task.Delay(100); n = n * 3; });
+                Task task3 = new Task(() => { n = n + 4; });
 
-            // ReSharper disable AccessToModifiedClosure
-            Task task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
-            Task task2 = new Task(() => { n = n * 3; });
-            // ReSharper restore AccessToModifiedClosure
+                // ReSharper restore AccessToModifiedClosure
+                task1.Start(scheduler);
+                task2.Start(scheduler);
+                task3.Start(scheduler);
+                // Pause to let things run
+                Thread.Sleep(300);
 
-            task1.Start(scheduler);
-            task2.Start(scheduler);
-
-            // Pause to let things run
-            Thread.Sleep(2000);
-
-            // N should be 15, because the two tasks should execute in order
-            Assert.True(n != 0, "Work items did not get executed");
-            Assert.Equal(15, n);
-            output.WriteLine("Test executed OK.");
+                // N should be 36, because the three tasks should execute in order, with awaited part being executed last
+                Assert.True(n != 0, "Work items did not get executed");
+                Assert.Equal(36, n);
+                // output.WriteLine("Test executed OK.");
+            }
             orleansTaskScheduler.Stop();
         }
 

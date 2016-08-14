@@ -17,9 +17,11 @@ namespace Orleans.Runtime.Messaging
             get
             {
                 int n = 0;
+                // currenlty doesn't being used
+
                 //foreach (var queue in messageQueues)
                 //    n += queue.Count;
-                
+
                 return n;
             }
         }
@@ -69,30 +71,18 @@ namespace Orleans.Runtime.Messaging
             if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
         }
 
-        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
+        public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
         {
+            // buffer block used for temporary storing of the messages that arrived before
             (messageQueues[(int) type] as BufferBlock<Message>).LinkTo(actionBlock);
             messageQueues[(int) type] = actionBlock;
         }
 
-        public Message WaitMessage(Message.Categories type)
-        {
-            try
-            {
-                Message msg = null;
-
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking[(int)msg.Category].OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
+//#if TRACK_DETAILED_STATS
+//                if (StatisticsCollector.CollectQueueStats)
+//                {
+//                    queueTracking[(int)msg.Category].OnDeQueueRequest(msg);
+//                }
+//#endif
     }
 }

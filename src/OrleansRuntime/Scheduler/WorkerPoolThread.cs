@@ -101,39 +101,13 @@ namespace Orleans.Runtime.Scheduler
             CurrentWorkItem = null;
             if (StatisticsCollector.CollectTurnsStats)
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
-            executor = new ActionBlock<IWorkItem>(item =>
-            {
-                try
-                {
-                    //  CurrentWorkerThread = Thread.CurrentThread;
-                    if (RuntimeContext.Current == null)
-                    {
-                        RuntimeContext.Current = new RuntimeContext
-                        {
-                            Scheduler = scheduler
-                        };
-                    }
-
-                    RuntimeContext.SetExecutionContext(item.SchedulingContext, scheduler);
-
-
-                    item.Execute();
-                    RuntimeContext.ResetExecutionContext();
-                }
-                catch (Exception ex)
-                {
-                    var b = ex;
-                }
-            },
-            new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = 16
-            });
         }
 
-        private readonly ActionBlock<IWorkItem> executor;
+        private readonly ActionBlock<IWorkItem> _executor;
         protected override void Run()
         {
+            // not used anymore
+            Thread.Sleep(222221000);
             try
             {
                 // We can't set these in the constructor because that doesn't run on our thread
@@ -204,7 +178,7 @@ namespace Orleans.Runtime.Scheduler
                                     }
                                 }
 #endif
-                                executor.Post(todo);
+                                _executor.Post(todo);
                             }
                             catch (ThreadAbortException ex)
                             {
@@ -380,6 +354,7 @@ namespace Orleans.Runtime.Scheduler
 
         private bool IsFrozen()
         {
+            // todo
             if (CurrentTask != null)
             {
                 return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;

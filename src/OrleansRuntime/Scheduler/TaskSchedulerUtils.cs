@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Scheduler
             return task;
         }
 
-        private static void RunWorkItemTask(IWorkItem todo, TaskScheduler sched)
+        internal static void RunWorkItemTask(IWorkItem todo, TaskScheduler sched)
         {
             try
             {

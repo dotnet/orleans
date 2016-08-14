@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "Newtonsoft.Json": "7.0.1"
+    "Newtonsoft.Json": "7.0.1",
+    "System.Threading.Tasks.Dataflow": "4.6.0" 
   },
   "frameworks": {
     "net451": {}

@@ -287,56 +287,7 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-//        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-//        public Message WaitMessage(Message.Categories type, CancellationToken ct)
-//        {
-//            try
-//            {
-//                if (ct.IsCancellationRequested)
-//                {
-//                    return null;
-//                }
-
-//                // Don't pass CancellationToken to Take. It causes too much spinning.
-//                Message msg = null;//= PendingInboundMessages.Take(); // todo
-//#if TRACK_DETAILED_STATS
-//                if (StatisticsCollector.CollectQueueStats)
-//                {
-//                    queueTracking.OnDeQueueRequest(msg);
-//                }
-//#endif
-//                return msg;
-//            }
-//            catch (ThreadAbortException exc)
-//            {
-//                // Silo may be shutting-down, so downgrade to verbose log
-//                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
-//                Thread.ResetAbort();
-//                return null;
-//            }
-//            catch (OperationCanceledException exc)
-//            {
-//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
-//                return null;
-//            }
-//            catch (ObjectDisposedException exc)
-//            {
-//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
-//                return null;
-//            }
-//            catch (InvalidOperationException exc)
-//            {
-//                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
-//                return null;
-//            }
-//            catch (Exception ex)
-//            {
-//                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
-//                return null;
-//            }
-//        }
-
-        public void LinkActionBlock(Message.Categories type, ActionBlock<Message> actionBlock)
+        public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
         {
             PendingInboundMessages.LinkTo(actionBlock);
         }

@@ -15,36 +15,14 @@ namespace Orleans.Runtime.Scheduler
         private readonly QueueTrackingStatistic systemQueueTracking;
         private readonly QueueTrackingStatistic tasksQueueTracking;
 
-        private readonly ActionBlock<IWorkItem> executor;
-        public int Length { get { return executor.InputCount; } }
+        private readonly ActionBlock<IWorkItem> mainQueueExecutor;
+        private readonly ActionBlock<IWorkItem> systemQueueExecutor;
+        public int Length => mainQueueExecutor.InputCount;
 
-        internal WorkQueue(TaskScheduler scheduler)
+        internal WorkQueue(OrleansTaskScheduler scheduler, int maxActiveThreads)
         {
-            executor = new ActionBlock<IWorkItem>(item =>
-            {
-                try
-                {
-                    //  CurrentWorkerThread = Thread.CurrentThread;
-                    RuntimeContext.Current = new RuntimeContext
-                    {
-                        Scheduler = scheduler
-                    };
-                    RuntimeContext.SetExecutionContext(item.SchedulingContext, scheduler);
-
-
-                    item.Execute();
-                    RuntimeContext.ResetExecutionContext();
-                }
-                catch (Exception ex)
-                {
-                    var b = ex;
-                    //throw new Exception("QQQ");
-                }
-            },
-            new ExecutionDataflowBlockOptions
-            {
-                MaxDegreeOfParallelism = 16
-            });
+            mainQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
+            systemQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue");
@@ -61,30 +39,29 @@ namespace Orleans.Runtime.Scheduler
 
             try
             {
-                executor.Post(workItem);
 #if PRIORITIZE_SYSTEM_TASKS
                 if (workItem.IsSystemPriority)
                 {
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         systemQueueTracking.OnEnQueueRequest(1, systemQueue.Count);
-    #endif
-                   // systemQueue.Add(workItem);
+#endif
+                  systemQueueExecutor.Post(workItem);
                 }
                 else
                 {
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
-    #endif
-                   // mainQueue.Add(workItem);                    
+#endif
+                    mainQueueExecutor.Post(workItem);
                 }
 #else
-    #if TRACK_DETAILED_STATS
+#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectQueueStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
-    #endif
-                mainQueue.Add(task);
+#endif
+                    mainQueueExecutor.Post(workItem);
 #endif
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectGlobalShedulerStats)
@@ -101,25 +78,21 @@ namespace Orleans.Runtime.Scheduler
 
         public void DumpStatus(StringBuilder sb)
         {
-            //if (systemQueue.Count > 0)
-            //{
-            //    sb.AppendLine("System Queue:");
-            //    foreach (var workItem in systemQueue)
-            //    {
-            //        sb.AppendFormat("  {0}", workItem).AppendLine();
-            //    }
-            //}
-            
-            //if (mainQueue.Count <= 0) return;
+            if (systemQueueExecutor.InputCount > 0)
+            {
+                sb.AppendLine("System Queue:");
+                sb.AppendFormat("  {0}", systemQueueExecutor.InputCount).AppendLine();
+            }
 
-            //sb.AppendLine("Main Queue:");
-            //foreach (var workItem in mainQueue)
-            //    sb.AppendFormat("  {0}", workItem).AppendLine();
+            if (mainQueueExecutor.InputCount <= 0) return;
+
+            sb.AppendLine("Main Queue:");
+            sb.AppendFormat("  {0}", mainQueueExecutor.InputCount).AppendLine();
         }
 
         public void RunDown()
         {
-          executor.Complete();
+          mainQueueExecutor.Complete();
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking.OnStopExecution();
@@ -127,5 +100,24 @@ namespace Orleans.Runtime.Scheduler
             tasksQueueTracking.OnStopExecution();
         }
 
+        internal static ActionBlock<IWorkItem> GetWorkItemExecutor(TaskScheduler scheduler, int maxActiveThreads)
+        {
+            return new ActionBlock<IWorkItem>(item =>
+            {
+                if (RuntimeContext.Current == null)
+                {
+                    RuntimeContext.Current = new RuntimeContext
+                    {
+                        Scheduler = scheduler
+                    };
+                }
+
+                TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
+            },
+                new ExecutionDataflowBlockOptions
+                {
+                    MaxDegreeOfParallelism = maxActiveThreads
+                });
+        }
     }
 }
