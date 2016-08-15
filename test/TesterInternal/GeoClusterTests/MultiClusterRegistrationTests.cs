@@ -29,7 +29,7 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
-        [Fact, TestCategory("GeoCluster")]
+        [Fact, TestCategory("Functional"), TestCategory("GeoCluster")]
         public async Task TwoClusterBattery()
         {
 
@@ -82,25 +82,6 @@ namespace UnitTests.GeoClusterTests
             foreach (var t in testtasks)
                 await t;
         }
-
-        [Fact, TestCategory("GeoCluster")]
-        public async Task WideParallelCreation()
-        {
-
-            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2, 2, 1, 1));
-
-            var testtasks = new List<Task>();
-
-            for (int i = 0; i < 20; i++)
-            {
-                testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
-                testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
-            }
-
-            foreach (var t in testtasks)
-                await t;
-        }
-
 
         public Task StartClustersAndClients(params int[] silos) 
         {
