@@ -6,7 +6,7 @@ title: Unit Testing Grains
 This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
 For a distributed application written in Orleans, you'll need load tests and integration tests as well but here we'll only focus on unit tests.
 
-Orleans makes it possible to mock many of its parts but here we only focus on simply running grains in test silos.
+Orleans makes it possible to mock many of its parts ([example](https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal)) but here we only focus on simply running grains in test silos.
 
 The steps are
 
@@ -41,7 +41,7 @@ namespace Tests
         [ClassCleanup]
         public static void ClassCleanup()
         {
-            // Optional. 
+            // Optional.
             // By default, the next test class which uses TestingSiloHost will
             // cause a fresh Orleans silo environment to be created.
             StopAllSilos();
@@ -56,10 +56,10 @@ namespace Tests
             const string greeting = "Bonjour";
 
             IHello grain = GrainFactory.GetGrain<IHello>(id);
-            
+
             // This will create and call a Hello grain with specified 'id' in one of the test silos.
             string reply = await grain.SayHello(greeting);
-            
+
             Assert.IsNotNull(reply, "Grain replied with some message");
             string expected = string.Format("You said: '{0}', I say: Hello!", greeting);
             Assert.AreEqual(expected, reply, "Grain replied with expected message");
@@ -70,11 +70,11 @@ namespace Tests
 ```
 
 Since this test method is asynchronous and leverages the `await` keyword, be sure the method is defined as `async` and returns a `Task`.
-As you can see having `ClassCleanup()` is optional but it's good to have it around. 
+As you can see having `ClassCleanup()` is optional but it's good to have it around.
 Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.
 
 So writing tests for Orleans is not much different from a normal test project.
-You just need to reference the two NuGet packages and derive your class from `TestingSiloHost`. 
+You just need to reference the two NuGet packages and derive your class from `TestingSiloHost`.
 
 ## Remarks
 
