@@ -16,7 +16,7 @@ namespace OrleansBenchmarks.MapReduce
 {
     public class MapReduceBenchmark
     {
-        private static SiloHandle _siloHandle;
+        private static TestCluster _host;
         private readonly int _intermediateStagesCount = 15;
         private readonly int _pipelineParallelization = 4;
         private readonly int _repeats = 50000;
@@ -25,23 +25,11 @@ namespace OrleansBenchmarks.MapReduce
         [Setup]
         public void BenchmarkSetup()
         {
-            var nodeConfig = new NodeConfiguration
-            {
-                TraceToConsole = false,
-                DefaultTraceLevel = Severity.Warning
-            };
-
-            var clusterConfig = ClusterConfiguration.LocalhostPrimarySilo();
-            clusterConfig.Defaults.TraceToConsole = false;
-            _siloHandle = TestCluster.StartOrleansSilo(
-                new TestCluster(),
-                Silo.SiloType.Primary,
-                clusterConfig,
-                nodeConfig);
-
-            var clientConfig = ClientConfiguration.LocalhostSilo();
-            clientConfig.TraceToConsole = false;
-            GrainClient.Initialize(clientConfig);
+            TestClusterOptions.DefaultTraceToConsole = false;
+            var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.ApplyToAllNodes(c => c.DefaultTraceLevel = Severity.Warning);
+            _host = new TestCluster(options);
+            _host.Deploy();
         }
 
         [Benchmark]
@@ -57,6 +45,7 @@ namespace OrleansBenchmarks.MapReduce
                 });
 
             await Task.WhenAll(pipelines);
+            _host.StopAllSilos();
         }
 
         private async Task BenchCore()
