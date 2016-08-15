@@ -46,9 +46,12 @@ namespace UnitTests.SchedulerTests
             orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
 
             output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
+
+            int repeats = 10;
+            CountdownEvent countdown = new CountdownEvent(repeats);
             orleansTaskScheduler.QueueWorkItem(new ClosureWorkItem(() =>
                 {
-                    for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < repeats; i++)
                     {
                         Task.Factory.StartNew(() => 
                         {
@@ -60,13 +63,14 @@ namespace UnitTests.SchedulerTests
                             Thread.Sleep(100); 
                             n = k + 1;
                             insideTask = false;
+                            countdown.Signal();
                             // ReSharper restore AccessToModifiedClosure
                         }).Ignore();
                     }
                 }), context);
 
             // Pause to let things run
-            Thread.Sleep(1500);
+            countdown.Wait();
 
             // N should be 10, because all tasks should execute serially
             Assert.True(n != 0, "Work items did not get executed");

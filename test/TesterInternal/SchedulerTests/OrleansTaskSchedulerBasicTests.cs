@@ -127,7 +127,7 @@ namespace UnitTests.SchedulerTests
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
             OrleansTaskScheduler orleansTaskScheduler = TestInternalHelper.InitializeSchedulerForTesting(context);
             ActivationTaskScheduler scheduler = orleansTaskScheduler.GetWorkItemGroup(context).TaskRunner;
-            for (int j = 0; j < 15; j++)
+            for (int j = 0; j < 5; j++)
             {
                 int n = 0;
 
@@ -141,7 +141,7 @@ namespace UnitTests.SchedulerTests
                 task2.Start(scheduler);
                 task3.Start(scheduler);
                 // Pause to let things run
-                Thread.Sleep(300);
+                Thread.Sleep(2000);
 
                 // N should be 36, because the three tasks should execute in order, with awaited part being executed last
                 Assert.True(n != 0, "Work items did not get executed");
@@ -268,7 +268,7 @@ namespace UnitTests.SchedulerTests
 
             wrapper2.Start(scheduler);
             pause2.Set();
-            bool finished = wrapper2.Wait(TimeSpan.FromMilliseconds(100));
+            bool finished = wrapper2.Wait(TimeSpan.FromMilliseconds(500));
             if (!finished) throw new TimeoutException();
 
             Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
