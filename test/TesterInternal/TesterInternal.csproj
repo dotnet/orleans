@@ -55,6 +55,7 @@
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
+    <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />

@@ -199,6 +199,10 @@
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj">
+      <Project>{67738e6c-f292-46a2-994d-5b52e745205b}</Project>
+      <Name>OrleansAWSUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
       <Name>OrleansAzureUtils</Name>
