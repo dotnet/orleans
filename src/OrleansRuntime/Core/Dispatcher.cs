@@ -145,27 +145,26 @@ namespace Orleans.Runtime
                         // we want to make sure that we don't un-register the activation we just created.
                         // We would add a counter here, except that there's already a counter for this in the Catalog.
                         // Note that this has to run in a non-null scheduler context, so we always queue it to the catalog's context
-                        if (config.Globals.DirectoryLazyDeregistrationDelay > TimeSpan.Zero)
-                        {
-                            Scheduler.QueueWorkItem(new ClosureWorkItem(
-                                // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
-                                async () =>   
+                        var origin = message.SendingSilo;
+                        Scheduler.QueueWorkItem(new ClosureWorkItem(
+                            // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
+                            async () =>
+                            {
+                                try
                                 {
-                                    try
-                                    { 
-                                        await Silo.CurrentSilo.LocalGrainDirectory.UnregisterConditionallyAsync(
-                                            nonExistentActivation);
-                                    }
-                                    catch(Exception exc)
-                                    {
-                                        logger.Warn(ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
-                                            String.Format("Failed to un-register NonExistentActivation {0}", 
-                                                nonExistentActivation), exc);
-                                    }
-                                },
-                                () => "LocalGrainDirectory.UnregisterConditionallyAsync"),
-                                catalog.SchedulingContext);
-                        }
+                                    await Silo.CurrentSilo.LocalGrainDirectory.UnregisterAfterNonexistingActivation(
+                                        nonExistentActivation, origin);
+                                }
+                                catch (Exception exc)
+                                {
+                                    logger.Warn(ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
+                                        String.Format("Failed to un-register NonExistentActivation {0}",
+                                            nonExistentActivation), exc);
+                                }
+                            },
+                            () => "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
+                            catalog.SchedulingContext);
+
                         ProcessRequestToInvalidActivation(message, nonExistentActivation, null, "Non-existent activation");
                     }
                     else
@@ -451,14 +450,31 @@ namespace Orleans.Runtime
             bool forwardingSucceded = true;
             try
             {
+
                 logger.Info(ErrorCode.Messaging_Dispatcher_TryForward, 
                     String.Format("Trying to forward after {0}, ForwardCount = {1}. Message {2}.", failedOperation, message.ForwardCount, message));
+
+                // if this message is from a different cluster and hit a non-existing activation
+                // in this cluster (which can happen due to stale cache or directory states)
+                // we forward it back to the original silo it came from in the original cluster,
+                // and target it to a fictional activation that is guaranteed to not exist.
+                // This ensures that the GSI protocol creates a new instance there instead of here.
+                if (forwardingAddress == null
+                    && message.TargetSilo != message.SendingSilo
+                    && !Silo.CurrentSilo.LocalGrainDirectory.IsSiloInCluster(message.SendingSilo))
+                {
+                    message.ReturnedFromRemoteCluster = true; // marks message to force invalidation of stale directory entry
+                    forwardingAddress = ActivationAddress.NewActivationAddress(message.SendingSilo, message.TargetGrain);
+                    logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster,
+                        String.Format("Forwarding back to origin cluster, to fictional activation {0}", message));
+                }
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageReRouted(message);
                 if (oldAddress != null)
                 {
                     message.AddToCacheInvalidationHeader(oldAddress);
                 }
+
                 forwardingSucceded = InsideRuntimeClient.Current.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)

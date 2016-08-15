@@ -578,7 +578,7 @@ namespace Orleans.Runtime
                                 // Need to undo the registration we just did earlier
                                 if (activation.IsUsingGrainDirectory)
                                 {
-                                    scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                    scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address, UnregistrationCause.Force),
                                         SchedulingContext).Ignore();
                                 }
                                 RerouteAllQueuedMessages(activation, null,
@@ -593,7 +593,7 @@ namespace Orleans.Runtime
                             // Need to undo the registration we just did earlier
                             if (activation.IsUsingGrainDirectory)
                             {
-                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address, UnregistrationCause.Force),
                                     SchedulingContext).Ignore();
                             }
 
@@ -607,7 +607,7 @@ namespace Orleans.Runtime
                             // Need to undo the registration we just did earlier
                             if (activation.IsUsingGrainDirectory)
                             {
-                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address),
+                                scheduler.RunOrQueueTask(() => directory.UnregisterAsync(address, UnregistrationCause.Force),
                                     SchedulingContext).Ignore();
                             }
 
@@ -1016,7 +1016,7 @@ namespace Orleans.Runtime
                     if (activationsToDeactivate.Count > 0)
                     {
                         await scheduler.RunOrQueueTask(() =>
-                            directory.UnregisterManyAsync(activationsToDeactivate),
+                            directory.UnregisterManyAsync(activationsToDeactivate, UnregistrationCause.Force),
                             SchedulingContext);
                     }
                 }

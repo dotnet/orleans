@@ -33,6 +33,21 @@ namespace Orleans.Runtime.GrainDirectory
             CheckIfDone();
         }
 
+        // for tracing, display outcome
+        public override string ToString()
+        {
+            if (!this.Task.IsCompleted)
+                return "pending";
+            else if (Task.IsFaulted)
+                return "faulted";
+            else
+            {
+                return string.Format("[{0} {1}]",
+                     Task.Result.ToString(),
+                     (RemoteOwner.Address != null) ? RemoteOwner.Address.ToString() : "");
+            }
+        }
+
         /// <summary>
         /// Check responses; signal completion if we have received enough responses to determine outcome.
         /// </summary>

@@ -36,6 +36,7 @@ namespace Orleans.Runtime
             SENDING_GRAIN,
             SENDING_SILO,
             IS_NEW_PLACEMENT,
+            RETURNED_FROM_REMOTE_CLUSTER,
 
             TARGET_ACTIVATION,
             TARGET_GRAIN,
@@ -273,6 +274,13 @@ namespace Orleans.Runtime
             }
         }
 
+        public bool ReturnedFromRemoteCluster
+        {
+            get { return GetScalarHeader<bool>(Header.RETURNED_FROM_REMOTE_CLUSTER); }
+            set {  SetHeader(Header.RETURNED_FROM_REMOTE_CLUSTER, value); }
+        }
+
+
         public ResponseTypes Result
         {
             get { return GetScalarHeader<ResponseTypes>(Header.RESULT); }
@@ -338,7 +346,11 @@ namespace Orleans.Runtime
         // (got here due to outdated cache, silo is shutting down/overloaded, ...).
         public bool MayForward(GlobalConfiguration config)
         {
-            return ForwardCount < config.MaxForwardCount;
+            return ForwardCount < config.MaxForwardCount +
+                // if using multiple clusters, due to stale cache or directory entries,
+                // we may return the message to the original cluster, 
+                // which means we take a detour of up to 3 hops
+                (ReturnedFromRemoteCluster ? 3 : 0);
         }
 
         /// <summary>

@@ -281,9 +281,10 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address);
+                        directory.InvalidateCacheEntry(address, message.ReturnedFromRemoteCluster);
                     }
                 }
+   
 #if false
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.

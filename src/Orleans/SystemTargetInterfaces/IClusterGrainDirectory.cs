@@ -89,9 +89,18 @@ namespace Orleans.SystemTargetInterfaces
         Task ProcessDeactivations(List<ActivationAddress> addresses);
 
         /// <summary>
+        /// Called when nonexistent activations are targeted, to remove stale directory 
+        /// entries for activations in different clusters. 
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns></returns>
+        Task UnregisterAfterNonexistingActivation(ActivationAddress address);
+
+        /// <summary>
         /// Called on remote clusters when deletion of all grain registrations is asked for.
         /// </summary>
         /// <param name="grainId"></param>
         Task ProcessDeletion(GrainId grainId);
+
     }
 }

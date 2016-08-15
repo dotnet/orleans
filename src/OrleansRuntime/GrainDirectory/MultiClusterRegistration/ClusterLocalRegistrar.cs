@@ -33,9 +33,9 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
   
-        public void Unregister(ActivationAddress address, bool force)
+        public void Unregister(ActivationAddress address, UnregistrationCause cause)
         {
-            directoryPartition.RemoveActivation(address.Grain, address.Activation, force);
+            directoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
         }
 
         public void Delete(GrainId gid)
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.GrainDirectory
             throw new InvalidOperationException();
         }
 
-        public Task UnregisterAsync(List<ActivationAddress> addresses, bool force)
+        public Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
             throw new InvalidOperationException();
         }
@@ -57,6 +57,11 @@ namespace Orleans.Runtime.GrainDirectory
         public Task DeleteAsync(GrainId gid)
         {
             throw new InvalidOperationException();
+        }
+
+        public void InvalidateCache(ActivationAddress address)
+        {
+            // no need to do anything since the directory does not cache activations in remote clusters
         }
     }
 }

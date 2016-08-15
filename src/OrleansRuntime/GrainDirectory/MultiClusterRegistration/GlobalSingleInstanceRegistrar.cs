@@ -31,7 +31,7 @@ namespace Orleans.Runtime.GrainDirectory
             throw new InvalidOperationException();
         }
 
-        public void Unregister(ActivationAddress address, bool force)
+        public void Unregister(ActivationAddress address, UnregistrationCause cause)
         {
             throw new InvalidOperationException();
         }
@@ -89,7 +89,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var outcome = await responses.Task;
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:Req {0} Round={1} Outcome={2}", address.Grain.ToString(), NUM_RETRIES - retries, outcome.ToString());
+                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), NUM_RETRIES - retries, responses);
 
                 switch (outcome)
                 {
@@ -150,20 +150,34 @@ namespace Orleans.Runtime.GrainDirectory
             Debugger.Break();
         }
 
-        public Task UnregisterAsync(List<ActivationAddress> addresses, bool force)
+        public Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
             List<ActivationAddress> formerActivationsInThisCluster = null;
 
             foreach (var address in addresses)
             {
-                var existingAct = directoryPartition.LookupAndRemoveActivation(address, force);
-                if (existingAct != null
-                    && (existingAct.RegistrationStatus == MultiClusterStatus.Owned 
-                        || existingAct.RegistrationStatus == MultiClusterStatus.Doubtful))
+                IActivationInfo existingAct;
+                bool was_removed;
+                directoryPartition.RemoveActivation(address.Grain, address.Activation, cause, out existingAct, out was_removed);
+                if (existingAct == null)
                 {
+                    logger.Verbose2("GSIP:Unr {0} {1} ignored", cause, address);
+                }
+                else if (!was_removed)
+                {
+                    logger.Verbose2("GSIP:Unr {0} {1} too fresh", cause, address);
+                }
+                else if (existingAct.RegistrationStatus == MultiClusterStatus.Owned
+                        || existingAct.RegistrationStatus == MultiClusterStatus.Doubtful)
+                {
+                    logger.Verbose2("GSIP:Unr {0} {1} broadcast ({2})", cause, address, existingAct.RegistrationStatus);
                     if (formerActivationsInThisCluster == null)
                         formerActivationsInThisCluster = new List<ActivationAddress>();
                     formerActivationsInThisCluster.Add(address);
+                }
+                else
+                {
+                    logger.Verbose2("GSIP:Unr {0} {1} removed ({2})", cause, address, existingAct.RegistrationStatus);
                 }
             }
 
@@ -172,7 +186,6 @@ namespace Orleans.Runtime.GrainDirectory
 
             // we must also remove cached references to former activations in this cluster
             // from remote clusters; thus, we broadcast the unregistration
-
             var myClusterId = Silo.CurrentSilo.ClusterId;
 
             if (myClusterId == null)
@@ -191,12 +204,28 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
+                
                 tasks.Add(clusterGrainDir.ProcessDeactivations(formerActivationsInThisCluster));
             }
             return Task.WhenAll(tasks);
         }
 
-     
+        public void InvalidateCache(ActivationAddress address)
+        {
+            IActivationInfo existingAct;
+            bool was_removed;
+            directoryPartition.RemoveActivation(address.Grain, address.Activation, UnregistrationCause.CacheInvalidation, out existingAct, out was_removed);
+            if (!was_removed)
+            {
+                logger.Verbose2("GSIP:Inv {0} ignored", address);
+            }
+            else  
+            {
+                logger.Verbose2("GSIP:Inv {0} removed ({1})", address, existingAct.RegistrationStatus);
+            }
+        }
+        
+
         public Task DeleteAsync(GrainId gid)
         {   
             directoryPartition.RemoveGrain(gid);
@@ -241,7 +270,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Send request to the given remote cluster
+        /// Send GSI protocol request to the given remote cluster
         /// </summary>
         /// <param name="remotecluster"></param>
         /// <param name="responses"></param>

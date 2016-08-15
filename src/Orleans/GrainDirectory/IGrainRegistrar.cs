@@ -40,17 +40,25 @@ namespace Orleans.GrainDirectory
         /// Removes the given activation registration, synchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="address">the activations to unregister</param>
-        /// <param name="force">if false, remove only registrations older than the lazy deregistration delay</param>
-        void Unregister(ActivationAddress address, bool force);
+        /// <param name="address">the activation to unregister</param>
+        /// <param name="cause">The reason for unregistration</param>
+        void Unregister(ActivationAddress address, UnregistrationCause cause);
+
+
+        /// <summary>
+        /// Invalidates registrations that are caches, i.e. point to activations in other clusters
+        /// </summary>
+        /// <param name="address">the remote activation to remove from the cache</param>
+        void InvalidateCache(ActivationAddress address);
+
 
         /// <summary>
         /// Removes the given activation registrations, asynchronously.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="addresses">the activations to unregister</param>
-        /// <param name="force">if false, remove only registrations older than the lazy deregistration delay</param>
-        Task UnregisterAsync(List<ActivationAddress> addresses, bool force);
+        /// <param name="cause">The reason for unregistration</param>
+        Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause);
 
         /// <summary>
         /// Deletes all registrations for a grain, synchronously

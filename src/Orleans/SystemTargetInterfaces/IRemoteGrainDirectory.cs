@@ -11,6 +11,7 @@ namespace Orleans.Runtime
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
         MultiClusterStatus RegistrationStatus { get; set; }
+        bool OkToRemove(UnregistrationCause cause);
     }
 
     internal interface IGrainInfo
@@ -20,9 +21,7 @@ namespace Orleans.Runtime
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus);
-        bool RemoveActivation(ActivationAddress addr);
-        bool RemoveActivation(ActivationId act, bool force);
-        IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force);
+        bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo entry, out bool was_removed);
         bool Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
         bool UpdateClusterRegistrationStatus(ActivationId activationId, MultiClusterStatus registrationStatus, MultiClusterStatus? compareWith = null);

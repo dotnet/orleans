@@ -28,6 +28,34 @@ namespace Orleans.Runtime.GrainDirectory
             RegistrationStatus = iActivationInfo.RegistrationStatus;
         }
 
+
+        public bool OkToRemove(UnregistrationCause cause)
+        {
+            switch (cause)
+            {
+                case UnregistrationCause.Force:
+                    return true;
+
+                case UnregistrationCause.CacheInvalidation:
+                    return RegistrationStatus == MultiClusterStatus.Cached;
+
+                case UnregistrationCause.NonexistentActivation:
+                    {
+                        if (RegistrationStatus == MultiClusterStatus.Cached)
+                            return true; // cache entries are always removed
+
+                        var delayparameter = Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay;
+                        if (delayparameter <= TimeSpan.Zero)
+                            return false; // no lazy deregistration
+                        else
+                            return (TimeCreated <= DateTime.UtcNow - delayparameter);
+                    }
+
+                default:
+                    throw new OrleansException("unhandled case");
+            }
+        }
+
         public override string ToString()
         {
             return String.Format("{0}, {1}", SiloAddress, TimeCreated);
@@ -93,50 +121,17 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public bool RemoveActivation(ActivationAddress addr)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo info, out bool was_removed)
         {
-            return RemoveActivation(addr.Activation, true);
-        }
-
-        public bool RemoveActivation(ActivationId act, bool force)
-        {
-            if (force)
+            info = null;
+            was_removed = false;
+            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause))
             {
                 Instances.Remove(act);
-                VersionTag = rand.Next();                
-            }
-            else
-            {
-                if (Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay > TimeSpan.Zero)
-                {
-                    IActivationInfo info;
-                    if (Instances.TryGetValue(act, out info))
-                    {
-                        if (info.TimeCreated <= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay)
-                        {
-                            Instances.Remove(act);
-                            VersionTag = rand.Next();
-                        }
-                    }
-                }
+                was_removed = true;
+                VersionTag = rand.Next();
             }
             return Instances.Count == 0;
-        }
-
-        public IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force)
-        {
-            IActivationInfo info = null;
-            if (Instances.TryGetValue(address.Activation, out info))
-            {
-                if (force
-                    || (Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay > TimeSpan.Zero
-                        && info.TimeCreated <= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay))
-                {
-                    Instances.Remove(address.Activation);
-                    VersionTag = rand.Next();
-                }
-            }
-            return info;
         }
 
         public bool Merge(GrainId grain, IGrainInfo other)
@@ -308,24 +303,45 @@ namespace Orleans.Runtime.GrainDirectory
             return result;
         }
 
+
         /// <summary>
         /// Removes an activation of the given grain from the partition
         /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="activation"></param>
-        /// <param name="force"></param>
-        internal void RemoveActivation(GrainId grain, ActivationId activation, bool force)
+        /// <param name="grain">the identity of the grain</param>
+        /// <param name="activation">the id of the activation</param>
+        /// <param name="cause">reason for removing the activation</param>
+        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause = UnregistrationCause.Force)
         {
-            lock (lockable)
-            {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, force))
-                {
-                    partitionData.Remove(grain);
-                }
-            }
-            if (log.IsVerbose3) log.Verbose3("Removing activation for grain {0}", grain.ToString());
+            IActivationInfo ignore1;
+            bool ignore2;
+            RemoveActivation(grain, activation, cause, out ignore1, out ignore2);
         }
 
+
+        /// <summary>
+        /// Removes an activation of the given grain from the partition
+        /// </summary>
+        /// <param name="grain">the identity of the grain</param>
+        /// <param name="activation">the id of the activation</param>
+        /// <param name="cause">reason for removing the activation</param>
+        /// <param name="entry">returns the entry, if found </param>
+        /// <param name="was_removed">returns whether the entry was actually removed</param>
+        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause, out IActivationInfo entry, out bool was_removed)
+        {
+            was_removed = false;
+            entry = null;
+            lock (lockable)
+            {
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, out entry, out was_removed))
+                    // if the last activation for the grain was removed, we remove the entire grain info 
+                    partitionData.Remove(grain);
+
+            }
+            if (log.IsVerbose3)
+                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, was_removed);
+        }
+
+   
         /// <summary>
         /// Removes the grain (and, effectively, all its activations) from the diretcory
         /// </summary>
@@ -408,16 +424,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public IActivationInfo LookupAndRemoveActivation(ActivationAddress address, bool force)
-        {
-            lock (lockable)
-            {
-                IGrainInfo graininfo;
-                if (partitionData.TryGetValue(address.Grain, out graininfo))
-                    return graininfo.LookupAndRemoveActivation(address, force);
-            }
-            return null;
-        }
         /// <summary>
         /// Merges one partition into another, asuuming partitions are disjoint.
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.

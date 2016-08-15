@@ -15,16 +15,152 @@ namespace UnitTests.GeoClusterTests
 {
     public class MultiClusterRegistrationTests : TestingClusterHost
     {
-        private const string ClusterA = "A";
-        private const string ClusterB = "B";
-        private const string ClusterC = "C";
+        private string[] ClusterNames;
+        private ClientWrapper[][] Clients;
 
-        private static ClientWrapper ClientA0;
-        private static ClientWrapper ClientA1;
-        private static ClientWrapper ClientB0;
-        private static ClientWrapper ClientB1;
-        private static ClientWrapper ClientC0;
-        private static ClientWrapper ClientC1;
+        private IEnumerable<KeyValuePair<string, ClientWrapper>> EnumerateClients()
+        {
+            for (int i = 0; i < ClusterNames.Length; i++)
+                foreach (var c in Clients[i])
+                    yield return new KeyValuePair<string, ClientWrapper>(ClusterNames[i], c);
+        }
+
+        public MultiClusterRegistrationTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task TwoClusterBattery()
+        {
+
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2,2));
+
+            var testtasks = new List<Task>();
+
+            testtasks.Add(RunWithTimeout("Deact", 20000, Deact));
+            testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
+            testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
+            testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+
+            foreach (var t in testtasks)
+                await t;
+        }
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task ThreeClusterBattery()
+        {
+
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2,2,2));
+
+            var testtasks = new List<Task>();
+
+            testtasks.Add(RunWithTimeout("Deact", 20000, Deact));
+            testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
+            testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
+            testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+
+            foreach (var t in testtasks)
+                await t;
+        }
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task FourClusterBattery()
+        {
+
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2, 2, 1, 1));
+
+            var testtasks = new List<Task>();
+
+            for (int i = 0; i < 20; i++)
+            {
+                testtasks.Add(RunWithTimeout("Deact", 20000, Deact));
+                testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
+                testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
+                testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+            }
+
+            foreach (var t in testtasks)
+                await t;
+        }
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task WideParallelCreation()
+        {
+
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2, 2, 1, 1));
+
+            var testtasks = new List<Task>();
+
+            for (int i = 0; i < 20; i++)
+            {
+                testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
+                testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+            }
+
+            foreach (var t in testtasks)
+                await t;
+        }
+
+
+        public Task StartClustersAndClients(params int[] silos) 
+        {
+            return StartClustersAndClients(null, silos);
+        }
+
+        public Task StartClustersAndClients(Action<ClusterConfiguration> customizer, params int[] silos)
+        {
+            WriteLog("Creating clusters and clients...");
+            var stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
+            // use a random global service id for testing purposes
+            var globalserviceid = Guid.NewGuid();
+            random = new Random();
+
+            System.Threading.ThreadPool.SetMaxThreads(8, 8);
+
+            Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
+            {
+                // logging  
+                foreach (var o in c.Overrides)
+                {
+                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Catalog", Severity.Verbose));
+                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Dispatcher", Severity.Verbose2));
+                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Orleans.GrainDirectory.LocalGrainDirectory", Severity.Verbose2));
+                }
+
+                customizer?.Invoke(c);
+            };
+
+            // Create clusters and clients
+            ClusterNames = new string[silos.Length];
+            Clients = new ClientWrapper[silos.Length][];
+            for (int i = 0; i < silos.Length; i++)
+            {
+                var numsilos = silos[i];
+                var clustername = ClusterNames[i] = ((char)('A' + i)).ToString();
+                var c = Clients[i] = new ClientWrapper[numsilos];
+                NewGeoCluster(globalserviceid, clustername, silos[i], addtracing);
+                // create one client per silo
+                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = NewClient<ClientWrapper>(clustername, j));
+            }
+
+            WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
+
+            // wait for configuration to stabilize
+            WaitForLivenessToStabilizeAsync().WaitWithThrow(TimeSpan.FromMinutes(1));
+    
+            Clients[0][0].InjectClusterConfiguration(ClusterNames);
+            WaitForMultiClusterGossipToStabilizeAsync(false).WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 1));
+
+            stopwatch.Stop();
+            WriteLog("Multicluster is ready (elapsed = {0}).", stopwatch.Elapsed);
+
+            return TaskDone.Done;
+        }
+
+  
+        Random random;
 
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
@@ -69,106 +205,27 @@ namespace UnitTests.GeoClusterTests
         #endregion
 
 
-        public MultiClusterRegistrationTests(ITestOutputHelper output) : base(output)
-        {
-            var inittask = Task.Run(() => StartClustersAndClients());
-            // setting up clusters can take long legitimately - but it can also hang forever sometimes
-            // so we need to set a timeout
-            inittask.WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 5));
-        }
 
-        public void StartClustersAndClients() 
-        {
-            WriteLog("Creating clusters and clients...");
-            var stopwatch = new System.Diagnostics.Stopwatch();
-            stopwatch.Start();
-
-            // use a random global service id for testing purposes
-            var globalserviceid = Guid.NewGuid();
-            random = new Random();
-
-            System.Threading.ThreadPool.SetMaxThreads(8, 8);
-
-            Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
-            {
-                // logging  
-                foreach (var o in c.Overrides)
-                {
-                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Runtime.Catalog", Severity.Verbose));
-                    o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Orleans.GrainDirectory.LocalGrainDirectory", Severity.Verbose));
-                }
-            };
-
-            // Create 3 clusters, each with 2 silos. 
-            NewGeoCluster(globalserviceid, ClusterA, 2, addtracing);
-            NewGeoCluster(globalserviceid, ClusterB, 2, addtracing);
-            NewGeoCluster(globalserviceid, ClusterC, 2, addtracing);
-
-            WriteLog("Clusters are ready (elapsed = {0})", stopwatch.Elapsed);
-
-            WaitForLivenessToStabilizeAsync().WaitWithThrow(TimeSpan.FromMinutes(1));
-
-            // Create two clients per cluster.
-            Parallel.Invoke(paralleloptions,
-              () => ClientA0 = NewClient<ClientWrapper>(ClusterA, 0),
-              () => ClientA1 = NewClient<ClientWrapper>(ClusterA, 1),
-              () => ClientB0 = NewClient<ClientWrapper>(ClusterB, 0),
-              () => ClientB1 = NewClient<ClientWrapper>(ClusterB, 1),
-              () => ClientC0 = NewClient<ClientWrapper>(ClusterC, 0),
-              () => ClientC1 = NewClient<ClientWrapper>(ClusterC, 1)
-            );
-
-            WriteLog("Clients are ready (elapsed = {0})", stopwatch.Elapsed);
-
-            ClientA0.InjectClusterConfiguration(ClusterA, ClusterB, ClusterC);
-            WaitForMultiClusterGossipToStabilizeAsync(false).WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 1));
-
-            Clients = new ClientWrapper[] { ClientA0, ClientA1, ClientB0, ClientB1, ClientC0, ClientC1 };
-            ClientClusters = new string[] { ClusterA, ClusterA, ClusterB, ClusterB, ClusterC, ClusterC };
-
-            stopwatch.Stop();
-            WriteLog("Clusters and clients are ready (elapsed = {0}).", stopwatch.Elapsed);
-        }
-
-        private ClientWrapper[] Clients;
-        private string[] ClientClusters;
-
-
-        Random random;
         private int Next()
         {
             lock (random)
                 return random.Next();
         }
 
-        [Fact, TestCategory("GeoCluster")]
-        public async Task All()
-        {
-            var testtasks = new List<Task>();
-
-            testtasks.Add(RunWithTimeout("Deact", 20000, Deact));
-            testtasks.Add(RunWithTimeout("LocalRegistration", 10000, LocalRegistration));
-            testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
-            testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
-            testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
-
-            foreach (var t in testtasks)
-                await t;
-        }
-
+      
         public async Task SequentialCalls()
         {
             await Task.Yield();
 
             var x = Next();
-            var gref = ClientA0.GetGrainRef(x);
-            ClientA0.CallGrain(x);
-            ClientA1.CallGrain(x);
-            ClientB0.CallGrain(x);
-            ClientB1.CallGrain(x);
-            ClientC0.CallGrain(x);
-            ClientC1.CallGrain(x);
-            AssertEqual(7, ClientA0.CallGrain(x), gref);
+            var gref = Clients[0][0].GetGrainRef(x);
+            var list = EnumerateClients().ToList();
+
+            // one call to each silo, in parallel
+            foreach (var c in list) c.Value.CallGrain(x);
+            
+            // total number of increments should match
+            AssertEqual(list.Count() + 1, Clients[0][0].CallGrain(x), gref);
         }
 
         public async Task ParallelCalls()
@@ -176,16 +233,14 @@ namespace UnitTests.GeoClusterTests
             await Task.Yield();
 
             var x = Next();
-            var gref = ClientA0.GetGrainRef(x);
-            Parallel.Invoke(paralleloptions,
-              () => ClientA0.CallGrain(x),
-              () => ClientA1.CallGrain(x),
-              () => ClientB0.CallGrain(x),
-              () => ClientB1.CallGrain(x),
-              () => ClientC0.CallGrain(x),
-              () => ClientC1.CallGrain(x)
-            );
-            AssertEqual(7, ClientA0.CallGrain(x), gref);
+            var gref = Clients[0][0].GetGrainRef(x);
+            var list = EnumerateClients().ToList();
+
+            // one call to each silo, in parallel
+            Parallel.ForEach(list, paralleloptions, k => k.Value.CallGrain(x));
+
+            // total number of increments should match
+            AssertEqual(list.Count + 1, Clients[0][0].CallGrain(x), gref);
         }
 
         public async Task ManyParallelCalls()
@@ -193,131 +248,106 @@ namespace UnitTests.GeoClusterTests
             await Task.Yield();
 
             var x = Next();
-            var gref = ClientA0.GetGrainRef(x);
-            var clients = new ClientWrapper[] { ClientA0, ClientB0, ClientC0 };
-            // concurrently chaotically increment (numupdates) times
-            Parallel.For(0, 20, paralleloptions, i => clients[i % 3].CallGrain(x));
-            AssertEqual(21, ClientC1.CallGrain(x), gref);
+            var gref = Clients[0][0].GetGrainRef(x);
+
+            // pick just one client per cluster, use it multiple times
+            var clients = Clients.Select(a => a[0]).ToList();
+
+            // concurrently increment (numupdates) times, distributed over the clients
+            Parallel.For(0, 20, paralleloptions, i => clients[i % clients.Count].CallGrain(x));
+
+            // total number of increments should match
+            AssertEqual(21, Clients[0][0].CallGrain(x), gref);
         }
 
-        private class GrainInfo
-        {
-            public int x;
-            public string gref;
-            public string runtimeid;
-            public int client;
-        }
-
-        public async Task LocalRegistration()
-        {
-            await Task.Yield();
-
-            Dictionary<string, List<GrainInfo>> grainsbysilo = new Dictionary<string, List<GrainInfo>>();
-
-            // each client allocates 20 grains, all of which are in their respective cluster
-            Parallel.For<List<GrainInfo>>(0, 120, paralleloptions,
-                 () => new List<GrainInfo>(),
-                 (i, s, list) =>
-                 {
-                     var g = new GrainInfo();
-                     g.x = Next();
-                     g.client = i % Clients.Length;
-                     var client = Clients[g.client];
-                     g.gref = client.GetGrainRef(g.x);
-                     var count = client.CallGrain(g.x);
-                     AssertEqual(1, count, g.gref);
-                     g.runtimeid = client.GetRuntimeId(g.x);
-                     Assert.NotNull(g.runtimeid);
-                     list.Add(g);
-                     return list;
-                 },
-                 (list) =>
-                 {
-                     foreach (var g in list)
-                     {
-                         List<GrainInfo> silolist;
-                         if (!grainsbysilo.TryGetValue(g.runtimeid, out silolist))
-                             grainsbysilo.Add(g.runtimeid, silolist = new List<GrainInfo>());
-                         silolist.Add(g);
-                     }
-                 });
-
-            // there should be 6 different silos
-            AssertEqual(6, grainsbysilo.Keys.Count, "all silos get some grains");
-
-            foreach (var kvp in grainsbysilo)
-            {
-                WriteLog("silo {0} in cluster {1} has {2} grains", kvp.Key, ClientClusters[kvp.Value[0].client], kvp.Value.Count);
-            }
-
-            // store by client that is connected to the silo
-            var GrainsBySiloSorted = new List<GrainInfo>[] {
-             grainsbysilo[Clusters[ClusterA].Silos[0].Silo.SiloAddress.ToString()],
-             grainsbysilo[Clusters[ClusterA].Silos[1].Silo.SiloAddress.ToString()],
-             grainsbysilo[Clusters[ClusterB].Silos[0].Silo.SiloAddress.ToString()],
-             grainsbysilo[Clusters[ClusterB].Silos[1].Silo.SiloAddress.ToString()],
-             grainsbysilo[Clusters[ClusterC].Silos[0].Silo.SiloAddress.ToString()],
-             grainsbysilo[Clusters[ClusterC].Silos[1].Silo.SiloAddress.ToString()]
-            };
-
-
-            // clients should have grains that are local to their cluster
-            for (int i = 0; i < 6; i++)
-                foreach (var g in GrainsBySiloSorted[i])
-                    AssertEqual(g.client / 2, i / 2, g.gref);
-
-            // deactivate the grains
-            Parallel.ForEach(grainsbysilo.SelectMany((kvp, i) => kvp.Value),
-                paralleloptions,
-                g => { Clients[g.client].Deactivate(g.x); });
-
-            // wait 5 seconds for deactivations
-            await Task.Delay(5000);
-
-            // permute grain identifiers
-            var ids = GrainsBySiloSorted.SelectMany((list, i) => list).ToList();
-            ids.Sort((a, b) => a.x.CompareTo(b.x));
-
-            // reactivate and check that we are fresh, and in local cluster
-            Parallel.ForEach(GrainsBySiloSorted.SelectMany((list, i) => list),
-               paralleloptions,
-               g =>
-               {
-                   // since grain was deactivated, count should be 1
-                   var count = Clients[Next() % Clients.Length].CallGrain(g.x);
-                   AssertEqual(1, count, g.gref);
-               });
-
-        }
-       
         public async Task Deact()
-        {
+        {            
             var x = Next();
-            var gref = ClientA0.GetGrainRef(x);
-            var id = ClientA0.GetRuntimeId(x);
-            WriteLog("Grain {0} at {1}", ClientA0.GetGrainRef(x), id);
-            Assert.True(id == Clusters[ClusterA].Silos[0].Silo.SiloAddress.ToString()
-                     || id == Clusters[ClusterA].Silos[1].Silo.SiloAddress.ToString(), gref);
+            var gref = Clients[0][0].GetGrainRef(x);
 
-            // ensure presence in caches
-            ClientA0.CallGrain(x);  
-            ClientA1.CallGrain(x);  
-            ClientB0.CallGrain(x);  
-            ClientB1.CallGrain(x);
+            // put into cluster A
+            var id = Clients[0][0].GetRuntimeId(x);
+
+            WriteLog("Grain {0} at {1}", gref, id);
+            Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == id));
+
+            // ensure presence in all caches
+            var list = EnumerateClients().ToList();
+            Parallel.ForEach(list, paralleloptions, k => k.Value.CallGrain(x));
+            Parallel.ForEach(list, paralleloptions, k => k.Value.CallGrain(x));
+
+            AssertEqual(2* list.Count() + 1, Clients[0][0].CallGrain(x), gref);
+
+            WriteLog("Grain {0} deactivating.", gref);
 
             //deactivate
-            ClientA0.Deactivate(x);
+            Clients[0][0].Deactivate(x);
 
             // wait for deactivation to complete
             await Task.Delay(5000);
 
-            // should be gone now, and allocated in same cluster as client
-            var val = ClientB0.CallGrain(x);
+            WriteLog("Grain {0} reactivating.", gref);
+
+            // activate anew in cluster B
+            var val = Clients[1][0].CallGrain(x);
             AssertEqual(1, val, gref);
-            var newid = ClientB0.GetRuntimeId(x);
-            WriteLog("Grain {0} at {1}", ClientB0.GetGrainRef(x), newid);
-            Assert.True(newid == Clusters[ClusterB].Silos[0].Silo.SiloAddress.ToString()
-                     || newid == Clusters[ClusterB].Silos[1].Silo.SiloAddress.ToString(), gref);
+            var newid = Clients[1][0].GetRuntimeId(x);
+            WriteLog("{2} sees Grain {0} at {1}", gref, newid, ClusterNames[1]);
+            Assert.True(Clusters[ClusterNames[1]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == newid));
+
+            WriteLog("Grain {0} Check that other clusters find new activation.", gref);
+            for (int i = 2; i < Clusters.Count; i++)
+            {
+                var idd = Clients[i][0].GetRuntimeId(x);
+                WriteLog("{2} sees Grain {0} at {1}", gref, idd, ClusterNames[i]);
+                AssertEqual(newid, idd, gref);
+            }
+        }
+
+
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task BlockedDeact()
+        {
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>
+            {
+                Action<ClusterConfiguration> c =
+                  (cc) => { cc.Globals.DirectoryLazyDeregistrationDelay = TimeSpan.FromSeconds(5); };
+                return StartClustersAndClients(c, 1, 1);
+            });
+
+            await RunWithTimeout("BlockedDeact", 10 * 1000, async () =>
+            {
+                var x = Next();
+                var gref = Clients[0][0].GetGrainRef(x);
+
+                // put into cluster A and access from cluster B
+                var id = Clients[0][0].GetRuntimeId(x);
+
+                WriteLog("Grain {0} at {1}", gref, id);
+                Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == id));
+
+                var id2 = Clients[1][0].GetRuntimeId(x);
+                AssertEqual(id2, id, gref);
+
+                // deactivate grain in cluster A, but block deactivation message to cluster B
+
+                WriteLog("Grain {0} deactivating.", gref);
+                BlockAllClusterCommunication(ClusterNames[0], ClusterNames[1]);
+                Clients[0][0].Deactivate(x);
+                await Task.Delay(5000);
+                UnblockAllClusterCommunication(ClusterNames[0]);
+
+                // reactivate in cluster B. This should cause unregistration to be sent
+                WriteLog("Grain {0} reactivating.", gref);
+
+                // activate anew in cluster B
+                var val = Clients[1][0].CallGrain(x);
+                AssertEqual(1, val, gref);
+                var newid = Clients[1][0].GetRuntimeId(x);
+                WriteLog("{2} sees Grain {0} at {1}", gref, newid, ClusterNames[1]);
+                Assert.True(Clusters[ClusterNames[1]].Silos[0].Silo.SiloAddress.ToString() == newid);
+            });
         }
     }
 }

@@ -132,10 +132,12 @@ namespace Orleans.Runtime.GrainDirectory
                             //update own activation status to race loser.
                             if (existingActivationStatus == MultiClusterStatus.RequestedOwnership)
                             {
+                                logger.Verbose2("GSIP:Rsp {0} Origin={1} RaceLoser", grain.ToString(), requestClusterId);
                                 var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, MultiClusterStatus.RaceLoser, MultiClusterStatus.RequestedOwnership);
                                 if (!success)
                                 {
                                     // there was a race. retry.
+                                    logger.Verbose2("GSIP:Rsp {0} Origin={1} Retry", grain.ToString(), requestClusterId);
                                     return ProcessRequestLocal(grain, requestClusterId);
                                 }
                             }
@@ -182,19 +184,40 @@ namespace Orleans.Runtime.GrainDirectory
             return responses;
         }
 
-
+        /// <summary>
+        /// Called by a remote cluster after it deactivates GSI grains, so this cluster can remove cached entries
+        /// </summary>
+        /// <returns></returns>
         public Task ProcessDeactivations(List<ActivationAddress> addresses)
         {
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
-            return router.UnregisterManyAsync(addresses, 0);
+            return router.UnregisterManyAsync(addresses, UnregistrationCause.Force, 0);
         }
 
+        /// <summary>
+        /// Called by remote cluster to unregister a directory entry in this cluster that is pointing
+        /// to a non-existing activation
+        /// </summary>
+        /// <param name="address">The address of the non-existing activation</param>
+        /// <returns></returns>
+        public Task UnregisterAfterNonexistingActivation(ActivationAddress address)
+        {
+            // call local grain directory to unregister activation in this cluster
+            return router.UnregisterAsync(address, UnregistrationCause.NonexistentActivation, 0);
+        }
+
+        /// <summary>
+        /// Called by a remote cluster that wishes to eradicate all activations of a grain in all clusters
+        /// </summary>
         public Task ProcessDeletion(GrainId grainId)
         {
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
             return router.DeleteGrainAsync(grainId, 0);
         }
+
+
+
     }
 }
