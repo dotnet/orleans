@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
@@ -150,6 +151,19 @@ namespace Orleans.Runtime
         /// <param name="configuration">XML elements and attributes to update</param>
         /// <returns></returns>
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
+
+        /// <summary>
+        /// Update the stream providers dynamically. The stream providers in the listed silos will be 
+        /// updated based on the differences between its loaded stream providers and the list of providers 
+        /// in the streamProviderConfigurations: If a provider in the configuration object already exists 
+        /// in the silo, it will be kept as is; if a provider in the configuration object does not exist 
+        /// in the silo, it will be loaded and started; if a provider that exists in silo but is not in 
+        /// the configuration object, it will be stopped and removed from the silo. 
+        /// </summary>
+        /// <param name="hostIds">Silos to update, or null for all silos</param>
+        /// <param name="streamProviderConfigurations">stream provider configurations that carries target stream providers</param>
+        /// <returns></returns>
+        Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations);
 
         /// <summary>
         /// Returns an array of all the active grain types in the system

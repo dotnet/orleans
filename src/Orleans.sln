@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -64,6 +64,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.Core.nuspec = NuGet\Microsoft.Orleans.Core.nuspec
 		NuGet\Microsoft.Orleans.CounterControl.nuspec = NuGet\Microsoft.Orleans.CounterControl.nuspec
 		NuGet\Microsoft.Orleans.EventSourcing.nuspec = NuGet\Microsoft.Orleans.EventSourcing.nuspec
+		NuGet\Microsoft.Orleans.OrleansAWSUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAWSUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec
@@ -180,6 +181,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalDtosRefOrleans", "..\test\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{B99C744A-7F62-430C-9255-E64875D39486}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{F3C3FA92-FC69-4B94-8914-3B70E624B5B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansPSUtils", "OrleansPSUtils\OrleansPSUtils.csproj", "{6AD37425-7CB4-4D23-80C3-A9D143329A66}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansAWSUtils", "OrleansAWSUtils\OrleansAWSUtils.csproj", "{67738E6C-F292-46A2-994D-5B52E745205B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -307,6 +312,14 @@ Global
 		{B99C744A-7F62-430C-9255-E64875D39486}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B99C744A-7F62-430C-9255-E64875D39486}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6AD37425-7CB4-4D23-80C3-A9D143329A66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6AD37425-7CB4-4D23-80C3-A9D143329A66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6AD37425-7CB4-4D23-80C3-A9D143329A66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6AD37425-7CB4-4D23-80C3-A9D143329A66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67738E6C-F292-46A2-994D-5B52E745205B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67738E6C-F292-46A2-994D-5B52E745205B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67738E6C-F292-46A2-994D-5B52E745205B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67738E6C-F292-46A2-994D-5B52E745205B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -344,5 +357,7 @@ Global
 		{09610024-F5B9-4065-9557-BD9E36A32421} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{B99C744A-7F62-430C-9255-E64875D39486} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{F3C3FA92-FC69-4B94-8914-3B70E624B5B5} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{6AD37425-7CB4-4D23-80C3-A9D143329A66} = {F3C3FA92-FC69-4B94-8914-3B70E624B5B5}
+		{67738E6C-F292-46A2-994D-5B52E745205B} = {F3C3FA92-FC69-4B94-8914-3B70E624B5B5}
 	EndGlobalSection
 EndGlobal

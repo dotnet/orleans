@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -113,6 +114,11 @@ namespace Orleans.Runtime
             silo.OrleansConfig.Update(configuration);
             logger.Info(ErrorCode.Runtime_Error_100318, "UpdateConfiguration - new config is now {0}", silo.OrleansConfig.ToString(silo.Name));
             return TaskDone.Done;
+        }
+
+        public Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
+        {
+            return silo.UpdateStreamProviders(streamProviderConfigurations);
         }
 
         public Task<int> GetActivationCount()
