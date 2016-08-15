@@ -9,8 +9,8 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubGrainState
     {
-        public HashSet<PubSubPublisherState> Producers { get; set; }
-        public HashSet<PubSubSubscriptionState> Consumers { get; set; }
+        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+        public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
 
     [Providers.StorageProvider(ProviderName = "PubSubStore")]
@@ -40,11 +40,6 @@ namespace Orleans.Streams
         {
             logger = GetLogger(GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
             LogPubSubCounts("OnActivateAsync");
-
-            if (State.Consumers == null)
-                State.Consumers = new HashSet<PubSubSubscriptionState>();
-            if (State.Producers == null)
-                State.Producers = new HashSet<PubSubPublisherState>();
 
             int numRemoved = RemoveDeadProducers();
             if (numRemoved > 0)
