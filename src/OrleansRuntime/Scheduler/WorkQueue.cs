@@ -112,8 +112,39 @@ namespace Orleans.Runtime.Scheduler
                         Scheduler = scheduler
                     };
                 }
+                try
+                {
+                    TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
+                }
+                catch (Exception ex)
+                {
+                    var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", item);
 
-                TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
+                    // todo
+                    LogManager.GetLogger(nameof(WorkQueue), LoggerType.Runtime).Error(ErrorCode.Runtime_Error_100030, errorStr, ex);
+                }
+                finally
+                {
+#if TRACK_DETAILED_STATS
+                                if (todo.ItemType != WorkItemType.WorkItemGroup)
+                                {
+                                    if (StatisticsCollector.CollectTurnsStats)
+                                    {
+                                        //SchedulerStatisticsGroup.OnTurnExecutionEnd(CurrentStateTime.Elapsed);
+                                        SchedulerStatisticsGroup.OnTurnExecutionEnd(Utils.Since(CurrentStateStarted));
+                                    }
+                                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                    {
+                                        threadTracking.IncrementNumberOfProcessed();
+                                    }
+                                    CurrentWorkItem = null;
+                                }
+                                if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                                {
+                                    threadTracking.OnStopProcessing();
+                                }
+#endif
+                }
             },
                 new ExecutionDataflowBlockOptions
                 {

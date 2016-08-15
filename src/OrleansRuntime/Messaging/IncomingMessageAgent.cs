@@ -23,7 +23,6 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             OnFault = FaultBehavior.RestartOnFault;
-
         }
 
         public override void Start()
@@ -68,7 +67,7 @@ namespace Orleans.Runtime.Messaging
             if (msg == null)
             {
                 if (Log.IsVerbose) Log.Verbose("Dequeued a null message, exiting");
-                // Null return means cancelled
+                // Null message means cancelled
                 return;
             }
 

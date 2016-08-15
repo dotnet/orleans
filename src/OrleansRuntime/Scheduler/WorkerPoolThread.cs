@@ -166,7 +166,7 @@ namespace Orleans.Runtime.Scheduler
                             // Do the work
                             try
                             {
-                            //    RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
+                                RuntimeContext.SetExecutionContext(todo.SchedulingContext, scheduler);
                                 CurrentWorkItem = todo;
 #if TRACK_DETAILED_STATS
                                 if (todo.ItemType != WorkItemType.WorkItemGroup)
@@ -354,6 +354,7 @@ namespace Orleans.Runtime.Scheduler
         private bool IsFrozen()
         {
             // todo
+            return false;
             if (CurrentTask != null)
             {
                 return Utils.Since(currentTaskStarted) > OrleansTaskScheduler.TurnWarningLengthThreshold;

@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Messaging
             get
             {
                 int n = 0;
-                // currenlty doesn't being used
+                // currently doesn't being used
 
                 //foreach (var queue in messageQueues)
                 //    n += queue.Count;
