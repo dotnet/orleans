@@ -162,9 +162,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
 
             if (extendedProtocol)
-            {
                 Assert.Equal(1, data.Version.Version);
-            }
 
             TableVersion nextTableVersion = data.Version.Next();
 
@@ -182,11 +180,9 @@ namespace UnitTests.MembershipTests
             logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(1, data.Members.Count);
-
+            Assert.NotNull(data.Version.VersionEtag);
             if (extendedProtocol)
             {
-                Assert.NotNull(data.Version.VersionEtag);
-
                 Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
                 Assert.Equal(newTableVersion.Version, data.Version.Version);
             }
@@ -237,10 +233,7 @@ namespace UnitTests.MembershipTests
             var tableData = await membershipTable.ReadAll();
             Assert.NotNull(tableData.Version);
 
-            if (extendedProtocol)
-            {
-                Assert.Equal(0, tableData.Version.Version);
-            }
+            Assert.Equal(0, tableData.Version.Version);
             Assert.Equal(0, tableData.Members.Count);
 
             for (int i = 1; i < 10; i++)
@@ -267,15 +260,14 @@ namespace UnitTests.MembershipTests
 
                 Assert.NotNull(etagBefore);
 
-                logger.Info("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
-                    etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
-
                 if (extendedProtocol)
                 {
+                    logger.Info("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
+                                etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
                     ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
+                    tableData = await membershipTable.ReadAll();
                 }
-                tableData = await membershipTable.ReadAll();
 
                 tableVersion = tableData.Version.Next();
 
@@ -286,13 +278,10 @@ namespace UnitTests.MembershipTests
 
                 Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
-                if (extendedProtocol)
-                {
-                    logger.Info("Calling UpdateRow with Entry = {0} old eTag = {1} old version={2}", siloEntry,
-                        etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
-                    ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
-                    Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
-                }
+                logger.Info("Calling UpdateRow with Entry = {0} old eTag = {1} old version={2}", siloEntry,
+                    etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
+                ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
+                Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
                 tableData = await membershipTable.ReadAll();
 
