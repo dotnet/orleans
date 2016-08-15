@@ -780,10 +780,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressesAndTag GetLocalDirectoryData(GrainId grain)
         {
-            var result = DirectoryPartition.LookUpGrain(grain);
-            if (result.Addresses != null)
-                result.Addresses = result.Addresses.Where(addr => IsValidSilo(addr.Silo)).ToList();
-            return result;
+            return DirectoryPartition.LookUpActivations(grain);
         }
 
         public List<ActivationAddress> GetLocalCacheData(GrainId grain)

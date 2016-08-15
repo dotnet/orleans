@@ -372,9 +372,10 @@ namespace Orleans.Runtime.GrainDirectory
                     result.Addresses = new List<ActivationAddress>();
                     result.VersionTag = partitionData[grain].VersionTag;
 
-                    foreach (var route in partitionData[grain].Instances.Where(route => IsValidSilo(route.Value.SiloAddress)))
+                    foreach (var route in partitionData[grain].Instances)
                     {
-                        result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
+                        if (IsValidSilo(route.Value.SiloAddress))
+                            result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
                     }
                 }
             }
