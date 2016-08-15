@@ -4,7 +4,7 @@ using Orleans;
 
 namespace OrleansGrainInterfaces.MapReduce
 {
-    public interface IDataflowGrain : IGrainWithGuidKey
+    public interface IDataflowGrain : IGrain
     {
         Task Complete();
 
@@ -13,7 +13,7 @@ namespace OrleansGrainInterfaces.MapReduce
         Task Completion();
     }
 
-    public interface ITargetGrain<in TInput> : IDataflowGrain
+    public interface ITargetGrain<in TInput> : IDataflowGrain, IGrainWithGuidKey
     {
         Task<GrainDataflowMessageStatus> OfferMessage(TInput messageValue, bool consumeToAccept);
 
@@ -22,7 +22,7 @@ namespace OrleansGrainInterfaces.MapReduce
         Task SendAsync(TInput t, GrainCancellationToken gct);
     }
 
-    public interface ISourceGrain<TOutput> : IDataflowGrain
+    public interface ISourceGrain<TOutput> : IDataflowGrain, IGrainWithGuidKey
     {
         Task LinkTo(ITargetGrain<TOutput> t);
 

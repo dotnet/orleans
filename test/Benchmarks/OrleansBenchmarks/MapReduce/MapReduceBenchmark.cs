@@ -45,6 +45,10 @@ namespace OrleansBenchmarks.MapReduce
                 });
 
             await Task.WhenAll(pipelines);
+        }
+
+        public void Teardown()
+        {
             _host.StopAllSilos();
         }
 

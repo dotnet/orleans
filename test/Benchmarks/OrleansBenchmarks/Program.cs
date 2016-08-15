@@ -13,13 +13,16 @@ namespace OrleansBenchmarks
         {
             ["MapReduce"] = () =>
             {
-                Console.WriteLine("Running MapReduce benchmark");
-                var mapReduceBenchmark = new MapReduceBenchmark();
-                mapReduceBenchmark.BenchmarkSetup();
-                var stopWatch = Stopwatch.StartNew();
-                mapReduceBenchmark.Bench().Wait();
-                Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
-                Console.ReadLine();
+                RunBenchmark(
+                "Running MapReduce benchmark", 
+                () =>
+                {
+                    var mapReduceBenchmark = new MapReduceBenchmark();
+                    mapReduceBenchmark.BenchmarkSetup();
+                    return mapReduceBenchmark;
+                },
+                benchmark => benchmark.Bench().Wait(),
+                benchmark => benchmark.Teardown());
             },
             ["Serialization"] = () =>
             {
@@ -30,6 +33,13 @@ namespace OrleansBenchmarks
         // requires benchmark name or 'All' word as first parameter
         static void Main(string[] args)
         {
+            if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
+            {
+                Console.WriteLine("Running full benchmarks suite");
+                _benchmarks.Select(pair => pair.Value).ToList().ForEach(action => action());
+                return;
+            }
+
             if (args.Length == 0 || !_benchmarks.ContainsKey(args[0]))
             {
                 Console.WriteLine("Please, select benchmark, list of available:");
@@ -41,16 +51,20 @@ namespace OrleansBenchmarks
                 return;
             }
 
-            if (args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
-            {
-                Console.WriteLine("Running full benchmarks suite");
-                _benchmarks.Select(pair => pair.Value).ToList().ForEach(action => action());
-                return;
-            }
-
             _benchmarks[args[0]]();
 
             Console.Read();
+        }
+
+        private static void RunBenchmark<T>(string name, Func<T> init, Action<T> benchmarkAction, Action<T> tearDown)
+        {
+            Console.WriteLine(name);
+            var bench = init();
+            var stopWatch = Stopwatch.StartNew();
+            benchmarkAction(bench);
+            Console.WriteLine($"Elapsed milliseconds: {stopWatch.ElapsedMilliseconds}");
+            tearDown(bench);
+            Console.ReadLine();
         }
     }
 }
