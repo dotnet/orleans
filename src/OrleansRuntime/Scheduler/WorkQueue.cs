@@ -92,7 +92,8 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunDown()
         {
-          mainQueueExecutor.Complete();
+            mainQueueExecutor.Complete();
+            systemQueueExecutor.Complete();
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking.OnStopExecution();

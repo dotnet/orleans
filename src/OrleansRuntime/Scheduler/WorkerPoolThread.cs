@@ -107,7 +107,7 @@ namespace Orleans.Runtime.Scheduler
         protected override void Run()
         {
             // not used anymore
-            Thread.Sleep(222221000);
+            Thread.Sleep(int.MaxValue);
             try
             {
                 // We can't set these in the constructor because that doesn't run on our thread
@@ -137,7 +137,6 @@ namespace Orleans.Runtime.Scheduler
 #endif
                         // Get some work to do
                         IWorkItem todo;
-                        Thread.Sleep(1000);
                         todo = null;
                         //todo = IsSystem ? scheduler.RunQueue.GetSystem(Cts.Token, maxWorkQueueWait) : 
                         //    scheduler.RunQueue.Get(Cts.Token, maxWorkQueueWait);

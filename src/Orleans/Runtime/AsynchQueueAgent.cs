@@ -42,7 +42,7 @@ namespace Orleans.Runtime
             },
             new ExecutionDataflowBlockOptions
             {
-                MaxDegreeOfParallelism = 16
+                MaxDegreeOfParallelism = Environment.ProcessorCount
             });
             if (StatisticsCollector.CollectQueueStats)
             {
