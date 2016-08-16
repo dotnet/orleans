@@ -84,13 +84,17 @@ namespace Orleans.Streams
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
             if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
+            return OrleansTaskExtentions.WrapInTask(() => InitializeInternal(qAdapter.Value, queueAdapterCache.Value, failureHandler.Value));
+        }
 
+        public void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
+        {
             logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
                 GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
-            
+
             // Remove cast once we cleanup
-            queueAdapter = qAdapter.Value;
-            streamFailureHandler = failureHandler.Value;
+            queueAdapter = qAdapter;
+            streamFailureHandler = failureHandler;
             lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
@@ -105,9 +109,9 @@ namespace Orleans.Streams
 
             try
             {
-                if (queueAdapterCache.Value != null)
+                if (queueAdapterCache != null)
                 {
-                    queueCache = queueAdapterCache.Value.CreateQueueCache(QueueId);
+                    queueCache = queueAdapterCache.CreateQueueCache(QueueId);
                 }
             }
             catch (Exception exc)
@@ -132,8 +136,7 @@ namespace Orleans.Streams
             var randomTimerOffset = safeRandom.NextTimeSpan(config.GetQueueMsgsTimerPeriod);
             timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, config.GetQueueMsgsTimerPeriod);
 
-            logger.Info((int) ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {0} under my responsibility.", QueueId.ToStringWithHashCode());
-            return TaskDone.Done;
+            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {0} under my responsibility.", QueueId.ToStringWithHashCode());
         }
 
         public async Task Shutdown()
