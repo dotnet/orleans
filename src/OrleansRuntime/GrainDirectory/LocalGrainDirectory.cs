@@ -47,6 +47,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal GrainDirectoryHandoffManager HandoffManager { get; private set; }
 
+        public string ClusterId { get; }
+
         internal ISiloStatusListener CatalogSiloStatusListener { get; set; }
 
         internal GlobalSingleInstanceActivationMaintainer GsiActivationMaintainer { get; private set; }
@@ -89,6 +91,7 @@ namespace Orleans.Runtime.GrainDirectory
             Scheduler = silo.LocalScheduler;
             membershipRingList = new List<SiloAddress>();
             membershipCache = new HashSet<SiloAddress>();
+            ClusterId = silo.ClusterId;
 
             silo.OrleansConfig.OnConfigChange("Globals/Caching", () =>
             {
@@ -791,6 +794,33 @@ namespace Orleans.Runtime.GrainDirectory
                 null;
         }
 
+        public Task<AddressesAndTag> LookupInCluster(GrainId grainId, string clusterId)
+        {
+            if (clusterId == null)
+                throw new ArgumentNullException("clusterId");
+
+            if (clusterId == ClusterId)
+            {
+                return LookupAsync(grainId);
+            }
+            else
+            {
+                // find gateway
+                var gossipOracle = Silo.CurrentSilo.LocalMultiClusterOracle;
+                var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(clusterId);
+                if (clusterGatewayAddress != null)
+                {
+                    // call remote grain directory
+                    var remotedirectory = GetDirectoryReference(clusterGatewayAddress);
+                    return remotedirectory.LookupAsync(grainId);
+                }
+                else
+                {
+                    return Task.FromResult(default(AddressesAndTag));
+                }
+            }
+        }
+
         public async Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
             (hopCount > 0 ? RemoteLookupsReceived : fullLookups).Increment();
@@ -1081,5 +1111,6 @@ namespace Orleans.Runtime.GrainDirectory
                 return membershipCache.Contains(silo);
             }
         }
+
     }
 }

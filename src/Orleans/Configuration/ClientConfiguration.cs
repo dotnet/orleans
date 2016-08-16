@@ -74,6 +74,13 @@ namespace Orleans.Runtime.Configuration
         public string DataConnectionString { get; set; }
 
         /// <summary>
+        /// the id of the cluster to which this client is connecting. 
+        /// This argument is optional, but is needed in order for the client to receive
+        /// observer messages from different clusters.
+        /// </summary>
+        public string ClusterId { get; set; }
+
+        /// <summary>
         /// When using ADO, identifies the underlying data provider for the gateway provider. This three-part naming syntax is also used when creating a new factory 
         /// and for identifying the provider in an application configuration file so that the provider name, along with its associated 
         /// connection string, can be retrieved at run time. https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx
@@ -176,6 +183,7 @@ namespace Orleans.Runtime.Configuration
             Port = 0;
             DNSHostName = Dns.GetHostName();
             DeploymentId = Environment.UserName;
+            ClusterId = null;
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
@@ -268,6 +276,10 @@ namespace Orleans.Runtime.Configuration
                                     throw new FormatException("SystemStore.AdoInvariant cannot be blank");
                                 }
                             }
+                            break;
+                        case "MultiClusterNetwork":
+                            if (child.HasAttribute("ClusterId"))
+                                ClusterId = child.GetAttribute("ClusterId");
                             break;
                         case "Tracing":
                             ConfigUtilities.ParseTracing(this, child, ClientName);
@@ -444,6 +456,11 @@ namespace Orleans.Runtime.Configuration
                 sb.Append("      DeploymentId: ").Append(DeploymentId).AppendLine();
                 string dataConnectionInfo = ConfigUtilities.RedactConnectionStringInfo(DataConnectionString); // Don't print Azure account keys in log files
                 sb.Append("      DataConnectionString: ").Append(dataConnectionInfo).AppendLine();
+            }
+            if (!String.IsNullOrEmpty(ClusterId))
+            {
+                sb.Append("   MultiClusterNetwork:").AppendLine();
+                sb.Append("      ClusterId: ").Append(ClusterId).AppendLine();
             }
             if (!string.IsNullOrWhiteSpace(NetInterface))
             {

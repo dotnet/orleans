@@ -48,6 +48,15 @@ namespace Orleans.Runtime.GrainDirectory
         bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
 
         /// <summary>
+        /// Fetches complete directory information for a grain in an explicitly named cluster.
+        /// <para>This method must be called from a scheduler thread.</para>
+        /// </summary>
+        /// <param name="grain">The ID of the grain to look up.</param>
+        /// <param name="clusterId">The cluster in which to look up the grain</param>
+        /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
+
+        /// <summary>
         /// Invalidates cache entry for the given activation address.
         /// This method is intended to be called whenever a directory client tries to access 
         /// an activation returned from the previous directory lookup and gets a reject from the target silo 
@@ -108,6 +117,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo">the address of the silo</param>
         /// <returns>true if the silo is known to be part of this cluster</returns>
         bool IsSiloInCluster(SiloAddress silo);
+
+        /// <summary>
+        /// The id of this cluster
+        /// </summary>
+        string ClusterId { get; }
     }
 
   

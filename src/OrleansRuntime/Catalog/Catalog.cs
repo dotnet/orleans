@@ -1238,6 +1238,12 @@ namespace Orleans.Runtime
             return scheduler.RunOrQueueTask(() => directory.LookupAsync(grain), this.SchedulingContext);
         }
 
+        public Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId)
+        {
+            return scheduler.RunOrQueueTask(() => directory.LookupInCluster(grain, clusterId), this.SchedulingContext);
+        }
+
+
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)
         {
             addresses = activations.FindTargets(grain);

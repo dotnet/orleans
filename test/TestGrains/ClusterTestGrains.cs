@@ -36,6 +36,11 @@ namespace UnitTests.Grains
         public Task<int> SayHelloAsync()
         {
             counter += 1;
+            logger.Info("GotSayHello {0}, {1} subscriptions", counter, observers.Count);
+            for(int i = 0; i < observers.Count; i++)
+            {
+                observers[i].GotHello(i);
+            }
             return Task.FromResult(counter);
             /*
             if (name == "internal")
@@ -67,6 +72,16 @@ namespace UnitTests.Grains
             this.DeactivateOnIdle();
             return TaskDone.Done;
         }
+
+        private List<IClusterTestListener> observers = new List<IClusterTestListener>();
+
+        public Task Subscribe(IClusterTestListener listener)
+        {
+            observers.Add(listener);
+            logger.Info("AddedSubscription {0}", observers.Count);
+            return TaskDone.Done;
+        }
+        
     }
 
     /// <summary>

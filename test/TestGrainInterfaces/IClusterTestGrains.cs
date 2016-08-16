@@ -31,6 +31,12 @@ namespace TestGrainInterfaces
         Task<int> SayHelloAsync();
         Task Deactivate();
         Task<string> GetRuntimeId();
+        Task Subscribe(IClusterTestListener listener);
+    }
+
+    public interface IClusterTestListener : IGrainObserver
+    {
+        void GotHello(int number);
     }
 
     public interface ISimpleGlobalSingleInstanceGrain : IGrainWithIntegerKey
@@ -39,4 +45,5 @@ namespace TestGrainInterfaces
         Task SetB(int b);
         Task<int> GetAxB();
     }
+
 }

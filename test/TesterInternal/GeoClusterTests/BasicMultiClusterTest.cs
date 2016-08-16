@@ -19,7 +19,7 @@ namespace Tests.GeoClusterTests
         // this client is used to call into the management grain.
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport) : base(name, gatewayport)
+            public ClientWrapper(string name, int gatewayport, string clusterId) : base(name, gatewayport, clusterId)
             {
                 systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
             }

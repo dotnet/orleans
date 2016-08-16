@@ -201,11 +201,14 @@ namespace Orleans.Runtime.GrainDirectory
                 // find gateway
                 var gossipOracle = Silo.CurrentSilo.LocalMultiClusterOracle;
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
-                var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                if (clusterGatewayAddress != null)
+                {
+                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
-                // try to send request
-                
-                tasks.Add(clusterGrainDir.ProcessDeactivations(formerActivationsInThisCluster));
+                    // try to send request
+
+                    tasks.Add(clusterGrainDir.ProcessDeactivations(formerActivationsInThisCluster));
+                }
             }
             return Task.WhenAll(tasks);
         }
@@ -246,10 +249,13 @@ namespace Orleans.Runtime.GrainDirectory
                 // find gateway
                 var gossipOracle = Silo.CurrentSilo.LocalMultiClusterOracle;
                 var clusterGatewayAddress = gossipOracle.GetRandomClusterGateway(remoteCluster);
-                var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
+                if (clusterGatewayAddress != null)
+                {
+                    var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
-                // try to send request
-                tasks.Add(clusterGrainDir.ProcessDeletion(gid));
+                    // try to send request
+                    tasks.Add(clusterGrainDir.ProcessDeletion(gid));
+                }
             }
             return Task.WhenAll(tasks);
         }

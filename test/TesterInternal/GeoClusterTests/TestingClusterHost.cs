@@ -284,7 +284,7 @@ namespace Tests.GeoClusterTests
 
             static Lazy<ClientConfiguration> clientconfiguration = new Lazy<ClientConfiguration>(() => ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml"));
 
-            public ClientWrapperBase(string name, int gatewayport)
+            public ClientWrapperBase(string name, int gatewayport, string clusterId)
             {
                 this.Name = name;
 
@@ -305,6 +305,8 @@ namespace Tests.GeoClusterTests
                 config.Gateways.Clear();
                 config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, gatewayport));
 
+                config.ClusterId = clusterId;
+
                 GrainClient.Initialize(config);
             }
 
@@ -321,7 +323,7 @@ namespace Tests.GeoClusterTests
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
 
-            var clientArgs = new object[] { name, gatewayport.Value };
+            var clientArgs = new object[] { name, gatewayport.Value, ClusterId };
             var setup = new AppDomainSetup { ApplicationBase = Environment.CurrentDirectory };
             var clientDomain = AppDomain.CreateDomain(name, null, setup);
 

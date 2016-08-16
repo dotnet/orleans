@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
@@ -29,11 +30,16 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
+
+    
+
+
+
         [Fact, TestCategory("Functional"), TestCategory("GeoCluster")]
         public async Task TwoClusterBattery()
         {
 
-            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2,2));
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2, 2));
 
             var testtasks = new List<Task>();
 
@@ -41,6 +47,7 @@ namespace UnitTests.GeoClusterTests
             testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
             testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
             testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+            testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
 
             foreach (var t in testtasks)
                 await t;
@@ -50,7 +57,7 @@ namespace UnitTests.GeoClusterTests
         public async Task ThreeClusterBattery()
         {
 
-            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2,2,2));
+            await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () => StartClustersAndClients(2, 2, 2));
 
             var testtasks = new List<Task>();
 
@@ -58,6 +65,7 @@ namespace UnitTests.GeoClusterTests
             testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
             testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
             testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+            testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
 
             foreach (var t in testtasks)
                 await t;
@@ -77,13 +85,14 @@ namespace UnitTests.GeoClusterTests
                 testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
                 testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
                 testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
+                testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
             }
 
             foreach (var t in testtasks)
                 await t;
         }
 
-        public Task StartClustersAndClients(params int[] silos) 
+        public Task StartClustersAndClients(params int[] silos)
         {
             return StartClustersAndClients(null, silos);
         }
@@ -130,7 +139,7 @@ namespace UnitTests.GeoClusterTests
 
             // wait for configuration to stabilize
             WaitForLivenessToStabilizeAsync().WaitWithThrow(TimeSpan.FromMinutes(1));
-    
+
             Clients[0][0].InjectClusterConfiguration(ClusterNames);
             WaitForMultiClusterGossipToStabilizeAsync(false).WaitWithThrow(TimeSpan.FromMinutes(System.Diagnostics.Debugger.IsAttached ? 60 : 1));
 
@@ -140,13 +149,13 @@ namespace UnitTests.GeoClusterTests
             return TaskDone.Done;
         }
 
-  
+
         Random random;
 
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport) : base(name, gatewayport)
+            public ClientWrapper(string name, int gatewayport, string clusterId) : base(name, gatewayport, clusterId)
             {
                 systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -173,6 +182,19 @@ namespace UnitTests.GeoClusterTests
                 Task toWait = grainRef.Deactivate();
                 toWait.Wait();
             }
+            public void Subscribe(int i, IClusterTestListener listener)
+            {
+                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                GrainClient.Logger.Info("Create Listener object {0}", grainRef);
+                listeners.Add(listener);
+                var obj = GrainClient.GrainFactory.CreateObjectReference<IClusterTestListener>(listener).Result;
+                listeners.Add(obj);
+                GrainClient.Logger.Info("Subscribe {0}", grainRef);
+                Task toWait = grainRef.Subscribe(obj);
+                toWait.Wait();
+            }
+            List<IClusterTestListener> listeners = new List<IClusterTestListener>(); // keep them from being GCed
+
             public void InjectClusterConfiguration(params string[] clusters)
             {
                 systemManagement.InjectMultiClusterConfiguration(clusters).Wait();
@@ -183,6 +205,26 @@ namespace UnitTests.GeoClusterTests
                 return GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i).ToString();
             }
         }
+
+        public class ClusterTestListener : MarshalByRefObject, IClusterTestListener
+        {
+            public ClusterTestListener(Action<int> oncall)
+            {
+                this.oncall = oncall;
+            }
+
+            private Action<int> oncall;
+
+            public void GotHello(int number)
+            {
+                count++;
+                oncall(number);
+            }
+
+            public int count;
+        }
+
+
         #endregion
 
 
@@ -285,6 +327,46 @@ namespace UnitTests.GeoClusterTests
             }
         }
 
+
+        public async Task Observer()
+        {
+            var x = Next();
+            var gref = Clients[0][0].GetGrainRef(x);
+            Clients[0][0].GetRuntimeId(x);
+            WriteLog("{0} created grain", gref);
+
+            var listeners = new List<ClusterTestListener>();
+            var promises = new List<Task<int>>();
+
+            // create an observer on each client
+            Parallel.For(0, Clients.Length, paralleloptions, i =>
+            {
+                for (int jj = 0; jj < Clients[i].Length; jj++)
+                {
+                    int j = jj;
+                    var promise = new TaskCompletionSource<int>();
+                    var listener = new ClusterTestListener((num) =>
+                    {
+                        WriteLog("{3} observedcall {2} on Client[{0}][{1}]", i, j, num, gref);
+                        promise.TrySetResult(num);
+                    });
+                    promises.Add(promise.Task);
+                    listeners.Add(listener);
+                    Clients[i][j].Subscribe(x, listener);
+                    WriteLog("{2} subscribed to Client[{0}][{1}]", i, j, gref);
+                }
+            });
+
+            // call the grain
+            Clients[0][0].CallGrain(x);
+
+            await Task.WhenAll(promises);
+
+            var sortedresults = promises.Select(p => p.Result).OrderBy(num => num).ToArray();
+
+            for (int i = 0; i < sortedresults.Length; i++)
+                AssertEqual(sortedresults[i], i, gref);
+        }
 
 
         [Fact, TestCategory("GeoCluster")]

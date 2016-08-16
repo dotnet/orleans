@@ -117,8 +117,8 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
         {
+
             this.grainFactory = grainFactory;
-            this.clientId = GrainId.NewClientId();
 
             if (cfg == null)
             {
@@ -133,6 +133,9 @@ namespace Orleans
             SerializationManager.Initialize(config.UseStandardSerializer, cfg.SerializationProviders, config.UseJsonFallbackSerializer);
             logger = LogManager.GetLogger("OutsideRuntimeClient", LoggerType.Runtime);
             appLogger = LogManager.GetLogger("Application", LoggerType.Application);
+
+            BufferPool.InitGlobalBufferPool(config);
+            this.clientId = GrainId.NewClientId(cfg.ClusterId);
 
             try
             {
@@ -162,7 +165,6 @@ namespace Orleans
                 }
 
                 responseTimeout = Debugger.IsAttached ? Constants.DEFAULT_RESPONSE_TIMEOUT : config.ResponseTimeout;
-                BufferPool.InitGlobalBufferPool(config);
                 var localAddress = ClusterConfiguration.GetLocalIPAddress(config.PreferredFamily, config.NetInterface);
 
                 // Client init / sign-on message
