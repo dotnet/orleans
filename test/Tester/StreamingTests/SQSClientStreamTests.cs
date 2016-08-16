@@ -56,7 +56,7 @@ namespace Tester
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StorageConnectionString).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");

@@ -43,7 +43,7 @@ namespace UnitTests.Streaming
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("SQS"), TestCategory("AWS"), TestCategory("Streaming")]
+        [Fact, TestCategory("SQS"), TestCategory("AWS")]
         public async Task SendAndReceiveFromSQS()
         {
             var properties = new Dictionary<string, string>

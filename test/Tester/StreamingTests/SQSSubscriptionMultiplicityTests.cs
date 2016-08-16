@@ -52,56 +52,56 @@ namespace Tester
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, deploymentId, StreamConnectionString).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleParallelSubscriptionTest()
         {
             logger.Info("************************ SQSMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleLinearSubscriptionTest()
         {
             logger.Info("************************ SQSMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSMultipleSubscriptionTest_AddRemove()
         {
             logger.Info("************************ SQSMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionTest()
         {
             logger.Info("************************ SQSResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionAfterDeactivationTest()
         {
             logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSActiveSubscriptionTest()
         {
             logger.Info("************************ SQSActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSTwoIntermitentStreamTest()
         {
             logger.Info("************************ SQSTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage"), TestCategory("Streaming")]
+        [Fact, TestCategory("AWS")]
         public async Task SQSSubscribeFromClientTest()
         {
             logger.Info("************************ SQSSubscribeFromClientTest *********************************");
