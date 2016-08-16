@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -119,7 +118,7 @@ namespace Orleans.Streams
 
             try
             {
-                this.recieverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout))
+                recieverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout))
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId.ToStringWithHashCode()} failed to Initialize.");
                 recieverInitTask.Ignore();
             }
@@ -141,16 +140,26 @@ namespace Orleans.Streams
         {
             // Stop pulling from queues that are not in my range anymore.
             logger.Info(ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
-            Task localrecieverInitTask;
-            if ((localrecieverInitTask = Interlocked.Exchange(ref recieverInitTask, null)) != null)
+
+            if (timer != null)
             {
-                await localrecieverInitTask;
+                IDisposable tmp = timer;
+                timer = null;
+                Utils.SafeExecute(tmp.Dispose);
             }
 
-            IDisposable localTimer;
-            if ((localTimer = Interlocked.Exchange(ref timer, null)) != null)
-            {
-                Utils.SafeExecute(localTimer.Dispose);
+            Task localRecieverInitTask = recieverInitTask;
+            recieverInitTask = null;
+            if (localRecieverInitTask != null)
+            { 
+                try
+                {
+                    await localRecieverInitTask;
+                }
+                catch (Exception)
+                {
+                    // squelch
+                }
             }
 
             try
