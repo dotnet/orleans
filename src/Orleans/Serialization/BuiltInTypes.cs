@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -836,6 +837,380 @@ namespace Orleans.Serialization
 
         #endregion
 
+        #endregion
+
+        #region Immutable Collections
+
+        internal static void SerializeGenericImmutableDictionary(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericImmutableDictionary(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static object CopyGenericImmutableDictionary(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableDictionary), nameof(DeserializeImmutableDictionary), nameof(CopyImmutableDictionary));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static object CopyImmutableDictionary<K, V>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableDictionary<K, V>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var dict = (ImmutableDictionary<K, V>)untypedInput;
+            SerializationManager.SerializeInner(dict.KeyComparer.Equals(EqualityComparer<K>.Default) ? null : dict.KeyComparer, stream, typeof(IEqualityComparer<K>));
+            SerializationManager.SerializeInner(dict.ValueComparer.Equals(EqualityComparer<V>.Default) ? null : dict.ValueComparer, stream, typeof(IEqualityComparer<V>));
+
+            stream.Write(dict.Count);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair.Key, stream, typeof(K));
+                SerializationManager.SerializeInner(pair.Value, stream, typeof(V));
+            }
+        }
+
+        internal static object DeserializeImmutableDictionary<K, V>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var keyComparer = SerializationManager.DeserializeInner<IEqualityComparer<K>>(stream);
+            var valueComparer = SerializationManager.DeserializeInner<IEqualityComparer<V>>(stream);
+            var count = stream.ReadInt();
+            var dictBuilder = ImmutableDictionary.CreateBuilder(keyComparer, valueComparer);
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                var value = SerializationManager.DeserializeInner<V>(stream);
+                dictBuilder.Add(key, value);
+            }
+            var dict = dictBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(dict);
+
+            return dict;
+        }
+
+        internal static void SerializeGenericImmutableList(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericImmutableList(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static object CopyGenericImmutableList(object original)
+        {
+            var t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableList), nameof(DeserializeImmutableList), nameof(CopyImmutableList));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static void SerializeImmutableList<T>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var list = (ImmutableList<T>)untypedInput;
+            stream.Write(list.Count);
+            foreach (var element in list)
+            {
+                SerializationManager.SerializeInner(element, stream, typeof(T));
+            }
+        }
+
+        internal static object DeserializeImmutableList<T>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var count = stream.ReadInt();
+            var listBuilder = ImmutableList.CreateBuilder<T>();
+
+            for (var i = 0; i < count; i++)
+            {
+                listBuilder.Add(SerializationManager.DeserializeInner<T>(stream));
+            }
+            var list = listBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(list);
+            return list;
+        }
+
+        internal static object CopyImmutableList<K>(object original)
+        {
+            return original;
+        }
+
+        internal static object CopyGenericImmutableHashSet(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static void SerializeGenericImmutableHashSet(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object DeserializeGenericImmutableHashSet(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableHashSet), nameof(DeserializeImmutableHashSet), nameof(CopyImmutableHashSet));
+            return concreteMethods.Item2(expected, stream);
+        }
+        
+        internal static object CopyImmutableHashSet<K>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableHashSet<K>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var dict = (ImmutableHashSet<K>)untypedInput;
+            SerializationManager.SerializeInner(dict.KeyComparer.Equals(EqualityComparer<K>.Default) ? null : dict.KeyComparer, stream, typeof(IEqualityComparer<K>));
+
+            stream.Write(dict.Count);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair, stream, typeof(K));
+            }
+        }
+
+        internal static object DeserializeImmutableHashSet<K>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var keyComparer = SerializationManager.DeserializeInner<IEqualityComparer<K>>(stream);
+            var count = stream.ReadInt();
+            var dictBuilder = ImmutableHashSet.CreateBuilder(keyComparer);
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                dictBuilder.Add(key);
+            }
+            var dict = dictBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(dict);
+
+            return dict;
+        }
+
+        internal static object CopyGenericImmutableSortedSet(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static object DeserializeGenericImmutableSortedSet(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static void SerializeGenericImmutableSortedSet(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableSortedSet), nameof(DeserializeImmutableSortedSet), nameof(CopyImmutableSortedSet));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object CopyImmutableSortedSet<K>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableSortedSet<K>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var dict = (ImmutableSortedSet<K>)untypedInput;
+            SerializationManager.SerializeInner(dict.KeyComparer.Equals(Comparer<K>.Default) ? null : dict.KeyComparer, stream, typeof(IComparer<K>));
+
+            stream.Write(dict.Count);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair, stream, typeof(K));
+            }
+        }
+
+        internal static object DeserializeImmutableSortedSet<K>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var keyComparer = SerializationManager.DeserializeInner<IComparer<K>>(stream);
+            var count = stream.ReadInt();
+            var dictBuilder = ImmutableSortedSet.CreateBuilder(keyComparer);
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                dictBuilder.Add(key);
+            }
+            var dict = dictBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(dict);
+
+            return dict;
+        }
+
+        internal static object CopyGenericImmutableSortedDictionary(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static object DeserializeGenericImmutableSortedDictionary(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static void SerializeGenericImmutableSortedDictionary(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableSortedDictionary), nameof(DeserializeImmutableSortedDictionary), nameof(CopyImmutableSortedDictionary));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object CopyImmutableSortedDictionary<K, V>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableSortedDictionary<K, V>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var dict = (ImmutableSortedDictionary<K, V>)untypedInput;
+            SerializationManager.SerializeInner(dict.KeyComparer.Equals(Comparer<K>.Default) ? null : dict.KeyComparer, stream, typeof(IComparer<K>));
+            SerializationManager.SerializeInner(dict.ValueComparer.Equals(EqualityComparer<V>.Default) ? null : dict.ValueComparer, stream, typeof(IEqualityComparer<V>));
+
+            stream.Write(dict.Count);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair.Key, stream, typeof(K));
+                SerializationManager.SerializeInner(pair.Value, stream, typeof(V));
+            }
+        }
+
+        internal static object DeserializeImmutableSortedDictionary<K, V>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var keyComparer = SerializationManager.DeserializeInner<IComparer<K>>(stream);
+            var valueComparer = SerializationManager.DeserializeInner<IEqualityComparer<V>>(stream);
+            var count = stream.ReadInt();
+            var dictBuilder = ImmutableSortedDictionary.CreateBuilder(keyComparer, valueComparer);
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                var value = SerializationManager.DeserializeInner<V>(stream);
+                dictBuilder.Add(key, value);
+            }
+            var dict = dictBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(dict);
+
+            return dict;
+        }
+
+        internal static object CopyGenericImmutableArray(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static object DeserializeGenericImmutableArray(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static void SerializeGenericImmutableArray(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableArray), nameof(DeserializeImmutableArray), nameof(CopyImmutableArray));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object CopyImmutableArray<K>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableArray<K>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var dict = (ImmutableArray<K>)untypedInput;
+
+            stream.Write(dict.Length);
+            foreach (var pair in dict)
+            {
+                SerializationManager.SerializeInner(pair, stream, typeof(K));
+            }
+        }
+
+        internal static object DeserializeImmutableArray<K>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var count = stream.ReadInt();
+            var dictBuilder = ImmutableArray.CreateBuilder<K>();
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                dictBuilder.Add(key);
+            }
+            var dict = dictBuilder.ToImmutable();
+            DeserializationContext.Current.RecordObject(dict);
+
+            return dict;
+        }
+        internal static object CopyGenericImmutableQueue(object original)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            return concreteMethods.Item3(original);
+        }
+
+        internal static object DeserializeGenericImmutableQueue(Type expected, BinaryTokenStreamReader stream)
+        {
+            var concreteMethods = RegisterConcreteMethods(expected, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            return concreteMethods.Item2(expected, stream);
+        }
+
+        internal static void SerializeGenericImmutableQueue(object original, BinaryTokenStreamWriter stream, Type expected)
+        {
+            Type t = original.GetType();
+            var concreteMethods = RegisterConcreteMethods(t, nameof(SerializeImmutableQueue), nameof(DeserializeImmutableQueue), nameof(CopyImmutableQueue));
+            concreteMethods.Item1(original, stream, expected);
+        }
+
+        internal static object CopyImmutableQueue<K>(object original)
+        {
+            return original;
+        }
+
+        internal static void SerializeImmutableQueue<K>(object untypedInput, BinaryTokenStreamWriter stream, Type typeExpected)
+        {
+            var queue = (ImmutableQueue<K>)untypedInput;
+
+            stream.Write(queue.Count());
+            foreach (var item in queue)
+            {
+                SerializationManager.SerializeInner(item, stream, typeof(K));
+            }
+        }
+
+        internal static object DeserializeImmutableQueue<K>(Type expected, BinaryTokenStreamReader stream)
+        {
+            var count = stream.ReadInt();
+            var items = new K[count];
+            for (var i = 0; i < count; i++)
+            {
+                var key = SerializationManager.DeserializeInner<K>(stream);
+                items[i] = key;
+            }
+            var queues = ImmutableQueue.CreateRange(items);
+
+            DeserializationContext.Current.RecordObject(queues);
+
+            return queues;
+        }
         #endregion
 
         #region Other generics
