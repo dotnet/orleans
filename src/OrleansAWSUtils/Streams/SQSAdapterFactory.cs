@@ -44,14 +44,8 @@ namespace OrleansAWSUtils.Streams
                 throw new ArgumentException(string.Format("{0} property not set", DeploymentIdPropertyName));
 
             cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
-
-            string numQueuesString;
-            numQueues = NumQueuesDefaultValue;
-            if (config.Properties.TryGetValue(NumQueuesPropertyName, out numQueuesString))
-            {
-                if (!int.TryParse(numQueuesString, out numQueues))
-                    throw new ArgumentException(string.Format("{0} invalid.  Must be int", NumQueuesPropertyName));
-            }
+            
+            numQueues = config.GetIntProperty(NumQueuesPropertyName, NumQueuesDefaultValue);
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);

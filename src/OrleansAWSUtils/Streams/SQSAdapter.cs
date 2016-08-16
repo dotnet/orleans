@@ -11,7 +11,7 @@ namespace OrleansAWSUtils.Streams
     {
         protected readonly string DeploymentId;
         protected readonly string DataConnectionString;
-        private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
+        private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
 
         public string Name { get; private set; }
@@ -19,7 +19,7 @@ namespace OrleansAWSUtils.Streams
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(HashRingBasedStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName)
+        public SQSAdapter(IConsistentRingStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName)
         {
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (string.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
@@ -39,7 +39,7 @@ namespace OrleansAWSUtils.Streams
         {
             if (token != null)
             {
-                throw new ArgumentException("AzureQueue stream provider currebtly does not support non-null StreamSequenceToken.", "token");
+                throw new ArgumentException("SQSStream stream provider currebtly does not support non-null StreamSequenceToken.", "token");
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             SQSStorage queue;

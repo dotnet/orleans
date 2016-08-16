@@ -126,19 +126,18 @@ namespace OrleansAWSUtils.Storage
         /// Delete the queue
         /// </summary>
         /// <returns></returns>
-        public Task DeleteQueue()
+        public async Task DeleteQueue()
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
-                return sqsClient.DeleteQueueAsync(queueUrl);
+                await sqsClient.DeleteQueueAsync(queueUrl);
             }
             catch (Exception exc)
             {
                 ReportErrorAndRethrow(exc, "DeleteQueue", ErrorCode.StreamProviderManagerBase);
             }
-            return null;
         }
 
         #endregion
@@ -178,10 +177,10 @@ namespace OrleansAWSUtils.Storage
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
 
-                if (count < 1 || count > MAX_NUMBER_OF_MESSAGE_TO_PEAK)
+                if (count < 1)
                     throw new ArgumentOutOfRangeException(nameof(count));
 
-                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count };
+                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEAK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEAK };
                 var response = await sqsClient.ReceiveMessageAsync(request);
                 return response.Messages;
             }
