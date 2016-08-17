@@ -126,7 +126,7 @@ public async override Task OnActivateAsync()
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
     var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
-    await x.SubscribeAsync(OnNextAsync)
+    await stream.SubscribeAsync(OnNextAsync)
 }
 ```
 
