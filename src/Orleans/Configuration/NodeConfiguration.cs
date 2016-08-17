@@ -9,6 +9,8 @@ using System.Xml;
 
 namespace Orleans.Runtime.Configuration
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>
     /// Individual node-specific silo configuration parameters.
     /// </summary>
@@ -172,6 +174,11 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public string StartupTypeName { get; set; }
 
+        /// <summary>
+        /// Specifies the name of the Startup class in the configuration file.
+        /// </summary>
+        public Func<IServiceCollection, IServiceProvider> ServiceProviderBuilder { get; set; }
+
         public string StatisticsProviderName { get; set; }
         /// <summary>
         /// The MetricsTableWriteInterval attribute specifies the frequency of updating the metrics in Azure table.
@@ -329,6 +336,7 @@ namespace Orleans.Runtime.Configuration
             UseNagleAlgorithm = other.UseNagleAlgorithm;
 
             StartupTypeName = other.StartupTypeName;
+            ServiceProviderBuilder = other.ServiceProviderBuilder;
             AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
         }
 
