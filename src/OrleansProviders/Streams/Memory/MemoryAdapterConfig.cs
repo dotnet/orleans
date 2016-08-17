@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.Memory
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
-                throw new ArgumentNullException(nameof(streamProviderName), "streamProviderName not set.");
+                throw new ArgumentNullException(nameof(streamProviderName));
             }
             if (totalQueueCount <= 0)
             {

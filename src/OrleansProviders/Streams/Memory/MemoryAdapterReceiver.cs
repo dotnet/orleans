@@ -62,7 +62,6 @@ namespace Orleans.Providers.Streams.Memory
             }
             catch (Exception)
             {
-                throw;
             }
         }
     }

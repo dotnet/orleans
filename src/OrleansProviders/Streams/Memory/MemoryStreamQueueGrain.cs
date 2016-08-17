@@ -24,7 +24,7 @@ namespace Orleans.Providers.Streams.Memory
         {
             if (eventQueue.Count >= maxEventCount)
             {
-                throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of { maxEventCount }");
+                throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of {maxEventCount}");
             }
             eventQueue.Enqueue(eventData);
             return TaskDone.Done;
