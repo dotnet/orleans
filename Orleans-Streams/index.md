@@ -38,7 +38,7 @@ public async Task OnHttpCall(DeviceEvent deviceEvent)
      // Post data directly into device's stream.
      IStreamProvider streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
      IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId);
-     await chatStream.OnNextAsync(deviceEvent.Data);
+     await deviceStream.OnNextAsync(deviceEvent.Data);
 }
 ```
 
