@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Async;
 using Orleans.Streams;
 using Orleans.Providers;
 
@@ -11,16 +12,16 @@ namespace Tester.TestStreamProviders
     /// </summary>
     public enum FailureInjectionStreamProviderMode
     {
-        UnknownException,
+        NoFault,
         InitializationThrowsException,
         StartThrowsException
     }
 
     public class FailureInjectionStreamProvider : IStreamProviderImpl
     {
-        private IProviderConfiguration config;
+        private FailureInjectionStreamProviderMode mode;
 
-        public static string FailureInjectionModeString { get { return "FAILURE_INJECTION_STREAM_PROVIDER_MODE"; } }
+        public static string FailureInjectionModeString => "FAILURE_INJECTION_STREAM_PROVIDER_MODE";
 
         public string Name { get; set; }
 
@@ -29,33 +30,27 @@ namespace Tester.TestStreamProviders
             throw new NotImplementedException();
         }
 
-        public bool IsRewindable { get; }
+        public bool IsRewindable => false;
 
         public Task Close()
         {
             return TaskDone.Done;
         }
 
-        public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
+        public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration providerConfig)
         {
             Name = name;
-            FailureInjectionStreamProviderMode exceptionMode = ProviderConfigurationExtensions.GetEnumProperty<FailureInjectionStreamProviderMode>(config,
-                FailureInjectionModeString, FailureInjectionStreamProviderMode.UnknownException);
-            if (exceptionMode == FailureInjectionStreamProviderMode.InitializationThrowsException)
-            {
-                throw new Exception("Error initializing provider "+typeof(FailureInjectionStreamProvider).ToString());
-            }
-            this.config = config;
+            mode = providerConfig.GetEnumProperty(FailureInjectionModeString, FailureInjectionStreamProviderMode.NoFault);
+            return mode == FailureInjectionStreamProviderMode.InitializationThrowsException
+                ? TaskUtility.Faulted(new ProviderInitializationException("Error initializing provider " + typeof(FailureInjectionStreamProvider)))
+                : TaskDone.Done;
         }
 
-        public async Task Start()
+        public Task Start()
         {
-            FailureInjectionStreamProviderMode exceptionMode = ProviderConfigurationExtensions.GetEnumProperty<FailureInjectionStreamProviderMode>(config,
-                FailureInjectionModeString, FailureInjectionStreamProviderMode.UnknownException);
-            if (exceptionMode == FailureInjectionStreamProviderMode.StartThrowsException)
-            {
-                throw new Exception("Error starting provider " + typeof(FailureInjectionStreamProvider).ToString());
-            }
+            return mode == FailureInjectionStreamProviderMode.StartThrowsException
+                ? TaskUtility.Faulted(new ProviderStartException("Error starting provider " + typeof(FailureInjectionStreamProvider).Name))
+                : TaskDone.Done;
         }
     }
 }
