@@ -20,7 +20,6 @@ namespace Tester.StreamingTests
         {
             public const string StreamProviderName = nameof(MemoryStreamProvider);
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
-            public TestCluster testCluster;
 
             public readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
             {
@@ -36,12 +35,7 @@ namespace Tester.StreamingTests
                 var options = new TestClusterOptions(1);
                 AdjustConfig(options.ClusterConfiguration);
                 AdjustConfig(options.ClientConfiguration);
-                testCluster = new TestCluster(options);
-                if (testCluster.Primary == null)
-                {
-                    testCluster.Deploy();
-                }
-                return testCluster;
+                return new TestCluster(options);
             }
 
             private static void AdjustConfig(ClusterConfiguration config)
@@ -56,6 +50,14 @@ namespace Tester.StreamingTests
             {
                 config.RegisterStreamProvider<MemoryStreamProvider>(Fixture.StreamProviderName, BuildProviderSettings());
             }
+
+            private static Dictionary<string, string> BuildProviderSettings()
+            {
+                var settings = new Dictionary<string, string>();
+                // get initial settings from configs
+                ProviderConfig.WriteProperties(settings);
+                return settings;
+            }
         }
 
         private static readonly MemoryAdapterConfig ProviderConfig = new MemoryAdapterConfig(Fixture.StreamProviderName);
@@ -64,15 +66,7 @@ namespace Tester.StreamingTests
 
         public MemoryStreamProviderClientTests(Fixture fixture)
         {
-            runner = new ClientStreamTestRunner(fixture.testCluster);
-        }
-
-        private static Dictionary<string, string> BuildProviderSettings()
-        {
-            var settings = new Dictionary<string, string>();
-            // get initial settings from configs
-            ProviderConfig.WriteProperties(settings);
-            return settings;
+            runner = new ClientStreamTestRunner(fixture.HostedCluster);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]

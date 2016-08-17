@@ -61,39 +61,10 @@ namespace Orleans.Providers.Streams.Memory
             return streamQueueMapper;
         }
 
-        private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
-        {
-            return queueGrains.GetOrAdd(queueId, grainFactory.GetGrain<IMemoryStreamQueueGrain>(GenerateDeterministicGuid(queueId)));
-        }
-
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             IQueueAdapterReceiver receiver = (IQueueAdapterReceiver)new MemoryAdapterReceiver(GetQueueGrain(queueId));
             return receiver;
-        }
-
-        private Guid GenerateDeterministicGuid(QueueId queueId)
-        {
-            // provider name hash code
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
-            int providerNameGuidHash = (int)jenkinsHash.ComputeHash(providerName);
-
-            // get queueId hash code
-            uint queueIdHash = queueId.GetUniformHashCode();
-            byte[] queIdHashByes = BitConverter.GetBytes(queueIdHash);
-            short s1 = BitConverter.ToInt16(queIdHashByes, 0);
-            short s2 = BitConverter.ToInt16(queIdHashByes, 2);
-
-            // build guid tailing 8 bytes from providerNameGuidHash and queIdHashByes.
-            var tail = new List<byte>();
-            tail.AddRange(BitConverter.GetBytes(providerNameGuidHash));
-            tail.AddRange(queIdHashByes);
-
-            // make guid.
-            // - First int is provider name hash
-            // - Two shorts from queue Id hash
-            // - 8 byte tail from provider name hash and queue Id hash.
-            return new Guid(providerNameGuidHash, s1, s2, tail.ToArray());
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -122,6 +93,35 @@ namespace Orleans.Providers.Streams.Memory
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
+        }
+
+        private Guid GenerateDeterministicGuid(QueueId queueId)
+        {
+            // provider name hash code
+            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
+            int providerNameGuidHash = (int)jenkinsHash.ComputeHash(providerName);
+
+            // get queueId hash code
+            uint queueIdHash = queueId.GetUniformHashCode();
+            byte[] queIdHashByes = BitConverter.GetBytes(queueIdHash);
+            short s1 = BitConverter.ToInt16(queIdHashByes, 0);
+            short s2 = BitConverter.ToInt16(queIdHashByes, 2);
+
+            // build guid tailing 8 bytes from providerNameGuidHash and queIdHashByes.
+            var tail = new List<byte>();
+            tail.AddRange(BitConverter.GetBytes(providerNameGuidHash));
+            tail.AddRange(queIdHashByes);
+
+            // make guid.
+            // - First int is provider name hash
+            // - Two shorts from queue Id hash
+            // - 8 byte tail from provider name hash and queue Id hash.
+            return new Guid(providerNameGuidHash, s1, s2, tail.ToArray());
+        }
+
+        private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
+        {
+            return queueGrains.GetOrAdd(queueId, grainFactory.GetGrain<IMemoryStreamQueueGrain>(GenerateDeterministicGuid(queueId)));
         }
     }
 }
