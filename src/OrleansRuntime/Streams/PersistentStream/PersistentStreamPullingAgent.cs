@@ -31,7 +31,7 @@ namespace Orleans.Streams
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
-        private Task recieverInitTask;
+        private Task receiverInitTask;
         private bool IsShutdown => timer == null;
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
@@ -122,9 +122,9 @@ namespace Orleans.Streams
 
             try
             {
-                recieverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout))
+                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout))
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId.ToStringWithHashCode()} failed to Initialize.");
-                recieverInitTask.Ignore();
+                receiverInitTask.Ignore();
             }
             catch
             {
@@ -151,13 +151,13 @@ namespace Orleans.Streams
                 Utils.SafeExecute(tmp.Dispose);
             }
 
-            Task localRecieverInitTask = recieverInitTask;
-            recieverInitTask = null;
-            if (localRecieverInitTask != null)
+            Task localReceiverInitTask = receiverInitTask;
+            receiverInitTask = null;
+            if (localReceiverInitTask != null)
             { 
                 try
                 {
-                    await localRecieverInitTask;
+                    await localReceiverInitTask;
                 }
                 catch (Exception)
                 {
@@ -325,11 +325,11 @@ namespace Orleans.Streams
         {
             try
             {
-                Task localrecieverInitTask = recieverInitTask;
-                if (localrecieverInitTask != null)
+                Task localReceiverInitTask = receiverInitTask;
+                if (localReceiverInitTask != null)
                 {
-                    await localrecieverInitTask;
-                    recieverInitTask = null;
+                    await localReceiverInitTask;
+                    receiverInitTask = null;
                 }
 
                 var myQueueId = (QueueId)(state);
