@@ -117,7 +117,6 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await a.DeactivateSelf();
             await a.IncrCounter();
-            //await Task.Delay(TimeSpan.FromSeconds(10));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
@@ -192,52 +191,23 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             await grain.DeactivateSelf();
             Thread.Sleep(3000);
-            bool didThrow = false;
-            bool didThrowCorrectly = false;
-            Exception thrownException = null;
-            try
-            {
-                logger.Info("About to make a 2nd GetAge() call.");
-                age = await grain.GetAge();
-                logger.Info(age.ToString());
-            }
-            catch (Exception exc)
-            {
-                didThrow = true;
-                thrownException = exc;
-                Exception baseException = exc.GetBaseException();
-                didThrowCorrectly = baseException.GetType().Equals(typeof(OrleansException)) && baseException.Message.Contains("Non-existent activation");
-            }
 
-            if (forwardCount == 0)
+            // ReSharper disable once PossibleNullReferenceException
+            var thrownException = await Record.ExceptionAsync(() => grain.GetAge());
+            if (forwardCount != 0)
             {
-                Assert.True(didThrow, "The call did not throw exception as expected.");
-                Assert.True(didThrowCorrectly, "The call did not throw Non-existent activation Exception as expected. Instead it has thrown: " + thrownException);
-                logger.Info("\nThe 1st call after DeactivateSelf has thrown Non-existent activation exception as expected, since forwardCount is {0}.\n", forwardCount);
+                Assert.Null(thrownException);
+                logger.Info("\nThe 1st call after DeactivateSelf has NOT thrown any exception as expected, since forwardCount is {0}.\n", forwardCount);
             }
             else
             {
-                Assert.False(didThrow, "The call has throw an exception, which was not expected. The exception is: " + (thrownException == null ? "" : thrownException.ToString()));
-                logger.Info("\nThe 1st call after DeactivateSelf has NOT thrown any exception as expected, since forwardCount is {0}.\n", forwardCount);
-            }
+                Assert.NotNull(thrownException);
+                Assert.IsType<OrleansException>(thrownException);
+                Assert.Contains("Non-existent activation", thrownException.Message);
+                logger.Info("\nThe 1st call after DeactivateSelf has thrown Non-existent activation exception as expected, since forwardCount is {0}.\n", forwardCount);
 
-            if (forwardCount == 0)
-            {
-                didThrow = false;
-                thrownException = null;
-                // try sending agan now and see it was fixed.
-                try
-                {
-                    age = await grain.GetAge();
-                    logger.Info(age.ToString());
-                }
-                catch (Exception exc)
-                {
-                    didThrow = true;
-                    thrownException = exc;
-                }
-                Assert.False(didThrow, "The 2nd call has throw an exception, which was not expected. The exception is: " + (thrownException == null ? "" : thrownException.ToString()));
-                logger.Info("\nThe 2nd call after DeactivateSelf has NOT thrown any exception as expected, despite the fact that forwardCount is {0}, since we send CacheMgmtHeader.\n", forwardCount);
+                // Try sending agan now and see it was fixed.
+                await grain.GetAge();
             }
         }
 
@@ -304,22 +274,14 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var label = await g.GetLabel();
             }
 
-            TimeSpan LazyDeregistrationDelay;
-            if (doLazyDeregistration)
-            {
-                LazyDeregistrationDelay = TimeSpan.FromSeconds(2);
-                // disable retries in this case, to make test more predictable.
-                testCluster.Primary.Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-                testCluster.SecondarySilos[0].Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-            }
-            else
-            {
-                LazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
-                testCluster.Primary.Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-                testCluster.SecondarySilos[0].Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-            }
-            testCluster.Primary.Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(LazyDeregistrationDelay);
-            testCluster.SecondarySilos[0].Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(LazyDeregistrationDelay);
+            // Disable retries in this case, to make test more predictable.
+            testCluster.Primary.Silo.TestHook.SetMaxForwardCount_ForTesting(0);
+            testCluster.SecondarySilos[0].Silo.TestHook.SetMaxForwardCount_ForTesting(0);
+
+            var lazyDeregistrationDelay = doLazyDeregistration ? TimeSpan.FromSeconds(2) : TimeSpan.FromMilliseconds(-1);
+
+            testCluster.Primary.Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
+            testCluster.SecondarySilos[0].Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
 
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
             int primaryActivation = testCluster.Primary.Silo.TestHook.UnregisterGrainForTesting(grain);
@@ -335,59 +297,31 @@ namespace UnitTests.ActivationsLifeCycleTests
             if (doLazyDeregistration)
             {
                 // Wait a bit
-                TimeSpan pause = LazyDeregistrationDelay.Multiply(2);
+                TimeSpan pause = lazyDeregistrationDelay.Multiply(2);
                 logger.Info("Pausing for {0} because DoLazyDeregistration=True", pause);
                 Thread.Sleep(pause);
             }
 
-            //g1.DeactivateSelf().Wait();
             // Now send a message again; it should fail);
-            try
-            {
-                var newLabel = await g.GetLabel();
-                logger.Info("After 1nd call. newLabel = " + newLabel);
-                Assert.True(false, "First message after incorrect deregister should fail!");
-            }
-            catch (Exception exc)
-            {
-                logger.Info("Got 1st exception - " + exc.GetBaseException().Message);
-                Exception baseExc = exc.GetBaseException();
-                if (baseExc is XunitException) throw;
-                Assert.IsType<OrleansException>(baseExc);
-                // Expected
-                Assert.True(baseExc.Message.Contains("Non-existent activation"), "1st exception message");
-                logger.Info("Got 1st Non-existent activation Exception, as expected.");
-            }
+            var firstEx = await Assert.ThrowsAsync<OrleansException>(() => g.GetLabel());
+            Assert.Contains("Non-existent activation", firstEx.Message);
+            logger.Info("Got 1st Non-existent activation Exception, as expected.");
 
-            // Try again; it should succeed or fail, based on DoLazyDeregistration
-            try
+            // Try again; it should succeed or fail, based on doLazyDeregistration
+            
+            if (doLazyDeregistration)
             {
                 var newLabel = await g.GetLabel();
                 logger.Info("After 2nd call. newLabel = " + newLabel);
-
-                if (!doLazyDeregistration)
-                {
-                    Assert.True(false, "Exception should have been thrown when DoLazyDeregistration=False");
-                }
             }
-            catch (Exception exc)
+            else
             {
-                logger.Info("Got 2nd exception - " + exc.GetBaseException().Message);
-                if (doLazyDeregistration)
-                {
-                    Assert.True(false, "Second message after incorrect deregister failed, while it should have not! Exception=" + exc);
-                }
-                else
-                {
-                    Exception baseExc = exc.GetBaseException();
-                    if (baseExc is XunitException) throw;
-                    Assert.IsType<OrleansException>(baseExc);
-                    // Expected
-                    Assert.True(baseExc.Message.Contains("duplicate activation") || baseExc.Message.Contains("Non-existent activation")
-                               || baseExc.Message.Contains("Forwarding failed"),
-                        "2nd exception message: " + baseExc);
-                    logger.Info("Got 2nd exception, as expected.");
-                }
+                var secondEx = await Assert.ThrowsAsync<OrleansException>(() => g.GetLabel());
+                logger.Info("Got 2nd exception - " + secondEx.GetBaseException().Message);
+                Assert.True(secondEx.Message.Contains("duplicate activation") || secondEx.Message.Contains("Non-existent activation")
+                               || secondEx.Message.Contains("Forwarding failed"),
+                        "2nd exception message: " + secondEx);
+                logger.Info("Got 2nd exception, as expected.");
             }
         }
     }
