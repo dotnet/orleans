@@ -48,6 +48,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="ActivationGCTestGrainInterfaces.cs" />
     <Compile Include="IClientAddressableTestClientObject.cs" />
     <Compile Include="IClientAddressableTestGrain.cs" />
     <Compile Include="IClientAddressableTestProducer.cs" />
