@@ -72,6 +72,16 @@ namespace Orleans.Runtime
                 queueTracking.OnStartExecution();
             }
 #endif
+
+            requestQueue.Completion.Wait();
+
+#if TRACK_DETAILED_STATS
+               if (StatisticsCollector.CollectThreadTimeTrackingStats)
+                 {
+                    threadTracking.OnStopExecution();
+                    queueTracking.OnStopExecution();
+                }
+#endif
         }
 
         public override void Stop()
@@ -94,7 +104,7 @@ namespace Orleans.Runtime
             }
         }
 
-        #region IDisposable Members
+#region IDisposable Members
 
         protected override void Dispose(bool disposing)
         {
@@ -114,6 +124,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
+#endregion
     }
 }
