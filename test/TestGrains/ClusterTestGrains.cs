@@ -9,6 +9,7 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
+using Orleans.Streams;
 
 namespace UnitTests.Grains
 {
@@ -37,11 +38,19 @@ namespace UnitTests.Grains
         {
             counter += 1;
             logger.Info("GotSayHello {0}, {1} subscriptions", counter, observers.Count);
-            for(int i = 0; i < observers.Count; i++)
+
+            // notify observers
+            for (int i = 0; i < observers.Count; i++)
             {
                 observers[i].GotHello(i);
             }
+
+            // notify stream
+            if (stream != null)
+                stream.OnNextAsync(counter);
+
             return Task.FromResult(counter);
+
             /*
             if (name == "internal")
             {
@@ -79,6 +88,16 @@ namespace UnitTests.Grains
         {
             observers.Add(listener);
             logger.Info("AddedSubscription {0}", observers.Count);
+            return TaskDone.Done;
+        }
+
+        IAsyncStream<int> stream;
+
+        public Task EnableStreamNotifications()
+        {
+            IStreamProvider streamProvider = GrainClient.GetStreamProvider("SMSProvider");
+            Guid guid = new Guid((int) this.GetPrimaryKeyLong(), 0, 0, new byte[8]);
+            stream = streamProvider.GetStream<int>(guid, "notificationtest");
             return TaskDone.Done;
         }
         

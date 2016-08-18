@@ -32,6 +32,7 @@ namespace TestGrainInterfaces
         Task Deactivate();
         Task<string> GetRuntimeId();
         Task Subscribe(IClusterTestListener listener);
+        Task EnableStreamNotifications();
     }
 
     public interface IClusterTestListener : IGrainObserver

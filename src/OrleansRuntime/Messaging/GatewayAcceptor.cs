@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Orleans.Messaging;
+using Orleans;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -23,6 +24,14 @@ namespace Orleans.Runtime.Messaging
             ThreadTrackingStatistic.FirstClientConnectedStartTracking();
             GrainId client;
             if (!ReceiveSocketPreample(sock, true, out client)) return false;
+
+            // refuse clients that are connecting to the wrong cluster
+            if (client.Category == UniqueKey.Category.GeoClient
+                && client.Key.ClusterId != Silo.CurrentSilo.ClusterId)
+            {
+                Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId, string.Format("Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}", client, client.Key.ClusterId, Silo.CurrentSilo.ClusterId));
+                return false;
+            }
 
             gateway.RecordOpenedSocket(sock, client);
             return true;

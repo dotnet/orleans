@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Runtime.Configuration;
 
 namespace Tests.GeoClusterTests
 {
@@ -19,7 +20,9 @@ namespace Tests.GeoClusterTests
         // this client is used to call into the management grain.
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport, string clusterId) : base(name, gatewayport, clusterId)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer)
+                 // use null clusterId, in this test, because we are testing non-geo clients
+                : base(name, gatewayport, null, customizer)
             {
                 systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
             }

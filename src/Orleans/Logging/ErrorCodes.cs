@@ -749,6 +749,7 @@ namespace Orleans
         ClientRegistrarFailedToRegister_2       = GatewayBase + 17,
         ClientRegistrarFailedToUnregister       = GatewayBase + 18,
         ClientRegistrarTimerFailed              = GatewayBase + 19,
+        GatewayAcceptor_WrongClusterId          = GatewayBase + 20,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability

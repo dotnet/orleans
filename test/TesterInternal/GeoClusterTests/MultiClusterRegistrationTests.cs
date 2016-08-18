@@ -1,6 +1,7 @@
 ﻿using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,7 +48,8 @@ namespace UnitTests.GeoClusterTests
             testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
             testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
             testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
-            testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
+            testtasks.Add(RunWithTimeout("ObserverBasedClientNotification", 10000, ObserverBasedClientNotification));
+            testtasks.Add(RunWithTimeout("StreamBasedClientNotification", 10000, StreamBasedClientNotification));
 
             foreach (var t in testtasks)
                 await t;
@@ -65,7 +67,8 @@ namespace UnitTests.GeoClusterTests
             testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
             testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
             testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
-            testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
+            testtasks.Add(RunWithTimeout("ObserverBasedClientNotification", 10000, ObserverBasedClientNotification));
+            testtasks.Add(RunWithTimeout("StreamBasedClientNotification", 10000, StreamBasedClientNotification));
 
             foreach (var t in testtasks)
                 await t;
@@ -85,7 +88,8 @@ namespace UnitTests.GeoClusterTests
                 testtasks.Add(RunWithTimeout("SequentialCalls", 10000, SequentialCalls));
                 testtasks.Add(RunWithTimeout("ParallelCalls", 10000, ParallelCalls));
                 testtasks.Add(RunWithTimeout("ManyParallelCalls", 10000, ManyParallelCalls));
-                testtasks.Add(RunWithTimeout("Observer", 10000, Observer));
+                testtasks.Add(RunWithTimeout("ObserverBasedClientNotification", 10000, ObserverBasedClientNotification));
+                testtasks.Add(RunWithTimeout("StreamBasedClientNotification", 10000, StreamBasedClientNotification));
             }
 
             foreach (var t in testtasks)
@@ -94,10 +98,10 @@ namespace UnitTests.GeoClusterTests
 
         public Task StartClustersAndClients(params int[] silos)
         {
-            return StartClustersAndClients(null, silos);
+            return StartClustersAndClients(null, null, silos);
         }
 
-        public Task StartClustersAndClients(Action<ClusterConfiguration> customizer, params int[] silos)
+        public Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params int[] silos)
         {
             WriteLog("Creating clusters and clients...");
             var stopwatch = new System.Diagnostics.Stopwatch();
@@ -109,8 +113,12 @@ namespace UnitTests.GeoClusterTests
 
             System.Threading.ThreadPool.SetMaxThreads(8, 8);
 
+            // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
+                c.AddAzureTableStorageProvider("PubSubStore", deleteOnClear:true, useJsonFormat:false, connectionString: Orleans.TestingHost.StorageTestConstants.DataConnectionString);
+                c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
+
                 // logging  
                 foreach (var o in c.Overrides)
                 {
@@ -119,8 +127,11 @@ namespace UnitTests.GeoClusterTests
                     o.Value.TraceLevelOverrides.Add(new Tuple<string, Severity>("Orleans.GrainDirectory.LocalGrainDirectory", Severity.Verbose2));
                 }
 
-                customizer?.Invoke(c);
+                config_customizer?.Invoke(c);
             };
+            // configuration for clients
+            Action<ClientConfiguration> ccc = (config) =>
+               config.RegisterStreamProvider("Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider", "SMSProvider");
 
             // Create clusters and clients
             ClusterNames = new string[silos.Length];
@@ -132,7 +143,7 @@ namespace UnitTests.GeoClusterTests
                 var c = Clients[i] = new ClientWrapper[numsilos];
                 NewGeoCluster(globalserviceid, clustername, silos[i], addtracing);
                 // create one client per silo
-                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = NewClient<ClientWrapper>(clustername, j));
+                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = NewClient<ClientWrapper>(clustername, j, ccc));
             }
 
             WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
@@ -155,7 +166,7 @@ namespace UnitTests.GeoClusterTests
         #region client wrappers
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport, string clusterId) : base(name, gatewayport, clusterId)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> clientconfig_customizer) : base(name, gatewayport, clusterId, clientconfig_customizer)
             {
                 systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -182,6 +193,16 @@ namespace UnitTests.GeoClusterTests
                 Task toWait = grainRef.Deactivate();
                 toWait.Wait();
             }
+
+            public void EnableStreamNotifications(int i)
+            {
+                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                GrainClient.Logger.Info("EnableStreamNotifications {0}", grainRef);
+                Task toWait = grainRef.EnableStreamNotifications();
+                toWait.Wait();
+            }
+
+            // observer-based notification
             public void Subscribe(int i, IClusterTestListener listener)
             {
                 var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
@@ -195,6 +216,16 @@ namespace UnitTests.GeoClusterTests
             }
             List<IClusterTestListener> listeners = new List<IClusterTestListener>(); // keep them from being GCed
 
+            // stream-based notification
+            public void SubscribeStream(int i, IAsyncObserver<int> listener)
+            {
+                IStreamProvider streamProvider = GrainClient.GetStreamProvider("SMSProvider");
+                Guid guid = new Guid(i, 0, 0, new byte[8]);
+                IAsyncStream<int> stream = streamProvider.GetStream<int>(guid, "notificationtest");
+                handle = stream.SubscribeAsync(listener).Result;
+            }
+            StreamSubscriptionHandle<int> handle;
+
             public void InjectClusterConfiguration(params string[] clusters)
             {
                 systemManagement.InjectMultiClusterConfiguration(clusters).Wait();
@@ -206,7 +237,7 @@ namespace UnitTests.GeoClusterTests
             }
         }
 
-        public class ClusterTestListener : MarshalByRefObject, IClusterTestListener
+        public class ClusterTestListener : MarshalByRefObject, IClusterTestListener, IAsyncObserver<int>
         {
             public ClusterTestListener(Action<int> oncall)
             {
@@ -219,6 +250,22 @@ namespace UnitTests.GeoClusterTests
             {
                 count++;
                 oncall(number);
+            }
+
+            public Task OnNextAsync(int item, StreamSequenceToken token = null)
+            {
+                GotHello(item);
+                return TaskDone.Done;
+            }
+
+            public Task OnCompletedAsync()
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task OnErrorAsync(Exception ex)
+            {
+                throw new NotImplementedException();
             }
 
             public int count;
@@ -328,7 +375,7 @@ namespace UnitTests.GeoClusterTests
         }
 
 
-        public async Task Observer()
+        public async Task ObserverBasedClientNotification()
         {
             var x = Next();
             var gref = Clients[0][0].GetGrainRef(x);
@@ -364,9 +411,49 @@ namespace UnitTests.GeoClusterTests
 
             var sortedresults = promises.Select(p => p.Result).OrderBy(num => num).ToArray();
 
+            // each client should get its own notification
             for (int i = 0; i < sortedresults.Length; i++)
                 AssertEqual(sortedresults[i], i, gref);
         }
+
+        public async Task StreamBasedClientNotification()
+        {
+            var x = Next();
+            var gref = Clients[0][0].GetGrainRef(x);
+            Clients[0][0].EnableStreamNotifications(x);
+            WriteLog("{0} created grain", gref);
+
+            var listeners = new List<ClusterTestListener>();
+            var promises = new List<Task<int>>();
+
+            // create an observer on each client
+            Parallel.For(0, Clients.Length, paralleloptions, i =>
+            {
+                for (int jj = 0; jj < Clients[i].Length; jj++)
+                {
+                    int j = jj;
+                    var promise = new TaskCompletionSource<int>();
+                    var listener = new ClusterTestListener((num) =>
+                    {
+                        WriteLog("{3} observedcall {2} on Client[{0}][{1}]", i, j, num, gref);
+                        promise.TrySetResult(num);
+                    });
+                    promises.Add(promise.Task);
+                    listeners.Add(listener);
+                    Clients[i][j].SubscribeStream(x, listener);
+                    WriteLog("{2} subscribed to Client[{0}][{1}]", i, j, gref);
+                }
+            });
+            // call the grain
+            Clients[0][0].CallGrain(x);
+
+            await Task.WhenAll(promises);
+
+            // each client should get same value
+            foreach (var p in promises)
+                AssertEqual(1, p.Result, gref);
+        }
+
 
 
         [Fact, TestCategory("GeoCluster")]
@@ -376,7 +463,7 @@ namespace UnitTests.GeoClusterTests
             {
                 Action<ClusterConfiguration> c =
                   (cc) => { cc.Globals.DirectoryLazyDeregistrationDelay = TimeSpan.FromSeconds(5); };
-                return StartClustersAndClients(c, 1, 1);
+                return StartClustersAndClients(c, null, 1, 1);
             });
 
             await RunWithTimeout("BlockedDeact", 10 * 1000, async () =>
