@@ -107,6 +107,6 @@
   </Target>
   -->
   <Target Name="AfterBuild">
-        <UpdateVersion InputFilename="$(SolutionDir)Build\Version.txt" OutputFilename="$(OutputPath)Orleans.psd1" />
+        <UpdateVersion InputFilename="$(SolutionDir)Build\Version.txt" OutputFilename="$(OutDir)Orleans.psd1" />
   </Target>
 </Project>
