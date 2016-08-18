@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue()
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            messageQueues = new BufferBlock<Message>[n];
+            messageQueues = new ITargetBlock<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
@@ -73,6 +73,12 @@ namespace Orleans.Runtime.Messaging
 
         public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
         {
+            if (!(messageQueues[(int) type] is BufferBlock<Message>))
+            {
+                // handler for this message category has been already attached
+                return;
+            }
+
             // buffer block used for temporary storing of the messages that arrived before
             (messageQueues[(int) type] as BufferBlock<Message>).LinkTo(actionBlock);
             messageQueues[(int) type] = actionBlock;
