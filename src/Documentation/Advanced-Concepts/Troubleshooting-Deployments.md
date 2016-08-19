@@ -47,7 +47,7 @@ role recycling. Check the logs for more information. Visual Studio provides some
 
 ## How to Check Logs
 - Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.
-- You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level. 
+- You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level.
 
 Programmatic configuration:
 - When creating a `ClusterConfiguration` object, set `config.Defaults.DefaultTraceLevel = Severity.Info`.
@@ -58,4 +58,4 @@ Declarative configuration:
 
 In the `diagnostics.wadcfgx` file for the web and worker roles, make sure to set the `scheduledTransferLogLevelFilter` attribute in the `Logs` element to `Information`, as this is an additional layer of trace filtering that defines which traces are sent to the `WADLogsTable` in Azure Storage.
 
-You can find more information about this in the [Orleans Configuration Guide] (Orleans-Configuration-Guide/).
+You can find more information about this in the [Orleans Configuration Guide] (../Orleans-Configuration-Guide/index.md).

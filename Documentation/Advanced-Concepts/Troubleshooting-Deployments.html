@@ -106,6 +106,22 @@ role recycling. Check the logs for more information. Visual Studio provides some
 <li>Make sure that the connections strings are correct.</li>
 <li>Check the Azure Cloud Services troubleshooting pages for more information.</li>
 </ul>
+<h2 id="how-to-check-logs">How to Check Logs</h2>
+<ul>
+<li>Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.</li>
+<li>You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level.</li>
+</ul>
+<p>Programmatic configuration:</p>
+<ul>
+<li>When creating a <code>ClusterConfiguration</code> object, set <code>config.Defaults.DefaultTraceLevel = Severity.Info</code>.</li>
+<li>When creating a <code>ClientConfiguration</code> object, set <code>config.DefaultTraceLevel = Severity.Info</code>.</li>
+</ul>
+<p>Declarative configuration:</p>
+<ul>
+<li>Add <code>&lt;Tracing DefaultTraceLevel=&quot;Info&quot; /&gt;</code> to the <code>OrleansConfiguration.xml</code> and/or the <code>ClientConfiguration.xml</code> files.</li>
+</ul>
+<p>In the <code>diagnostics.wadcfgx</code> file for the web and worker roles, make sure to set the <code>scheduledTransferLogLevelFilter</code> attribute in the <code>Logs</code> element to <code>Information</code>, as this is an additional layer of trace filtering that defines which traces are sent to the <code>WADLogsTable</code> in Azure Storage.</p>
+<p>You can find more information about this in the <a href="../Orleans-Configuration-Guide/index.html">Orleans Configuration Guide</a>.</p>
 
             </article>
           </div>

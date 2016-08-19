@@ -95,7 +95,7 @@ Rather than adding some clever backoff-retry code, here we simply expect you to 
 
     GrainClient.Initialize(config);
 }
-</code></pre><p>Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. Try to not mix NuGet package versions, make sure all Orlean packages are aligned in the solution.</p>
+</code></pre><p>Now you should add reference to Microsoft.Orleans.Server NuGet package to your collection project and then in its project properties in Debug tab set the bin/Debug/OrleansHost.exe or bin/Release/OrleansHost.exe file as startup program for your collections class library. Try to not mix NuGet package versions, make sure all Orlean packages (client, graininterface and grain projects) are aligned in the solution.</p>
 <p>You also need to add a OrleansConfiguration.xml file, you can create it using the instruction in <a href="Minimal-Orleans-Application.html">Minimal Orleans Application tutorial</a>. Then, in this file, make sure that the <code>ProxyingGateway</code> element inside its Defaults section matches this value:</p>
 <pre><code class="lang-xml">&lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
 </code></pre><p>OrleansHost.exe is a ready-made host executable intended for running Orleans silo code. It is also useful for development purposes. If you set both the grain collection project and the the host project as startup projects, you will see two windows come up:</p>
@@ -108,6 +108,12 @@ To start the client again, you will have to use the right-button context menu in
 <p>To demonstrate keeping state around across client sessions, let&#39;s modify the <code>SayHello()</code> method to take a string argument.
 Then, we will have our grain save each string it is sent and return the last one.
 Only at the first greeting will we see something we didn&#39;t send to the grain from the client.</p>
+<p>First, change the interface definition of SayHello</p>
+<pre><code class="lang-csharp">public interface IGrain1 : IGrainWithIntegerKey
+{
+    Task&lt;string&gt; SayHello(string greeting);
+}
+</code></pre><p>Then change the Implementation</p>
 <pre><code class="lang-csharp">private string text = &quot;Hello World!&quot;;
 
 public Task&lt;string&gt; SayHello(string greeting)
@@ -116,7 +122,7 @@ public Task&lt;string&gt; SayHello(string greeting)
     text = greeting;
     return Task.FromResult(oldText);
 }
-</code></pre><p> We also change the client to send a greeting several times:</p>
+</code></pre><p> We also change the client to send a greeting several times in Program.cs:</p>
 <pre><code class="lang-csharp">var hello = GrainClient.GrainFactory.GetGrain&lt;IGrain1&gt;(0);
 Console.WriteLine(hello.SayHello(&quot;First&quot;).Result);
 Console.WriteLine(hello.SayHello(&quot;Second&quot;).Result);

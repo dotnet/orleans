@@ -136,7 +136,7 @@ On the other hand, for explicit subscriptions, one needs to Resume the subscript
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
     var stream = streamProvider.GetStream&lt;string&gt;(this.GetPrimaryKey(), &quot;MyStreamNamespace&quot;);
-    await x.SubscribeAsync(OnNextAsync)
+    await stream.SubscribeAsync(OnNextAsync)
 }
 </code></pre><p><strong>Explicit Subscriptions:</strong></p>
 <p>Grain that wants to explicitly subscribe first has to call <code>SubscribeAsync</code> in some place in its code, in order to subsribe the first time. This causes the subsription to be established, as well as attaches the processig logic.

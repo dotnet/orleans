@@ -2,10 +2,11 @@
 layout: page
 title: PowerShell Client Module
 ---
-{% include JB/setup %}
 
-The Orleans PowerShell Client Module is a set of [PowerShell Cmdlets](https://technet.microsoft.com/en-us/library/dd772285.aspx) that wraps 
-[GrainClient](https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs) in a set of convenient commands making possible to interact with not just 
+# PowerShell Client Module
+
+The Orleans PowerShell Client Module is a set of [PowerShell Cmdlets](https://technet.microsoft.com/en-us/library/dd772285.aspx) that wraps
+[GrainClient](https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs) in a set of convenient commands making possible to interact with not just
 [ManagementGrain](https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs) but any `IGrain` just as a regular Orleans application can by using Powershell scripts.
 
 These Cmdlets enable a series of scenarions from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershel scripts.
@@ -63,7 +64,7 @@ PS> Import-Module "Orleans"
 ```
 
 **Note**:
-In case of building from source, you must import it as suggested on the Install section by using the path to the `.psd1` instead of using the module name since it will not be on the `$env:PSModulePath` PowerShell runtime variable. 
+In case of building from source, you must import it as suggested on the Install section by using the path to the `.psd1` instead of using the module name since it will not be on the `$env:PSModulePath` PowerShell runtime variable.
 Again, it is highly recommended that you install from PowerShell Gallery instead.
 
 After the module is imported (which means it is loaded on PowerShell session), you will have the following Cmdlets available:
@@ -80,10 +81,10 @@ This module is a wrapper around `GrainClient.Initialize()` and its overloads.
 
 
 
-* __`Start-GrainClient`__ 
+* __`Start-GrainClient`__
 
   * The same as call `GrainClient.Initialize()` which will look for the known Orleans Client configuration file names
-  
+
 * __`Start-GrainClient [-ConfigFilePath] <string> [[-Timeout] <timespan>]`__
 
   * Will use the provided file path as in `GrainClient.Initialize(filePath)`
@@ -134,7 +135,7 @@ PS> $grainInterfaceType = [MyInterfacesNamespace.IMyGrain]
 
 PS> $grainId = [System.Guid]::Parse("A4CF7B5D-9606-446D-ACE9-C900AC6BA3AD")
 
-PS> $grain = Get-Grain -GrainType $grainInterfaceType -GuidKey $grainId 
+PS> $grain = Get-Grain -GrainType $grainInterfaceType -GuidKey $grainId
 
 PS> $message = $grain.SayHelloTo("Gutemberg").Result
 
@@ -149,12 +150,3 @@ Thats it for now. We plan to update this page as we introduce more Cmdlets like 
 We hope that this help people as a starting point for automation. As always, this is a work-in-progress and we love contributions! :)
 
 Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.
-
-
-
-
-
-
-
-
-

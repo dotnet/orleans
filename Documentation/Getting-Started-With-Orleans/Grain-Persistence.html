@@ -132,6 +132,17 @@ public class MyGrain&lt;MyGrainState&gt; ...
 <li><strong><code>UseFullAssemblyNames=&quot;false&quot;</code></strong> (optional) - Serializes types with full assembly names (true) or simple (false), defaults to <code>false</code></li>
 <li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - Indents the serialized json, defaults to <code>false</code></li>
 </ul>
+<h3 id="dynamodbstorageprovider">DynamoDBStorageProvider</h3>
+<pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.Storage.DynamoDBStorageProvider&quot; Name=&quot;DDBStore&quot;
+    DataConnectionString=&quot;Service=us-wes-1;AccessKey=MY_ACCESS_KEY;SecretKey=MY_SECRET_KEY;&quot; /&gt;
+</code></pre><ul>
+<li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The DynamoDB storage connection string to use. You can set <code>Service</code>,<code>AccessKey</code>, <code>SecretKey</code>, <code>ReadCapacityUnits</code> and <code>WriteCapacityUnits</code> in it.</li>
+<li><strong><code>TableName=&quot;OrleansGrainState&quot;</code></strong> (optional) - The table name to use in table storage, defaults to <code>OrleansGrainState</code></li>
+<li><strong><code>DeleteStateOnClear=&quot;false&quot;</code></strong> (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to <code>false</code></li>
+<li><strong><code>UseJsonFormat=&quot;false&quot;</code></strong> (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to <code>false</code></li>
+<li><strong><code>UseFullAssemblyNames=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Serializes types with full assembly names (true) or simple (false), defaults to <code>false</code></li>
+<li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
+</ul>
 <!--
 ### SqlStorageProvider
 

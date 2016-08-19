@@ -32,3 +32,5 @@
   href: Deployment-and-Versioning-of-Dependencies.md
 - name: Troubleshooting Deployments
   href: Troubleshooting-Deployments.md
+- name: Powershell Client
+  href: Powershell-Client.md
