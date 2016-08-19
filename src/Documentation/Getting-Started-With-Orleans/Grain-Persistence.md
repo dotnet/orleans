@@ -84,6 +84,22 @@ The following attributes can be added to the `<Provider />` element to configure
 * __`UseFullAssemblyNames="false"`__ (optional) - Serializes types with full assembly names (true) or simple (false), defaults to `false`
 * __`IndentJSON="false"`__ (optional) - Indents the serialized json, defaults to `false`
 
+### DynamoDBStorageProvider
+
+```xml
+<Provider Type="Orleans.Storage.DynamoDBStorageProvider" Name="DDBStore"
+    DataConnectionString="Service=us-wes-1;AccessKey=MY_ACCESS_KEY;SecretKey=MY_SECRET_KEY;" />
+```
+
+* __`DataConnectionString="..."`__ (mandatory) - The DynamoDB storage connection string to use. You can set `Service`,`AccessKey`, `SecretKey`, `ReadCapacityUnits` and `WriteCapacityUnits` in it.
+* __`TableName="OrleansGrainState"`__ (optional) - The table name to use in table storage, defaults to `OrleansGrainState`
+* __`DeleteStateOnClear="false"`__ (optional) - If true, the record will be deleted when grain state is cleared, otherwise an null record will be written, defaults to `false`
+* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`
+* __`UseFullAssemblyNames="false"`__ (optional) - (if `UseJsonFormat="true"`) Serializes types with full assembly names (true) or simple (false), defaults to `false`
+* __`IndentJSON="false"`__ (optional) - (if `UseJsonFormat="true"`) Indents the serialized json, defaults to `false`
+
+
+
 <!--
 ### SqlStorageProvider
 

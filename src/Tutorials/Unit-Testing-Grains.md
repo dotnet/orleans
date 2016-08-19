@@ -8,7 +8,7 @@ title: Unit Testing Grains
 This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
 For a distributed application written in Orleans, you'll need load tests and integration tests as well but here we'll only focus on unit tests.
 
-Orleans makes it possible to mock many of its parts but here we only focus on simply running grains in test silos.
+Orleans makes it possible to mock many of its parts ([example](https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal)) but here we only focus on simply running grains in test silos.
 
 The steps are
 

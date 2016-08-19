@@ -14,3 +14,4 @@ In production, Orleans requires persistent storage. The following technologies a
 * [ZooKeeper](https://zookeeper.apache.org) 3.4.0 or higher
 * [MySQL](https://www.mysql.com) 5.0 or higher
 * [Consul](https://www.consul.io) 0.6.0 or higher
+* [DynamoDB](https://aws.amazon.com/dynamodb/) - Tested with [AWSSDK - Amazon DynamoDB 3.1.5.3](https://www.nuget.org/packages/AWSSDK.DynamoDBv2/3.1.5.3)
