@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Presence Service | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Presence Service | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Presence-Service.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Presence-Service.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="presence-service">Presence Service</h1>
               
 <p>A presence service serves as the hub of many social applications, including multi-player games and chats. Its essential function is to know who is online at given point in time and alert other users of their online presence. Each logged-in player sends a &quot;heartbeat pulse&quot; at regular intervals, </p>
@@ -101,17 +101,14 @@ The underlying type <code>T</code> for value <code>Task</code> must be serializa
   Task JoinGame(IGameGrain game);
   Task LeaveGame(IGameGrain game);
 }
-</code></pre>
-<h2 id="using-the-grain-factory">Using the Grain Factory</h2>
+</code></pre><h2 id="using-the-grain-factory">Using the Grain Factory</h2>
 <p>After the grain interface has been defined, building the project originally created with the Orleans Visual Studio project template will use the Orleans-specific MSBuild targets to generate a client proxy classes corresponding to the user-defined grain interfaces and to merge this additional code back into the interface DLL.</p>
 <p>Application should use the generic grain factory class to get references to grains. Inside the grain code, the factory is available via the protected GrainFactory class member property. On the client side the factory is available via the <code>GrainClient.GrainFactory</code> static field.</p>
 <p>When running inside a grain the following code should be used to get the grain reference:</p>
 <pre><code class="lang-csharp">    this.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(grainKey);
-</code></pre>
-<p>When running on the Orleans client side the following code should be used to get the grain reference:</p>
+</code></pre><p>When running on the Orleans client side the following code should be used to get the grain reference:</p>
 <pre><code class="lang-csharp">    GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(grainKey);
-</code></pre>
-<h2 id="the-implementation-class">The Implementation Class</h2>
+</code></pre><h2 id="the-implementation-class">The Implementation Class</h2>
 <p>A grain type is materialized by a class that implements the grain type’s interface and inherits directly or indirectly from <code>Orleans.Grain</code>.</p>
 <p>The <code>PlayerGrain</code> grain class implements the <code>IPlayerGrain</code> interface.</p>
 <pre><code class="lang-csharp">public class PlayerGrain : Grain, IPlayerGrain
@@ -141,7 +138,6 @@ The underlying type <code>T</code> for value <code>Task</code> must be serializa
    }
 }
 </code></pre>
-
             </article>
           </div>
           

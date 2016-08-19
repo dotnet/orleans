@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>On-Premise Deployment | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="On-Premise Deployment | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/On-Premise-Deployment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/On-Premise-Deployment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="on-premise-deployment">On-Premise Deployment</h1>
               
 <h2 id="overview">Overview</h2>
@@ -90,7 +90,7 @@ There are also scripts for removing a service, monitoring its performance, start
 These are the scripts we found useful for ourselves while building and testing Orleans.</p>
 <h2 id="prerequisites">Prerequisites</h2>
 <p>The following table lists the prerequisites for deploying and running Orleans on a remote machine:</p>
-<h3 id="-net-framework-4-5">.Net Framework 4.5</h3>
+<h3 id="net-framework-4-5">.Net Framework 4.5</h3>
 <p>Orleans runs under the .Net Framework 4.5, which can be installed from this link: (<a href="http://www.microsoft.com/en-us/download/details.aspx?id=30653">http://www.microsoft.com/en-us/download/details.aspx?id=30653</a>)</p>
 <h3 id="powershell-2-0-with-winrm">Powershell 2.0 with WinRM</h3>
 <p>Windows 7 and Windows Server 2008 R2 should have these installed by default.
@@ -134,8 +134,7 @@ Start by building the <a href="../Documentation/Samples-Overview/Hello-World.htm
 
     //hostDomain.DoCallBack(ShutdownSilo);
 }
-</code></pre>
-<p>Also, start a new PowerShell window as Administrator and move to the <code>RemoteDeployment</code>folder.</p>
+</code></pre><p>Also, start a new PowerShell window as Administrator and move to the <code>RemoteDeployment</code>folder.</p>
 <p>The basic steps to deploy Orleans code are:</p>
 <ul>
 <li>Setup a deployment manifest <em>(Deployment.xml)</em>.</li>
@@ -164,7 +163,7 @@ The file name must be &quot;OrleansConfiguration.xml&quot; – if necessary, jus
 <p>Located in the <code>&lt;Deployment&gt;&lt;TargetLocation&gt;</code> element.
 This must be an absolute local file system path (i.e. no &quot;..&quot; locations) that is valid on all the target hosts.</p>
 <pre><code>&lt;TargetLocation Path=&quot;C:\Orleans&quot; /&gt;
-</code></pre><h3 id="the-set-of-silos-host-machines-and-optional-silo-names-this-orleans-system-should-to-be-deployed-to-">The set of silos (host machines and optional silo names) this Orleans system should to be deployed to.</h3>
+</code></pre><h3 id="the-set-of-silos-host-machines-and-optional-silo-names-this-orleans-system-should-to-be-deployed-to">The set of silos (host machines and optional silo names) this Orleans system should to be deployed to.</h3>
 <p>Located in the <code>&lt;Deployment&gt;&lt;Nodes&gt;&lt;Node&gt;</code> elements.
 Typically: &quot;Primary&quot; on <em>localhost</em>, or multiple machines with one silo each.
 The <code>HostName</code> attribute specifies the machine name.
@@ -175,16 +174,14 @@ Generally, this is arbitrary, with the exception that if multiple silos will run
     &lt;Node HostName=&quot;MACHINE2&quot; NodeName=&quot;Node2&quot; /&gt;
     &lt;Node HostName=&quot;MACHINE3&quot; NodeName=&quot;Node3&quot; /&gt;
 &lt;Nodes /&gt;
-</code></pre>
-<h3 id="deployment-group-id">Deployment Group ID</h3>
+</code></pre><h3 id="deployment-group-id">Deployment Group ID</h3>
 <p>This is a GUID which distinguishes one Orleans runtime system from another, even if both Orleans systems are running on the same machines.
 Located in the <code>&lt;Deployment&gt;</code> element.</p>
 <pre><code class="lang-xml">&lt;Deployment
     Name=&quot;Deployment1&quot;
     DeploymentGroup=&quot;F219832A-1EE1-45DA-B35D-0BB3060C9FDA&quot;
     xmlns=&quot;urn:xcg-deployment&quot;&gt;
-</code></pre>
-<h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
+</code></pre><h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
 <p>Refer to  <a href="../Documentation/Orleans-Configuration-Guide/Server-Configuration.html">Server Configuration</a> for information on silo configuration.</p>
 <h2 id="orleans-powershell-scripts">Orleans Powershell Scripts</h2>
 <p>The following sections detail the PowerShell scripts provided with Orleans to aid with deployment and monitoring.
@@ -270,8 +267,7 @@ In the author&#39;s setup, Azure is not involved, so the client configuration lo
     &lt;Statistics MetricsTableWriteInterval=&quot;30s&quot; PerfCounterWriteInterval=&quot;30s&quot; LogWriteInterval=&quot;300s&quot;
     WriteLogStatisticsToTable=&quot;true&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p>which corresponds to a server configuration that looks like this (relevant excerpts only):</p>
+</code></pre><p>which corresponds to a server configuration that looks like this (relevant excerpts only):</p>
 <pre><code class="lang-xml">&lt;Globals&gt;
     &lt;SeedNode Address=&quot;host001&quot; Port=&quot;11111&quot; /&gt;
     &lt;Liveness LivenessType =&quot;MembershipTableGrain&quot; /&gt;
@@ -282,8 +278,7 @@ In the author&#39;s setup, Azure is not involved, so the client configuration lo
     &lt;ProxyingGateway Address=&quot;&quot; Port=&quot;30000&quot; /&gt;
     ...
 &lt;/Defaults&gt;
-</code></pre>
-<p>Running the client in VS, I see this:</p>
+</code></pre><p>Running the client in VS, I see this:</p>
 <p><img src="../Images/onpremise%201.PNG" alt=""></p>
 <h2 id="monitoring-orleans">Monitoring Orleans</h2>
 <p>Once Orleans is deployed, you can start an optional script that will monitor the Orleans deployment using standard performance counters.

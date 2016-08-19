@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>My First Orleans Application | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="My First Orleans Application | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/My-First-Orleans-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/My-First-Orleans-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="my-first-orleans-application">My First Orleans Application</h1>
               
 <p>In this tutorial, we will walk through the steps to get the simplest possible Orleans application up and running, the all-too-familiar &quot;Hello World!&quot;.
@@ -122,8 +122,7 @@ Under &quot;Visual C#,&quot; you should see the following:</p>
 
     hostDomain.DoCallBack(ShutdownSilo);
 }
-</code></pre>
-<h2 id="adding-some-grains">Adding Some Grains</h2>
+</code></pre><h2 id="adding-some-grains">Adding Some Grains</h2>
 <p>At this point, we have everything we need except some actual Orleans-based code.
 Next we will create two more projects, one to hold the communication interface, and one to hold our grain.
 Separating the two is a best practice since the interface project is shared between the client and server-side, while the grains are implementation code and should be private to the server side.</p>
@@ -138,8 +137,7 @@ We should have something like this:</p>
 {
     Task&lt;string&gt; SayHello();
 }
-</code></pre>
-<p>One of the important things is choosing a Key type for your grains, in this example we are using the Integer Key type.  There are also Guids, strings and various compound keys that may meet your needs.</p>
+</code></pre><p>One of the important things is choosing a Key type for your grains, in this example we are using the Integer Key type.  There are also Guids, strings and various compound keys that may meet your needs.</p>
 <p>Additionally, Orleans relies on TPL tasks in the interface method&#39;s return type -- an essential means to achieving scalability in the lightweight Orleans programming model is to use asynchronous I/O everywhere, and Orleans forces you to do so.
 Use <code>Task</code> or <code>Task&lt;T&gt;</code> as the return type of all methods of communication interfaces.
 Next, we turn our attention to the grain implementation, which is found in <em>Grain1.cs</em>. The first thing to do is make sure that the interface it implements is the right one: it should be <code>MyGrainInterfaces1.IGrain1</code>, unless you renamed the project and/or the interface in the previous step.</p>
@@ -148,21 +146,18 @@ Next, we turn our attention to the grain implementation, which is found in <em>G
 {
     throw new NotImplementedException();
 }
-</code></pre>
-<p>We&#39;re finally ready to add the much-anticipated &quot;Hello World!&quot; code.
+</code></pre><p>We&#39;re finally ready to add the much-anticipated &quot;Hello World!&quot; code.
 Just return the string as the contents of a Task:</p>
 <pre><code class="lang-csharp">public Task&lt;string&gt; SayHello()
 {
     return Task.FromResult(&quot;Hello World!&quot;);
 }
-</code></pre>
-<p>OK, we&#39;re nearly done.
+</code></pre><p>OK, we&#39;re nearly done.
 All we need is a bit of client code, which we will return to <em>Program.cs</em> in order to add.
 In place of the comment following the call to <code>GrainClient.Initialize()</code>, add these two lines:</p>
 <pre><code class="lang-csharp">var friend = GrainClient.GrainFactory.GetGrain&lt;MyGrainInterfaces1.IGrain1&gt;(0);
 Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello().Result);
-</code></pre>
-<p>That&#39;s it!
+</code></pre><p>That&#39;s it!
 Hit F5, let the silo initialization code take its time.
 This will take a few seconds, maybe as much as ten, and there will be a lot of log messages printed.
 At the very end, you should see the printout of the greeting.</p>

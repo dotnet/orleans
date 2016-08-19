@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Hello World | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Hello World | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Hello-World.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Hello-World.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="hello-world">Hello World</h1>
               
 <p>In this sample, a client connects with an Orleans grain instance, sends it a greeting and receives a greeting back. The client then prints that greeting and that&#39;s that. Simple enough in theory, but since there&#39;s distribution involved, there&#39;s a bit more to it.</p>
@@ -81,8 +81,7 @@
 {
    Task&lt;string&gt; SayHello(string greeting);
 }
-</code></pre>
-<p>This is simple enough, and we can see that all replies must be represented as a Task or Task<t> in communication interfaces. The implementation, found in HelloGrain.cs, is similarly trivial:<p>
+</code></pre><p>This is simple enough, and we can see that all replies must be represented as a Task or Task<t> in communication interfaces. The implementation, found in HelloGrain.cs, is similarly trivial:<p>
 <pre><code class="lang-csharp">public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
 {
     Task&lt;string&gt; HelloWorldInterfaces.IHello.SayHello(string greeting)
@@ -90,14 +89,12 @@
         return Task.FromResult(&quot;You said: &#39;&quot; + greeting + &quot;&#39;, I say: Hello!&quot;);
     }
 }
-</code></pre>
-<p>The class inherits from an Orleans-defined base class, and implements the communication interface defined earlier. Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
+</code></pre><p>The class inherits from an Orleans-defined base class, and implements the communication interface defined earlier. Since there is nothing that the grain needs to wait on, the method is not declared <code>async</code> and instead returns its value using <code>Task.FromResult()</code>.</p>
 <p> The client, which orchestrates the grain code and is found in Program.cs, looks like this:</p>
 <pre><code class="lang-csharp">Orleans.GrainClient.Initialize(&quot;DevTestClientConfiguration.xml&quot;);
 var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
 Console.WriteLine(&quot;\n\n{0}\n\n&quot;, friend.SayHello(&quot;Good morning!&quot;).Result);
-</code></pre>
-<p>There&#39;s other code in the method, too, but that is unrelated to the client logic, it&#39;s hosting the Orleans silo.</p>
+</code></pre><p>There&#39;s other code in the method, too, but that is unrelated to the client logic, it&#39;s hosting the Orleans silo.</p>
 </t>
             </article>
           </div>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Serialization and Writing Custom Serializers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Serialization and Writing Custom Serializers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Serialization.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Serialization.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="serialization-and-writing-custom-serializers">Serialization and Writing Custom Serializers</h1>
               
 <p>Orleans has an advanced and extensible serialization framework. Orleans serializes data types passed in grain request and response messages as well as grain persistent state objects. As part of this framework, Orleans automatically generates serialization code for those data types. Orleans serialization is compatible with the standard .NET binary serialization but is more efficient and provides more compact representation. In addition to generating a more efficient serialization/deserialization for types that are already .NET-serializable, Orleans also tries to generate serializers for types used in grain interfaces that are not .NET-serializable. The framework also includes a set of efficient built-in serializers for frequently used types: lists, dictionaries, strings, primitives, arrays, etc.</p>
@@ -116,12 +116,10 @@ static private object Copy(object input)
 {
     ...
 }
-</code></pre>
-<p>Copiers are usually the simplest serializer routines to write. They take an object, guaranteed to be of the same type as the type the copier is defined in, and must return a semantically-equivalent copy of the object.</p>
+</code></pre><p>Copiers are usually the simplest serializer routines to write. They take an object, guaranteed to be of the same type as the type the copier is defined in, and must return a semantically-equivalent copy of the object.</p>
 <p>If, as part of copying the object, a sub-object needs to be copied, the best way to do so is to use the SerializationManager&#39;s DeepCopyInner routine:</p>
 <pre><code class="lang-csharp">var fooCopy = SerializationManager.DeepCopyInner(foo);
-</code></pre>
-<p>It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.</p>
+</code></pre><p>It is important to use DeepCopyInner, instead of DeepCopy, in order to maintain the object identity context for the full copy operation.</p>
 <p><strong>Maintaining Object Identity</strong></p>
 <p>An important responsibility of a copy routine is to maintain object identity. The Orleans runtime provides a helper class for this. Before copying a sub-object &quot;by hand&quot; (i.e., not by calling DeepCopyInner), check to see if it has already been referenced as follows:</p>
 <pre><code class="lang-csharp">var fooCopy = SerializationContext.Current.CheckObjectWhileCopying(foo);
@@ -131,8 +129,7 @@ if (fooCopy == null)
     // Actually make a copy of foo
     SerializationContext.Current.RecordObject(foo, fooCopy);
 }
-</code></pre>
-<p>The last line, the call to RecordObject, is required so that possible future references to the same object as foo references will get found properly by CheckObjectWhileCopying.</p>
+</code></pre><p>The last line, the call to RecordObject, is required so that possible future references to the same object as foo references will get found properly by CheckObjectWhileCopying.</p>
 <p>Note that this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums).</p>
 <p>If you use DeepCopyInner to copy sub-objects, then object identity is handled for you.</p>
 <h3 id="serializer">Serializer</h3>
@@ -142,12 +139,10 @@ static private void Serialize(object input, BinaryTokenStreamWriter stream, Type
 {
     ...
 }
-</code></pre>
-<p>As with copiers, the &quot;input&quot; object passed to a serializer is guaranteed to be an instance of the defining type. The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream.</p>
+</code></pre><p>As with copiers, the &quot;input&quot; object passed to a serializer is guaranteed to be an instance of the defining type. The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream.</p>
 <p>To serialize sub-objects, use the SerializationManager&#39;s SerializeInner routine:</p>
 <pre><code class="lang-csharp">SerializationManager.SerializeInner(foo, stream, typeof(FooType));
-</code></pre>
-<p>If there is no particular expected type for foo, then you can pass null for the expected type.</p>
+</code></pre><p>If there is no particular expected type for foo, then you can pass null for the expected type.</p>
 <p>The BinaryTokenStreamWriter class provides a wide variety of methods for writing data to the byte stream. See the class for documentation.</p>
 <p><strong>Maintaining Object Identity</strong></p>
 <p>As with copy routines, serialization routines must maintain object identity. If you use SerializerInner, then this is taken care of for you. If not, then before serializing a sub-object, you should do the following:</p>
@@ -160,8 +155,7 @@ if (reference &gt;= 0)
 }
 
 SerializationContext.Current.RecordObject(foo, stream.CurrentOffset);
-</code></pre>
-<p> As for copiers, this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums), and if you use SerializeInner for sub-objects, then object identity is handled for you.</p>
+</code></pre><p> As for copiers, this should only be done for class instances, not struct instances or .NET primitives (strings, Uris, enums), and if you use SerializeInner for sub-objects, then object identity is handled for you.</p>
 <h3 id="deserializer">Deserializer</h3>
 <p>Deserialization methods are flagged with the <code>DeserializerMethod</code> attribute:</p>
 <pre><code class="lang-csharp">[DeserializerMethod]
@@ -169,15 +163,12 @@ static private object Deserialize(Type expected, BinaryTokenStreamReader stream)
 {
     ...
 }
-</code></pre>
-<p>The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream. The actual type of the object to be created will always be the type of the class in which the deserializer is defined.</p>
+</code></pre><p>The &quot;expected&quot; type may be ignored; it is based on compile-time type information about the data item, and is used at a higher level to form the type prefix in the byte stream. The actual type of the object to be created will always be the type of the class in which the deserializer is defined.</p>
 <p> To deserialize sub-objects, use the SerializationManager&#39;s DeserializeInner routine:</p>
 <pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner(typeof(FooType), stream);
-</code></pre>
-<p>Or, alternatively,</p>
+</code></pre><p>Or, alternatively,</p>
 <pre><code class="lang-csharp">var foo = SerializationManager.DeserializeInner&lt;FooType&gt;(stream);
-</code></pre>
-<p>If there is no particular expected type for foo, use the first call pattern and pass null for the expected type.</p>
+</code></pre><p>If there is no particular expected type for foo, use the first call pattern and pass null for the expected type.</p>
 <p>The BinaryTokenStreamReader class provides a wide variety of methods for reading data from the byte stream. See the class for documentation.</p>
 <p><strong>Maintaining Object Identity</strong></p>
 <p>As with serializer routines, deserialization routines must maintain object identity. If you use DeserializerInner, then this is taken care of for you. If not, then before deserializing a sub-object, you should do the following:</p>
@@ -192,8 +183,7 @@ else
 {
     // Deserialize foo
 }
-</code></pre>
-<p> If you use DeserializeInner for sub-objects, then object identity is handled for you.</p>
+</code></pre><p> If you use DeserializeInner for sub-objects, then object identity is handled for you.</p>
 <h2 id="method-2-writing-a-special-serialization-class">Method 2: Writing a Special Serialization Class</h2>
 <p>In this method you write a new class annotated with an attribute <code>RegisterSerializerAttribute</code> and put the 3 serialization routines in it. The rules for how to write those routines are identical to method 1. The only difference is how they are hooked up with the rest of Orleans serialization framework. Below is an example for such a class:</p>
 <pre><code class="lang-csharp">[Orleans.CodeGeneration.RegisterSerializerAttribute()]
@@ -224,8 +214,7 @@ internal class MyObjectSerializationExample
         SerializationManager.Register(typeof(MyObject), DeepCopier, Serializer, Deserializer);
     }
 }
-</code></pre>
-<h2 id="hints-for-writing-serializers-and-deserializers">Hints for Writing Serializers and Deserializers</h2>
+</code></pre><h2 id="hints-for-writing-serializers-and-deserializers">Hints for Writing Serializers and Deserializers</h2>
 <p>Often the simplest way to write a serializer/deserializer pair is to serialize by constructing a byte array and writing the array length to the stream, followed by the array itself, and then deserialize by reversing the process. If the array is fixed-length, you can omit it from the stream. This works well when you have a data type that you can represent compactly and that doesn&#39;t have sub-objects that might be duplicated (so you don&#39;t have to worry about object identity).</p>
 <p>Another approach, which is the approach the Orleans runtime takes for collections such as dictionaries, works well for classes with significant and complex internal structure: use instance methods to access the semantic content of the object, serialize that content, and deserialize by setting the semantic contents rather than the complex internal state. In this approach, inner objects are written using SerializeInner and read using DeserializeInner. In this case, it is common to write a custom copier, as well.</p>
 <p>If you write a custom serializer, and it winds up looking like a sequence of calls to SerializeInner for each field in the class, you don&#39;t need a custom serializer for that class.</p>

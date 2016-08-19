@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Running the Application | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Running the Application | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Running-the-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Running-the-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h2 id="configuring-connections-to-orleans">Configuring Connections to Orleans</h2>
               
 <p>To allow applications to communicate with grains from outside Orleans, the framework includes a client library.
@@ -88,8 +88,7 @@ As an alternative, a configuration object can be passed to <code>GrainClient.Ini
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
     &lt;Gateway Address=&quot;&lt;IP address or host name of silo&gt;&quot; Port=&quot;30000&quot; /&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p>If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn&#39;t be statically configured.
+</code></pre><p>If an Orleans-based application runs in Windows Azure, the client automatically discovers silo gateways and shouldn&#39;t be statically configured.
 Refer to the <a href="../Samples-Overview/Azure-Web-Sample.html">Azure application sample</a> for an example of how to configure the client.</p>
 <h2 id="configuring-silos">Configuring Silos</h2>
 <p>In <em>OrleansConfiguration.xml</em>, the <code>ProxyingGateway</code> element specifies the gateway endpoint of the silo, which is separate from the inter-silo endpoint defined by the Networking element and must have a different port number:</p>
@@ -101,7 +100,6 @@ Refer to the <a href="../Samples-Overview/Azure-Web-Sample.html">Azure applicati
     &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
 </code></pre>
-
             </article>
           </div>
           

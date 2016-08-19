@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Orleans Streams Extensibility | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Orleans Streams Extensibility | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Extensibility.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Extensibility.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="orleans-streams-extensibility">Orleans Streams Extensibility</h1>
               
 <p>There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:</p>
@@ -125,8 +125,7 @@
     &lt;/StreamProviders&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<h2 id="writing-a-completely-new-stream-provider">Writing a Completely New Stream Provider</h2>
+</code></pre><h2 id="writing-a-completely-new-stream-provider">Writing a Completely New Stream Provider</h2>
 <p>It is also possible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs"><code>IStreamProviderImpl</code></a> interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totally up to you how to implement it. Implementing a completely new Stream Provider might turn to be a rather complicated task, since you might need access to various internal runtime components, some of which may have internal access.</p>
 <p>We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.</p>
 

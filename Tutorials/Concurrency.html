@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Concurrency | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Concurrency | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/Concurrency.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Concurrency.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="concurrency">Concurrency</h1>
               
 <p>Please read about <a href="/orleans/Getting-Started-With-Orleans/Grains.md">Grains</a> before following this tutorial.</p>
@@ -84,13 +84,11 @@ This will send a back-and-forth series of messages, until we get to 3.</p>
     public string Message { get; set; }
     public int Count { get; set; }
 }
-</code></pre>
-<p><code>From</code> will be the sender of the message (the ID of the grain), <code>Message</code> will be the message text, and <code>Count</code> will be the number of times the message has been sent back and forth.
+</code></pre><p><code>From</code> will be the sender of the message (the ID of the grain), <code>Message</code> will be the message text, and <code>Count</code> will be the number of times the message has been sent back and forth.
 This stops us from getting a stack overflow.</p>
 <p>We need to modify the arguments of <code>Greeting</code> on the <code>IEmployee</code> interface to :</p>
 <pre><code class="lang-csharp">Task Greeting(GreetingData data);
-</code></pre>
-<p> We need to update the implementation accordingly:</p>
+</code></pre><p> We need to update the implementation accordingly:</p>
 <pre><code class="lang-csharp">public async Task Greeting(GreetingData data)
 {
     Console.WriteLine(&quot;{0} said: {1}&quot;, data.From, data.Message);
@@ -105,8 +103,7 @@ This stops us from getting a stack overflow.</p>
         Message = &quot;Thanks!&quot;,
         Count = data.Count + 1 });
 }
-</code></pre>
-<p> We&#39;ll also update the <code>Manager</code> class, so it send the new message object:</p>
+</code></pre><p> We&#39;ll also update the <code>Manager</code> class, so it send the new message object:</p>
 <pre><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
 {
     _reports.Add(employee);
@@ -115,14 +112,12 @@ This stops us from getting a stack overflow.</p>
         From = this.GetPrimaryKey(),
         Message = &quot;Welcome to my team!&quot; });
 }
-</code></pre>
-<p>Now the Employee sends a message back to the manager, saying &quot;Thanks!&quot;.</p>
+</code></pre><p>Now the Employee sends a message back to the manager, saying &quot;Thanks!&quot;.</p>
 <p>Let&#39;s add some simple client code to add a direct report to a manager:</p>
 <pre><code class="lang-csharp">var e0 = GrainClient.GrainFactory.GetGrain&lt;IEmployee&gt;(Guid.NewGuid());
 var m1 = GrainClient.GrainFactory.GetGrain&lt;IManager&gt;(Guid.NewGuid());
 m1.AddDirectReport(e0).Wait();
-</code></pre>
-<p>When we run this code, the first &quot;Thanks!&quot; greeting is received.
+</code></pre><p>When we run this code, the first &quot;Thanks!&quot; greeting is received.
 However, when this message is responded to this we get a 30 second pause (or 10 minutes when the debugger is attached), then warnings appear in the log and we&#39;re told the grain is about to break it&#39;s promise.</p>
 <pre><code>    7b66f830-8d81-49fc-b8fc-279af6924bd3 said: Welcome to my team!
     ce14310a-8500-4b2f-a21b-b4b23eb48d0d said: Thanks!    
@@ -145,8 +140,7 @@ public class Employee : Grain, IEmployee
 {
     ...
 }
-</code></pre>
-<p>We see that the sample works, and Orleans is able to interleave the grain calls:</p>
+</code></pre><p>We see that the sample works, and Orleans is able to interleave the grain calls:</p>
 <pre><code> aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Welcome to my team!
  63e4d07c-ac50-4012-ba50-5b5cf54e4e45 said: Thanks!
  aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Thanks!
@@ -168,8 +162,7 @@ public class GreetingData
     public string Message { get; set; }
     public int Count { get; set; }
 }
-</code></pre>
-<p>No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.</p>
+</code></pre><p>No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.</p>
 <h2 id="next">Next</h2>
 <p>Next, we&#39;ll see how we can interact with external services from inside our grain.</p>
 <p><a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a></p>

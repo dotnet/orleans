@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Getting Started using Azure Web Apps | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Getting Started using Azure Web Apps | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Azure-Web-Apps.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Azure-Web-Apps.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="getting-started-using-azure-web-apps">Getting Started using Azure Web Apps</h1>
               
 <p>If you would like to connect to an Azure Silo from an <a href="http://azure.microsoft.com/en-gb/services/app-service/web/">Azure Web App</a> rather than a Web Role hosted within the same cloud service you can.</p>
@@ -88,14 +88,12 @@
     &lt;/InstanceAddress&gt;
   &lt;/AddressAssignments&gt;
 &lt;/NetworkConfiguration&gt;
-</code></pre>
-<p>Also make sure the Silo endpoints are configured.</p>
+</code></pre><p>Also make sure the Silo endpoints are configured.</p>
 <pre><code class="lang-xml">&lt;Endpoints&gt;
   &lt;InternalEndpoint name=&quot;OrleansSiloEndpoint&quot; protocol=&quot;tcp&quot; port=&quot;11111&quot; /&gt;
   &lt;InternalEndpoint name=&quot;OrleansProxyEndpoint&quot; protocol=&quot;tcp&quot; port=&quot;30000&quot; /&gt;
 &lt;/Endpoints&gt;
-</code></pre>
-<p>Finally, you need to specify the same deployment id for Silos and the Wen App Client.</p>
+</code></pre><p>Finally, you need to specify the same deployment id for Silos and the Wen App Client.</p>
 <p>You can now use the <code>GrainClient</code> to make a connection from the Web App to the Silo.</p>
 <h3 id="potential-issues">Potential Issues</h3>
 <p>If the Web App is having difficulty connecting to the Silo:</p>
@@ -106,7 +104,6 @@
 <pre><code class="lang-c">New-AzureNetworkSecurityGroup -Name &quot;Default&quot; -Location &quot;North Europe&quot;
 Get-AzureNetworkSecurityGroup -Name &quot;Default&quot; | Set-AzureNetworkSecurityGroupToSubnet -VirtualNetworkName &quot;virtual-network-name&quot; -SubnetName &quot;subnet-name&quot;
 </code></pre>
-
             </article>
           </div>
           

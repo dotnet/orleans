@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Client Configuration | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Client Configuration | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Client-Configuration.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Client-Configuration.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="client-configuration">Client Configuration</h1>
               
 <p>The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
@@ -82,8 +82,7 @@
   &lt;Gateway Address=&quot;gateway2&quot; Port=&quot;30000&quot;/&gt;
   &lt;Gateway Address=&quot;gateway3&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p> One gateway is generally enough. Multiple gateway connections help increase throughput and reliability of the system.</p>
+</code></pre><p> One gateway is generally enough. Multiple gateway connections help increase throughput and reliability of the system.</p>
 <h2 id="gateway-configuration-based-on-cluster-membership">Gateway Configuration Based on Cluster Membership</h2>
 <p>To configure the client to automatically find gateways from the silo cluster membership table, you need to specify the Azure Table or SQL Server connection string and the target deployment ID.</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
@@ -91,28 +90,24 @@
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;Azure storage connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p> or</p>
+</code></pre><p> or</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;SqlServer&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;SQL connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p> or</p>
+</code></pre><p> or</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;ZooKeeper connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="local-silo">Local Silo</h2>
+</code></pre><h2 id="local-silo">Local Silo</h2>
 <p>For the local development/test configuration that uses a local silo, the client gateway should be configured to &#39;localhost.&#39;</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;localhost&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="web-role-client-in-azure">Web Role Client in Azure</h2>
+</code></pre><h2 id="web-role-client-in-azure">Web Role Client in Azure</h2>
 <p>When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role.</p>
 <pre><code class="lang-xml">&lt;ServiceConfiguration  ...&gt;
   &lt;Role name=&quot;WebRole&quot;&gt; ...
@@ -122,16 +117,14 @@
   &lt;/Role&gt;
   ...
 &lt;/ServiceConfiguration&gt;
-</code></pre>
-<p>Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
+</code></pre><p>Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
 <p>When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for gateway address discovery, no additional gateway address info in required in the client config file. Typically the ClientConfiguration.xml file will only contain some minimal debug / tracing configuration settings, although even that is not required.</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Tracing DefaultTraceLevel=&quot;Info&quot; &gt;
     &lt;TraceLevelOverride LogPrefix=&quot;Application&quot; TraceLevel=&quot;Info&quot; /&gt;
   &lt;/Tracing&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p>Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.</p>
+</code></pre><p>Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.</p>
 <pre><code class="lang-csharp">var dataConnection = &quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot;;
 
 var config = new ClientConfiguration
@@ -185,7 +178,6 @@ while (!GrainClient.IsInitialized)
     Thread.Sleep(TimeSpan.FromSeconds(5)); // TODO: developer may want to add counter to break up infinity cycle (circuit breaker pattern)
 }
 </code></pre>
-
             </article>
           </div>
           

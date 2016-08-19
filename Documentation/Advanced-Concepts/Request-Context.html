@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Request Context | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Request Context | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Request-Context.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Request-Context.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="request-context">Request Context</h1>
               
 <p>RequestContext is an Orleans feature that allows application metadata, such as a trace ID, to flow with requests. Application metadata may be added on the client; it will flow with Orleans requests to the receiving grain.</p>
@@ -82,11 +82,9 @@
 <p> Note that application metadata does not flow back with responses; that is, code that runs as a result of a response being received, either within a ContinueWith continuation or after a call to Wait or GetValue, will still run within the current context that was set by the original request.</p>
 <p> For example, to set a trace ID in the client to a new GUID, one would simply call:</p>
 <pre><code class="lang-csharp">RequestContext.Set(&quot;TraceId&quot;, new Guid());
-</code></pre>
-<p>Within grain code (or other code that runs within Orleans on a scheduler thread), the trace ID of the original client request could be used, for instance, when writing a log:</p>
+</code></pre><p>Within grain code (or other code that runs within Orleans on a scheduler thread), the trace ID of the original client request could be used, for instance, when writing a log:</p>
 <pre><code class="lang-csharp">Logger.Info(&quot;Currently processing external request {0}&quot;, RequestContext.Get(&quot;TraceId&quot;));
-</code></pre>
-<p>While any serializable object may be sent as application metadata, it’s worth mentioning that large or complex objects may add noticeable overhead to message serialization time. For this reason, the use of simple types (strings, GUIDs, or numeric types) is recommended.</p>
+</code></pre><p>While any serializable object may be sent as application metadata, it’s worth mentioning that large or complex objects may add noticeable overhead to message serialization time. For this reason, the use of simple types (strings, GUIDs, or numeric types) is recommended.</p>
 
             </article>
           </div>

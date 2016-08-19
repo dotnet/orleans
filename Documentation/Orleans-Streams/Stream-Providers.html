@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Orleans Stream Providers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Orleans Stream Providers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Stream-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Stream-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="stream-providers">Stream Providers</h1>
               
 <p>Streams can come in different shapes and forms. Some streams may deliver events over direct TCP links, while others deliver events via durable queues. Different stream types may use different batching strategies, different caching algorithms, or different back pressure procedures. We did not want to constrain streaming applications to only a small subset of those behavioral choices. Instead, <strong>Stream Providers</strong> are extensibility points to Orleans Streaming Runtime that allow users to implement any type of stream. This extensibility point is similar in spirit to <a href="https://github.com/dotnet/orleans/wiki/Custom%20Storage%20Providers">Orleans Storage Providers</a>.  Orleans currently ships with two default stream providers: <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/SimpleMessageStream/SimpleMessageStreamProvider.cs">Simple Message Stream Provider</a> and <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansAzureUtils/Providers/Streams/AzureQueue/AzureQueueStreamProvider.cs">Azure Queue Stream Provider</a>.</p>

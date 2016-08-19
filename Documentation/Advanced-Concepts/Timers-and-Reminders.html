@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Timers and Reminders | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Timers and Reminders | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Timers-and-Reminders.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Timers-and-Reminders.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="timers-and-reminders">Timers and Reminders</h1>
               
 <p>The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
@@ -82,8 +82,7 @@
 <h2 id="usage">Usage</h2>
 <p>To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
 <pre><code class="lang-csharp">protected IDisposable RegisterTimer(Func&lt;object, Task&gt; asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-</code></pre>
-<ul>
+</code></pre><ul>
 <li>asyncCallback is the function to be invoked when the timer ticks.</li>
 <li>state is an object that will be passed to asyncCallback when the timer ticks.</li>
 <li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
@@ -111,35 +110,29 @@
 <p>Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.</p>
 <pre><code class="lang-xml">&lt;SystemStore SystemStoreType=&quot;AzureTable&quot; /&gt; OR
 &lt;SystemStore SystemStoreType=&quot;SqlServer&quot; /&gt;
-</code></pre>
-<p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
+</code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
 <pre><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
-</code></pre>
-<h2 id="usage-0">Usage</h2>
+</code></pre><h2 id="usage-0">Usage</h2>
 <p>A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
 <pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
 {
     Console.WriteLine(&quot;Thanks for reminding me-- I almost forgot!&quot;);
     return TaskDone.Done;
 }
-</code></pre>
-<p> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IOrleansReminder</strong> object:</p>
+</code></pre><p> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IOrleansReminder</strong> object:</p>
 <pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-</code></pre>
-<ul>
+</code></pre><ul>
 <li>reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.</li>
 <li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
 <li>period specifies the period of the timer.</li>
 </ul>
 <p>Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling <strong>Grain.UnregisterReminder</strong>:</p>
 <pre><code class="lang-csharp">protected Task UnregisterReminder(IOrleansReminder reminder)
-</code></pre>
-<p>reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
+</code></pre><p>reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
 <p> Instances of <strong>IOrleansReminder</strong> aren&#39;t guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder&#39;s name.</p>
 <p> If you only have the reminder&#39;s name and need the corresponding instance of  <strong>IOrleansReminder</strong>, call the <strong>Grain.GetReminder</strong> method:</p>
 <pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; GetReminder(string reminderName)
-</code></pre>
-<h2 id="which-should-i-use-">Which Should I Use?</h2>
+</code></pre><h2 id="which-should-i-use">Which Should I Use?</h2>
 <p>We recommend that you use timers in the following circumstances:</p>
 <ul>
 <li>It doesn&#39;t matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.</li>

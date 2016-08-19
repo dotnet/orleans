@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Application Bootstrapping within a Silo | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Application Bootstrapping within a Silo | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="application-bootstrapping-within-a-silo">Application Bootstrapping within a Silo</h1>
               
 <p>There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online.</p>
@@ -89,21 +89,18 @@
     &lt;/BootstrapProviders&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>It is also possible to register Bootstrap provider programaticaly, via calling one of the:</p>
+</code></pre><p>It is also possible to register Bootstrap provider programaticaly, via calling one of the:</p>
 <pre><code class="lang-csharp">public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary&lt;string, string&gt; properties = null)
 
 public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&lt;string, string&gt; properties = null) where T : IBootstrapProvider
-</code></pre>
-<p>on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> class.</p>
+</code></pre><p>on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> class.</p>
 <p>These bootstrap providers are C# classes that implement the <code>Orleans.Providers.IBootstrapProvider</code> interface.</p>
 <p>When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.</p>
 <pre><code class="lang-csharp">Task Init(
     string name,
     IProviderRuntime providerRuntime,
     IProviderConfiguration config)
-</code></pre>
-<p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
+</code></pre><p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
 <p>This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.</p>
 
             </article>

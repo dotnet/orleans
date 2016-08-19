@@ -56,7 +56,11 @@
     "noLangKeyword": false,
     "globalMetadata": {
       "_appTitle": "Microsoft Orleans Website",
-      "_enableSearch": true
+      "_enableSearch": true,
+      "_gitContribute": {
+        "repo": "https://github.com/dotnet/orleans",
+        "branch": "gh-pages"
+      }
     }
   }
 

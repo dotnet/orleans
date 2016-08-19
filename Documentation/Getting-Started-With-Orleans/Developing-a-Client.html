@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Developing a Client | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Developing a Client | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,8 +71,8 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Developing-a-Client.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Developing-a-Client.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              
               <p>Once we have our grain type implemented, we can write a client application that uses the type.</p>
 <p>The following Orleans DLLs from either the <code>[SDK-ROOT]\Binaries\PresenceClient_ or _[SDK-ROOT]\Samples\References</code> directories need to be referenced in the client application project:</p>
 <ul>
@@ -92,8 +92,7 @@ IGameGrain game = player.CurrentGame.Result;
 var watcher = new GameObserver();
 var observer = GrainClient.GrainFactory.CreateObjectReference&lt;IGameObserver&gt;(watcher);
 await game.SubscribeForGameUpdates();
-</code></pre>
-<p>If this code is used from the main thread of a console application, you have to call <code>Wait()</code> on the task returned by <code>game.SubscribeForGameUpdates()</code> because <code>await</code> does not prevent the <code>Main()</code> function from returning, which will cause the client process to exit.</p>
+</code></pre><p>If this code is used from the main thread of a console application, you have to call <code>Wait()</code> on the task returned by <code>game.SubscribeForGameUpdates()</code> because <code>await</code> does not prevent the <code>Main()</code> function from returning, which will cause the client process to exit.</p>
 <p>See the Key Concepts section for more details on the various ways to use <code>Task</code>s for execution scheduling and exception flow.</p>
 <h2 id="find-or-create-grains">Find or create grains</h2>
 <p>After establishing a connection by calling <code>GrainClient.Initialize()</code>, static methods in the generic factory class may be used to get a reference to a grain, such as <code>GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;()</code> for the <code>PlayerGrain</code>. The grain interface is passed as a type argument to <code>GrainFactory.GetGrain&lt;T&gt;()</code>.</p>
@@ -185,8 +184,7 @@ Unlike in the client subscription case, the subscribing grain simply implements 
         }
     }
 }
-</code></pre>
-<h2 id="next">Next</h2>
+</code></pre><h2 id="next">Next</h2>
 <p><a href="Running-the-Application.html">Running the Application</a></p>
 
             </article>

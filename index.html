@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Microsoft Orleans | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Microsoft Orleans | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="favicon.ico">
     <link rel="stylesheet" href="styles/docfx.vendor.css">
@@ -105,8 +105,7 @@
 {
     Task&lt;string&gt; SayHello(string name);
 }
-</code></pre>
-<p>The implementation is executed inside the Orleans framework:</p>
+</code></pre><p>The implementation is executed inside the Orleans framework:</p>
 <pre><code class="lang-csharp">public class MyGrain : IMyGrain
 {
     public async Task&lt;string&gt; SayHello(string name)
@@ -114,12 +113,10 @@
         return &quot;Hello &quot; + name;
     }
 }
-</code></pre>
-<p>You can then send messages to the grain by creating a proxy object, and calling the methods:</p>
+</code></pre><p>You can then send messages to the grain by creating a proxy object, and calling the methods:</p>
 <pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IMyGrain&gt;(&quot;grain1&quot;);
 await grain.SayHello(&quot;World&quot;);
-</code></pre>
-<h2 id="where-next-">Where Next?</h2>
+</code></pre><h2 id="where-next">Where Next?</h2>
 <p>To learn more about the concepts in Orleans, read the <a href="Documentation/Introduction.html">introduction</a>.</p>
 <p>There are a number of <a href="Tutorials/index.html">step-by-step tutorials</a>.</p>
 <p>Discuss your Orleans questions on the <a href="https://gitter.im/dotnet/orleans">gitter chat room</a>.</p>

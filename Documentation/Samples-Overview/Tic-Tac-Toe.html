@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Tic Tac Toe | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Tic Tac Toe | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Tic-Tac-Toe.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Tic-Tac-Toe.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="tic-tac-toe">Tic Tac Toe</h1>
               
 <p>TicTacToe is based on the classic board game, also known as &quot;noughts and crosses.&quot; Its game logic is simple, which makes it an excellent sample for showing how a turn-based game could be easily implemented in Orleans.</p>
@@ -118,8 +118,7 @@
     Task SetUsername(string username);
     Task&lt;string&gt; GetUsername();
 }
-</code></pre>
-<p>The player grain handles the creating of new games (so another player can then join), leaving a game (once it is over), and tracking the progress of all active games.</p>
+</code></pre><p>The player grain handles the creating of new games (so another player can then join), leaving a game (once it is over), and tracking the progress of all active games.</p>
 <p><strong>Game Grain</strong></p>
 <p>Each game is also represented by a <code>GameGrain</code>. They are also uniquely identify using a GUID.</p>
 <pre><code class="lang-csharp">public interface IGame : Orleans.IGrain
@@ -131,8 +130,7 @@
     Task&lt;GameSummary&gt; GetSummary(Guid player);
     Task SetName(string name);  
 }
-</code></pre>
-<p>Once a user grain creates a game, that user is automatically added as one of the players. Once a game is joined by a second player, the game can start. The players make their turns until the game ends with either a draw or a winner.</p>
+</code></pre><p>Once a user grain creates a game, that user is automatically added as one of the players. Once a game is joined by a second player, the game can start. The players make their turns until the game ends with either a draw or a winner.</p>
 <p>The <code>GameGrain</code> maintains the state of the game, the players in the game, whose turn it is next, and whether the game is in play or finished.</p>
 <p>The <code>MakeMove</code> method handles the game logic, checking the validity of a move and, once played, checks if that move ends the game. In the case of the game ending, the player grains are informed of the outcome via the LeaveGame call.</p>
 <p>The game was designed with social gaming in mind, so the main mechanism for inviting other players is an &quot;out of band&quot; from the game, and would probably be an invite to a friend, sending the GUID that represents the game. As an optimization purely for testing, a pairing grain was created that uses MemoryCache to hold a the list of games that are available to join, with an expiry of one hour, to stop &quot;stale&quot; games appearing on the list.</p>

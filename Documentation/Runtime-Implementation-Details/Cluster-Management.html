@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Cluster Management in Orleans | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Cluster Management in Orleans | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,13 +71,13 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Cluster-Management.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Cluster-Management.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="cluster-management-in-orleans">Cluster Management in Orleans</h1>
               
 <p>Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as <strong>Silo Membership</strong>. The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.</p>
 <p>The protocol relies on an external service to provide an abstraction of <code>MembershipTable</code>. <code>MembershipTable</code> is a flat No-SQL like durable table that we use for 2 purposes. First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, it is used to store the current membership view  (list of alive silos) and helps coordinate the agreement on the membership view. We currently have 5 implementations of the <code>MembershipTable</code>: based on <a href="http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/">Azure Table Storage</a>, SQL server, <a href="https://ZooKeeper.apache.org/">Apache ZooKeeper</a>, <a href="https://www.consul.io">Consul IO</a> and in-memory emulation for development.
 In addition to the <code>MembershipTable</code> each silo participates in fully distributed peer-to-peer membership protocol that detects failed silos and reaches agreement on a set alive silos. We start by describing the internal implementation of the Orleans&#39;s membership protocol below and later on describe the implementation of the <code>MembershipTable</code>.</p>
-<h3 id="the-basic-membership-protocol-">The Basic Membership Protocol:</h3>
+<h3 id="the-basic-membership-protocol">The Basic Membership Protocol:</h3>
 <ol>
 <li><p>Upon startup every silo writes itself into a well-known <code>MembershipTable</code> (passed via config). A combination of silo identity (<code>ip:port:epoch</code>) and service deployment id are used as unique keys in the table. Epoch is just time in ticks when this silo started, and as such <code>ip:port:epoch</code> is guaranteed to be unique in a given Orleans deployment.</p>
 </li>
@@ -112,7 +112,7 @@ In addition to the <code>MembershipTable</code> each silo participates in fully 
 <li><p><strong>Optimization  to reduce the frequency of periodical table reads and speed up all silos learning about new joining silos and dead silos</strong>. Every time any silo writes anything successfully to the table (suspicion, new join, …) it also broadcasts to all other silos – “go and reread the table now”. The silo does NOT tell others what it wrote in the table (since this information could already be outdated/wrong), it just tells them to re-read the table. That way we learn very quickly about membership changes without the need to wait for the full periodic read cycle. We still need the periodic read, in case the “re-read the table” message gets lost.</p>
 </li>
 </ol>
-<h3 id="properties-of-the-basic-membership-protocol-and-faq-">Properties of the Basic Membership Protocol and FAQ:</h3>
+<h3 id="properties-of-the-basic-membership-protocol-and-faq">Properties of the Basic Membership Protocol and FAQ:</h3>
 <ol>
 <li><strong>Can handle any number of failures</strong> – our algorithm can handle any number of failures (that is, f&lt;=n), including full cluster restart. This is in contrast with “traditional” <a href="http://en.wikipedia.org/wiki/Paxos_(computer_science)">Paxos</a> based solutions, which require quorum, which is usually a majority. We have seen in production situations when more than half of the silos were down. Our system stayed functional, while Paxos based membership would not be able to make progress.</li>
 <li><strong>Traffic to the table is very light</strong> - The actual pings go directly between servers and not to the table. This would generate a lot of traffic plus would be less accurate from the failure detection perspective - if a silo could not reach the table, it would miss to write its I am alive heartbeat and others would kill him.</li>
@@ -129,7 +129,7 @@ In addition to the <code>MembershipTable</code> each silo participates in fully 
 <li><p><strong>Direct IAmAlive writes into the table for diagnostics only</strong> - in addition to heartbeats that are sent between the silos, each silo also periodically updates an &quot;I Am Alive&quot; column in his row in the table. This &quot;I Am Alive&quot; column is only used <strong>for manual troubleshooting and diagnostics</strong> and is not used by the membership protocol itself. It is usually written at much lower frequency (once every 5 minutes) and serves as a very useful tool for system administratosr to check the liveness of the cluster or easily find out when the silo was alive the last time.</p>
 </li>
 </ol>
-<h3 id="extension-to-totally-order-membership-views-">Extension to totally order membership views:</h3>
+<h3 id="extension-to-totally-order-membership-views">Extension to totally order membership views:</h3>
 <p>The basic membership protocol described above was later extended to support totally ordered membership views. We will briefly describe the reasons for this extension and how it is implemented. The extension does not change anything in the above design, just adds an additional property that all membership configurations are globally totally ordered.</p>
 <p><strong>Why it is useful to totally order membership views?</strong></p>
 <ul>
@@ -155,7 +155,7 @@ In addition to the <code>MembershipTable</code> each silo participates in fully 
 </ol>
 <p><strong>Scalability of the Extended Membership Protocol:</strong></p>
 <p>In the extended version of the protocol all writes are serialized via one row. This can potentially heart the scalability of the cluster managemenet protocol, since it increases the risk of conflicts between concurrent table writes. To partially mitigate this problem silos retry all their writes to the table by using exponential backoff. We have observed the extended protocols to work smoothly in production environment in Azure with up to 200 silos. However, we do think the protocol might have problems to scale beyond a thousand silos. In such large setups the updates to version row may be easily disabled, essentially maintaining the rest of the cluster managemenet protocol and giving up on the total ordering property. Please also note that we refer here to the scalability of the cluster management protocol, not the rest of Orleans. We believe that other parts of the Orleans runtime (messaging, distributed directory, grain hosting, client to gateway connectivity) are scalable way beyond hundreds of silos.</p>
-<h3 id="membership-table-">Membership Table:</h3>
+<h3 id="membership-table">Membership Table:</h3>
 <p>As already mentioned, <code>MembershipTable</code> is used as a rendezvous point for silos to find each other and Orleans clients to find silos and also helps coordinate the agreement on the membership view. We currently have5 implementation of the <code>MembershipTable</code>: based on Azure Table, SQL server, Apache ZooKeeper, Consul IO and in-memory emulation for development. The interface for <code>MembershipTable</code> is defined in <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs"><strong><code>IMembershipTable</code></strong></a>.</p>
 <ol>
 <li><p><a href="http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-tables/">Azure Table Storage</a> - in this implementation we use Azure deployment ID as partition key and the silo identity (<code>ip:port:epoch</code>) as row key. Together they guarantee a unique key per silo. For concurrency control we use optimistic concurrency control based on <a href="http://msdn.microsoft.com/en-us/library/azure/dd179427.aspx">Azure Table ETags</a>. Every time we read from the table we store the etag for every read row and use that eTag when we try to write back. etags are automatically assigned and checked by Azure Table service on every write. For multi-row transactions we utilize the support for <a href="http://msdn.microsoft.com/en-us/library/azure/dd894038.aspx">batch transactions provided by Azure table</a>, which guarantees serializale transactions over rows with the same partition key.</p>
@@ -169,13 +169,12 @@ In addition to the <code>MembershipTable</code> each silo participates in fully 
 <li><p>In-memory emulation for development setup. We use a special system grain, called <code>MembershipTableGrain</code>, for that implementation. This grain lives on a designated primary silo, which is only used for a <strong>development setup</strong>. In any real production usage primary silo <strong>is not required</strong>.</p>
 </li>
 </ol>
-<h3 id="configuration-">Configuration:</h3>
+<h3 id="configuration">Configuration:</h3>
 <p>Membership protocol is configured via the <code>Liveness</code> element in the <code>Globals</code> section in <code>OrleansConfiguration.xml</code> file.
 The default values were tuned in years of production usage in Azure and we believe they represent good default settings. There is no need in general to change them.</p>
 <p>Sample config element:</p>
 <pre><code class="lang-xml">&lt;Liveness ProbeTimeout = &quot;5s&quot; TableRefreshTimeout =&quot;10s  DeathVoteExpirationTimeout =&quot;80s&quot; NumMissedProbesLimit = &quot;3&quot; NumProbedSilos=&quot;3&quot; NumVotesForDeathDeclaration=&quot;2&quot; /&gt;
-</code></pre>
-<p>There are 4 types of liveness implemented. The type of the liveness protocol is configured via the <code>SystemStoreType</code> attribute of the <code>SystemStore</code> element in the <code>Globals</code> section in <code>OrleansConfiguration.xml</code> file.</p>
+</code></pre><p>There are 4 types of liveness implemented. The type of the liveness protocol is configured via the <code>SystemStoreType</code> attribute of the <code>SystemStore</code> element in the <code>Globals</code> section in <code>OrleansConfiguration.xml</code> file.</p>
 <ol>
 <li><p><code>MembershipTableGrain</code> - membership table is stored in a grain on primary silo. This is a <strong>development setup only</strong>.</p>
 </li>
@@ -213,12 +212,12 @@ The default values were tuned in years of production usage in Azure and we belie
 <li><p><code>ExpectedClusterSize</code> - The expected size of a cluster. Need not be very accurate, can be an overestimate. Used to tune the exponential backoff algorithm of retries to write to Azure table. Default is 20.</p>
 </li>
 </ol>
-<h3 id="design-rationale-">Design Rationale:</h3>
+<h3 id="design-rationale">Design Rationale:</h3>
 <p>A natural question that might be asked is why not to rely completely on <a href="https://ZooKeeper.apache.org/">Apache ZooKeeper</a> for the cluster membership implementation, potentially by using it&#39;s out of the box support for <a href="http://zookeeper.apache.org/doc/trunk/recipes.html#sc_outOfTheBox">group membership with ephemeral nodes</a>? Why did we bother implementing our own membership protocol? There were primarily three reasons:</p>
 <p>1) <strong>Deployment/Hosting in the Cloud</strong> - Zookeeper is not a hosted service (at least at the time of this writing July 2015 and definitely when we first implemented this protocol in the summer of 2011 there was no version of Zookeeper running as a hosted service by any major cloud provider). It means that in the Cloud environment Orleans customers would have to deploy/run/manage their own instance of a ZK cluster. This is just yet another unnecessary burden, that we did not want to force on our customers. By using Azure Table we rely on a hosted, managed service which makes our customers lives much simpler. <em>Basically, in the Cloud, use Cloud as a Platform, not as an Infrastructure.</em> On the other hand, when running on premises and managing your own servers, relying on ZK as an implementation of the <code>MembershipTable</code> is a viable option.</p>
 <p>2) <strong>Direct failure detection</strong> - when using ZK&#39;s group membership with ephemeral nodes the failure detection is performed between the Orleans servers (ZK clients) and ZK servers. This may not necessarily correlate with the actual network problems between Orleans servers. <em>Our desire was that the failure detection would accurately reflect the intra-cluster state of the communication.</em> Specifically, in our design, if an Orleans silo cannot communicate with the <code>MembershipTable</code> it is not considered dead and can keep working. As opposite to that, have we used ZK group membership with ephemeral nodes a disconnection from a ZK server may cause an Orleans silo (ZK client) to be declared dead, while it may actually be alive and fully functional.</p>
 <p>3) <strong>Portability and flexibility</strong> - as part of Orleans&#39;s philosophy, we do not want to force a strong dependence on any particular technology, but rather have a flexible design where different components can be easily switched with different implementations. This is exactly the purpuse that <code>MembershipTable</code> abstraction serves.</p>
-<h3 id="acknowledgements-">Acknowledgements:</h3>
+<h3 id="acknowledgements">Acknowledgements:</h3>
 <p>We would to acknowledge the contribution of <a href="https://www.linkedin.com/pub/alex-kogan/4/b52/3a2">Alex Kogan</a> to the design and implementation of the first version of this protocol. This work was done as part of summer internship in Microsoft Research in the Summer of 2011.
 The implementation of ZooKeeper based <code>MembershipTable</code> was done by <a href="https://github.com/shayhatsor">Shay Hazor</a>, the implementation of SQL <code>MembershipTable</code> was done by <a href="https://github.com/veikkoeeva">Veikko Eeva</a>, and the implementation of Consul based <code>MembershipTable</code> was done by <a href="https://github.com/PaulNorth">Paul North</a>.</p>
 

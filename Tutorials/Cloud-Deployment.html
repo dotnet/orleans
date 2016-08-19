@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Cloud Deployment | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Cloud Deployment | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/Cloud-Deployment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Cloud-Deployment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="cloud-deployment">Cloud Deployment</h1>
               
 <h2 id="deploying-orleans-to-windows-azure">Deploying Orleans to Windows Azure</h2>
@@ -138,8 +138,7 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
         silo.Run(); // Call will block until silo is shutdown
     }
 }
-</code></pre>
-<p>It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.</p>
+</code></pre><p>It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.</p>
 <p>Then, in the <code>ServiceDefinition.csdef</code> file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:</p>
 <ul>
 <li>Add a <code>ConfigurationSettings</code> declaration named &#39;DataConnectionString&#39;. This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table.</li>
@@ -161,8 +160,7 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
     &lt;/WorkerRole&gt;
     ...
 &lt;/ServiceDefinition&gt;
-</code></pre>
-<p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
+</code></pre><p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
 <p>Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;</p>
 <p>This will be a normal Azure storage connection – either for the development storage emulator (only valid if running locally), or a full Azure storage account connection string for cloud-storage.</p>
 <p>In general, this connection string is likely to use the same configuration values as the <code>Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString</code> diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.</p>
@@ -172,14 +170,12 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;UseDevelopmentStorage=true&quot; /&gt;
     &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;UseDevelopmentStorage=true&quot; /&gt;
 &lt;/ConfigurationSettings&gt;
-</code></pre>
-<p>Or using an Azure cloud storage account:</p>
+</code></pre><p>Or using an Azure cloud storage account:</p>
 <pre><code class="lang-xml">&lt;ConfigurationSettings&gt;
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey&quot; /&gt;
     &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey&quot; /&gt;
 &lt;/ConfigurationSettings&gt;
-</code></pre>
-<h2 id="changing-dataconnectionstring">Changing DataConnectionString</h2>
+</code></pre><h2 id="changing-dataconnectionstring">Changing DataConnectionString</h2>
 <p>The &quot;DataConnectionString&quot; setting in <code>ServiceDefinition.csdef</code> is the default name use by the Orleans silo for the Azure table account connection string that will be used for Orleans system tables such as <code>OrleanSiloInstances</code>.</p>
 <p>If you wish to use a different setting name for this value, then in the silo role initialization code set the property <code>OrleansAzureSilo.DataConnectionConfigurationSettingName</code> before the call to <code>OrleansAzureSilo.Start(...)</code></p>
 <h2 id="add-your-grain-binaries-to-azure-worker-role-for-orleans-silos">Add your grain binaries to Azure Worker Role for Orleans Silos</h2>
@@ -228,8 +224,7 @@ This is the Azure storage location where Orleans Azure hosting library will plac
 &lt;/WebRole&gt;
 ...
 &lt;/ServiceDefinition&gt;
-</code></pre>
-<p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
+</code></pre><p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
 <p>Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;.
 This will be a normal Azure storage connection – either for the development storage emulator (if running locally), or a full Azure storage account connection string for cloud-storage.</p>
 <p>This setting MUST match the <code>DataConnectionString</code> value used by the <code>OrleansSiloWorker</code> role in order for the client to discover and bootstrap the connection to the Orleans silos.</p>
@@ -245,8 +240,7 @@ This will be a normal Azure storage connection – either for the development st
 &lt;/Role&gt;
 ...
 &lt;/ServiceConfiguration&gt;
-</code></pre>
-<p>Or using an Azure cloud storage account:</p>
+</code></pre><p>Or using an Azure cloud storage account:</p>
 <pre><code class="lang-xml">&lt;ServiceConfiguration ...&gt;
 &lt;Role name=&quot;OrleansWebClient&quot; ...&gt;
     ...
@@ -258,8 +252,7 @@ This will be a normal Azure storage connection – either for the development st
 &lt;/Role&gt;
 ...
 &lt;/ServiceConfiguration&gt;
-</code></pre>
-<h3 id="add-your-grain-interface-binaries-to-azure-web-role-for-orleans-client">Add your grain interface binaries to Azure Web Role for Orleans Client</h3>
+</code></pre><h3 id="add-your-grain-interface-binaries-to-azure-web-role-for-orleans-client">Add your grain interface binaries to Azure Web Role for Orleans Client</h3>
 <p>Add the grain interfaces DLL for the application grains into this web role project.</p>
 <p>Access to the DLL containing the grain implementation classes should not be required by the client web role.</p>
 <p>Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.</p>
@@ -299,8 +292,7 @@ This will be a normal Azure storage connection – either for the development st
                 }
             }
               ...
-</code></pre>
-<p>Repeated calls to <code>AzureClient.Initialize()</code>  will return and do nothing if the Orleans client connection is already set up.</p>
+</code></pre><p>Repeated calls to <code>AzureClient.Initialize()</code>  will return and do nothing if the Orleans client connection is already set up.</p>
 <p>An additional variant of <code>AzureClient.Initialize(System.IO.FileInfo)</code> allows a base client config file location to be specified explicitly.
 The internal endpoint addresses of the Orleans silo nodes will still be determined dynamically from the Orleans Silo instance table each silo node registers with.</p>
 <!--TODO: Create link to Orleans API when the link is created/found-->

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Runtime Tables | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Runtime Tables | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Runtime-Tables.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Runtime-Tables.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="runtime-tables">Runtime Tables</h1>
               
 <p>Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables and provide more details on their internal structure.</p>
@@ -114,7 +114,7 @@
 <li><em>DeploymentId</em></li>
 <li><em>MembershipVersion</em> - the latest version of the current membership configuration.</li>
 </ol>
-<h3 id="naming-">Naming:</h3>
+<h3 id="naming">Naming:</h3>
 <p>The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
 First, it is important to note that <a href="http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html">Orleans cluster protocol</a> does not use any of these names for distinguishing between silos. Instead it uses <code>IP:port:epoch</code> as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.</p>
 <p>Hostname is always set to the name of this host, as returned by <code>Dns.GetHostName()</code>.

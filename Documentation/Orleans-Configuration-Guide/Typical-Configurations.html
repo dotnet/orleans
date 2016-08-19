@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Typical Configurations | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Typical Configurations | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Typical-Configurations.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Orleans-Configuration-Guide/Typical-Configurations.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="typical-configurations">Typical Configurations</h1>
               
 <p>Below are examples of typical configurations that can be used for development and production deployments.</p>
@@ -86,13 +86,11 @@
     &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine. The Orleans client that can be started by running a project created with the <em>Orleans Dev/Test Host</em> template is configured as follows in DevTestClientConfiguration.xml</p>
+</code></pre><p>To connect to the local silo, the client needs to be configured to localhost and can only connect from the same machine. The Orleans client that can be started by running a project created with the <em>Orleans Dev/Test Host</em> template is configured as follows in DevTestClientConfiguration.xml</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;localhost&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="reliable-production-deployment-using-azure">Reliable Production Deployment Using Azure</h2>
+</code></pre><h2 id="reliable-production-deployment-using-azure">Reliable Production Deployment Using Azure</h2>
 <p>For a reliable production deployment using Azure, you need to use the Azure Table option for cluster membership. This configuration is typical of deployments to either on-premise servers or Azure virtual machine instances.</p>
 <p> The format of the DataConnection string is &quot;DefaultEndpointsProtocol=https;AccountName=<azure storage="" account="">;AccountKey=<azure table="" storage="" account="" key="">&quot;<p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
@@ -107,13 +105,11 @@
     &lt;ProxyingGateway Address=&quot;&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>Clients need to be configured to use Azure Table for discovering the gateways, the addresses of the Orleans servers are not statically known to the clients.</p>
+</code></pre><p>Clients need to be configured to use Azure Table for discovering the gateways, the addresses of the Orleans servers are not statically known to the clients.</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;AzureTable&quot; DeploymentId=&quot;target deployment ID&quot; DataConnectionString=&quot;&lt;&lt;see comment above&gt;&gt;&quot; /&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="reliable-production-deployment-using-zookeeper">Reliable Production Deployment Using ZooKeeper</h2>
+</code></pre><h2 id="reliable-production-deployment-using-zookeeper">Reliable Production Deployment Using ZooKeeper</h2>
 <p>For a reliable production deployment using ZooKeeper, you need to use the ZooKeeper option for cluster membership. This configuration is typical of deployments to on-premise servers.</p>
 <p> The format of the DataConnection string is documented in the <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#ch_zkSessions">ZooKeeper Programmer&#39;s Guide</a>. A minimum of 5 ZooKeeper servers is <a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html#sc_zkMulitServerSetup">recommended</a>.</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
@@ -128,14 +124,12 @@
     &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>Clients need to be configured to use ZooKeeper for discovering the gateways, the addresses of the Orleans servers are not statically known to the clients.</p>
+</code></pre><p>Clients need to be configured to use ZooKeeper for discovering the gateways, the addresses of the Orleans servers are not statically known to the clients.</p>
 <pre><code class="lang-xml">﻿&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot; DeploymentId=&quot;target deployment ID&quot; DataConnectionString=&quot;&lt;&lt;see comment above&gt;&gt;&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="unreliable-deployment-on-a-cluster-of-dedicated-servers">Unreliable Deployment on a Cluster of Dedicated Servers</h2>
+</code></pre><h2 id="unreliable-deployment-on-a-cluster-of-dedicated-servers">Unreliable Deployment on a Cluster of Dedicated Servers</h2>
 <p>For testing on a cluster of dedicated servers when reliability isn’t a concern you can leverage MembershipTableGrain and avoid dependency on Azure Table. You just need to designate one of the nodes as a Primary.</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
@@ -147,15 +141,13 @@
     &lt;ProxyingGateway Address=&quot; &quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p> For the client:</p>
+</code></pre><p> For the client:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;node-1&quot; Port=&quot;30000&quot;/&gt;
   &lt;Gateway Address=&quot;node-2&quot; Port=&quot;30000&quot;/&gt;
   &lt;Gateway Address=&quot;node-3&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<h2 id="azure-worker-role-deployment">Azure Worker Role Deployment</h2>
+</code></pre><h2 id="azure-worker-role-deployment">Azure Worker Role Deployment</h2>
 <p>When Orleans is deployed into an Azure Worker role, as opposed to VM instances, most of the server-side configuration is actually done in files other than the OrleansConfiguration, which looks something like this:</p>
 <pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
@@ -165,8 +157,7 @@
     &lt;Tracing DefaultTraceLevel=&quot;Info&quot; TraceToConsole=&quot;true&quot; TraceToFile=&quot;{0}-{1}.log&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p> Some information is kept in the service configuration file, in which the worker role section looks like this:</p>
+</code></pre><p> Some information is kept in the service configuration file, in which the worker role section looks like this:</p>
 <pre><code class="lang-xml">&lt;Role name=&quot;OrleansAzureSilos&quot;&gt;
   &lt;Instances count=&quot;2&quot; /&gt;
   &lt;ConfigurationSettings&gt;
@@ -174,8 +165,7 @@
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;&lt;&lt;see earlier comment&gt;&gt;&quot; /&gt;
   &lt;/ConfigurationSettings&gt;
 &lt;/Role&gt;
-</code></pre>
-<p>The data connection string and the diagnostics connection string do not have to be the same.</p>
+</code></pre><p>The data connection string and the diagnostics connection string do not have to be the same.</p>
 <p>Some configuration information is kept in the service definition file. The worker role has to be configured there, too:</p>
 <pre><code class="lang-xml">&lt;WorkerRole name=&quot;OrleansAzureSilos&quot; vmsize=&quot;Large&quot;&gt;
   &lt;Imports&gt;
@@ -192,8 +182,7 @@
     &lt;InternalEndpoint name=&quot;OrleansProxyEndpoint&quot; protocol=&quot;tcp&quot; port=&quot;30000&quot; /&gt;
   &lt;/Endpoints&gt;
 &lt;/WorkerRole&gt;
-</code></pre>
-<p>That&#39;s it for the worker role hosting the Orleans runtime. However, when deploying to Azure, there is typically a front end of some sort, either a web site or a web service, since making the Orleans ports public is not a good idea. Therefore, the client configuration is configuration of the web or worker role (or web site) that sits in front of Orleans.</p>
+</code></pre><p>That&#39;s it for the worker role hosting the Orleans runtime. However, when deploying to Azure, there is typically a front end of some sort, either a web site or a web service, since making the Orleans ports public is not a good idea. Therefore, the client configuration is configuration of the web or worker role (or web site) that sits in front of Orleans.</p>
 <p> Assuming that the frontend is a web role, a simple ClientConfiguration file should be used:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Tracing DefaultTraceLevel=&quot;Info&quot;
@@ -201,8 +190,7 @@
            TraceToFile=&quot;{0}-{1}.log&quot;
            WriteTraces=&quot;false&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p> The web role needs the same connection string information as the worker role, in the service configuration file:</p>
+</code></pre><p> The web role needs the same connection string information as the worker role, in the service configuration file:</p>
 <pre><code class="lang-xml">&lt;Role name=&quot;WebRole&quot;&gt;
   &lt;Instances count=&quot;2&quot; /&gt;
   &lt;ConfigurationSettings&gt;
@@ -210,8 +198,7 @@
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;&lt;&lt;see earlier comment&gt;&gt;&quot; /&gt;
   &lt;/ConfigurationSettings&gt;
 &lt;/Role&gt;
-</code></pre>
-<p> and in the service definition file:</p>
+</code></pre><p> and in the service definition file:</p>
 <pre><code class="lang-xml">&lt;WebRole name=&quot;WebRole&quot; vmsize=&quot;Large&quot;&gt;
   &lt;Imports&gt;
     &lt;Import moduleName=&quot;Diagnostics&quot; /&gt;
@@ -221,8 +208,7 @@
   &lt;/ConfigurationSettings&gt;
   &lt;!-- There is additional web role data that has nothing to do with Orleans --&gt;
 &lt;/WebRole&gt;
-</code></pre>
-</azure></azure>
+</code></pre></azure></azure>
             </article>
           </div>
           

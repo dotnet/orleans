@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Twitter Sentiment | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Twitter Sentiment | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Twitter-Sentiment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Twitter-Sentiment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="twitter-sentiment">Twitter Sentiment</h1>
               
 <p>The Twitter Sentiment application records Twitter sentiment by consuming the Twitter streaming API, calulates a sentiment score for each tweet (i.e. is it a positive/negative/neutral tone of lanuage), and then records that sentiment against each hashtag in the tweet using an Orleans grain to maintain a total score for each unique hashtag.</p>
@@ -89,8 +89,7 @@ public interface ITweetDispatcherGrain : Orleans.IGrain
     Task AddScore(int score, string[] hashtags, string tweet);
     Task&lt;Totals[]&gt; GetTotals(string[] hashtags);
 }
-</code></pre>
-<p>Note that it is a stateless grain, and its main role is to pass the work to stateful grains for processing. AddScore takes a tweet, and parses out each hashtag for processing by the appropriate grain. GetTotals retrieves get the number of tweets that have included a specific list of hashtags. This grain exists in part to support the “batch processing” of several hashtags within a single tweet.</p>
+</code></pre><p>Note that it is a stateless grain, and its main role is to pass the work to stateful grains for processing. AddScore takes a tweet, and parses out each hashtag for processing by the appropriate grain. GetTotals retrieves get the number of tweets that have included a specific list of hashtags. This grain exists in part to support the “batch processing” of several hashtags within a single tweet.</p>
 <p>One Orleans grain is created for each unique hashtag, and this grain is used to track the current sentiment score.</p>
 <pre><code class="lang-csharp">[ExtendedPrimaryKey]
 public interface IHashtagGrain : Orleans.IGrain
@@ -98,8 +97,7 @@ public interface IHashtagGrain : Orleans.IGrain
     Task AddScore(int score, string lastTweet);
     Task&lt;Totals&gt; GetTotals();
 }
-</code></pre>
-<p>Note that the ExtendedPrimaryKey attribute indicates that a string, in this case the twitter hashtag, is being used as a composite key for the grain, instead of the more usual Guid or long, which is a more natural fit for grains that have strings rather than numeric keys. The AddMethod updates the current state with the latest sentiment score, and GetTotals returns a Totals structure, with the breakdown of the sentiment analysis, along with the date stamp for the last processed tweet, and the test of the last tweet. The last tweet is kept just to allow the UI to display it, to help give the sentiment more context.</p>
+</code></pre><p>Note that the ExtendedPrimaryKey attribute indicates that a string, in this case the twitter hashtag, is being used as a composite key for the grain, instead of the more usual Guid or long, which is a more natural fit for grains that have strings rather than numeric keys. The AddMethod updates the current state with the latest sentiment score, and GetTotals returns a Totals structure, with the breakdown of the sentiment analysis, along with the date stamp for the last processed tweet, and the test of the last tweet. The last tweet is kept just to allow the UI to display it, to help give the sentiment more context.</p>
 <p>When first activated, the grain tracks this activation by calling the IncrementCounter method on a Counter grain.</p>
 <pre><code class="lang-csharp">public interface ICounter : Orleans.IGrain
 {
@@ -107,8 +105,7 @@ public interface IHashtagGrain : Orleans.IGrain
     Task ResetCounter();
     Task&lt;int&gt; GetTotalCounter();
 }
-</code></pre>
-<p>To increase performance, the counter grain only persists its internal state periodically, in this case, every 100 calls. The running total does not have to be one hundred percent accurate, so if the data were lost due to a silo failure between updates, that would not be critical. If this grain were to be called repeatedly from other grains, it could become a bottleneck, and some form of aggregation pattern would be needed, but as its only called once from each grain, upon grain initialization, this should not be an issue.</p>
+</code></pre><p>To increase performance, the counter grain only persists its internal state periodically, in this case, every 100 calls. The running total does not have to be one hundred percent accurate, so if the data were lost due to a silo failure between updates, that would not be critical. If this grain were to be called repeatedly from other grains, it could become a bottleneck, and some form of aggregation pattern would be needed, but as its only called once from each grain, upon grain initialization, this should not be an issue.</p>
 <h3 id="prerequisites">Prerequisites</h3>
 <p>The following must be installed prior to running the sample:</p>
 <ul>

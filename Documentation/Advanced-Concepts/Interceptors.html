@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Interceptors | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Interceptors | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Interceptors.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Interceptors.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="interceptors">Interceptors</h1>
               
 <p>Orleans provides a way to intercept grain invocation calls and inject an arbitrary application logic into the invocation path.</p>
@@ -97,12 +97,10 @@
     log.LogInfo($&quot;Grain method returned {result}&quot;);
     return result;
 });
-</code></pre>
-<p>Note how the interceptor wraps the call to the grain. This allows the user to inspect the return value of each method as well as handle any exceptions which are thrown.</p>
+</code></pre><p>Note how the interceptor wraps the call to the grain. This allows the user to inspect the return value of each method as well as handle any exceptions which are thrown.</p>
 <p><code>SetInvokeInterceptor</code> takes a single parameter, a delegate of type <code>InvokeInterceptor</code> with the following signature:</p>
 <pre><code class="lang-csharp">public delegate Task&lt;object&gt; InvokeInterceptor(MethodInfo targetMethod, InvokeMethodRequest request, IGrain target, IGrainMethodInvoker invoker);
-</code></pre>
-<p>In this delegate:</p>
+</code></pre><p>In this delegate:</p>
 <ul>
 <li><code>targetMethod</code> is the <code>MethodInfo</code> of the method being called on the grain implementation, not the interface.</li>
 <li><code>request.Arguments</code> is an <code>object[]</code> containing the arguments to the method, if any.</li>
@@ -115,8 +113,7 @@
 {
     Task&lt;object&gt; Invoke(MethodInfo method, InvokeMethodRequest request, IGrainMethodInvoker invoker);
 }
-</code></pre>
-<p>For example:</p>
+</code></pre><p>For example:</p>
 <pre><code class="lang-csharp">public Task&lt;object&gt; Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)
 {
     // Check access conditions.
@@ -128,8 +125,7 @@
 
     return invoker.Invoke(this, request);
 }
-</code></pre>
-<p>If a silo-level interceptor is also present, the grain-level interceptor is invoked inside of silo-level interceptors, during the call to <code>invoker.Invoke(...)</code>. Grain-level interceptors will also be invoked for grain extensions (implementations of <code>IGrainExtension</code>), not only for method in the current class.</p>
+</code></pre><p>If a silo-level interceptor is also present, the grain-level interceptor is invoked inside of silo-level interceptors, during the call to <code>invoker.Invoke(...)</code>. Grain-level interceptors will also be invoked for grain extensions (implementations of <code>IGrainExtension</code>), not only for method in the current class.</p>
 
             </article>
           </div>

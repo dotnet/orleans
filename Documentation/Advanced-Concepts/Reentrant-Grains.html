@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Reentrant Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Reentrant Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Reentrant-Grains.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Reentrant-Grains.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="reentrant-grains">Reentrant Grains</h1>
               
 <p>By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request.
@@ -93,8 +93,7 @@ Task Bar()
     await task2;   // line 3
     return Do2();  // line 4
 }
-</code></pre>
-<p>If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
+</code></pre><p>If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
 <p>For example, the following order of execution is possible:</p>
 <p>Line 1, line 3, line 2 and line 4. That is, the turns from different requests interleave.</p>
 <p>If the grain was not reentrant, the only possible executions would be: line 1, line 2, line 3, line 4 OR: line 3, line 4, line 1, line 2 (new request cannot start before the previous one finished).</p>

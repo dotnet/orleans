@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
               
 <p>This note shows how to manually convert a Visual Studio .csproj file which was created with Orleans v0.9 Visual Studio templates from using assembly references based on the $(OrleansSDK) environment variable to using Orleans NuGet packages.</p>
@@ -90,15 +90,13 @@
            &lt;Private&gt;False&lt;/Private&gt;
       &lt;/Reference&gt;
  &lt;/ItemGroup&gt;
-</code></pre>
-</li>
+</code></pre></li>
 <li><p>Remove old v0.9 Orleans code-gen metadata and script trigger.</p>
 <pre><code class="lang-xml"> &lt;PropertyGroup&gt;
        &lt;OrleansProjectType&gt;Server&lt;/OrleansProjectType&gt;
  &lt;/PropertyGroup&gt;
  &lt;Import Project=&quot;$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets&quot; /&gt;
-</code></pre>
-</li>
+</code></pre></li>
 <li><p><strong>Make sure to re-save the .csproj to disk at this point, otherwise the next step will fail !</strong></p>
 </li>
 <li>Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Interfaces</code> package to the grain interfaces project.<ul>
@@ -122,7 +120,7 @@
 <li>Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Grains</code> package to the  project.</li>
 <li>Follow Steps 6..8 from the grain interfaces .csproj above.</li>
 </ol>
-<h2 id="problems-">Problems?</h2>
+<h2 id="problems">Problems?</h2>
 <p>If you have problems getting these conversions to work for you, then please post a <strong>full</strong> copy of your .csproj into a <a href="https://gist.github.com/">Gist</a> on your GitHub account and then open a new Issue in the <a href="https://github.com/dotnet/orleans/issues">Orleans GitHub Project</a> asking for assistance and pointing to the Gist for your specific project file.</p>
 
             </article>

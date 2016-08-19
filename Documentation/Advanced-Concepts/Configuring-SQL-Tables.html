@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>SQL Tables | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="SQL Tables | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Configuring-SQL-Tables.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Configuring-SQL-Tables.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="sql-system-storage">SQL System Storage</h1>
               
 <p>Any reliable production-style Orleans deployment requires using persistent storage to keep system state, specifically Orleans cluster status and the data used for the reminders functionality. In addition to out of the box support for Azure storage Orleans also provides an option to store this information in SQL server.</p>
@@ -84,15 +84,13 @@
                  DataConnectionString=&quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot; AdoInvariant=&quot;System.Data.SqlClient&quot; /&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>The client configuration should look like this:</p>
+</code></pre><p>The client configuration should look like this:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
       &lt;SystemStore SystemStoreType =&quot;SqlServer&quot;
                  DeploymentId=&quot;OrleansTest&quot;
                  DataConnectionString=&quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot; AdoInvariant=&quot;System.Data.SqlClient&quot; /&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre>
-<p>Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_*</a>(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.</p>
+</code></pre><p>Where the DataConnectionString is set to any valid SQL Server connection string. In order to use SQL Server as the store for system data, there’s now a script file <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/CreateOrleansTables_SqlServer.sql">CreateOrleansTables_*</a>(where asterisk denotes database vendor) in the Binaries\OrleansServer folder which establishes the necessary database objects. Make sure that all servers that will be hosting Orleans silos can reach the database and has access rights to it! We’ve tripped up a few times on this seemingly trivial concern during our testing.</p>
 <h3 id="sql-metrics-and-statistics-tables">SQL Metrics and Statistics tables</h3>
 <p>System tables can currently only be stored in Azure table or SQL server.
 For Metrics and Statistics tables however, we provide a generic support to host it in any persistent storage. This is provided via the notion of a <code>StatisticsProvider</code>. Any application can write an arbitrary provider to store statistics and metrics data in a persistent store of their choice. Orleans provides an implemention of one such provider: SQL Table Statistics Provider.</p>
@@ -108,8 +106,7 @@ For Metrics and Statistics tables however, we provide a generic support to host 
          &lt;Statistics ProviderType=&quot;MySQLStatsProvider&quot; WriteLogStatisticsToTable=&quot;true&quot;/&gt;
      &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p>The client configuration should look like this:</p>
+</code></pre><p>The client configuration should look like this:</p>
 <pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
       &lt;StatisticsProviders&gt;
          &lt;Provider Type=&quot;Orleans.Providers.SqlServer.SqlStatisticsPublisher&quot; Name=&quot;SQL&quot; ConnectionString=&quot;Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Orleans;Integrated Security=True;Pooling=False;Max Pool Size=200;Asynchronous Processing=True;MultipleActiveResultSets=True&quot; /&gt;
@@ -117,7 +114,6 @@ For Metrics and Statistics tables however, we provide a generic support to host 
       &lt;Statistics ProviderType=&quot;MySQLStatsProvider&quot; WriteLogStatisticsToTable=&quot;true&quot;/&gt;
 &lt;/ClientConfiguration&gt;
 </code></pre>
-
             </article>
           </div>
           

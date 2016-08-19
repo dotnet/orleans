@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Declarative Persistence | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Declarative Persistence | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/Declarative-Persistence.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Declarative-Persistence.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="declarative-persistence">Declarative Persistence</h1>
               
 <p>In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of &#39;cache with behavior,&#39; an object-oriented cache, if you will.
@@ -110,8 +110,7 @@ Therefore, we&#39;ll create a set of GUIDs first, then use them as the worker id
     var m1 = GrainClient.GrainFactory.GetGrain&lt;IManager&gt;(Guid.Parse(ids[6]));
     ...
 }
-</code></pre>
-<p>Next, we&#39;ll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
+</code></pre><p>Next, we&#39;ll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
 The silo host project includes a file <em>OrleansHostWrapper.cs</em> which is where we find the following section:</p>
 <pre><code class="lang-csharp">var config = ClusterConfiguration.LocalhostPrimarySilo();
 config.AddMemoryStorageProvider();
@@ -122,11 +121,9 @@ config.AddMemoryStorageProvider();
 // config.AddAzureBlobStorageProvider(&quot;AzureStore&quot;, &quot;[insert data connection string]&quot;);
 
 siloHost = new SiloHost(siloName, config);
-</code></pre>
-<p>If this is hosted in Azure Cloud Services, then one can use:</p>
+</code></pre><p>If this is hosted in Azure Cloud Services, then one can use:</p>
 <pre><code class="lang-csharp">config.AddAzureBlobStorageProvider(&quot;AzureStore&quot;);
-</code></pre>
-<p>and it will pick up the same connection string used in <code>config.Globals.DataConnectionString</code>.</p>
+</code></pre><p>and it will pick up the same connection string used in <code>config.Globals.DataConnectionString</code>.</p>
 <p>The <code>MemoryStorage</code> provider is fairly uninteresting, since it doesn&#39;t actually provide any permanent storage; it&#39;s intended for debugging persistent grains while having no access to a persistent store.
 In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.</p>
 <p>Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should add one of the other two lines, but not both. You can use either the <code>AddAzureTableStorageProvider()</code> function or the <code>AddAzureBlobStorageProvider()</code> function depending on how you want to store information.</p>
@@ -151,23 +148,19 @@ with <em>CopyLocal=&#39;True&#39;</em>.</p>
     public int Level { get; set; }
     public IManager Manager { get; set; }
 }
-</code></pre>
-<p>and for managers, we must store the direct reports, but the <code>_me</code> reference may continue to be created during activation.</p>
+</code></pre><p>and for managers, we must store the direct reports, but the <code>_me</code> reference may continue to be created during activation.</p>
 <pre><code class="lang-csharp">public class ManagerState
 {
     public List&lt;IEmployee&gt; Reports { get; set; }
 }
-</code></pre>
-<p>Then, we change the grain class declaration to identify the state interface (e.g., from <code>Orleans.Grain</code> to <code>Orleans.Grain&lt;EmployeeState&gt;</code>) and remove the variables that we want persisted. Make sure to remove <code>level</code>, and <code>manager</code> from the <code>Employee</code> class and <code>_reports</code> from the <code>Manager</code> class. In addition, we must update the other functions to reflect these removals.</p>
+</code></pre><p>Then, we change the grain class declaration to identify the state interface (e.g., from <code>Orleans.Grain</code> to <code>Orleans.Grain&lt;EmployeeState&gt;</code>) and remove the variables that we want persisted. Make sure to remove <code>level</code>, and <code>manager</code> from the <code>Employee</code> class and <code>_reports</code> from the <code>Manager</code> class. In addition, we must update the other functions to reflect these removals.</p>
 <p> We also add an attribute to identify the storage provider:</p>
 <pre><code class="lang-csharp">[StorageProvider(ProviderName = &quot;AzureStore&quot;)]
 public class Employee : Orleans.Grain&lt;EmployeeState&gt;, Interfaces.IEmployee
-</code></pre>
-<p>and</p>
+</code></pre><p>and</p>
 <pre><code class="lang-csharp">[StorageProvider(ProviderName=&quot;AzureStore&quot;)]
 public class Manager : Orleans.Grain&lt;ManagerState&gt;, IManager
-</code></pre>
-<p>At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file.
+</code></pre><p>At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file.
 This indirection is what allows you to delay choices around where to store grain state until deployment.</p>
 <p>Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager.
 Instead, the grain base class gives us access to the state via a <code>State</code> property that is available to the grain.</p>
@@ -177,8 +170,7 @@ Instead, the grain base class gives us access to the state via a <code>State</co
    State.Manager = manager;
    return TaskDone.Done;
 }
-</code></pre>
-<h2 id="controlling-checkpoints">Controlling Checkpoints</h2>
+</code></pre><h2 id="controlling-checkpoints">Controlling Checkpoints</h2>
 <p>The question that remains is when the persistent state gets saved to the storage provider.</p>
 <p>One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not.</p>
 <p>Saving the state using the storage provider is easily accomplished by calling <code>base.WriteStateAsync()</code>.</p>
@@ -194,8 +186,7 @@ public Task SetManager(IManager manager)
     State.Manager = manager;
     return base.WriteStateAsync();
 }
-</code></pre>
-<p>In the <code>Manager</code> class, there&#39;s only one method that need to be modified to write out data, <code>AddDirectReport()</code>.
+</code></pre><p>In the <code>Manager</code> class, there&#39;s only one method that need to be modified to write out data, <code>AddDirectReport()</code>.
 It should look like this:</p>
 <pre><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
 {
@@ -213,15 +204,14 @@ It should look like this:</p>
 
     await base.WriteStateAsync();
 }
-</code></pre>
-<p>Let&#39;s try this out!</p>
+</code></pre><p>Let&#39;s try this out!</p>
 <p>Set a breakpoint in <code>Employee.Promote()</code>.</p>
 <p>When we run the client code the first time and hit the breakpoint, the level field should be <code>0</code> and the newLevel parameter either <code>10</code> or <code>11</code>:</p>
 <p><img src="../Images/Persistence%202.PNG" alt=""></p>
 <p>Let the application finish (reach the &#39;Hit Enter...&#39; prompt) and exit.
 Run it again, and compare what happens when you look at state this second time around:</p>
 <p><img src="../Images/Persistence%203.PNG" alt=""></p>
-<h2 id="just-making-sure-">Just Making Sure...</h2>
+<h2 id="just-making-sure">Just Making Sure...</h2>
 <p>It&#39;s worth checking what Azure thinks about the data.
 Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the &#39;OrleansGrainState&#39; table.
 It should look something like this (you have to hit &#39;Query&#39; in ASE):</p>

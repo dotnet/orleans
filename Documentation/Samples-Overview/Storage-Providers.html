@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Storage Providers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Storage Providers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Storage-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Samples-Overview/Storage-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="storage-providers">Storage Providers</h1>
               
 <p><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/">download</a> and install MongoDB.</p>
@@ -90,8 +90,7 @@
 &lt;Provider Type=&quot;Samples.StorageProviders.OrleansFileStorage&quot;
          Name=&quot;TestStore&quot;
          RootDirectory=&quot;.\Samples.FileStorage&quot;/&gt;
-</code></pre>
-<p>Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
+</code></pre><p>Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
 <p>Set the &#39;Test.Client&#39; project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:</p>
 <pre><code>Successfully started Orleans silo &#39;host-001&#39; as a Primary node.
 
@@ -152,8 +151,7 @@ switched to db orleanssamples
     }
     return TaskDone.Done;
 }
-</code></pre>
-<p>On read, the _id field is removed from the JSON document that is passed back to the caller, since that is not part of the Orleans data model.</p>
+</code></pre><p>On read, the _id field is removed from the JSON document that is passed back to the caller, since that is not part of the Orleans data model.</p>
 <pre><code class="lang-csharp">public Task&lt;string&gt; Read(string collectionName, string key)
 {
     var collection = GetCollection(collectionName);
@@ -175,7 +173,6 @@ switched to db orleanssamples
     return Task.FromResult(strwrtr.ToString());
 }
 </code></pre>
-
             </article>
           </div>
           

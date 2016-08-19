@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Actor Identity | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Actor Identity | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/Actor-Identity.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Actor-Identity.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="actor-identity">Actor Identity</h1>
               
 <p>In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
@@ -94,39 +94,33 @@ You don&#39;t need to coordinate the allocation of keys, which could introduce a
 There is a very low chance of GUIDs colliding, so they would probably be the default choice when architecting an Orleans system.</p>
 <p>Referencing a grain by GUID in client code:</p>
 <pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(Guid.NewGuid());
-</code></pre>
-<p>Retrieving the primary key from grain code:</p>
+</code></pre><p>Retrieving the primary key from grain code:</p>
 <pre><code class="lang-csharp">public override Task OnActivateAsync()
 {
     Guid primaryKey = this.GetPrimaryKey();
     return base.OnActivateAsync();
 }
-</code></pre>
-<h2 id="using-longs">Using Longs</h2>
+</code></pre><h2 id="using-longs">Using Longs</h2>
 <p>A long integer is also available, which would make sense if the grain is persisted to a relational database, where numerical indexes are preferred over GUIDs.</p>
 <p>Referencing a grain by long integer in client code:</p>
 <pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(1);
-</code></pre>
-<p>Retrieving the primary key form grain code:</p>
+</code></pre><p>Retrieving the primary key form grain code:</p>
 <pre><code class="lang-csharp">public override Task OnActivateAsync()
 {
     long primaryKey = this.GetPrimaryKeyLong();
     return base.OnActivateAsync();
 }
-</code></pre>
-<h2 id="using-strings">Using Strings</h2>
+</code></pre><h2 id="using-strings">Using Strings</h2>
 <p>A string is also available.</p>
 <p>Referencing a grain by String in client code:</p>
 <pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(&quot;myGrainKey&quot;);
-</code></pre>
-<p>Retrieving the primary key form grain code:</p>
+</code></pre><p>Retrieving the primary key form grain code:</p>
 <pre><code class="lang-csharp">public override Task OnActivateAsync()
 {
     string primaryKey = this.GetPrimaryKeyString();
     return base.OnActivateAsync();
 }
-</code></pre>
-<p>The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
+</code></pre><p>The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
 <h2 id="using-compound-primary-key">Using Compound Primary Key</h2>
 <p>If you have a system that doesn&#39;t fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.</p>
 <p>You can inherit your interface from &#39;IGrainWithGuidCompoundKey&#39; or &#39;IGrainWithIntegerCompoundKey&quot; interface like this:</p>
@@ -134,11 +128,9 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
 {
     Task Hello();
 }
-</code></pre>
-<p>In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory.</p>
+</code></pre><p>In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory.</p>
 <pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;);
-</code></pre>
-<p>To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
+</code></pre><p>To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
 <pre><code class="lang-csharp">public class ExampleGrain : Orleans.Grain, IExampleGrain
 {
     public Task Hello()
@@ -149,8 +141,7 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
         return TaskDone.Done;
     }
 }
-</code></pre>
-<h2 id="next">Next</h2>
+</code></pre><h2 id="next">Next</h2>
 <p>Let&#39;s add another type of grain into the solution, and demonstrate inter-grain communication.</p>
 <p><a href="A-Service-is-a-Collection-of-Communicating-Actors.html">A Service is a Collection of Communicating Actors</a></p>
 

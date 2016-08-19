@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Client Observers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Client Observers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,8 +71,8 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Observers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
-              <h1></h1>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Observers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              
               <p>There are situations in which a simple message/response pattern is not enough, and the client needs to receive asynchronous notifications.
 For example, a user might want to be notified when a new instant message has been published by a friend.</p>
 <p>Client observers is a mechanism that allows notifying clients asynchronously.
@@ -93,8 +93,7 @@ Unlike in the client subscription case, the subscribing grain simply implements 
 {
     void ReceiveMessage(string message);
 }
-</code></pre>
-<p>The only special thing is that the interface should inherit from <code>IGrainObserver</code>. Now any client that wants to observe those messages should implement a class which implements <code>IChat</code>.</p>
+</code></pre><p>The only special thing is that the interface should inherit from <code>IGrainObserver</code>. Now any client that wants to observe those messages should implement a class which implements <code>IChat</code>.</p>
 <p>The simplest case would be something like this:</p>
 <pre><code class="lang-csharp">public class Chat : IChat
 {
@@ -103,8 +102,7 @@ Unlike in the client subscription case, the subscribing grain simply implements 
         Console.WriteLine(message);
     }
 }
-</code></pre>
-<p>Now on the server we should have a Grain which sends these chat messages to clients. The Grain also should have a mechanism for clients to subscribe and unsubscribe themselves to receive notifications. For subscription the Grain can use the utility class <code>ObserverSubscriptionManager</code>:</p>
+</code></pre><p>Now on the server we should have a Grain which sends these chat messages to clients. The Grain also should have a mechanism for clients to subscribe and unsubscribe themselves to receive notifications. For subscription the Grain can use the utility class <code>ObserverSubscriptionManager</code>:</p>
 <pre><code class="lang-csharp">class HelloGrain : Grain, IHello
 {
     private ObserverSubscriptionManager&lt;IChat&gt; _subsManager;
@@ -128,15 +126,13 @@ Unlike in the client subscription case, the subscribing grain simply implements 
         _SubsManager.Unsubscribe(observer);
     }
 }
-</code></pre>
-<p>To send the message to clients the <code>Notify</code> method of the <code>ObserverSubscriptionManager&lt;IChat&gt;</code> instance can be used. The method takes an <code>Action&lt;T&gt;</code> method or lambda expression (where <code>T</code> is of type <code>IChat</code> here). You can call any method on the interface to send it to clients. In our case we only have one method <code>ReceiveMessage</code> and our sending code on the server would look like this:</p>
+</code></pre><p>To send the message to clients the <code>Notify</code> method of the <code>ObserverSubscriptionManager&lt;IChat&gt;</code> instance can be used. The method takes an <code>Action&lt;T&gt;</code> method or lambda expression (where <code>T</code> is of type <code>IChat</code> here). You can call any method on the interface to send it to clients. In our case we only have one method <code>ReceiveMessage</code> and our sending code on the server would look like this:</p>
 <pre><code class="lang-csharp">public Task SendUpdateMessage(string message)
 {
     _SubsManager.Notify(s =&gt; s.ReceiveMessage(message));
     return TaskDone.Done;
 }
-</code></pre>
-<p>Now our server has a method to send messages to observer clients, two methods for subscribing/unsubscribing and the client implemented a class to be able to observe the grain messages. The last step is to create an observer reference on the client using our previously implemented <code>Chat</code> class and let it receive the messages after subscribing it.</p>
+</code></pre><p>Now our server has a method to send messages to observer clients, two methods for subscribing/unsubscribing and the client implemented a class to be able to observe the grain messages. The last step is to create an observer reference on the client using our previously implemented <code>Chat</code> class and let it receive the messages after subscribing it.</p>
 <p>The code would look like this:</p>
 <pre><code class="lang-csharp">//First create the grain reference
 var friend = GrainClient.GrainFactory.GetGrain&lt;IHello&gt;(0);
@@ -146,8 +142,7 @@ Chat c = new Chat();
 var obj = await GrainClient.GrainFactory.CreateObjectReference&lt;IChat&gt;(c);
 //Subscribe the instance to receive messages.
 await friend.Subscribe(obj);
-</code></pre>
-<p>Now whenever our grain on the server calls the <code>SendUpdateMessage</code> method, all subscribed clients will receive the message. In our client code, the <code>Chat</code> instance in variable <code>c</code> will receive the message and output it to the console.</p>
+</code></pre><p>Now whenever our grain on the server calls the <code>SendUpdateMessage</code> method, all subscribed clients will receive the message. In our client code, the <code>Chat</code> instance in variable <code>c</code> will receive the message and output it to the console.</p>
 <p><strong>Note:</strong> Objects passed to <code>CreateObjectReference</code> are held via a <a href="https://msdn.microsoft.com/en-us/library/system.weakreference"><code>WeakReference&lt;T&gt;</code></a> and will therefore be garbage collected if no other references exist. Users should maintain a reference for each observer which they do not want to be collected.</p>
 <p><strong>Note:</strong> Support for observers might be removed in a future version and replaced with a Simple Message Stream <a href="http://dotnet.github.io/orleans/Orleans-Streams/">SMS</a>, which can support the same concept with more power, flexibility, and reliability.</p>
 <h2 id="next">Next</h2>

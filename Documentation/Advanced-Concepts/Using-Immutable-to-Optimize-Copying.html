@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Using Immutable&lt;T&gt; to Optimize Copying | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Using Immutable&lt;T&gt; to Optimize Copying | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Using-Immutable-to-Optimize-Copying.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="using-immutable-t-to-optimize-copying">Using Immutable<t> to Optimize Copying</t></h1>
               
 <p>Orleans has a feature that can be used to avoid some of the overhead associated with serializing request messages. This note starts with a general description of how serialization works, and then explains how to use the new feature.</p>
@@ -89,20 +89,15 @@
 <p><strong>Using Immutable<t></t></strong></p>
 <p>Using Immutable<t> is simple: in your grain interface, instead of passing T, pass Immutable<t>. For instance, in the above described scenario, the grain method that was:<p>
 <pre><code class="lang-csharp">Task&lt;byte[]&gt; ProcessRequest(byte[] request);
-</code></pre>
-<p> becomes:</p>
+</code></pre><p> becomes:</p>
 <pre><code class="lang-csharp">Task&lt;Immutable&lt;byte[]&gt;&gt; ProcessRequest(Immutable&lt;byte[]&gt; request);
-</code></pre>
-<p>To create an Immutable<t>, simply use the constructor:<p>
+</code></pre><p>To create an Immutable<t>, simply use the constructor:<p>
 <pre><code class="lang-csharp">Immutable&lt;byte[]&gt; immutable = new Immutable&lt;byte[]&gt;(buffer);
-</code></pre>
-<p> And to get the value inside the immutable, use the .Value property:</p>
+</code></pre><p> And to get the value inside the immutable, use the .Value property:</p>
 <pre><code class="lang-csharp">byte[] buffer = immutable.Value;
-</code></pre>
-<p> You can also get a deep copy of the value inside the Immutable, in case you need a value that can be modified, using the GetCopy method:</p>
+</code></pre><p> You can also get a deep copy of the value inside the Immutable, in case you need a value that can be modified, using the GetCopy method:</p>
 <pre><code class="lang-csharp">byte[] buffer = immutable.GetCopy();
-</code></pre>
-<p><strong>What Is Immutable?</strong></p>
+</code></pre><p><strong>What Is Immutable?</strong></p>
 <p>For the purposes of the Immutable&lt;&gt; class, immutability is a rather strict statement: the contents of the data item will not be modified in any way that could change the item&#39;s semantic meaning, or that would interfere with another thread simultaneously accessing the item. The safest way to ensure this is to simply not modify the item at all: bitwise immutability, rather than logical immutability.</p>
 <p>In some cases it is safe to relax this to logical immutability, but care must be taken to ensure that the mutating code is properly thread-safe; because dealing with multithreading is complex, and uncommon in an Orleans context, we strongly recommend against this approach and recommend sticking to bitwise immutability.</p>
 </t></t></t></t></t></t>

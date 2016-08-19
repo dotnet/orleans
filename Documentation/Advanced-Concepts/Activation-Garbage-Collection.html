@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Activation Garbage Collection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Activation Garbage Collection | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Activation-Garbage-Collection.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Activation-Garbage-Collection.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="activation-garbage-collection">Activation Garbage Collection</h1>
               
 <p>The Orleans Team often uses the phrase “Activation Garbage Collection” but that is probably a somewhat misleading term as it might imply it works the same way that .NET garbage collection does, based solely on memory-pressure triggers.</p>
@@ -146,8 +146,7 @@ The minimal allowed age limit is 1 minute.</p>
     &lt;/Application&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<h2 id="specifying-per-type-age-limits">Specifying per-Type Age Limits</h2>
+</code></pre><h2 id="specifying-per-type-age-limits">Specifying per-Type Age Limits</h2>
 <p>Individual grain types may specify a collection age limit that is independent from the global default, using the OrleansConfiguation/Globals/Application/GrainType/Deactivation element. The minimal allowed age limit is 1 minute.</p>
 <p>In the following example, activations that have been idle for 10 minutes are eligible for collection, except activations that are instantiations of the MyGrainAssembly.DoNotDeactivateMeOften class, which are not considered collectable unless idle for a full 24 hours:</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
@@ -163,13 +162,11 @@ The minimal allowed age limit is 1 minute.</p>
     &lt;/Application&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre>
-<p> Any number of GrainType elements may be specified.</p>
+</code></pre><p> Any number of GrainType elements may be specified.</p>
 <h2 id="configuring-activation-garbage-collection-programmatically">Configuring Activation Garbage Collection Programmatically</h2>
 <p>An activation can also impact its own activation GC, by calling the method on the <code>Orleans.Grain</code> base class:</p>
 <pre><code class="lang-csharp">protected void DelayDeactivation(TimeSpan timeSpan)
-</code></pre>
-<p>This call will insure that this activations is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
+</code></pre><p>This call will insure that this activations is not deactivated for at least the specified time duration. It takes priority over Activation Garbage Collection settings specified in the config, but does not cancel them.
 Therefore, this call provides an additional hook to <strong>delay the deactivation beyond what is specified in the Activation Garbage Collection settings</strong>. This call can not be used to expedite Activation Garbage Collection.</p>
 <p>A positive <c><code>timeSpan</code></c> value means “prevent GC of this activation for that time span”.</p>
 <p>A negative <c><code>timeSpan</code></c> value means “cancel the previous setting of the <code>DelayDeactivation</code> call and make this activation behave based on the regular Activation Garbage Collection settings ”.</p>
@@ -180,8 +177,7 @@ Therefore, this call provides an additional hook to <strong>delay the deactivati
 <p>4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.</p>
 <p>You can also instruct the runtime to deactivate the grain next time it becomes idle, by using:</p>
 <pre><code class="lang-csharp">  protected void DeactivateOnIdle()
-</code></pre>
-<p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
+</code></pre><p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
 Please notice that this setting only applies to this particular activation from which it has been called and it does not apply to all possible instances of grains of this type.</p>
 
             </article>

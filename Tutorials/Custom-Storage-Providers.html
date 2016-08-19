@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Custom Storage Providers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Custom Storage Providers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.0.1.0">
+    <meta name="generator" content="docfx 2.3.1.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/richorama/orleans/blob/gh-pages/src/Tutorials/Custom-Storage-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
+              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Custom-Storage-Providers.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="custom-storage-providers">Custom Storage Providers</h1>
               
 <h2 id="writing-a-custom-storage-provider">Writing a Custom Storage Provider</h2>
@@ -145,8 +145,7 @@ namespace StorageProviders
         }
     }
 }
-</code></pre>
-<p>The first thing we have to figure out is what data we need to provide through configuration. 
+</code></pre><p>The first thing we have to figure out is what data we need to provide through configuration. 
 The name is a required property, but we will also need the path to the root directory for our file store.
 That is, in fact, the only piece of information we need, so we&#39;ll add a <code>RootDirectory</code> string property and edit the configuration file as in the previous section.
 In doing so, it&#39;s critical to pay attention to the namespace and class name of the provider.
@@ -179,8 +178,7 @@ In our case, we&#39;ll want to set the properties and create the root directory 
 
     return TaskDone.Done;
 }
-</code></pre>
-<p>Run the program again.
+</code></pre><p>Run the program again.
 This time, you will still crash, but in <code>ReadStateAsync()</code>.
 After running the code, you should find a <em>Storage</em> directory under the <code>bin\Debug</code> directory of the silo host project.
 Make sure you have set the project up to build on F5, or you may not see the edits take effect.</p>
@@ -197,8 +195,7 @@ var path = System.IO.Path.Combine(RootDirectory, fName);
 var fileInfo = new System.IO.FileInfo(path);
 if (!fileInfo.Exists)
     return;
-</code></pre>
-<p>We also need to decide how the data will be stored.
+</code></pre><p>We also need to decide how the data will be stored.
 To make it easy to inspect the data outside of the application, we&#39;re going to use JSON.
 A more space-conscious design may use a binary serialization format, instead, it&#39;s entirely a choice of the provider designer&#39;s.</p>
 <pre><code class="lang-csharp">using (var stream = fileInfo.OpenText())
@@ -207,8 +204,7 @@ A more space-conscious design may use a binary serialization format, instead, it
 
     grainState.State = JsonConvert.DeserializeObject(storedData, grainState.State.GetType(), _jsonSettings);
 }
-</code></pre>
-<h2 id="writing-state">Writing State</h2>
+</code></pre><h2 id="writing-state">Writing State</h2>
 <p>The format decisions have already been made, so coding up the <code>WriteStateAsync</code> method should be straight-forward: serialize as JSON, construct the file name, then write to the file:</p>
 <pre><code class="lang-csharp">public async Task WriteStateAsync(string grainType, GrainReference grainRef, IGrainState grainState)
 {
@@ -229,8 +225,7 @@ A more space-conscious design may use a binary serialization format, instead, it
         await stream.WriteAsync(storedData);
     }
 }
-</code></pre>
-<h2 id="putting-it-together">Putting it Together</h2>
+</code></pre><h2 id="putting-it-together">Putting it Together</h2>
 <p>There&#39;s really just one thing left to do, and that is to test the thing.
 Run the application and let it get to the end, where the greetings are shown, and then terminate it.
 Under the <em>bin\Debug\Storage</em> directory of your silo host project, you should find a file called <em>0.Grain1State</em>, and it should contain something very recognizable:</p>
