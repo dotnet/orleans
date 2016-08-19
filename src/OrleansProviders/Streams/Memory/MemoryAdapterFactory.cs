@@ -63,7 +63,7 @@ namespace Orleans.Providers.Streams.Memory
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            IQueueAdapterReceiver receiver = (IQueueAdapterReceiver)new MemoryAdapterReceiver(GetQueueGrain(queueId));
+            IQueueAdapterReceiver receiver = (IQueueAdapterReceiver)new MemoryAdapterReceiver(GetQueueGrain(queueId), logger);
             return receiver;
         }
 

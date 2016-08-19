@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Memory
@@ -11,10 +12,12 @@ namespace Orleans.Providers.Streams.Memory
         private IMemoryStreamQueueGrain queueGrain;
         private long sequenceId;
         private List<Task> awaitingTasks;
+        private Logger logger;
 
-        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain)
+        public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, Logger logger)
         {
             this.queueGrain = queueGrain;
+            this.logger = logger;
             awaitingTasks = new List<Task>();
         }
 
@@ -37,6 +40,7 @@ namespace Orleans.Providers.Streams.Memory
             }
             catch (Exception exc)
             {
+                logger.Error((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.", exc);
                 throw;
             }
             finally

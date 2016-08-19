@@ -10,5 +10,6 @@ namespace Orleans.Providers
 
         MemoryStreamProviderBase                    = ProvidersBase + 400,
         MemoryStreamProviderBase_QueueMessageBatchAsync = MemoryStreamProviderBase + 1,
+        MemoryStreamProviderBase_GetQueueMessagesAsync = MemoryStreamProviderBase + 2,
     }
 }
