@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActivationsLifeCycleTests\ActivationCollectorTests.cs" />
+    <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
