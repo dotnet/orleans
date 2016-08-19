@@ -9,7 +9,8 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter =new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
 
@@ -152,15 +153,16 @@ namespace Orleans.Streams
             }
 
             Task localReceiverInitTask = receiverInitTask;
-            receiverInitTask = null;
             if (localReceiverInitTask != null)
             { 
                 try
                 {
                     await localReceiverInitTask;
+                    receiverInitTask = null;
                 }
                 catch (Exception)
                 {
+                    receiverInitTask = null;
                     // squelch
                 }
             }
@@ -261,7 +263,7 @@ namespace Orleans.Streams
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          (exception, i) => !(exception is ClientNotAvailableException),
                          config.MaxEventDeliveryTime,
-                         DefaultBackoffProvider);
+                         DeliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -332,80 +334,113 @@ namespace Orleans.Streams
                     receiverInitTask = null;
                 }
 
-                var myQueueId = (QueueId)(state);
                 if (IsShutdown) return; // timer was already removed, last tick
                 
-                IQueueAdapterReceiver rcvr = receiver;
                 int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
-                    var now = DateTime.UtcNow;
-                    // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-                    if ((now - lastTimeCleanedPubSubCache) >= config.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
-                    {
-                        lastTimeCleanedPubSubCache = now;
-                        CleanupPubSubCache(now);
-                    }
-
-                    if (queueCache != null)
-                    {
-                        IList<IBatchContainer> purgedItems;
-                        if (queueCache.TryPurgeFromCache(out purgedItems))
-                        {
-                            try
-                            {
-                                await rcvr.MessagesDeliveredAsync(purgedItems);
-                            }
-                            catch (Exception exc)
-                            {
-                                logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
-                                    $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
-                            }
-                        }
-                    }
-
-                    if (queueCache != null && queueCache.IsUnderPressure())
-                    {
-                        // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
-                        logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
+                    // If read succeeds and there is more data, we continue reading.
+                    // If read succeeds and there is no more data, we breack out of loop
+                    // If read fails, we try again, with backoff policy.
+                    //    This prevents spamming backend queue which may be encountering transient errors.
+                    //    We retry until the operation succeeds or we are shutdown.
+                    bool moreData = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                        i => ReadFromQueue((QueueId)state, receiver, maxCacheAddCount),
+                        AsyncExecutorWithRetries.INFINITE_RETRIES,
+                        (e, i) => !IsShutdown,
+                        TimeSpan.MaxValue,
+                        ReadLoopBackoff);
+                    if (!moreData)
                         return;
-                    }
-
-                    // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-                    IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
-                    
-                    if (multiBatch == null || multiBatch.Count == 0) return; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
-
-                    queueCache?.AddToCache(multiBatch);
-                    numMessages += multiBatch.Count;
-                    numReadMessagesCounter.IncrementBy(multiBatch.Count);
-                    if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
-                        multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
-                    
-                    foreach (var group in 
-                        multiBatch
-                        .Where(m => m != null)
-                        .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
-                    {
-                        var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
-                        StreamConsumerCollection streamData;
-                        if (pubSubCache.TryGetValue(streamId, out streamData))
-                        {
-                            streamData.RefreshActivity(now);
-                            StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
-                        }
-                        else
-                        {
-                            RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
-                        }
-                    }
                 }
             }
             catch (Exception exc)
             {
+                receiverInitTask = null;
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_12, "Exception while PersistentStreamPullingAgentGrain.AsyncTimerCallback", exc);
+            }
+        }
+
+        /// <summary>
+        /// Read from queue.
+        /// Returns true, if data was read, false if it was not
+        /// </summary>
+        /// <param name="myQueueId"></param>
+        /// <param name="rcvr"></param>
+        /// <param name="maxCacheAddCount"></param>
+        /// <returns></returns>
+        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
+                if ((now - lastTimeCleanedPubSubCache) >= config.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
+                {
+                    lastTimeCleanedPubSubCache = now;
+                    CleanupPubSubCache(now);
+                }
+
+                if (queueCache != null)
+                {
+                    IList<IBatchContainer> purgedItems;
+                    if (queueCache.TryPurgeFromCache(out purgedItems))
+                    {
+                        try
+                        {
+                            await rcvr.MessagesDeliveredAsync(purgedItems);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
+                                $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
+                        }
+                    }
+                }
+
+                if (queueCache != null && queueCache.IsUnderPressure())
+                {
+                    // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
+                    logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
+                    return false;
+                }
+
+                // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
+                IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+
+                if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
+
+                queueCache?.AddToCache(multiBatch);
+                numMessages += multiBatch.Count;
+                numReadMessagesCounter.IncrementBy(multiBatch.Count);
+                if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
+                    multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
+
+                foreach (var group in
+                    multiBatch
+                    .Where(m => m != null)
+                    .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
+                {
+                    var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
+                    StreamConsumerCollection streamData;
+                    if (pubSubCache.TryGetValue(streamId, out streamData))
+                    {
+                        streamData.RefreshActivity(now);
+                        StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
+                    }
+                    else
+                    {
+                        RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                    }
+                }
+                return true;
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_28, "Exception while reading from queue.", exc);
+                throw;
             }
         }
 
@@ -515,7 +550,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !(exception is ClientNotAvailableException),
                                 config.MaxEventDeliveryTime,
-                                DefaultBackoffProvider);
+                                DeliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
