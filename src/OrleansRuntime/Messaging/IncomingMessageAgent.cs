@@ -41,11 +41,15 @@ namespace Orleans.Runtime.Messaging
                     threadTracking.OnStartExecution();
                 }
 #endif
+
                 _actionBlock = new ActionBlock<Message>(message => ReceiveMessage(message),
                     new ExecutionDataflowBlockOptions
                     {
                         MaxDegreeOfParallelism = scheduler.MaximumConcurrencyLevel,
-                        CancellationToken = Cts.Token
+                        CancellationToken = Cts.Token,
+                        TaskScheduler = DedicatedThreadPoolTaskScheduler.Instance,
+                        EnsureOrdered = false,
+                        MaxMessagesPerTask = 100
                     });
 
                 messageCenter.AddTargetBlock(category, _actionBlock);

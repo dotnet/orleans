@@ -2,6 +2,10 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,14 +18,17 @@ namespace Orleans.Runtime.Scheduler
         private readonly QueueTrackingStatistic mainQueueTracking;
         private readonly QueueTrackingStatistic systemQueueTracking;
         private readonly QueueTrackingStatistic tasksQueueTracking;
-
+        private readonly DedicatedThreadPool DedicatedThreadPool;
         private readonly ActionBlock<IWorkItem> mainQueueExecutor;
         private readonly ActionBlock<IWorkItem> systemQueueExecutor;
         public int Length => mainQueueExecutor.InputCount;
-
+        private OrleansTaskScheduler _scheduler;
         internal WorkQueue(OrleansTaskScheduler scheduler, int maxActiveThreads)
         {
+            _scheduler = scheduler;
             mainQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
+           // DedicatedThreadPools = new DedicatedThreadPool(new DedicatedThreadPoolSettings(4));
+            DedicatedThreadPool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
             systemQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
@@ -46,7 +53,8 @@ namespace Orleans.Runtime.Scheduler
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         systemQueueTracking.OnEnQueueRequest(1, systemQueue.Count);
 #endif
-                  systemQueueExecutor.Post(workItem);
+                  //   systemQueueExecutor.Post(workItem);
+                    DedicatedThreadPool.QueueSystemWorkItem(() => ProcessWorkItem(_scheduler, workItem));
                 }
                 else
                 {
@@ -54,7 +62,8 @@ namespace Orleans.Runtime.Scheduler
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
 #endif
-                    mainQueueExecutor.Post(workItem);
+                    // mainQueueExecutor.Post(workItem);
+                    DedicatedThreadPool.QueueUserWorkItem(() => ProcessWorkItem(_scheduler, workItem));
                 }
 #else
 #if TRACK_DETAILED_STATS
@@ -103,28 +112,37 @@ namespace Orleans.Runtime.Scheduler
 
         internal static ActionBlock<IWorkItem> GetWorkItemExecutor(TaskScheduler scheduler, int maxActiveThreads)
         {
-            return new ActionBlock<IWorkItem>(item =>
-            {
-                if (RuntimeContext.Current == null)
+            return new ActionBlock<IWorkItem>(item => ProcessWorkItem(scheduler, item),
+                new ExecutionDataflowBlockOptions
                 {
-                    RuntimeContext.Current = new RuntimeContext
-                    {
-                        Scheduler = scheduler
-                    };
-                }
-                try
-                {
-                    TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
-                }
-                catch (Exception ex)
-                {
-                    var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", item);
+                    MaxDegreeOfParallelism = maxActiveThreads,
+                    EnsureOrdered = false,
+                });
+        }
 
-                    // todo
-                    LogManager.GetLogger(nameof(WorkQueue), LoggerType.Runtime).Error(ErrorCode.Runtime_Error_100030, errorStr, ex);
-                }
-                finally
+        private static void ProcessWorkItem(TaskScheduler scheduler, IWorkItem item)
+        {
+            if (RuntimeContext.Current == null)
+            {
+                RuntimeContext.Current = new RuntimeContext
                 {
+                    Scheduler = scheduler
+                };
+            }
+            try
+            {
+                TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
+            }
+            catch (Exception ex)
+            {
+                var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", item);
+
+                // todo
+                LogManager.GetLogger(nameof(WorkQueue), LoggerType.Runtime)
+                    .Error(ErrorCode.Runtime_Error_100030, errorStr, ex);
+            }
+            finally
+            {
 #if TRACK_DETAILED_STATS
                                 if (todo.ItemType != WorkItemType.WorkItemGroup)
                                 {
@@ -144,12 +162,7 @@ namespace Orleans.Runtime.Scheduler
                                     threadTracking.OnStopProcessing();
                                 }
 #endif
-                }
-            },
-                new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = maxActiveThreads
-                });
+            }
         }
     }
 }

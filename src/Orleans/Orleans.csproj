@@ -101,6 +101,7 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
+    <Compile Include="Runtime\DedicatedThreadPool.cs" />
     <Compile Include="Runtime\RingRange.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
