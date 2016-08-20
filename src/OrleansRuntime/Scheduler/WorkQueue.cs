@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Scheduler
                 new ExecutionDataflowBlockOptions
                 {
                     MaxDegreeOfParallelism = maxActiveThreads,
-                    EnsureOrdered = false,
+                    EnsureOrdered = true,
                 });
         }
 

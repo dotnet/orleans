@@ -310,7 +310,18 @@ namespace Orleans
                 });
 
             transport.AddTargetBlock(Message.Categories.Application, _messageHandler);
-            _messageHandler.Completion.Wait();
+            try
+            {
+                _messageHandler.Completion.Wait();
+
+            }
+            catch (AggregateException)
+            {
+                // run was cancelled
+            }
+            catch (ObjectDisposedException)
+            {
+            }
 
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
             {

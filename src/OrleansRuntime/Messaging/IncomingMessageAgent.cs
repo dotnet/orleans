@@ -48,12 +48,22 @@ namespace Orleans.Runtime.Messaging
                         MaxDegreeOfParallelism = scheduler.MaximumConcurrencyLevel,
                         CancellationToken = Cts.Token,
                         TaskScheduler = DedicatedThreadPoolTaskScheduler.Instance,
-                        EnsureOrdered = false,
+                        EnsureOrdered = true,
                         MaxMessagesPerTask = 100
                     });
 
                 messageCenter.AddTargetBlock(category, _actionBlock);
-                _actionBlock.Completion.Wait();
+                try
+                {
+                    _actionBlock.Completion.Wait();
+                }
+                catch (AggregateException)
+                {
+                    // run was cancelled
+                }
+                catch (ObjectDisposedException)
+                {
+                }
             }
             finally
             {

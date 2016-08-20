@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             new ExecutionDataflowBlockOptions
             {
                 MaxDegreeOfParallelism = Environment.ProcessorCount,
-                EnsureOrdered = false,
+                EnsureOrdered = true,
                 TaskScheduler = DedicatedThreadPoolTaskScheduler.Instance,
                 MaxMessagesPerTask = 100
             });
@@ -75,8 +75,17 @@ namespace Orleans.Runtime
                 queueTracking.OnStartExecution();
             }
 #endif
-
-            requestQueue.Completion.Wait();
+            try
+            {
+                requestQueue.Completion.Wait();
+            }
+            catch (AggregateException)
+            {
+                // run was cancelled
+            }
+            catch (ObjectDisposedException)
+            {
+            }
 
 #if TRACK_DETAILED_STATS
                if (StatisticsCollector.CollectThreadTimeTrackingStats)
