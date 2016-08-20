@@ -55,6 +55,10 @@ Actors are often transient, i.e., their state lives only for a short period of t
 In many circumstances, however, actor state needs to persist for longer periods of time and be stored in an external database of some sort. 
 Orleans offers the developer flexible options on where to store actor state, and this walkthrough will introduce the simplest way to deal with long-lived actor state: declaratively.
 
+## [Handling Failures](Failure-Handling)
+
+Everything is easy and beautiful in a distributed system until something failes and handling failures is one of the hardest  things in any computer program. In this section we will learn how we can handle failures.
+
 ## [Front Ends for Orleans Services](Front-Ends-for-Orleans-Services)
 
 Many Orleans services will be private and available only to front-end services that rely on the Orleans-based code as one of several backend services.
