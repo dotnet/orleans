@@ -1,0 +1,34 @@
+﻿{
+  "version": "1.0.0-*",
+  "buildOptions": {
+    "emitEntryPoint": true,
+    "copyToOutput": [
+      "AdventureMap.json",
+      "OrleansConfiguration.xml"
+    ],
+    "embed": [
+      "OrleansConfiguration.xml"
+    ]
+  },
+
+  "dependencies": {
+    "AdventureGrainInterfaces": "1.0.0-*",
+    "AdventureGrains": "1.0.0-*",
+    "Microsoft.Extensions.DependencyInjection": "1.0.0",
+    "Microsoft.Orleans.OrleansRuntime": "1.2.2"
+  },
+
+  "frameworks": {
+    "net452": {
+      "dependencies": {
+      }
+    }
+  },
+
+  "runtimeOptions": {
+    "configProperties": {
+      "System.GC.Server": true,
+      "System.GC.Concurrent": false
+    }
+  }
+}
