@@ -59,6 +59,7 @@
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />

@@ -50,6 +50,7 @@
     <Compile Include="Membership\DynamoDBGatewayListProvider.cs" />
     <Compile Include="Membership\DynamoDBMembershipTable.cs" />
     <Compile Include="Membership\SiloInstanceRecord.cs" />
+    <Compile Include="Reminders\DynamoDBReminderTable.cs" />
     <Compile Include="Storage\DynamoDBStorage.cs" />
     <Compile Include="Storage\Provider\DynamoDBStorageProvider.cs" />
   </ItemGroup>
