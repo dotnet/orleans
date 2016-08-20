@@ -296,6 +296,7 @@
     <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
+    <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

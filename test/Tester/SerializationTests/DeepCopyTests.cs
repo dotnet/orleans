@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
@@ -53,6 +54,56 @@ namespace UnitTests.Serialization
                 var copy = (Dictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(original);
                 copy["a"]["1"] = "";
                 Assert.Equal(original["a"]["1"], "2");
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        public void DeepCopyTests_ImmutableCollections()
+        {
+            {
+                var original = ImmutableDictionary.CreateBuilder<string, Dictionary<string, string>>();
+                original.Add("a", new Dictionary<string, string>() {
+                    {"0","1" },
+                    {"1","2" }
+                });
+                var dict = original.ToImmutable();
+                var copy = (ImmutableDictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(dict);
+                Assert.Same(dict, copy);
+            }
+            {
+                var original = ImmutableArray.Create<string>("1", "2", "3");
+                var copy = (ImmutableArray<string>)SerializationManager.DeepCopy(original);
+                Assert.Equal(original, copy);
+            }
+            {
+                var original = ImmutableHashSet.Create("1", "2", "3");
+                var copy = (ImmutableHashSet<string>)SerializationManager.DeepCopy(original);
+                Assert.Same(original, copy);
+            }
+            {
+                var original = ImmutableList.Create("1", "2", "3");
+                var copy = (ImmutableList<string>)SerializationManager.DeepCopy(original);
+                Assert.Same(original, copy);
+            }
+            {
+                var original = ImmutableQueue.Create("1", "2", "3");
+                var copy = (ImmutableQueue<string>)SerializationManager.DeepCopy(original);
+                Assert.Same(original, copy);
+            }
+            {
+                var original = ImmutableSortedDictionary.CreateBuilder<string, Dictionary<string, string>>();
+                original.Add("a", new Dictionary<string, string>() {
+                    {"0","1" },
+                    {"1","2" }
+                });
+                var dict = original.ToImmutable();
+                var copy = (ImmutableSortedDictionary<string, Dictionary<string, string>>)SerializationManager.DeepCopy(dict);
+                Assert.Same(dict, copy);
+            }
+            {
+                var original = ImmutableSortedSet.Create("1", "2", "3");
+                var copy = (ImmutableSortedSet<string>)SerializationManager.DeepCopy(original);
+                Assert.Same(original, copy);
             }
         }
 
