@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansAWSUtils</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans AWS Utilities</title>
+    <authors>Microsoft Research</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      AWS Utilities Library of Microsoft Orleans - OrleansAWSUtils.dll
+    </summary>
+    <description>
+      Library of utility types for Amazon AWS of Microsoft Orleans.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors AWS Amazon DynamoDB Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+
+      <dependency id="AWSSDK.DynamoDBv2" version="3.1.5.2" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansAWSUtils.dll" target="lib\net451" />
+    <file src="OrleansAWSUtils.pdb" target="lib\net451" />
+    <file src="OrleansAWSUtils.xml" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansAWSUtils\**\*.cs" target="src" />
+  </files>
+</package>

@@ -1,4 +1,4 @@
-using AdventureGrainInterfaces;
+﻿using AdventureGrainInterfaces;
 using Orleans;
 using System;
 using Orleans.Runtime.Configuration;
@@ -31,11 +31,11 @@ namespace AdventureClient
 
             Console.WriteLine(player.Play("look").Result);
 
-            string result="Start";
+            string result = "Start";
 
             try
             {
-                while (result!="")
+                while (result != "")
                 {
                     string command = Console.ReadLine();
 

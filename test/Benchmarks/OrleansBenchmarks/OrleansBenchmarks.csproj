@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{29A8C5E0-8129-40B9-B57B-5B9A8C6D004E}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>OrleansBenchmarks</RootNamespace>
+    <AssemblyName>OrleansBenchmarks</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Serialization\PocoState.cs" />
+    <Compile Include="Serialization\SerializationBenchmarkConfig.cs" />
+    <Compile Include="MapReduce\MapReduceBenchmarkConfig.cs" />
+    <Compile Include="MapReduce\MapReduceBenchmark.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Serialization\SerializationBenchmarks.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="project.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tester\Tester.csproj">
+      <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55d}</Project>
+      <Name>Tester</Name>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansBenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.csproj">
+      <Project>{936397df-8d11-4244-a493-767d31f9d727}</Project>
+      <Name>OrleansBenchmarkGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansBenchmarkGrains\OrleansBenchmarkGrains.csproj">
+      <Project>{071cb148-eaa3-4f85-a1f7-52d1b7fdaf82}</Project>
+      <Name>OrleansBenchmarkGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\ClientGenerator\ClientGenerator.csproj">
+      <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
+      <Name>ClientGenerator</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
+      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
+      <Name>OrleansTestingHost</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\src\Orleans\Orleans.csproj">
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

@@ -153,7 +153,6 @@ namespace Orleans.Runtime
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
 
         /// <summary>
-
         /// Update the stream providers dynamically. The stream providers in the listed silos will be 
         /// updated based on the differences between its loaded stream providers and the list of providers 
         /// in the streamProviderConfigurations: If a provider in the configuration object already exists 
@@ -166,6 +165,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations);
 
+        /// <summary>
         /// Returns an array of all the active grain types in the system
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>

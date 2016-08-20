@@ -9,12 +9,12 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DefaultBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+        private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter =new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
 
         private readonly string streamProviderName;
-        private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
@@ -32,8 +32,9 @@ namespace Orleans.Streams
         private IDisposable timer;
 
         internal readonly QueueId QueueId;
-        private bool IsShutdown { get { return timer == null; } }
-        private string StatisticUniquePostfix { get { return streamProviderName + "." + QueueId; } }
+        private Task receiverInitTask;
+        private bool IsShutdown => timer == null;
+        private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
             GrainId id, 
@@ -49,14 +50,13 @@ namespace Orleans.Streams
 
             QueueId = queueId;
             streamProviderName = strProviderName;
-            providerRuntime = runtime;
             pubSub = streamPubSub;
             pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.config = config;
             numMessages = 0;
 
-            logger = providerRuntime.GetLogger(GrainId + "-" + streamProviderName);
+            logger = runtime.GetLogger(GrainId + "-" + streamProviderName);
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
@@ -81,17 +81,21 @@ namespace Orleans.Streams
         /// <param name="queueAdapterCache"></param>
         /// <param name="failureHandler"></param>
         /// <returns></returns>
-        public async Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> failureHandler)
+        public Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> failureHandler)
         {
             if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
             if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
+            return OrleansTaskExtentions.WrapInTask(() => InitializeInternal(qAdapter.Value, queueAdapterCache.Value, failureHandler.Value));
+        }
 
+        private void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
+        {
             logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
                 GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
-            
+
             // Remove cast once we cleanup
-            queueAdapter = qAdapter.Value;
-            streamFailureHandler = failureHandler.Value;
+            queueAdapter = qAdapter;
+            streamFailureHandler = failureHandler;
             lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
@@ -101,27 +105,27 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
-                return;
+                throw;
             }
 
             try
             {
-                if (queueAdapterCache.Value != null)
+                if (queueAdapterCache != null)
                 {
-                    queueCache = queueAdapterCache.Value.CreateQueueCache(QueueId);
+                    queueCache = queueAdapterCache.CreateQueueCache(QueueId);
                 }
             }
             catch (Exception exc)
             {
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
-                return;
+                throw;
             }
 
             try
             {
-                var task = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout));
-                task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, String.Format("QueueAdapterReceiver {0} failed to Initialize.", QueueId.ToStringWithHashCode()));
-                await task;
+                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(config.InitQueueTimeout))
+                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId.ToStringWithHashCode()} failed to Initialize.");
+                receiverInitTask.Ignore();
             }
             catch
             {
@@ -131,27 +135,43 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver. 
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = safeRandom.NextTimeSpan(config.GetQueueMsgsTimerPeriod);
-            timer = base.RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, config.GetQueueMsgsTimerPeriod);
+            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, config.GetQueueMsgsTimerPeriod);
 
-            logger.Info((int) ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {0} under my responsibility.", QueueId.ToStringWithHashCode());
+            logger.Info((int)ErrorCode.PersistentStreamPullingAgent_04, "Taking queue {0} under my responsibility.", QueueId.ToStringWithHashCode());
         }
 
         public async Task Shutdown()
         {
             // Stop pulling from queues that are not in my range anymore.
             logger.Info(ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {0} responsible for queue: {1}", GetType().Name, QueueId.ToStringWithHashCode());
+
             if (timer != null)
             {
-                var tmp = timer;
+                IDisposable tmp = timer;
                 timer = null;
                 Utils.SafeExecute(tmp.Dispose);
+            }
+
+            Task localReceiverInitTask = receiverInitTask;
+            if (localReceiverInitTask != null)
+            { 
+                try
+                {
+                    await localReceiverInitTask;
+                    receiverInitTask = null;
+                }
+                catch (Exception)
+                {
+                    receiverInitTask = null;
+                    // squelch
+                }
             }
 
             try
             {
                 var task = OrleansTaskExtentions.SafeExecute(() => receiver.Shutdown(config.InitQueueTimeout));
                 task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_07,
-                    String.Format("QueueAdapterReceiver {0} failed to Shutdown.", QueueId));
+                    $"QueueAdapterReceiver {QueueId} failed to Shutdown.");
                 await task;
             }
             catch
@@ -194,7 +214,7 @@ namespace Orleans.Streams
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
             AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
-                    String.Format("Failed to add subscription for stream {0}." , streamId))
+                    $"Failed to add subscription for stream {streamId}.")
                 .Ignore();
             return TaskDone.Done;
         }
@@ -243,7 +263,7 @@ namespace Orleans.Streams
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          (exception, i) => !(exception is ClientNotAvailableException),
                          config.MaxEventDeliveryTime,
-                         DefaultBackoffProvider);
+                         DeliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -262,7 +282,7 @@ namespace Orleans.Streams
                 }
                 if (exceptionOccured != null)
                 {
-                    bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken != null ? requestedHandshakeToken.Token : null);
+                    bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken?.Token);
                     if (faultedSubscription) return false;
                 }
             }
@@ -307,83 +327,120 @@ namespace Orleans.Streams
         {
             try
             {
-                var myQueueId = (QueueId)(state);
+                Task localReceiverInitTask = receiverInitTask;
+                if (localReceiverInitTask != null)
+                {
+                    await localReceiverInitTask;
+                    receiverInitTask = null;
+                }
+
                 if (IsShutdown) return; // timer was already removed, last tick
                 
-                IQueueAdapterReceiver rcvr = receiver;
-                int maxCacheAddCount = queueCache != null ? queueCache.GetMaxAddCount() : QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
+                int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
-                    var now = DateTime.UtcNow;
-                    // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-                    if ((now - lastTimeCleanedPubSubCache) >= config.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
-                    {
-                        lastTimeCleanedPubSubCache = now;
-                        CleanupPubSubCache(now);
-                    }
-
-                    if (queueCache != null)
-                    {
-                        IList<IBatchContainer> purgedItems;
-                        if (queueCache.TryPurgeFromCache(out purgedItems))
-                        {
-                            try
-                            {
-                                await rcvr.MessagesDeliveredAsync(purgedItems);
-                            }
-                            catch (Exception exc)
-                            {
-                                logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
-                                    $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
-                            }
-                        }
-                    }
-
-                    if (queueCache != null && queueCache.IsUnderPressure())
-                    {
-                        // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
-                        logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
+                    // If read succeeds and there is more data, we continue reading.
+                    // If read succeeds and there is no more data, we breack out of loop
+                    // If read fails, we try again, with backoff policy.
+                    //    This prevents spamming backend queue which may be encountering transient errors.
+                    //    We retry until the operation succeeds or we are shutdown.
+                    bool moreData = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                        i => ReadFromQueue((QueueId)state, receiver, maxCacheAddCount),
+                        AsyncExecutorWithRetries.INFINITE_RETRIES,
+                        (e, i) => !IsShutdown,
+                        TimeSpan.MaxValue,
+                        ReadLoopBackoff);
+                    if (!moreData)
                         return;
-                    }
-
-                    // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
-                    IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
-                    
-                    if (multiBatch == null || multiBatch.Count == 0) return; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
-
-                    if (queueCache != null)
-                    {
-                        queueCache.AddToCache(multiBatch);
-                    }
-                    numMessages += multiBatch.Count;
-                    numReadMessagesCounter.IncrementBy(multiBatch.Count);
-                    if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
-                        multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
-                    
-                    foreach (var group in 
-                        multiBatch
-                        .Where(m => m != null)
-                        .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
-                    {
-                        var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
-                        StreamConsumerCollection streamData;
-                        if (pubSubCache.TryGetValue(streamId, out streamData))
-                        {
-                            streamData.RefreshActivity(now);
-                            StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
-                        }
-                        else
-                        {
-                            RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
-                        }
-                    }
                 }
             }
             catch (Exception exc)
             {
+                receiverInitTask = null;
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_12, "Exception while PersistentStreamPullingAgentGrain.AsyncTimerCallback", exc);
+            }
+        }
+
+        /// <summary>
+        /// Read from queue.
+        /// Returns true, if data was read, false if it was not
+        /// </summary>
+        /// <param name="myQueueId"></param>
+        /// <param name="rcvr"></param>
+        /// <param name="maxCacheAddCount"></param>
+        /// <returns></returns>
+        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount)
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
+                if ((now - lastTimeCleanedPubSubCache) >= config.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
+                {
+                    lastTimeCleanedPubSubCache = now;
+                    CleanupPubSubCache(now);
+                }
+
+                if (queueCache != null)
+                {
+                    IList<IBatchContainer> purgedItems;
+                    if (queueCache.TryPurgeFromCache(out purgedItems))
+                    {
+                        try
+                        {
+                            await rcvr.MessagesDeliveredAsync(purgedItems);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
+                                $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
+                        }
+                    }
+                }
+
+                if (queueCache != null && queueCache.IsUnderPressure())
+                {
+                    // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
+                    logger.Info((int)ErrorCode.PersistentStreamPullingAgent_24, "Stream cache is under pressure. Backing off.");
+                    return false;
+                }
+
+                // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
+                IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+
+                if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
+
+                queueCache?.AddToCache(multiBatch);
+                numMessages += multiBatch.Count;
+                numReadMessagesCounter.IncrementBy(multiBatch.Count);
+                if (logger.IsVerbose2) logger.Verbose2(ErrorCode.PersistentStreamPullingAgent_11, "Got {0} messages from queue {1}. So far {2} msgs from this queue.",
+                    multiBatch.Count, myQueueId.ToStringWithHashCode(), numMessages);
+
+                foreach (var group in
+                    multiBatch
+                    .Where(m => m != null)
+                    .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
+                {
+                    var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
+                    StreamConsumerCollection streamData;
+                    if (pubSubCache.TryGetValue(streamId, out streamData))
+                    {
+                        streamData.RefreshActivity(now);
+                        StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
+                    }
+                    else
+                    {
+                        RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                    }
+                }
+                return true;
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_28, "Exception while reading from queue.", exc);
+                throw;
             }
         }
 
@@ -430,10 +487,7 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    if (consumerData.Cursor != null)
-                    {
-                        consumerData.Cursor.Refresh();
-                    }
+                    consumerData.Cursor?.Refresh();
                 }
             }
         }
@@ -480,7 +534,8 @@ namespace Orleans.Streams
                         }
                         catch (Exception exc)
                         {
-                            var message = string.Format("Ignoring exception while trying to evaluate subscription filter function {0} on stream {1} in PersistentStreamPullingAgentGrain.RunConsumerCursor", filterWrapper, consumerData.StreamId);
+                            var message =
+                                $"Ignoring exception while trying to evaluate subscription filter function {filterWrapper} on stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
                             logger.Warn((int) ErrorCode.PersistentStreamPullingAgent_13, message, exc);
                         }
                     }
@@ -495,7 +550,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !(exception is ClientNotAvailableException),
                                 config.MaxEventDeliveryTime,
-                                DefaultBackoffProvider);
+                                DeliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
@@ -507,10 +562,7 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        if (consumerData.Cursor != null)
-                        {
-                            consumerData.Cursor.RecordDeliveryFailure();
-                        }
+                        consumerData.Cursor?.RecordDeliveryFailure();
                         var message =
                             $"Exception while trying to deliver msgs to stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
                         logger.Error(ErrorCode.PersistentStreamPullingAgent_14, message, exc);
@@ -521,7 +573,7 @@ namespace Orleans.Streams
                     // if we failed to deliver a batch
                     if (exceptionOccured != null)
                     {
-                        bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch != null ? batch.SequenceToken : null);
+                        bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
                         if (faultedSubscription) return;
                     }
                 }

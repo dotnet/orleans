@@ -1,18 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Text;
-using Orleans;
+using HelloWorld.Interfaces;
 
-namespace HelloWorldGrains
+namespace HelloWorld.Grains
 {
     /// <summary>
     /// Orleans grain implementation class HelloGrain.
     /// </summary>
-    public class HelloGrain : Orleans.Grain, HelloWorldInterfaces.IHello
+    public class HelloGrain : Orleans.Grain, IHello
     {
-        Task<string> HelloWorldInterfaces.IHello.SayHello(string greeting)
+        Task<string> IHello.SayHello(string greeting)
         {
             return Task.FromResult("You said: '" + greeting + "', I say: Hello!");
         }
