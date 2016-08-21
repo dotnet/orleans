@@ -4,20 +4,20 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
-    public class ValueTypeTestGrain : Grain<System.Int64>, IValueTypeTestGrain
+    [Orleans.Providers.StorageProvider(ProviderName = "Memory")]
+    public class ValueTypeTestGrain : Grain<ValueTypeTestData>, IValueTypeTestGrain
     {
         public ValueTypeTestGrain()
         {
         }
 
-        public async Task<System.Int64> GetStateData()
+        public async Task<ValueTypeTestData> GetStateData()
         {
             await ReadStateAsync();
             return State;
         }
 
-        public Task SetStateData(System.Int64 d)
+        public Task SetStateData(ValueTypeTestData d)
         {
             State = d;
             return WriteStateAsync();
