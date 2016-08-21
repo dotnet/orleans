@@ -1,0 +1,16 @@
+﻿{
+  "version": "1.0.0-*",
+
+  "dependencies": {
+    "AdventureGrainInterfaces": "1.0.0-*",
+    "NETStandard.Library": "1.6.0"
+  },
+
+  "frameworks": {
+    "net452": {
+      "dependencies": {
+        "Microsoft.Orleans.Server": "1.2.2"
+      }
+    }
+  }
+}

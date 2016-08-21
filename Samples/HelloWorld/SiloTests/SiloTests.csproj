@@ -6,8 +6,8 @@
     <ProjectGuid>{9604458C-57CC-4D69-8B20-7CB1FD4FC273}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Tests</RootNamespace>
-    <AssemblyName>Tests</AssemblyName>
+    <RootNamespace>SiloTests</RootNamespace>
+    <AssemblyName>SiloTests</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -40,28 +40,44 @@
       <HintPath>..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Orleans, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.Core.1.2.0\lib\net451\Orleans.dll</HintPath>
+    <Reference Include="Orleans, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.2.2\lib\net451\Orleans.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansDependencyInjection, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansDependencyInjection.dll</HintPath>
+    <Reference Include="OrleansDependencyInjection, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.2\lib\net451\OrleansDependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansProviders, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.2.0\lib\net451\OrleansProviders.dll</HintPath>
+    <Reference Include="OrleansProviders, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.2.2\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansRuntime, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.0\lib\net451\OrleansRuntime.dll</HintPath>
+    <Reference Include="OrleansRuntime, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.2.2\lib\net451\OrleansRuntime.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="OrleansTestingHost, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Orleans.TestingHost.1.2.0\lib\net451\OrleansTestingHost.dll</HintPath>
+    <Reference Include="OrleansTestingHost, Version=1.2.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.TestingHost.1.2.2\lib\net451\OrleansTestingHost.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.assert, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.assert.2.1.0\lib\dotnet\xunit.assert.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.core, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.core.2.1.0\lib\dotnet\xunit.core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.execution.desktop, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.execution.2.1.0\lib\net45\xunit.execution.desktop.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <Choose>
     <When Condition="('$(VisualStudioVersion)' == '10.0' or '$(VisualStudioVersion)' == '') and '$(TargetFrameworkVersion)' == 'v3.5'">
@@ -69,11 +85,7 @@
         <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=10.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
       </ItemGroup>
     </When>
-    <Otherwise>
-      <ItemGroup>
-        <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" />
-      </ItemGroup>
-    </Otherwise>
+    <Otherwise />
   </Choose>
   <ItemGroup>
     <Compile Include="HelloWorldSiloTests.cs" />

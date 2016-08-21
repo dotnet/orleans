@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using Orleans;
+using Newtonsoft.Json;
 
 namespace AdventureSetup
 {
@@ -36,25 +36,26 @@ namespace AdventureSetup
         {
             var rand = new Random();
 
-            var bytes = File.ReadAllText(filename);
+            using (var jsonStream = new JsonTextReader(File.OpenText(filename)))
+            {
+                var deserializer = new JsonSerializer();
+                var data = deserializer.Deserialize<MapInfo>(jsonStream);
 
-            JavaScriptSerializer deserializer = new JavaScriptSerializer();
-            var data = deserializer.Deserialize<MapInfo>(bytes);
-
-            var rooms = new List<IRoomGrain>();
-            foreach (var room in data.Rooms)
-            {
-                var roomGr = await MakeRoom(room);
-                if (room.Id >= 0)
-                    rooms.Add(roomGr);
-            }
-            foreach (var thing in data.Things)
-            {
-                await MakeThing(thing);
-            }
-            foreach (var monster in data.Monsters)
-            {
-                await MakeMonster(monster, rooms[rand.Next(0, rooms.Count)]);
+                var rooms = new List<IRoomGrain>();
+                foreach (var room in data.Rooms)
+                {
+                    var roomGr = await MakeRoom(room);
+                    if (room.Id >= 0)
+                        rooms.Add(roomGr);
+                }
+                foreach (var thing in data.Things)
+                {
+                    await MakeThing(thing);
+                }
+                foreach (var monster in data.Monsters)
+                {
+                    await MakeMonster(monster, rooms[rand.Next(0, rooms.Count)]);
+                }
             }
         }
     }
