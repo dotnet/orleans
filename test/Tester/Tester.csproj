@@ -119,6 +119,7 @@
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\GeneratedStreamRecoveryTests.cs" />
+    <Compile Include="StreamingTests\MemoryStreamProviderClientTests.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />

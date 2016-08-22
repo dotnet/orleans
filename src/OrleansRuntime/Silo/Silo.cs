@@ -465,7 +465,7 @@ namespace Orleans.Runtime
             IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
             membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
             multiClusterOracle = multiClusterFactory.CreateGossipOracle(this).WaitForResultWithThrow(initTimeout);
-            
+
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
 
