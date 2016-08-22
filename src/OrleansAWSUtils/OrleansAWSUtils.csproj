@@ -53,6 +53,13 @@
     <Compile Include="Reminders\DynamoDBReminderTable.cs" />
     <Compile Include="Storage\DynamoDBStorage.cs" />
     <Compile Include="Storage\Provider\DynamoDBStorageProvider.cs" />
+    <Compile Include="Storage\SQSStorage.cs" />
+    <Compile Include="Streams\SQSAdapter.cs" />
+    <Compile Include="Streams\SQSAdapterFactory.cs" />
+    <Compile Include="Streams\SQSAdapterReceiver.cs" />
+    <Compile Include="Streams\SQSBatchContainer.cs" />
+    <Compile Include="Streams\SQSStreamProvider.cs" />
+    <Compile Include="Streams\SQSStreamProviderUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />

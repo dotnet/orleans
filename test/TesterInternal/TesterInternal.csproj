@@ -203,6 +203,8 @@
     <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
     <Compile Include="StreamingTests\SingleStreamTestRunner.cs" />
     <Compile Include="StreamingTests\SMSStreamingTests.cs" />
+    <Compile Include="StreamingTests\SQSAdapterTests.cs" />
+    <Compile Include="StreamingTests\SQSStreamTests.cs" />
     <Compile Include="StreamingTests\StreamLifecycleTests.cs" />
     <Compile Include="StreamingTests\StreamLimitTests.cs" />
     <Compile Include="StreamingTests\StreamPubSubReliabilityTests.cs" />
@@ -313,6 +315,9 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="ReadMe.md" />
+    <None Include="ClientConfig_SQSStreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <Content Include="Config_AdditionalAssemblies.xml">
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -320,6 +325,9 @@
     <Content Include="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Include="Config_SQSStreamProviders.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
