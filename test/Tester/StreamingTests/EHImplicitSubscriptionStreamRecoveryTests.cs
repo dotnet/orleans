@@ -45,7 +45,8 @@ namespace UnitTests.StreamingTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(2);
+                // poor fault injection requires grain instances stay on same host, so only single host for this test
+                var options = new TestClusterOptions(1);
                 // register stream provider
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());

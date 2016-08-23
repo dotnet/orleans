@@ -359,9 +359,9 @@ namespace Orleans.Providers.Streams.Common
         {
             if (IsEmpty)
             {
-                logger.Info("BlockPurged: cache empty");
+                logger.Verbose("BlockPurged: cache empty");
             }
-            logger.Info($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
+            logger.Verbose($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
         }
 
         private enum CursorStates

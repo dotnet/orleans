@@ -216,6 +216,7 @@ namespace Orleans.ServiceBus.Providers
 
         private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionConfig partitionConfig, string offset, Logger logger)
         {
+            bool offsetInclusive = true;
             EventHubClient client = EventHubClient.CreateFromConnectionString(partitionConfig.Hub.ConnectionString, partitionConfig.Hub.Path);
             EventHubConsumerGroup consumerGroup = client.GetConsumerGroup(partitionConfig.Hub.ConsumerGroup);
             if (partitionConfig.Hub.PrefetchCount.HasValue)
@@ -233,9 +234,10 @@ namespace Orleans.ServiceBus.Providers
                 PartitionRuntimeInformation patitionInfo =
                     await client.GetPartitionRuntimeInformationAsync(partitionConfig.Partition);
                 offset = patitionInfo.LastEnqueuedOffset;
+                offsetInclusive = false;
                 logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionConfig.Hub.Path, partitionConfig.Partition, offset);
             }
-            return await consumerGroup.CreateReceiverAsync(partitionConfig.Partition, offset, true);
+            return await consumerGroup.CreateReceiverAsync(partitionConfig.Partition, offset, offsetInclusive);
         }
 
         private class StreamActivityNotificationBatch : IBatchContainer
