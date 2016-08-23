@@ -75,6 +75,32 @@ namespace UnitTests.StorageTests
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
         }
 
+        [Fact, TestCategory("Azure"), TestCategory("Storage"), TestCategory("Stress")]
+        public void AzureTableDataManagerStressTests_ReadAllTableEntities()
+        {
+            const string testName = "AzureTableDataManagerStressTests_ReadAllTableEntities";
+            const int iterations = 2000;
+
+            // Write some data
+            WriteAlot_Async(testName, 3, iterations, iterations);
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            var data = manager.ReadAllTableEntriesAsync()
+                .WaitForResultWithThrow(AzureTableDefaultPolicies.TableCreationTimeout).Select(tuple => tuple.Item1);
+
+            sw.Stop();
+            int count = data.Count();
+            output.WriteLine("AzureTable_ReadAllTableEntities completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
+
+            Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
+
+            sw = Stopwatch.StartNew();
+            manager.ClearTableAsync().WaitWithThrow(AzureTableDefaultPolicies.TableCreationTimeout);
+            sw.Stop();
+            output.WriteLine("AzureTable_ReadAllTableEntities clear. Cleared table of {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
+        }
+
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);

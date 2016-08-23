@@ -123,22 +123,11 @@ namespace Orleans.AzureUtils
         /// <returns>Completion promise for this operation.</returns>
         public async Task ClearTableAsync()
         {
-            IEnumerable<Tuple<T,string>> items = (await ReadAllTableEntriesAsync()).ToList();
-            List <Tuple<T,string>> batch = new List<Tuple<T, string>>(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
-            foreach (Tuple<T, string> item in items)
-            {
-                batch.Add(item);
-                // delete and clear when we have a full batch
-                if (batch.Count == AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
-                {
-                    await DeleteTableEntriesAsync(batch);
-                    batch.Clear();
-                }
-            }
-            if (batch.Count != 0)
-            {
-                await DeleteTableEntriesAsync(batch);
-            }
+            IEnumerable<Tuple<T,string>> items = await ReadAllTableEntriesAsync();
+            IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
+                                          .SelectMany(partition => partition.ToBatch(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                                          .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
+            await Task.WhenAll(work);
         }
 
         /// <summary>
@@ -410,8 +399,7 @@ namespace Orleans.AzureUtils
         /// <returns>Enumeration of all entries in the table.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
         {
-            Expression<Func<T, bool>> query = _ => true;
-            return ReadTableEntriesAndEtagsAsync(query);
+            return ReadTableEntriesAndEtagsAsync(null);
         }
 
         /// <summary>
@@ -486,7 +474,9 @@ namespace Orleans.AzureUtils
 
             try
             {
-                TableQuery<T> cloudTableQuery = tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
+                TableQuery<T> cloudTableQuery = predicate == null 
+                    ? tableReference.CreateQuery<T>()
+                    : tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
                 try
                 {
                     Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
@@ -495,7 +485,7 @@ namespace Orleans.AzureUtils
                         var list = new List<T>();
                         while (querySegment == null || querySegment.ContinuationToken != null)
                         {
-                            querySegment = await cloudTableQuery.ExecuteSegmentedAsync(querySegment != null ? querySegment.ContinuationToken : null);
+                            querySegment = await cloudTableQuery.ExecuteSegmentedAsync(querySegment?.ContinuationToken);
                             list.AddRange(querySegment);
                         }
 
@@ -766,5 +756,23 @@ namespace Orleans.AzureUtils
         }
 
         #endregion
+    }
+
+    internal static class TableDataManagerInternalExtensions
+    {
+        internal static IEnumerable<IEnumerable<TItem>> ToBatch<TItem>(this IEnumerable<TItem> source, int size)
+        {
+            using (IEnumerator<TItem> enumerator = source.GetEnumerator())
+                while (enumerator.MoveNext())
+                    yield return Take(enumerator, size);
+        }
+
+        private static IEnumerable<TItem> Take<TItem>(IEnumerator<TItem> source, int size)
+        {
+            int i = 0;
+            do
+                yield return source.Current;
+            while (++i < size && source.MoveNext());
+        }
     }
 }
