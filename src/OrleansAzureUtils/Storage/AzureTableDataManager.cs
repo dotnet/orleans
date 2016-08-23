@@ -124,26 +124,10 @@ namespace Orleans.AzureUtils
         public async Task ClearTableAsync()
         {
             IEnumerable<Tuple<T,string>> items = await ReadAllTableEntriesAsync();
-            IEnumerable<IGrouping<string, Tuple<T, string>>> partitions = items.GroupBy(item => item.Item1.PartitionKey);
-            List<Tuple<T,string>> batch = new List<Tuple<T, string>>(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
-            foreach (IGrouping<string, Tuple<T, string>> partition in partitions)
-            {
-                foreach (Tuple<T, string> item in partition)
-                {
-                    batch.Add(item);
-                    // delete and clear when we have a full batch
-                    if (batch.Count == AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
-                    {
-                        await DeleteTableEntriesAsync(batch);
-                        batch.Clear();
-                    }
-                }
-                if (batch.Count != 0)
-                {
-                    await DeleteTableEntriesAsync(batch);
-                    batch.Clear();
-                }
-            }
+            IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
+                                          .SelectMany(partition => partition.ToBatch(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                                          .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
+            await Task.WhenAll(work);
         }
 
         /// <summary>
@@ -772,5 +756,23 @@ namespace Orleans.AzureUtils
         }
 
         #endregion
+    }
+
+    internal static class TableDataManagerInternalExtensions
+    {
+        internal static IEnumerable<IEnumerable<TItem>> ToBatch<TItem>(this IEnumerable<TItem> source, int size)
+        {
+            using (IEnumerator<TItem> enumerator = source.GetEnumerator())
+                while (enumerator.MoveNext())
+                    yield return Take(enumerator, size);
+        }
+
+        private static IEnumerable<TItem> Take<TItem>(IEnumerator<TItem> source, int size)
+        {
+            int i = 0;
+            do
+                yield return source.Current;
+            while (++i < size && source.MoveNext());
+        }
     }
 }

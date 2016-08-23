@@ -241,7 +241,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="newestItem"></param>
         protected override void OnPurge(CachedEventHubMessage? lastItemPurged, CachedEventHubMessage? newestItem)
         {
-            if (log.IsInfo && lastItemPurged.HasValue && newestItem.HasValue)
+            if (log.IsVerbose && lastItemPurged.HasValue && newestItem.HasValue)
             {
                 log.Verbose($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
             }
