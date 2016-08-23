@@ -61,7 +61,6 @@ namespace Orleans.Providers
         {
             List<Task> tasks = new List<Task>();
             int count = providers.Count;
-            TProvider provider;
 
             if (providerConfigs != null) count = providerConfigs.Count;
             foreach (string providerName in providerNames)
