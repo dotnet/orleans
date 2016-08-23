@@ -98,20 +98,18 @@ namespace Orleans.Serialization
         private static HashSet<Type> registeredTypes;
         private static List<IExternalSerializer> externalSerializers;
         private static ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
-        private static Dictionary<string, Type> types;
-        volatile private static Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
-        volatile private static Dictionary<RuntimeTypeHandle, Serializer> serializers;
-        volatile private static Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
-        volatile private static bool _setupDone = false;
-
+        private static IReadOnlyDictionary<string, Type> types;
+        private static IReadOnlyDictionary<RuntimeTypeHandle, DeepCopier> copiers;
+        private static IReadOnlyDictionary<RuntimeTypeHandle, Tuple<Serializer,Deserializer>> serializers;
+        private static bool addingComplete;
         private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
+
 
         private static IExternalSerializer fallbackSerializer;
         private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
         private static readonly object registerBuiltInSerializerLockObj = new object();
-        internal static int RegisteredTypesCount { get { return registeredTypes == null ? 0 : registeredTypes.Count; } }
-
+        
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
         private static readonly RuntimeTypeHandle intTypeHandle = typeof(int).TypeHandle;
@@ -169,6 +167,7 @@ namespace Orleans.Serialization
             {
                 throw ex.Flatten();
             }
+            InitialRegistrationComplete();
         }
 
         internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
@@ -203,7 +202,8 @@ namespace Orleans.Serialization
                 HeaderSerTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
                 HeaderDeserTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
 
-                TotalTimeInSerializer = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_TOTAL_TIME_IN_SERIALIZER_MILLIS, () => {
+                TotalTimeInSerializer = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_TOTAL_TIME_IN_SERIALIZER_MILLIS, () =>
+                {
                     long ticks = CopyTimeStatistic.GetCurrentValue() + SerTimeStatistic.GetCurrentValue() + DeserTimeStatistic.GetCurrentValue()
                             + HeaderSerTime.GetCurrentValue() + HeaderDeserTime.GetCurrentValue();
                     return Utils.TicksToMilliSeconds(ticks);
@@ -220,7 +220,7 @@ namespace Orleans.Serialization
 
             RegisterSerializationProviders(serializationProviders);
             AssemblyProcessor.Initialize();
-            _setupDone = true;
+            InitialRegistrationComplete();
         }
 
         internal static void RegisterBuiltInSerializers()
@@ -240,12 +240,9 @@ namespace Orleans.Serialization
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
             types = new Dictionary<string, Type>();
-            //copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
-            //serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
-            //deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
-            serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
-            deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
+            serializers = new Dictionary<RuntimeTypeHandle, Tuple<Serializer,Deserializer>>();
+            
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
             logger = LogManager.GetLogger("SerializationManager", LoggerType.Runtime);
             UseStandardSerializer = false; // Default
@@ -354,6 +351,26 @@ namespace Orleans.Serialization
             Register(typeof(Message.ResponseTypes));
         }
 
+        /// <summary>
+        /// Converts the initial plain dictionary object we used to stop a lot of memory allocation during initialization to 
+        /// an actuaal readonly dictionary to stop any threading mistakes
+        /// </summary>
+        private static void InitialRegistrationComplete()
+        {
+            lock (registeredTypes)
+            {
+                if (addingComplete == true)
+                {
+                    return;
+                }
+                
+                addingComplete = true;
+                copiers = new ReadOnlyDictionary<RuntimeTypeHandle, DeepCopier>((Dictionary<RuntimeTypeHandle, DeepCopier>)copiers);
+                serializers = new ReadOnlyDictionary<RuntimeTypeHandle, Tuple<Serializer, Deserializer>>((Dictionary<RuntimeTypeHandle, Tuple<Serializer, Deserializer>>) serializers);
+                types = new ReadOnlyDictionary<string, Type>((Dictionary<string,Type>) types);
+            }
+        }
+
         #endregion
 
         #region Serialization info registration
@@ -392,162 +409,25 @@ namespace Orleans.Serialization
 
             lock (registeredTypes)
             {
-                if (registeredTypes.Contains(t))
-                {
-                    if (cop != null)
-                    {
-                        if (_setupDone)
-                        {
-                            lock (copiers)
-                            {
-                                DeepCopier current;
-                                if (forceOverride || !copiers.TryGetValue(t.TypeHandle, out current) || (current == null))
-                                {
-                                    var clone = copiers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                    clone[t.TypeHandle] = cop;
-                                    //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                    System.Threading.Thread.MemoryBarrier();
-                                    copiers = clone;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            lock (copiers)
-                            {
-                                DeepCopier current;
-                                if (forceOverride || !copiers.TryGetValue(t.TypeHandle, out current) || (current == null))
-                                {
-                                    copiers[t.TypeHandle] = cop;
-                                }
-                            }
-                        }
-                    }
-                    if (ser != null)
-                    {
-                        if (_setupDone)
-                        {
-                            lock (ser)
-                            {
-                                Serializer currentSer;
-                                if (forceOverride || !serializers.TryGetValue(t.TypeHandle, out currentSer) || (currentSer == null))
-                                {
-                                    var clone = serializers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                    clone[t.TypeHandle] = ser;
-                                    //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                    System.Threading.Thread.MemoryBarrier();
-                                    serializers = clone;
-                                }
-                            }
-                            lock (deserializers)
-                            {
-                                Deserializer currentDeser;
-                                if (forceOverride || !deserializers.TryGetValue(t.TypeHandle, out currentDeser) || (currentDeser == null))
-                                {
-                                    var clone = deserializers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                    clone[t.TypeHandle] = deser;
-                                    //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                    System.Threading.Thread.MemoryBarrier();
-                                    deserializers = clone;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            lock (serializers)
-                            {
-                                Serializer currentSer;
-                                if (forceOverride || !serializers.TryGetValue(t.TypeHandle, out currentSer) || (currentSer == null))
-                                {
-                                    serializers[t.TypeHandle] = ser;
-                                }
-                            }
-                            lock (deserializers)
-                            {
-                                Deserializer currentDeser;
-                                if (forceOverride || !deserializers.TryGetValue(t.TypeHandle, out currentDeser) || (currentDeser == null))
-                                {
-                                    deserializers[t.TypeHandle] = deser;
-                                }
-                            }
-                        }
-                    }
-                }
-                else
+                if (!registeredTypes.Contains(t))
                 {
                     registeredTypes.Add(t);
                     string name = t.OrleansTypeKeyString();
-                    lock (types)
-                    {
-                        types[name] = t;
-                    }
-                    if (cop != null)
-                    {
-                        if (_setupDone)
-                        {
-                            lock (copiers)
-                            {
-                                var clone = copiers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                clone[t.TypeHandle] = cop;
-                                //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                System.Threading.Thread.MemoryBarrier();
-                                copiers = clone;
-                            }
-                        }
-                        else
-                        {
-                            lock (copiers)
-                            {
-                                copiers[t.TypeHandle] = cop;
-                            }
-                        }
-                    }
-                    if (ser != null)
-                    {
-                        if (_setupDone)
-                        {
-                            lock (serializers)
-                            {
-                                var clone = serializers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                clone[t.TypeHandle] = ser;
-                                //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                System.Threading.Thread.MemoryBarrier();
-                                serializers = clone;
-                            }
-                        }
-                        else
-                        {
-                            lock (serializers)
-                            {
-                                serializers[t.TypeHandle] = ser;
-                            }
-                        }
-                    }
-                    if (deser != null)
-                    {
-                        if (_setupDone)
-                        {
-                            lock (deserializers)
-                            {
-                                var clone = deserializers.ToDictionary(kv => kv.Key, kv => kv.Value);
-                                clone[t.TypeHandle] = deser;
-                                //Put in a memory barrier to ensure the dictionary is fully updated before we switch it to the new location
-                                System.Threading.Thread.MemoryBarrier();
-                                deserializers = clone;
-                            }
-                        }
-                        else
-                        {
-                            lock (deserializers)
-                            {
-                                deserializers[t.TypeHandle] = deser;
-                            }
-                        }
-                    }
+                    AddAndExchangeDictionary(ref types, name, t, forceOverride);
 
                     if (logger.IsVerbose3) logger.Verbose3("Registered type {0} as {1}", t, name);
                 }
+                if (cop != null)
+                {
+                    AddAndExchangeDictionary(ref copiers, t.TypeHandle, cop, forceOverride);
+                }
+                if (ser != null)
+                {
+                    AddAndExchangeDictionary(ref serializers, t.TypeHandle, Tuple.Create(ser, deser), forceOverride);
+                }
+
             }
+
 
             // Register any interfaces this type implements, in order to support passing values that are statically of the interface type
             // but dynamically of this (implementation) type
@@ -584,10 +464,8 @@ namespace Orleans.Serialization
                 }
 
                 registeredTypes.Add(t);
-                lock (types)
-                {
-                    types[name] = t;
-                }
+
+                AddAndExchangeDictionary(ref types, name , t, true);
             }
             if (logger.IsVerbose3) logger.Verbose3("Registered type {0} as {1}", t, name);
 
@@ -661,6 +539,25 @@ namespace Orleans.Serialization
             }
         }
 
+        private static void AddAndExchangeDictionary<K, V>(ref IReadOnlyDictionary<K,V> currentDictionary, K keyToUpdate, V valueToUpdate, bool forceOverride)
+        {
+            V currentValue;
+            if (forceOverride || !currentDictionary.TryGetValue(keyToUpdate, out currentValue) || (currentValue == null))
+            {
+                if (addingComplete)
+                {
+                    var newDictionary = currentDictionary.ToDictionary(kv => kv.Key, kv => kv.Value);
+                    newDictionary[keyToUpdate] = valueToUpdate;
+                    System.Threading.Thread.MemoryBarrier();
+                    currentDictionary = new ReadOnlyDictionary<K,V>(newDictionary);
+                }
+                else
+                {
+                    var dict = (Dictionary<K, V>)currentDictionary;
+                    dict[keyToUpdate] = valueToUpdate;
+                }
+            }
+        }
         /// <summary>
         /// Looks for types with marked serializer and deserializer methods, and registers them if necessary.
         /// </summary>
@@ -1001,6 +898,7 @@ namespace Orleans.Serialization
             var typeInfo = t.GetTypeInfo();
             if (typeInfo.IsGenericType && copiers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out copier))
                 return copier;
+
             return null;
         }
 
@@ -1180,22 +1078,25 @@ namespace Orleans.Serialization
         /// <returns>true if <paramref name="t"/> is serializable, false otherwise.</returns>
         internal static bool HasSerializer(Type t)
         {
-            Serializer ser;
+            Tuple<Serializer, Deserializer> ser;
+            
             if (serializers.TryGetValue(t.TypeHandle, out ser)) return true;
+
             var typeInfo = t.GetTypeInfo();
             return typeInfo.IsGenericType && serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser);
         }
 
         internal static Serializer GetSerializer(Type t)
         {
-            Serializer ser;
+            Tuple<Serializer, Deserializer> ser;
             if (serializers.TryGetValue(t.TypeHandle, out ser))
-                return ser;
+                return ser.Item1;
 
             var typeInfo = t.GetTypeInfo();
             if (typeInfo.IsGenericType)
                 if (serializers.TryGetValue(typeInfo.GetGenericTypeDefinition().TypeHandle, out ser))
-                    return ser;
+                    return ser.Item1;
+
             return null;
         }
 
@@ -1811,15 +1712,15 @@ namespace Orleans.Serialization
 
         internal static Deserializer GetDeserializer(Type t)
         {
-            Deserializer deser;
+            Tuple<Serializer, Deserializer> deser;
 
-            if (deserializers.TryGetValue(t.TypeHandle, out deser))
-                return deser;
+            if (serializers.TryGetValue(t.TypeHandle, out deser))
+                return deser.Item2;
 
             if (t.GetTypeInfo().IsGenericType)
             {
-                if (deserializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out deser))
-                    return deser;
+                if (serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out deser))
+                    return deser.Item2;
             }
 
             return null;
@@ -2228,13 +2129,9 @@ namespace Orleans.Serialization
                     line.Append(" copier");
                     discardLine = false;
                 }
-                if (deserializers.ContainsKey(typeHandle))
-                {
-                    line.Append(" deserializer");
-                    discardLine = false;
-                }
                 if (serializers.ContainsKey(typeHandle))
                 {
+                    line.Append(" deserializer");
                     line.Append(" serializer");
                     discardLine = false;
                 }
