@@ -364,9 +364,6 @@ namespace Orleans.Serialization
                 }
                 
                 addingComplete = true;
-                copiers = new ReadOnlyDictionary<RuntimeTypeHandle, DeepCopier>((Dictionary<RuntimeTypeHandle, DeepCopier>)copiers);
-                serializers = new ReadOnlyDictionary<RuntimeTypeHandle, Tuple<Serializer, Deserializer>>((Dictionary<RuntimeTypeHandle, Tuple<Serializer, Deserializer>>) serializers);
-                types = new ReadOnlyDictionary<string, Type>((Dictionary<string,Type>) types);
             }
         }
 
@@ -548,7 +545,7 @@ namespace Orleans.Serialization
                     var newDictionary = currentDictionary.ToDictionary(kv => kv.Key, kv => kv.Value);
                     newDictionary[keyToUpdate] = valueToUpdate;
                     System.Threading.Thread.MemoryBarrier();
-                    currentDictionary = new ReadOnlyDictionary<K,V>(newDictionary);
+                    currentDictionary = newDictionary;
                 }
                 else
                 {
