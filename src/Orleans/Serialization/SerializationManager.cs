@@ -109,7 +109,8 @@ namespace Orleans.Serialization
         private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
         private static readonly object registerBuiltInSerializerLockObj = new object();
-        
+        internal static int RegisteredTypesCount { get { lock (registeredTypes) { return registeredTypes == null ? 0 : registeredTypes.Count; } } }
+
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
         private static readonly RuntimeTypeHandle intTypeHandle = typeof(int).TypeHandle;
