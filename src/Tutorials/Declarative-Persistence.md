@@ -234,10 +234,14 @@ If a grain type has state, at activation time the state will be loaded from stor
 
 ## Handling failures using persistence
 
-Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent. There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed. In this case reading from storage can return your state to the last correct state. Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy.
+Generally speaking reading and writing a grain's state is a good mechanism to handle failures as well as serving its original intent.
+There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed.
+In this case reading from storage can return your state to the last correct state.
+Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy.
+Deactivation is the cleanest way of resetting a grain to its last know good state, but if you want to avoid the cost of the reactivation process, you can reset its state and rerun any initialization logic (for example, by calling `OnActivateAsync`) instead of deactivating the grain.
 
 ## Next
 
 Next, we'll see how we can call our grains from an MVC web application.
 
-[Front Ends for Orleans Services](Front-Ends-for-Orleans-Services.md)
+[Handling Failure](Failure-Handling.md)

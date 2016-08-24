@@ -15,6 +15,8 @@
       href: Interaction-with-Libraries-and-Services.md
     - name: Declarative Persistence
       href: Declarative-Persistence.md
+    - name: Handling Failure
+      href: Failure-Handling.md
     - name: Front Ends for Orleans Services
       href: Front-Ends-for-Orleans-Services.md
     - name: On-Premise Deployment

@@ -81,9 +81,9 @@ In this tutorial, we describe the steps to take.</p>
 <p>Orleans based services are xcopy-deployable.
 All you need to do to deploy an Orleans based service to a set of machines is copy the following set of file to the target machines and start the <em>OrleansHost.exe</em> host process:</p>
 <ul>
-<li>Contents of the Orleans SDK <em>.\Binaries\OrleansServer</em> folder</li>
-<li><em>OrleansConfiguration.xml</em> file with configuration for the deployment to replace the default placeholder from <em>.\Binaries\OrleansServer</em></li>
-<li>Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to <em>Application&lt;service name&gt;</em> subdirectory of the folder on the target with binaries from <em>.\Binaries\OrleansServer</em>.</li>
+<li>Contents of the build folder of your host project (it can use <code>Microsoft.Orleans.Host</code> NuGet package or use your own console application running the Silo).</li>
+<li><em>OrleansConfiguration.xml</em> file with configuration for the deployment to replace the default placeholder (If you use file based config).</li>
+<li>Binaries with grain interfaces and grain implementation classes of the service along with any external dependencies to <em>Application&lt;service name&gt;</em> subdirectory of the folder on the target with binaries of the host which should contain Orleans DLLs as well.</li>
 </ul>
 <p>This simple task may be accomplished in many different ways and with different tools, but the Orleans GitHub repo includes a set of PowerShell scripts (<a href="https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment">https://github.com/dotnet/orleans/tree/master/misc/scripts/RemoteDeployment</a>) that provide a way to deploy an Orleans based service to a cluster of machines and remote start the hosting processes on them.
 There are also scripts for removing a service, monitoring its performance, starting and stopping it, and collecting logs.
