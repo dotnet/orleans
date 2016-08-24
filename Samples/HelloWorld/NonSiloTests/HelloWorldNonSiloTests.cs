@@ -1,11 +1,6 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using HelloWorld.Grains;
 using HelloWorld.Interfaces;
-using Moq;
-using Orleans;
-using Orleans.Core;
-using Orleans.Runtime;
 using Xunit;
 
 namespace NonSiloTests
@@ -28,8 +23,7 @@ namespace NonSiloTests
             string reply = await grain.SayHello(greeting);
 
             Assert.NotNull(reply);
-            string expected = string.Format("You said: '{0}', I say: Hello!", greeting);
-            Assert.Equal(expected, reply);
+            Assert.Equal($"You said: '{greeting}', I say: Hello!", reply);
         }
 
         [Fact(Skip = "WriteStateAsync currently throws an exception due to a null pointer within Grain.GrainReference. Hopefully fixed in 1.3.0")]
@@ -51,8 +45,8 @@ namespace NonSiloTests
 
             var greetings = (await grain.GetGreetings()).ToList();
 
-            Assert.True(greetings.Contains(greeting1));
-            Assert.True(greetings.Contains(greeting2));
+            Assert.Contains(greeting1, greetings);
+            Assert.Contains(greeting2, greetings);
         }
     }
 }
