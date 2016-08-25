@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
@@ -16,7 +17,7 @@ namespace UnitTests.CancellationTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                return new TestCluster(new TestClusterOptions(2));
+                return new TestCluster(new TestClusterOptions(2), OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

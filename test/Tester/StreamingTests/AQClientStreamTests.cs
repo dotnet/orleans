@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
 using UnitTests.Tester;
@@ -33,7 +34,7 @@ namespace Tester.StreamingTests
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         public override void Dispose()

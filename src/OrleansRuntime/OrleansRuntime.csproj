@@ -60,6 +60,8 @@
     <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\PerfCounterConfigData.cs" />
     <Compile Include="Startup\ConfigureServicesBuilder.cs" />
+    <Compile Include="Startup\IStartup.cs" />
+    <Compile Include="Startup\OrleansInternalServicesExtentions.cs" />
     <Compile Include="Startup\StartupBuilder.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />

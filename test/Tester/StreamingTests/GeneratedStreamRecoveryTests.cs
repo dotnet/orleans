@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
@@ -45,7 +46,7 @@ namespace UnitTests.StreamingTests
                 // register stream provider
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

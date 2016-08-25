@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using Tester;
@@ -191,7 +192,7 @@ namespace UnitTests.MembershipTests
         {
             var options = new TestClusterOptions(2);
             options.ClientConfiguration.PreferedGatewayIndex = 1;
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]
@@ -239,7 +240,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("Azure")]
@@ -288,7 +289,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
@@ -335,7 +336,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Membership"), TestCategory("ZooKeeper")]
@@ -383,7 +384,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Membership"), TestCategory("SqlServer")]
@@ -432,7 +433,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            return new TestCluster(options);
+            return new TestCluster(options.ClusterConfiguration, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]

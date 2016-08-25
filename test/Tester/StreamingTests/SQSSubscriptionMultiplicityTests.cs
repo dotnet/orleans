@@ -7,6 +7,7 @@ using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Startup;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
@@ -37,7 +38,7 @@ namespace Tester
             options.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
             options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
             options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         public SQSSubscriptionMultiplicityTests()

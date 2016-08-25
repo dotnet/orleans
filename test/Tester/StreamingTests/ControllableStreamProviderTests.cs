@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Startup;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
@@ -29,7 +30,7 @@ namespace UnitTests.StreamingTests
                         {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
                     };
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

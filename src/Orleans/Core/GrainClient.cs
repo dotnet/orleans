@@ -241,6 +241,7 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
+                        //TODO: should get GrainFactory trhough Dependency Injection system
                         grainFactory = new GrainFactory();
 
                         if (runtimeClient == null)

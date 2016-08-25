@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost.Utils;
 using Xunit;
 
@@ -11,6 +13,7 @@ namespace UnitTests.Deployment
 {
     public class AzureSiloTests
     {
+        static IServiceProvider services = new Startup().ConfigureServices(new ServiceCollection());
         [SkippableFact, TestCategory("Functional")]
         public async Task ValidateConfiguration_Startup()
         {
@@ -21,10 +24,11 @@ namespace UnitTests.Deployment
             serviceRuntime.Settings["DataConnectionString"] = "UseDevelopmentStorage=true";
             serviceRuntime.InstanceName = "name";
 
+            //TODO: inject real dependency instead of service provider
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, services);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.True(ok);
@@ -41,7 +45,8 @@ namespace UnitTests.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            //TODO: inject real dependency instead of service provider
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, services);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);
@@ -58,7 +63,8 @@ namespace UnitTests.Deployment
             var config = AzureSilo.DefaultConfiguration(serviceRuntime);
             config.AddMemoryStorageProvider();
 
-            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime);
+            //TODO: inject real dependency instead of service provider
+            AzureSilo orleansAzureSilo = new AzureSilo(serviceRuntime, services);
             bool ok = await orleansAzureSilo.ValidateConfiguration(config);
 
             Assert.False(ok);
@@ -89,5 +95,14 @@ namespace UnitTests.Deployment
         public void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler) { }
 
         public void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler) { }
+    }
+
+    public class Startup : IStartup
+    {
+        public IServiceProvider ConfigureServices(IServiceCollection svcCollection)
+        {
+            OrleansInternalServices.RegisterSystemTypes(svcCollection);
+            return svcCollection.BuildServiceProvider();
+        }
     }
 }

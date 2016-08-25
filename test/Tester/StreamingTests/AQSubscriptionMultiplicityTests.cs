@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 using Xunit;
@@ -22,7 +23,7 @@ namespace UnitTests.StreamingTests
             options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AQStreamProviderName);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         public AQSubscriptionMultiplicityTests()

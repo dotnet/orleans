@@ -6,6 +6,7 @@ using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime.Startup;
 using Tester.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
@@ -46,7 +47,7 @@ namespace Tester
             options.ClusterConfiguration.Globals.DataConnectionString = StorageConnectionString;
             options.ClusterConfiguration.Globals.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
             options.ClientConfiguration.RegisterStreamProvider<SQSStreamProvider>(SQSStreamProviderName, streamConnectionString);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         public override void Dispose()

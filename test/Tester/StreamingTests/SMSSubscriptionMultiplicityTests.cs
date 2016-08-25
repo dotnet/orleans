@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.Tester;
@@ -24,7 +25,7 @@ namespace UnitTests.StreamingTests
 
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

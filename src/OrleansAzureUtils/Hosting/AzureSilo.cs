@@ -42,6 +42,7 @@ namespace Orleans.Runtime.Host
         public string ProxyEndpointConfigurationKeyName { get; set; }
         
         private SiloHost host;
+        private IServiceProvider serviceProvider;
         private OrleansSiloInstanceManager siloInstanceManager;
         private SiloInstanceTableEntry myEntry;
         private readonly Logger logger;
@@ -50,12 +51,12 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Constructor
         /// </summary>
-        public AzureSilo()
-            : this(new ServiceRuntimeWrapper())
+        public AzureSilo(IServiceProvider svcProvider)
+            : this(new ServiceRuntimeWrapper(), svcProvider)
         {
         }
 
-        internal AzureSilo(IServiceRuntimeWrapper serviceRuntimeWrapper)
+        internal AzureSilo(IServiceRuntimeWrapper serviceRuntimeWrapper, IServiceProvider svcProvider)
         {
             this.serviceRuntimeWrapper = serviceRuntimeWrapper;
             DataConnectionConfigurationSettingName = AzureConstants.DataConnectionConfigurationSettingName;
@@ -66,6 +67,7 @@ namespace Orleans.Runtime.Host
             MaxRetries = AzureConstants.MAX_RETRIES;  // 120 x 5s = Total: 10 minutes
 
             logger = LogManager.GetLogger("OrleansAzureSilo", LoggerType.Runtime);
+            serviceProvider = svcProvider;
         }
 
         public async Task<bool> ValidateConfiguration(ClusterConfiguration config)
@@ -162,7 +164,7 @@ namespace Orleans.Runtime.Host
             }
             else
             {
-                host = new SiloHost(instanceName, config); // Use supplied config data + Initializes logger configurations
+                host = new SiloHost(instanceName, config, serviceProvider); // Use supplied config data + Initializes logger configurations
             }
 
             IPEndPoint myEndpoint = serviceRuntimeWrapper.GetIPEndpoint(SiloEndpointConfigurationKeyName);

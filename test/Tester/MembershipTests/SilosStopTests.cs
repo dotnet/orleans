@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -20,7 +21,7 @@ namespace UnitTests.MembershipTests
 
             // use only Primary as the gateway
             options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]

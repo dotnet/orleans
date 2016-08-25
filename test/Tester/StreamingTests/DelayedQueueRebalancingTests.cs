@@ -7,6 +7,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.Tester;
@@ -35,7 +36,7 @@ namespace UnitTests.StreamingTests
 
             options.ClusterConfiguration.AddAzureQueueStreamProvider(adapterName, persistentStreamProviderConfig: persistentStreamProviderConfig);
             options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            var host = new TestCluster(options);
+            var host = new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             host.Deploy(new[] { Silo.PrimarySiloName, "Secondary_1" });
             return host;
         }

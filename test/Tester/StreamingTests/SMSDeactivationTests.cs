@@ -32,7 +32,7 @@ namespace UnitTests.StreamingTests
             options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
             options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
 
-            return new TestCluster(options);
+            return new TestCluster(options, null);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]

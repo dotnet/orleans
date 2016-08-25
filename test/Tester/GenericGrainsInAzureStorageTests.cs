@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
@@ -17,7 +18,7 @@ namespace UnitTests.General
             {
                 var options = new TestClusterOptions();
                 options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

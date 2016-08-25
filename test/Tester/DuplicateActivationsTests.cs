@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
@@ -20,7 +21,7 @@ namespace UnitTests.CatalogTests
                 var options = new TestClusterOptions(2);
                 options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(1);
                 options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.MaxActiveThreads = 1);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 

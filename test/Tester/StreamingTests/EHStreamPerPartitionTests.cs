@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -47,7 +48,7 @@ namespace UnitTests.StreamingTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<StreamPerPartitionEventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
                 options.ClientConfiguration.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
 
             public override void Dispose()

@@ -16,6 +16,7 @@ namespace Orleans.Providers
         private readonly AsyncLock lockable;
         private InvokeInterceptor invokeInterceptor;
 
+        //TODO change this to ClientProviderRuntime(IServceProvider svcProvider) since GrainFactory is injectable now
         public ClientProviderRuntime(IGrainFactory grainFactory, IServiceProvider serviceProvider) 
         {
             caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();

@@ -14,7 +14,7 @@ namespace Orleans
     /// <summary>
     /// Factory for accessing grains.
     /// </summary>
-    public class GrainFactory : IGrainFactory
+    internal class GrainFactory : IGrainFactory
     {
         /// <summary>
         /// The cached <see cref="MethodInfo"/> for <see cref="GrainReference.CastInternal"/>.

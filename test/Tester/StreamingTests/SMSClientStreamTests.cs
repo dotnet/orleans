@@ -3,6 +3,8 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
@@ -32,7 +34,7 @@ namespace Tester.StreamingTests
             options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]

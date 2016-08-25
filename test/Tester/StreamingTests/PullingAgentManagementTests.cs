@@ -6,6 +6,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.Tester;
@@ -28,7 +29,7 @@ namespace UnitTests.StreamingTests
                 // options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
 
                 options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 
