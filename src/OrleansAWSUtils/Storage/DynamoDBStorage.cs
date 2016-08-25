@@ -14,7 +14,7 @@ namespace OrleansAWSUtils.Storage
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
-    internal class DynamoDBStorage
+    public class DynamoDBStorage
     {
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";

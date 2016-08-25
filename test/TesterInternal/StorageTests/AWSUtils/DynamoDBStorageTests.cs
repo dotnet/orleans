@@ -1,12 +1,13 @@
-﻿using Amazon.DynamoDBv2.Model;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2.Model;
 using Xunit;
 
 namespace UnitTests.StorageTests.AWSUtils
 {
+    [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBStorageTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private string PartitionKey;
@@ -14,6 +15,9 @@ namespace UnitTests.StorageTests.AWSUtils
 
         public DynamoDBStorageTests(DynamoDBStorageTestsFixture fixture)
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+
             manager = fixture.DataManager;
             PartitionKey = "PK-DynamoDBDataManagerTests-" + Guid.NewGuid();
         }
@@ -23,7 +27,7 @@ namespace UnitTests.StorageTests.AWSUtils
             return new UnitTestDynamoDBTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage")]
+        [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_CreateItemAsync()
         {
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
@@ -42,7 +46,7 @@ namespace UnitTests.StorageTests.AWSUtils
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage")]
+        [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_UpsertItemAsync()
         {
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
@@ -72,7 +76,7 @@ namespace UnitTests.StorageTests.AWSUtils
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage")]
+        [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_DeleteItemAsync()
         {
             var toPersist = GenerateNewData();
@@ -82,7 +86,7 @@ namespace UnitTests.StorageTests.AWSUtils
             Assert.Null(persisted);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage")]
+        [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_ReadSingleTableEntryAsync()
         {
             var toPersist = GenerateNewData();
@@ -95,7 +99,7 @@ namespace UnitTests.StorageTests.AWSUtils
             Assert.Null(notFound);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("AWS"), TestCategory("Storage")]
+        [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_ReadAllTableEntryByPartitionAsync()
         {
             var toPersist = GenerateNewData();

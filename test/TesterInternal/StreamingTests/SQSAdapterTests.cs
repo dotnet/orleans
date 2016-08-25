@@ -19,6 +19,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Streaming
 {
+    [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -43,7 +44,7 @@ namespace UnitTests.Streaming
             SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, deploymentId, AWSTestConstants.DefaultSQSConnectionString).Wait();
         }
 
-        [Fact, TestCategory("SQS"), TestCategory("AWS")]
+        [Fact]
         public async Task SendAndReceiveFromSQS()
         {
             var properties = new Dictionary<string, string>

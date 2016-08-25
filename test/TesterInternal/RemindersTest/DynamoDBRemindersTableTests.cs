@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Orleans;
+using OrleansAWSUtils.Reminders;
 using UnitTests.StorageTests.AWSUtils;
 using Xunit;
-using OrleansAWSUtils.Reminders;
 
 namespace UnitTests.RemindersTest
 {
+    [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
         public DynamoDBRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
@@ -18,6 +15,9 @@ namespace UnitTests.RemindersTest
 
         protected override IReminderTable CreateRemindersTable()
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+
             return new DynamoDBReminderTable();
         }
 
@@ -26,24 +26,24 @@ namespace UnitTests.RemindersTest
             return $"Service={AWSTestConstants.Service}";
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("AWS")]
+        [SkippableFact]
         public void RemindersTable_AWS_Init()
         {
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("AWS")]
+        [SkippableFact]
         public async Task RemindersTable_AWS_RemindersRange()
         {
             await RemindersRange(50);
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("AWS")]
+        [SkippableFact]
         public async Task RemindersTable_AWS_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [Fact, TestCategory("Reminders"), TestCategory("AWS")]
+        [SkippableFact]
         public async Task RemindersTable_AWS_ReminderSimple()
         {
             await ReminderSimple();
