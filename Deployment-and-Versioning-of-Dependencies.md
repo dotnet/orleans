@@ -13,7 +13,7 @@ Orleans currently references the following external dependencies.
 
 **Newtonsoft.Json 5.0.8**
 
-The exact versions of the dependencies will change over time. We will use the current versions to illustrate the deployment and versioning options. The general rule we are trying to follow with regards to Azure SDK is to target it's version current-1, to make transition to new versions of it easier. As of this writing the current version is 2.5, and hence we target 2.4.
+The exact versions of the dependencies will change over time. We will use the current versions to illustrate the deployment and versioning options. The general rule we are trying to follow with regards to Azure SDK is to target its version current-1, to make the transition to new versions of it easier. As of this writing the current version is 2.5, and hence we target 2.4.
 
 ## Versioning of Orleans dependencies ##
 
@@ -45,10 +45,10 @@ Here's an example of an app.config that redirects Microsoft.WindowsAzure.Storage
 
 ## Grain assemblies deployed to subfolder ##
 
-The recommended way to deploy application code, grain assemblies and their dependencies, is to put them to a subfolder of the Applications folder. This approach provides a clear separation of application code from the Orleans runtime code and allows for additional flexibility with dependencies. You can (but don't have to) have some of the same assemblies that are already present in the main Orleans folder but of different versions.
+The recommended way to deploy application code, grain assemblies and their dependencies, is to put them into a subfolder of the Applications folder. This approach provides a clear separation of application code from the Orleans runtime code and allows for additional flexibility with dependencies. You can (but don't have to) have some of the same assemblies that are already present in the main Orleans folder but of different versions.
 
 For example, if your code depends on a library that is incompatible with, say, Azure Storage 4.3, you can simply put a compatible version of Microsoft.WindowsAzure.Storage.dll (and its dependencies) into your application folder. In that case, the two versions will be loaded by the CLR side by side.
 
 ## Grain assemblies deployed to main folder ##
 
-If for some reason deploying grain assemblies into a subfolder is not an option, and you have to deploy grain assemblies into the main folder, you are obviously limited to just one set of dependency assemblies. So you need to choose a set of versions that are compatible with both the Orleans runtime and your grain code. If necessary, you can specified assembly binding redirects as in the example above. 
+If for some reason deploying grain assemblies into a subfolder is not an option, and you have to deploy grain assemblies into the main folder, you are obviously limited to just one set of dependency assemblies. So you need to choose a set of versions that are compatible with both the Orleans runtime and your grain code. If necessary, you can specify assembly binding redirects as in the example above. 
