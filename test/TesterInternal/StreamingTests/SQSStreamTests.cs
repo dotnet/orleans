@@ -1,16 +1,17 @@
-﻿using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using Orleans.Providers.Streams;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
 using UnitTests.StorageTests.AWSUtils;
-using System.IO;
-using Xunit;
 using UnitTests.StreamingTests;
-using Orleans.Providers.Streams;
-using System.Collections.Generic;
-using Orleans.Storage;
+using Xunit;
 
 namespace UnitTests.Streaming
 {
+    [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSStreamTests : HostedTestClusterPerTest
     {
         internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_SQSStreamProviders.xml");
@@ -68,7 +69,7 @@ namespace UnitTests.Streaming
             runner = new SingleStreamTestRunner(SQS_STREAM_PROVIDER_NAME);
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
@@ -77,25 +78,25 @@ namespace UnitTests.Streaming
 
         ////------------------------ One to One ----------------------//
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_01_OneProducerGrainOneConsumerGrain()
         {
             await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_02_OneProducerGrainOneConsumerClient()
         {
             await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_03_OneProducerClientOneConsumerGrain()
         {
             await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_04_OneProducerClientOneConsumerClient()
         {
             await runner.StreamTest_04_OneProducerClientOneConsumerClient();
@@ -103,50 +104,50 @@ namespace UnitTests.Streaming
 
         //------------------------ MANY to Many different grains ----------------------//
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
             await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
         }
 
         //------------------------ MANY to Many Same grains ----------------------//
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
             await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
             await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
             await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
@@ -154,13 +155,13 @@ namespace UnitTests.Streaming
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_13_SameGrain_ConsumerFirstProducerLater()
         {
             await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_14_SameGrain_ProducerFirstConsumerLater()
         {
             await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
@@ -168,20 +169,20 @@ namespace UnitTests.Streaming
 
         //----------------------------------------------//
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_15_ConsumeAtProducersRequest()
         {
             await runner.StreamTest_15_ConsumeAtProducersRequest();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(SQS_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
-        [Fact, TestCategory("AWS")]
+        [Fact]
         public async Task SQS_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(SQS_STREAM_PROVIDER_NAME, 17, false);

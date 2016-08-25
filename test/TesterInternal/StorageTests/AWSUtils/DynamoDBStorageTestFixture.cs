@@ -1,6 +1,4 @@
-﻿using Xunit;
-
-namespace UnitTests.StorageTests.AWSUtils
+﻿namespace UnitTests.StorageTests.AWSUtils
 {
     public class DynamoDBStorageTestsFixture
     {
@@ -8,7 +6,10 @@ namespace UnitTests.StorageTests.AWSUtils
 
         public DynamoDBStorageTestsFixture()
         {
-            DataManager = new UnitTestDynamoDBStorage();
+            if (AWSTestConstants.IsDynamoDbAvailable)
+            {
+                DataManager = new UnitTestDynamoDBStorage();
+            }
         }
     }
 }

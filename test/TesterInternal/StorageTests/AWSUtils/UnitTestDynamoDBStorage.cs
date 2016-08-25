@@ -91,7 +91,7 @@ namespace UnitTests.StorageTests.AWSUtils
         public UnitTestDynamoDBStorage()
             : base($"Service={AWSTestConstants.Service}")
         {
-            if (AWSTestConstants.CanConnectDynamoDb.Value)
+            if (AWSTestConstants.IsDynamoDbAvailable)
             {
                 InitializeTable(INSTANCE_TABLE_NAME,
                                new List<KeySchemaElement>
