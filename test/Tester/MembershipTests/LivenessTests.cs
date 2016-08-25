@@ -14,6 +14,10 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Amazon.DynamoDBv2.Model;
+using Amazon.DynamoDBv2;
+using OrleansAWSUtils.Storage;
+using Orleans.TestingHost.Utils;
 
 namespace UnitTests.MembershipTests
 {
@@ -275,12 +279,37 @@ namespace UnitTests.MembershipTests
 
     public class LivenessTests_DynamoDB : LivenessTestsBase
     {
+        private static Lazy<bool> canConnectDynamoDb = new Lazy<bool>(() =>
+        {
+            
+            var storage = new DynamoDBStorage($"Service=http://localhost:8000", null);
+            try
+            {
+                storage.InitializeTable("TestTable", new List<KeySchemaElement> {
+                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
+                }, new List<AttributeDefinition> {
+                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
+                }).WithTimeout(TimeSpan.FromSeconds(2), "Unable to connect to AWS DynamoDB simulator").Wait();
+                return true;
+            }
+            catch (Exception exc)
+            {
+                if(exc.InnerException is TimeoutException)
+                    return false;
+
+                throw;
+            }
+        });
+
         public LivenessTests_DynamoDB(ITestOutputHelper output) : base(output)
         {
         }
 
         public override TestCluster CreateTestCluster()
         {
+            if (!canConnectDynamoDb.Value)
+                throw new SkipException("Unable to connect to DynamoDB simulator");
+
             var options = new TestClusterOptions(2);
             options.ClusterConfiguration.Globals.DataConnectionString = "Service=http://localhost:8000;"; ;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
@@ -291,31 +320,31 @@ namespace UnitTests.MembershipTests
             return new TestCluster(options);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task Liveness_AWS_DynamoDB_1()
         {
             await Do_Liveness_OracleTest_1();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task Liveness_AWS_DynamoDB_2_Restart_Primary()
         {
             await Do_Liveness_OracleTest_2(0);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task Liveness_AWS_DynamoDB_3_Restart_GW()
         {
             await Do_Liveness_OracleTest_2(1);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task Liveness_AWS_DynamoDB_4_Restart_Silo_1()
         {
             await Do_Liveness_OracleTest_2(2);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task Liveness_AWS_DynamoDB_5_Kill_Silo_1_With_Timers()
         {
             await Do_Liveness_OracleTest_2(2, false, true);

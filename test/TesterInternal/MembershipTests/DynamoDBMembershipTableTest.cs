@@ -22,6 +22,9 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(Logger logger)
         {
+            if (!AWSTestConstants.CanConnectDynamoDb.Value)
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+
             return new DynamoDBMembershipTable();
         }
 
@@ -35,43 +38,43 @@ namespace UnitTests.MembershipTests
             return "Service=http://localhost:8000;";
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_InsertRow()
         {
             await MembershipTable_InsertRow(false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read(false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll(false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Functional"), TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_UpdateRow()
         {
             await MembershipTable_UpdateRow(false);
         }
 
-        [Fact, TestCategory("Membership"), TestCategory("AWS")]
+        [SkippableFact, TestCategory("Membership"), TestCategory("AWS")]
         public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);

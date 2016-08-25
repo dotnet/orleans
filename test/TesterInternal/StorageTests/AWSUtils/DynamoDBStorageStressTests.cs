@@ -19,6 +19,9 @@ namespace UnitTests.StorageTests.AWSUtils
 
         public DynamoDBStorageStressTests(DynamoDBStorageTestsFixture fixture, ITestOutputHelper output)
         {
+            if (!AWSTestConstants.CanConnectDynamoDb.Value)
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+
             this.output = output;
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
@@ -26,7 +29,7 @@ namespace UnitTests.StorageTests.AWSUtils
             PartitionKey = "PK-DynamoDBDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
         public void DynamoDBDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_SinglePartition";
@@ -38,7 +41,7 @@ namespace UnitTests.StorageTests.AWSUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
         public void DynamoDBDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_MultiPartition";
@@ -50,7 +53,7 @@ namespace UnitTests.StorageTests.AWSUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
         public void DynamoDBDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_ReadAll";

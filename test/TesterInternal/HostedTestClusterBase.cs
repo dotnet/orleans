@@ -22,7 +22,8 @@ namespace UnitTests
 
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
+            if (this.HostedCluster != null)
+                this.HostedCluster.StopAllSilos();
         }
     }
 
@@ -44,7 +45,8 @@ namespace UnitTests
 
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
+            if (this.HostedCluster != null)
+                this.HostedCluster.StopAllSilos();
         }
     }
 }

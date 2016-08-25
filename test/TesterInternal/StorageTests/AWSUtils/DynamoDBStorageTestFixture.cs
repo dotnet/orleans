@@ -1,4 +1,6 @@
-﻿namespace UnitTests.StorageTests.AWSUtils
+﻿using Xunit;
+
+namespace UnitTests.StorageTests.AWSUtils
 {
     public class DynamoDBStorageTestsFixture
     {
