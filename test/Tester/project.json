@@ -3,7 +3,7 @@
     "Bond.Runtime.CSharp": "3.0.7",
     "FluentAssertions": "4.0.0",
     "FSharp.Core": "4.0.0.1",
-    "Google.Protobuf": "3.0.0-alpha4",
+    "Google.Protobuf": "3.0.0",
     "Microsoft.Extensions.DependencyInjection": "1.0.0",
     "Newtonsoft.Json": "7.0.1",
     "System.Management.Automation.dll": "10.0.10586",
