@@ -48,6 +48,4 @@ In _OrleansConfiguration.xml_, the `ProxyingGateway` element specifies the gatew
 ## Next
 Back to the [Orleans documentation](../) index
 
-Back to the [Getting Started](./) index
-
 Forward to the [Step-by-step Tutorials](../Step-by-step-Tutorials)
