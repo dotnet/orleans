@@ -6,47 +6,52 @@
 using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
-namespace UnitTests.Serialization
-{
+using scg = global::System.Collections.Generic;
+namespace UnitTests.Serialization {
 
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-  public static partial class Addressbook {
+  /// <summary>Holder for reflection information generated from addressbook.proto</summary>
+  [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+  public static partial class AddressbookReflection {
 
     #region Descriptor
+    /// <summary>File descriptor for addressbook.proto</summary>
     public static pbr::FileDescriptor Descriptor {
       get { return descriptor; }
     }
     private static pbr::FileDescriptor descriptor;
 
-    static Addressbook() {
+    static AddressbookReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "ChFhZGRyZXNzYm9vay5wcm90bxIIdHV0b3JpYWwi1QEKBlBlcnNvbhIMCgRu", 
-            "YW1lGAEgASgJEgoKAmlkGAIgASgFEg0KBWVtYWlsGAMgASgJEiwKBnBob25l", 
-            "cxgEIAMoCzIcLnR1dG9yaWFsLlBlcnNvbi5QaG9uZU51bWJlchpHCgtQaG9u", 
-            "ZU51bWJlchIOCgZudW1iZXIYASABKAkSKAoEdHlwZRgCIAEoDjIaLnR1dG9y", 
-            "aWFsLlBlcnNvbi5QaG9uZVR5cGUiKwoJUGhvbmVUeXBlEgoKBk1PQklMRRAA", 
-            "EggKBEhPTUUQARIICgRXT1JLEAIiSAoLQWRkcmVzc0Jvb2sSIAoGcGVvcGxl", 
-            "GAEgAygLMhAudHV0b3JpYWwuUGVyc29uEhcKD2FkZHJlc3NCb29rTmFtZRgC", 
+            "ChFhZGRyZXNzYm9vay5wcm90bxIIdHV0b3JpYWwi1QEKBlBlcnNvbhIMCgRu",
+            "YW1lGAEgASgJEgoKAmlkGAIgASgFEg0KBWVtYWlsGAMgASgJEiwKBnBob25l",
+            "cxgEIAMoCzIcLnR1dG9yaWFsLlBlcnNvbi5QaG9uZU51bWJlchpHCgtQaG9u",
+            "ZU51bWJlchIOCgZudW1iZXIYASABKAkSKAoEdHlwZRgCIAEoDjIaLnR1dG9y",
+            "aWFsLlBlcnNvbi5QaG9uZVR5cGUiKwoJUGhvbmVUeXBlEgoKBk1PQklMRRAA",
+            "EggKBEhPTUUQARIICgRXT1JLEAIiSAoLQWRkcmVzc0Jvb2sSIAoGcGVvcGxl",
+            "GAEgAygLMhAudHV0b3JpYWwuUGVyc29uEhcKD2FkZHJlc3NCb29rTmFtZRgC",
             "IAEoCUIaqgIXVW5pdFRlc3RzLlNlcmlhbGl6YXRpb25iBnByb3RvMw=="));
-      descriptor = pbr::FileDescriptor.InternalBuildGeneratedFileFrom(descriptorData,
+      descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedCodeInfo(null, new pbr::GeneratedCodeInfo[] {
-            new pbr::GeneratedCodeInfo(typeof(global::UnitTests.Serialization.Person), new[]{ "Name", "Id", "Email", "Phones" }, null, new[]{ typeof(global::UnitTests.Serialization.Person.Types.PhoneType) }, new pbr::GeneratedCodeInfo[] { new pbr::GeneratedCodeInfo(typeof(global::UnitTests.Serialization.Person.Types.PhoneNumber), new[]{ "Number", "Type" }, null, null, null)}),
-            new pbr::GeneratedCodeInfo(typeof(global::UnitTests.Serialization.AddressBook), new[]{ "People", "AddressBookName" }, null, null, null)
+          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::UnitTests.Serialization.Person), global::UnitTests.Serialization.Person.Parser, new[]{ "Name", "Id", "Email", "Phones" }, null, new[]{ typeof(global::UnitTests.Serialization.Person.Types.PhoneType) }, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::UnitTests.Serialization.Person.Types.PhoneNumber), global::UnitTests.Serialization.Person.Types.PhoneNumber.Parser, new[]{ "Number", "Type" }, null, null, null)}),
+            new pbr::GeneratedClrTypeInfo(typeof(global::UnitTests.Serialization.AddressBook), global::UnitTests.Serialization.AddressBook.Parser, new[]{ "People", "AddressBookName" }, null, null, null)
           }));
     }
     #endregion
 
   }
   #region Messages
+  /// <summary>
+  ///  [START messages]
+  /// </summary>
   [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
   public sealed partial class Person : pb::IMessage<Person> {
     private static readonly pb::MessageParser<Person> _parser = new pb::MessageParser<Person>(() => new Person());
     public static pb::MessageParser<Person> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::UnitTests.Serialization.Addressbook.Descriptor.MessageTypes[0]; }
+      get { return global::UnitTests.Serialization.AddressbookReflection.Descriptor.MessageTypes[0]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -70,17 +75,22 @@ namespace UnitTests.Serialization
       return new Person(this);
     }
 
+    /// <summary>Field number for the "name" field.</summary>
     public const int NameFieldNumber = 1;
     private string name_ = "";
     public string Name {
       get { return name_; }
       set {
-        name_ = pb::Preconditions.CheckNotNull(value, "value");
+        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
+    /// <summary>Field number for the "id" field.</summary>
     public const int IdFieldNumber = 2;
     private int id_;
+    /// <summary>
+    ///  Unique ID number for this person.
+    /// </summary>
     public int Id {
       get { return id_; }
       set {
@@ -88,15 +98,17 @@ namespace UnitTests.Serialization
       }
     }
 
+    /// <summary>Field number for the "email" field.</summary>
     public const int EmailFieldNumber = 3;
     private string email_ = "";
     public string Email {
       get { return email_; }
       set {
-        email_ = pb::Preconditions.CheckNotNull(value, "value");
+        email_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
+    /// <summary>Field number for the "phones" field.</summary>
     public const int PhonesFieldNumber = 4;
     private static readonly pb::FieldCodec<global::UnitTests.Serialization.Person.Types.PhoneNumber> _repeated_phones_codec
         = pb::FieldCodec.ForMessage(34, global::UnitTests.Serialization.Person.Types.PhoneNumber.Parser);
@@ -133,7 +145,7 @@ namespace UnitTests.Serialization
     }
 
     public override string ToString() {
-      return pb::JsonFormatter.Default.Format(this);
+      return pb::JsonFormatter.ToDiagnosticString(this);
     }
 
     public void WriteTo(pb::CodedOutputStream output) {
@@ -211,12 +223,13 @@ namespace UnitTests.Serialization
     }
 
     #region Nested types
+    /// <summary>Container for nested types declared in the Person message type.</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     public static partial class Types {
       public enum PhoneType {
-        MOBILE = 0,
-        HOME = 1,
-        WORK = 2,
+        [pbr::OriginalName("MOBILE")] Mobile = 0,
+        [pbr::OriginalName("HOME")] Home = 1,
+        [pbr::OriginalName("WORK")] Work = 2,
       }
 
       [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -247,17 +260,19 @@ namespace UnitTests.Serialization
           return new PhoneNumber(this);
         }
 
+        /// <summary>Field number for the "number" field.</summary>
         public const int NumberFieldNumber = 1;
         private string number_ = "";
         public string Number {
           get { return number_; }
           set {
-            number_ = pb::Preconditions.CheckNotNull(value, "value");
+            number_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
           }
         }
 
+        /// <summary>Field number for the "type" field.</summary>
         public const int TypeFieldNumber = 2;
-        private global::UnitTests.Serialization.Person.Types.PhoneType type_ = global::UnitTests.Serialization.Person.Types.PhoneType.MOBILE;
+        private global::UnitTests.Serialization.Person.Types.PhoneType type_ = 0;
         public global::UnitTests.Serialization.Person.Types.PhoneType Type {
           get { return type_; }
           set {
@@ -284,12 +299,12 @@ namespace UnitTests.Serialization
         public override int GetHashCode() {
           int hash = 1;
           if (Number.Length != 0) hash ^= Number.GetHashCode();
-          if (Type != global::UnitTests.Serialization.Person.Types.PhoneType.MOBILE) hash ^= Type.GetHashCode();
+          if (Type != 0) hash ^= Type.GetHashCode();
           return hash;
         }
 
         public override string ToString() {
-          return pb::JsonFormatter.Default.Format(this);
+          return pb::JsonFormatter.ToDiagnosticString(this);
         }
 
         public void WriteTo(pb::CodedOutputStream output) {
@@ -297,7 +312,7 @@ namespace UnitTests.Serialization
             output.WriteRawTag(10);
             output.WriteString(Number);
           }
-          if (Type != global::UnitTests.Serialization.Person.Types.PhoneType.MOBILE) {
+          if (Type != 0) {
             output.WriteRawTag(16);
             output.WriteEnum((int) Type);
           }
@@ -308,7 +323,7 @@ namespace UnitTests.Serialization
           if (Number.Length != 0) {
             size += 1 + pb::CodedOutputStream.ComputeStringSize(Number);
           }
-          if (Type != global::UnitTests.Serialization.Person.Types.PhoneType.MOBILE) {
+          if (Type != 0) {
             size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Type);
           }
           return size;
@@ -321,7 +336,7 @@ namespace UnitTests.Serialization
           if (other.Number.Length != 0) {
             Number = other.Number;
           }
-          if (other.Type != global::UnitTests.Serialization.Person.Types.PhoneType.MOBILE) {
+          if (other.Type != 0) {
             Type = other.Type;
           }
         }
@@ -352,13 +367,16 @@ namespace UnitTests.Serialization
 
   }
 
+  /// <summary>
+  ///  Our address book file is just one of these.
+  /// </summary>
   [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
   public sealed partial class AddressBook : pb::IMessage<AddressBook> {
     private static readonly pb::MessageParser<AddressBook> _parser = new pb::MessageParser<AddressBook>(() => new AddressBook());
     public static pb::MessageParser<AddressBook> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::UnitTests.Serialization.Addressbook.Descriptor.MessageTypes[1]; }
+      get { return global::UnitTests.Serialization.AddressbookReflection.Descriptor.MessageTypes[1]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -380,6 +398,7 @@ namespace UnitTests.Serialization
       return new AddressBook(this);
     }
 
+    /// <summary>Field number for the "people" field.</summary>
     public const int PeopleFieldNumber = 1;
     private static readonly pb::FieldCodec<global::UnitTests.Serialization.Person> _repeated_people_codec
         = pb::FieldCodec.ForMessage(10, global::UnitTests.Serialization.Person.Parser);
@@ -388,12 +407,16 @@ namespace UnitTests.Serialization
       get { return people_; }
     }
 
+    /// <summary>Field number for the "addressBookName" field.</summary>
     public const int AddressBookNameFieldNumber = 2;
     private string addressBookName_ = "";
+    /// <summary>
+    ///  the name of this address book
+    /// </summary>
     public string AddressBookName {
       get { return addressBookName_; }
       set {
-        addressBookName_ = pb::Preconditions.CheckNotNull(value, "value");
+        addressBookName_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -421,7 +444,7 @@ namespace UnitTests.Serialization
     }
 
     public override string ToString() {
-      return pb::JsonFormatter.Default.Format(this);
+      return pb::JsonFormatter.ToDiagnosticString(this);
     }
 
     public void WriteTo(pb::CodedOutputStream output) {

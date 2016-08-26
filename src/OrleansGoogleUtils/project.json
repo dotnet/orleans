@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "Google.Protobuf": "3.0.0-alpha4"
+    "Google.Protobuf": "3.0.0"
   },
   "frameworks": {
     "net451": {}
