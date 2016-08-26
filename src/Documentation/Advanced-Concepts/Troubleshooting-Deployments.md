@@ -42,7 +42,7 @@ role recycling. Check the logs for more information. Visual Studio provides some
 ## Role Keeps Recycling
 - Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.
 - Check the logs to see if there is an unhandled exception while initializing.
-- Make sure that the connections strings are correct.
+- Make sure that the connection strings are correct.
 - Check the Azure Cloud Services troubleshooting pages for more information.
 
 ## How to Check Logs
