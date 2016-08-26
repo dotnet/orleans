@@ -1,3 +1,5 @@
+using Orleans.Streams.AdHoc;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -12,6 +14,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
+    using Orleans.Streams;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -183,15 +186,26 @@ namespace Orleans.CodeGenerator
 
                     body.Add(SF.ExpressionStatement(invocation));
                 }
+                else if (method.ReturnType.IsConstructedGenericType &&
+                          method.ReturnType.GetGenericTypeDefinition() == typeof(IAsyncObservable<>))
+                {
+                    var invocation =
+                        SF.InvocationExpression(baseReference.Member("InvokeObservableMethod", method.ReturnType.GenericTypeArguments[0]))
+                            .AddArgumentListArguments(methodIdArgument)
+                            .AddArgumentListArguments(SF.Argument(args));
+
+                    body.Add(SF.ReturnStatement(invocation));
+                }
                 else
                 {
                     var returnType = method.ReturnType == typeof(Task)
                                          ? typeof(object)
                                          : method.ReturnType.GenericTypeArguments[0];
+                    
                     var invocation =
-                        SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", returnType))
-                            .AddArgumentListArguments(methodIdArgument)
-                            .AddArgumentListArguments(SF.Argument(args));
+                    SF.InvocationExpression(baseReference.Member("InvokeMethodAsync", returnType))
+                        .AddArgumentListArguments(methodIdArgument)
+                        .AddArgumentListArguments(SF.Argument(args));
 
                     if (options != null)
                     {

@@ -6,9 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime
 {
+    using Orleans.Streams;
+
     /// <summary>
     /// This is the base class for all typed grain references.
     /// </summary>
@@ -279,20 +282,17 @@ namespace Orleans.Runtime
             }
         }
 
+        protected IAsyncObservable<T> InvokeObservableMethod<T>(int methodId, object[] arguments)
+        {
+            return new GrainObservableProxy<T>(this, CreateInvokeMethodRequest(methodId, arguments));
+        }
+
         /// <summary>
         /// Called from generated code.
         /// </summary>
         protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None, SiloAddress silo = null)
         {
-            object[] argsDeepCopy = null;
-            if (arguments != null)
-            {
-                CheckForGrainArguments(arguments);
-                SetGrainCancellationTokensTarget(arguments, this);
-                argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
-            }
-            
-            var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
+            var request = CreateInvokeMethodRequest(methodId, arguments);
 
             if (IsUnordered)
                 options |= InvokeMethodOptions.Unordered;
@@ -312,6 +312,20 @@ namespace Orleans.Runtime
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
             return resultTask.Unbox<T>();
+        }
+
+        private InvokeMethodRequest CreateInvokeMethodRequest(int methodId, object[] arguments)
+        {
+            object[] argsDeepCopy = null;
+            if (arguments != null)
+            {
+                CheckForGrainArguments(arguments);
+                SetGrainCancellationTokensTarget(arguments, this);
+                argsDeepCopy = (object[]) SerializationManager.DeepCopy(arguments);
+            }
+
+            var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
+            return request;
         }
 
         #endregion

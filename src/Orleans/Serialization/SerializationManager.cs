@@ -2176,7 +2176,6 @@ namespace Orleans.Serialization
                 field.FieldType.GetTypeInfo().Module,
                 true);
 
-            // Emit IL to return the value of the Transaction property.
             var emitter = method.GetILGenerator();
             emitter.Emit(OpCodes.Ldarg_0);
             emitter.Emit(OpCodes.Ldfld, field);

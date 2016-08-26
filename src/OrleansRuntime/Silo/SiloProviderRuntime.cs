@@ -9,10 +9,13 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans.Runtime.Providers
 {
-    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
+    using Orleans.Core;
+
+    internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime, IGrainExtensionManager
     { 
         private static volatile SiloProviderRuntime instance;
         private static readonly object syncRoot = new Object();
@@ -148,16 +151,22 @@ namespace Orleans.Runtime.Providers
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
         }
 
+        internal bool TryAddExtension(IGrainExtension handler)
+        {
+            return TryAddExtension(handler, handler.GetType());
+        }
+
         /// <summary>
         /// Adds the specified extension handler to the currently running activation.
         /// This method must be called during an activation turn.
         /// </summary>
         /// <param name="handler"></param>
+        /// <param name="extensionType">The extension type to register, used for disambiguation.</param>
         /// <returns></returns>
-        internal bool TryAddExtension(IGrainExtension handler)
+        public bool TryAddExtension(IGrainExtension handler, Type extensionType)
         {
             var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(handler.GetType());
+            var invoker = TryGetExtensionInvoker(extensionType);
             if (invoker == null)
                 throw new SystemException("Extension method invoker was not generated for an extension interface");
             
@@ -180,13 +189,13 @@ namespace Orleans.Runtime.Providers
         /// This method must be called during an activation turn.
         /// </summary>
         /// <param name="handler"></param>
-        internal void RemoveExtension(IGrainExtension handler)
+        public void RemoveExtension(IGrainExtension handler)
         {
             var currentActivation = GetCurrentActivationData();
             currentActivation.RemoveExtension(handler);
         }
 
-        internal bool TryGetExtensionHandler<TExtension>(out TExtension result)
+        public bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension
         {
             var currentActivation = GetCurrentActivationData();
             IGrainExtension untypedResult;
@@ -202,16 +211,24 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
-            if(interfaces.Count != 1)
-                throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
+            Type interfaceType;
+            if (!handlerType.IsInterface)
+            {
+                var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
+                if (interfaces.Count != 1) throw new InvalidOperationException($"Extension type {handlerType.FullName} implements more than one grain interface.");
+                interfaceType = interfaces.First();
+            }
+            else
+            {
+                interfaceType = handlerType;
+            }
 
-            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
+            var interfaceId = GrainInterfaceUtils.ComputeInterfaceId(interfaceType);
             var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker) invoker;
             
-            throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
+            throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", nameof(handlerType));
         }
 
         public object GetCurrentSchedulingContext()

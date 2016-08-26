@@ -6,9 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans.CodeGeneration
 {
+    using Orleans.Streams;
+
     internal static class GrainInterfaceUtils
     {
         [Serializable]
@@ -61,11 +64,14 @@ namespace Orleans.CodeGeneration
             return string.IsNullOrEmpty(n) ? "arg" + info.Position : n;
         }
 
-        public static bool IsTaskType(Type t)
+        public static bool IsValidGrainInterfaceReturnType(Type t)
         {
             var typeInfo = t.GetTypeInfo();
-            return t == typeof (Task)
-                || (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.Task`1");
+            return t == typeof(Task)
+                   ||
+                   (typeInfo.IsGenericType &&
+                    (typeInfo.GetGenericTypeDefinition() == typeof(Task<>) ||
+                     typeInfo.GetGenericTypeDefinition() == typeof(IAsyncObservable<>)));
         }
 
         /// <summary>
@@ -157,7 +163,7 @@ namespace Orleans.CodeGeneration
         {
             var methods = type.GetMethods();
             // An interface is task-based if it has at least one method that returns a Task or at least one parent that's task-based.
-            return methods.Any(m => IsTaskType(m.ReturnType)) || type.GetInterfaces().Any(IsTaskBasedInterface);
+            return methods.Any(m => IsValidGrainInterfaceReturnType(m.ReturnType)) || type.GetInterfaces().Any(IsTaskBasedInterface);
         }
 
         public static bool IsGrainType(Type grainType)
@@ -225,10 +231,10 @@ namespace Orleans.CodeGeneration
                             type.FullName, method.Name));
                     }
                 }
-                else if (!IsTaskType(method.ReturnType))
+                else if (!IsValidGrainInterfaceReturnType(method.ReturnType))
                 {
                     success = false;
-                    violations.Add(String.Format("Method {0}.{1} must return Task or Task<T> because it is defined within a grain interface.",
+                    violations.Add(String.Format("Method {0}.{1} must return Task, Task<T>, or IAsyncObservable<T> because it is defined within a grain interface.",
                         type.FullName, method.Name));
                 }
 

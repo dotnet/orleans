@@ -90,6 +90,7 @@
     <Compile Include="ProducerEventCountingGrain.cs" />
     <Compile Include="PromiseForwardGrain.cs" />
     <Compile Include="ProxyGrain.cs" />
+    <Compile Include="ReactiveGrain.cs" />
     <Compile Include="ReentrantGrain.cs" />
     <Compile Include="ReminderTestGrain.cs" />
     <Compile Include="RequestContextTestGrain.cs" />

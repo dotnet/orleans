@@ -71,6 +71,7 @@
     <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
     <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
+    <Compile Include="ReactiveStreams\ReactiveStreamsTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
     <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
     <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />

@@ -87,6 +87,7 @@
     <Compile Include="IProducerEventCountingGrain.cs" />
     <Compile Include="IPromiseForwardGrain.cs" />
     <Compile Include="IProxyGrain.cs" />
+    <Compile Include="IReactiveGrain.cs" />
     <Compile Include="IReentrancyGrain.cs" />
     <Compile Include="IReentrantStressTestGrain.cs" />
     <Compile Include="IReminderTestGrain.cs" />

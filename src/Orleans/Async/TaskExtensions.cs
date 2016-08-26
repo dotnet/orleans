@@ -4,9 +4,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Async;
 using Orleans.Runtime;
+using Orleans.Streams.AdHoc;
 
 namespace Orleans
 {
+    using Orleans.Streams;
+
     /// <summary>
     /// Utility functions for dealing with Tasks.
     /// </summary>
@@ -59,6 +62,15 @@ namespace Orleans
                 default:
                     return BoxAwait(task);
             }
+        }
+
+        /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="IGrainObservable{T}"/>.
+        /// </summary>
+        /// <param name="value">The observable.</param>
+        public static Task<object> Box<T>(this IAsyncObservable<T> value)
+        {
+            return Task.FromResult((object)value);
         }
 
         /// <summary>
