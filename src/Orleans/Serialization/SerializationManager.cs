@@ -95,7 +95,7 @@ namespace Orleans.Serialization
 
         #region Privates
 
-        private static HashSet<Type> registeredTypes;
+        private static HashSet<Type> registeredTypes = new HashSet<Type>();
         private static List<IExternalSerializer> externalSerializers;
         private static ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
         private static IReadOnlyDictionary<string, Type> types;
@@ -109,7 +109,7 @@ namespace Orleans.Serialization
         private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
         private static readonly object registerBuiltInSerializerLockObj = new object();
-        internal static int RegisteredTypesCount { get { if (registeredTypes == null) return 0; lock (registeredTypes) { return registeredTypes.Count; } } }
+        internal static int RegisteredTypesCount { get { lock (registeredTypes) { return registeredTypes.Count; } } }
 
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
@@ -155,25 +155,30 @@ namespace Orleans.Serialization
 
         public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
         {
-            try
+            lock (registeredTypes)
             {
-                RegisterBuiltInSerializers();
-                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-                RegisterSerializationProviders(serializationProviders);
-                AssemblyProcessor.Initialize();
-                fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+                try
+                {
+                    RegisterBuiltInSerializers();
+                    BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+                    RegisterSerializationProviders(serializationProviders);
+                    AssemblyProcessor.Initialize();
+                    fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    throw ex.Flatten();
+                }
+                InitialRegistrationComplete();
             }
-            catch (ReflectionTypeLoadException ex)
-            {
-                throw ex.Flatten();
-            }
-            InitialRegistrationComplete();
         }
 
         internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
-            RegisterBuiltInSerializers();
-            UseStandardSerializer = useStandardSerializer;
+            lock (registeredTypes)
+            {
+                RegisterBuiltInSerializers();
+                UseStandardSerializer = useStandardSerializer;
 
 #if NETSTANDARD1_6
             if (!useJsonFallbackSerializer)
@@ -184,43 +189,44 @@ namespace Orleans.Serialization
 
             useJsonFallbackSerializer = true;
 #endif
-            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+                fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
 
-            if (StatisticsCollector.CollectSerializationStats)
-            {
-                const CounterStorage store = CounterStorage.LogOnly;
-                Copies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPIES, store);
-                Serializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION, store);
-                Deserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION, store);
-                HeaderSers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION, store);
-                HeaderDesers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION, store);
-                HeaderSersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_NUMHEADERS, store);
-                HeaderDesersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_NUMHEADERS, store);
-                CopyTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPY_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                SerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                DeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                HeaderSerTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-                HeaderDeserTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
-
-                TotalTimeInSerializer = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_TOTAL_TIME_IN_SERIALIZER_MILLIS, () =>
+                if (StatisticsCollector.CollectSerializationStats)
                 {
-                    long ticks = CopyTimeStatistic.GetCurrentValue() + SerTimeStatistic.GetCurrentValue() + DeserTimeStatistic.GetCurrentValue()
-                            + HeaderSerTime.GetCurrentValue() + HeaderDeserTime.GetCurrentValue();
-                    return Utils.TicksToMilliSeconds(ticks);
-                }, CounterStorage.LogAndTable);
+                    const CounterStorage store = CounterStorage.LogOnly;
+                    Copies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPIES, store);
+                    Serializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION, store);
+                    Deserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION, store);
+                    HeaderSers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION, store);
+                    HeaderDesers = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION, store);
+                    HeaderSersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_NUMHEADERS, store);
+                    HeaderDesersNumHeaders = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_NUMHEADERS, store);
+                    CopyTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DEEPCOPY_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
+                    SerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
+                    DeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
+                    HeaderSerTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_SERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
+                    HeaderDeserTime = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_HEADER_DESERIALIZATION_MILLIS, store).AddValueConverter(Utils.TicksToMilliSeconds);
 
-                const CounterStorage storeFallback = CounterStorage.LogOnly;
-                FallbackSerializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION, storeFallback);
-                FallbackDeserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION, storeFallback);
-                FallbackCopies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPIES, storeFallback);
-                FallbackSerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
-                FallbackDeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
-                FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
+                    TotalTimeInSerializer = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_TOTAL_TIME_IN_SERIALIZER_MILLIS, () =>
+                    {
+                        long ticks = CopyTimeStatistic.GetCurrentValue() + SerTimeStatistic.GetCurrentValue() + DeserTimeStatistic.GetCurrentValue()
+                                + HeaderSerTime.GetCurrentValue() + HeaderDeserTime.GetCurrentValue();
+                        return Utils.TicksToMilliSeconds(ticks);
+                    }, CounterStorage.LogAndTable);
+
+                    const CounterStorage storeFallback = CounterStorage.LogOnly;
+                    FallbackSerializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION, storeFallback);
+                    FallbackDeserializations = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION, storeFallback);
+                    FallbackCopies = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPIES, storeFallback);
+                    FallbackSerTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_SERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
+                    FallbackDeserTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DESERIALIZATION_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
+                    FallbackCopiesTimeStatistic = CounterStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BODY_FALLBACK_DEEPCOPY_MILLIS, storeFallback).AddValueConverter(Utils.TicksToMilliSeconds);
+                }
+
+                RegisterSerializationProviders(serializationProviders);
+                AssemblyProcessor.Initialize();
+                InitialRegistrationComplete();
             }
-
-            RegisterSerializationProviders(serializationProviders);
-            AssemblyProcessor.Initialize();
-            InitialRegistrationComplete();
         }
 
         internal static void RegisterBuiltInSerializers()
@@ -236,7 +242,6 @@ namespace Orleans.Serialization
             }
 
             AppDomain.CurrentDomain.AssemblyResolve += OnResolveEventHandler;
-            registeredTypes = new HashSet<Type>();
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
             types = new Dictionary<string, Type>();
