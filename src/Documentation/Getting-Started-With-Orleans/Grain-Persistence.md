@@ -99,20 +99,41 @@ The following attributes can be added to the `<Provider />` element to configure
 * __`IndentJSON="false"`__ (optional) - (if `UseJsonFormat="true"`) Indents the serialized json, defaults to `false`
 
 
+### ADO.NET Storage Provider (SQL Storage Provider)
 
-<!--
-### SqlStorageProvider
+Note that to use the it is necessary to deploy the database script to the database. It can be found in the The scripts are located in the Nuget library, similar to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version and database vendor.
 
 ```xml
-<Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore"
-    ConnectionString="..." />
+<Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore" DataConnectionString="Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;" />
 ```
-* __`ConnectionString="..."`__ (mandatory) - The SQL connection string to use
-* __`MapName=""`__ ???
-* __`ShardCredentials=""`__ ???
-* __`StateMapFactoryType=""`__ (optional) defaults to `Lazy`???
-* __`Ignore="false"`__ (optional) - If true, disables persistence, defaults to `false`
--->
+ 
+* __`DataConnectionString="..."`__ (mandatory) - The SQL connection string to use.
+* __`UseJsonFormat="false"`__ (optional) - If true, the json serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`.
+* __`UseXmlFormat="false"`__ (optional) - If true, the .NET XML serializer will be used, otherwise the Orleans binary serializer will be used, defaults to `false`.
+* __`UseBinaryFormat="false"`__ (the default) - If true, the Orleans binary data format will be used.
+
+Note that pool size of 200 is quite a low figure.
+
+The following is an example of programmatic configuration.
+
+``` csharp
+//props["RootDirectory"] = @".\Samples.FileStorage";
+//config.Globals.RegisterStorageProvider<Samples.StorageProviders.OrleansFileStorage>("TestStore", props);
+props[Orleans.Storage.AdoNetStorageProvider.DataConnectionStringPropertyName] = @"Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;";
+props[Orleans.Storage.AdoNetStorageProvider.UseJsonFormatPropertyName] = "true"; //Binary, the default option, is more efficient. This is for illustrative purposes.
+config.Globals.RegisterStorageProvider<Orleans.Storage.AdoNetStorageProvider>("TestStore", props);
+```
+
+A quick way to test this is to (see in the aforementioned the few commented lines)
+
+1. Open `\Samples\StorageProviders`.
+2. On the package manager console, run: `Install-Package Microsoft.Orleans.OrleansSqlUtils -project Test.Client`.
+3. Update all the Orleans packages in the solution, run: `Get-Package | where Id -like 'Microsoft.Orleans.*' | foreach { update-package $_.Id }` (this is a precaution to make sure the packages are on same version).
+4. Go to `OrleansHostWrapper.cs` and to the following
+
+The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
+there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
+
 
 ### MemoryStorage
 
@@ -123,33 +144,6 @@ The following attributes can be added to the `<Provider />` element to configure
 
 * __`NumStorageGrains="10"`__ (optional) - The number of grains to use to store the state, defaults to `10`
 
-### ADO.NET Persistence
-
-Initializing the database structures needs table named `Storage` from the database scripts and `OrleansQuery` with its contents (or the queries that use `Storage` table).
-The scripts are located in the Nuget library, the path is in projects close to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version. Deploying
-the whole script to the database should not cause problems.
-
-In addition to deploying the script to the database, the following is an example of programmatic configuration. A quick way to test this is to
-
-1. Open `\Samples\StorageProviders`.
-2. On the package manager console, run: `Install-Package Microsoft.Orleans.OrleansSqlUtils -project Test.Client`.
-3. Update all the Orleans packages in the solution, run: `Get-Package | where Id -like 'Microsoft.Orleans.*' | foreach { update-package $_.Id }` (this is a precaution to make sure the packages are on same version).
-4. Go to `OrleansHostWrapper.cs` and to the following
-
-``` csharp
-//props["RootDirectory"] = @".\Samples.FileStorage";
-//config.Globals.RegisterStorageProvider<Samples.StorageProviders.OrleansFileStorage>("TestStore", props);
-props[Orleans.Storage.AdoNetStorageProvider.DataConnectionStringPropertyName] = @"Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;";
-props[Orleans.Storage.AdoNetStorageProvider.UseJsonFormatPropertyName] = "true"; //Binary, the default option, is more efficient. This is for illustrative purposes.
-config.Globals.RegisterStorageProvider<Orleans.Storage.AdoNetStorageProvider>("TestStore", props);
-```
-
-This is a simple configuration that stores data to the database in JSON format. Other built-in formats are
-`Storage.AdoNetStorageProvider.UseXmlFormatPropertyName` for XML and the default, `Storage.AdoNetStorageProvider.UseBinaryFormatPropertyName` for Orleans binary serialization format.
-Do observe `Max Pool Size = 200` is insufficient for large deployments.
-
-The ADO.NET persistence has functionality to version data and define arbitrary (de)serializers with arbitrary application rules and streaming, but currently
-there is no method to expose them to application code. More information in [ADO.NET Persistence Rationale](#ADONETPersistenceRationale).
 
 ### ShardedStorageProvider
 
@@ -352,7 +346,7 @@ The principles for ADO.NET backed persistence storage are:
 2. Take advantenge of vendor and storage specific functionality.
 
 In practice this means adhering to [ADO.NET implementation goals](../Runtime-Implementation-Details/Relational-Storage)
-and some added twists in ADO.NET specific storage provider that allow evolving the shape of the data in the storage.
+and some added implementation logic in ADO.NET specific storage provider that allow evolving the shape of the data in the storage.
 
 In addition to the usual storage provider capabilities, the ADO.NET provider has built-in capability to
 
@@ -372,4 +366,4 @@ This is an implementation of [IStorageSerializationPicker](https://github.com/do
 [StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
 or using (de)serializers can be seen at [RelationalStorageTests]https://github.com/dotnet/orleans/blob/master/test/TesterInternal/StorageTests/Relational/RelationalStorageTests.cs).
 
-Unfortunately currently there is no method to expose this to Orleans application consumption as there there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
+Currently there is no method to expose this to Orleans application consumption as there is no method to access the framework created [AdoNetStorageProvider](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/Storage/Provider/AdoNetStorageProvider.cs) instance.
