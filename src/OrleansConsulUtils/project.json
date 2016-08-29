@@ -1,7 +1,6 @@
 {
   "dependencies": {
-    "Consul": "0.6.4.1",
-    "Newtonsoft.Json": "7.0.1"
+    "Consul": "0.6.4.1"
   },
   "frameworks": {
     "net451": {}

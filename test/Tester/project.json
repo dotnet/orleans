@@ -5,7 +5,6 @@
     "FSharp.Core": "4.0.0.1",
     "Google.Protobuf": "3.0.0",
     "Microsoft.Extensions.DependencyInjection": "1.0.0",
-    "Newtonsoft.Json": "7.0.1",
     "System.Management.Automation.dll": "10.0.10586",
     "WindowsAzure.ServiceBus": "3.3.2",
     "WindowsAzure.Storage": "7.0.0",
