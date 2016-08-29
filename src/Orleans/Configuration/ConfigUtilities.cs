@@ -619,9 +619,12 @@ namespace Orleans.Runtime.Configuration
         public static string RuntimeVersionInfo()
         {
             var sb = new StringBuilder();
+#if !NETSTANDARD
+			// TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   Is .NET 4.5=").AppendLine(IsNet45OrNewer().ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
+#endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))

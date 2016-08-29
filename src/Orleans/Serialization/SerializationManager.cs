@@ -72,7 +72,7 @@ namespace Orleans.Serialization
             set;
         }
 
-#if NETSTANDARD1_6
+#if NETSTANDARD
         // Workaround for CoreCLR where FormatterServices.GetUninitializedObject is not public (but might change in RTM so we could remove this then).
         private static readonly Func<Type, object> getUninitializedObjectDelegate =
             (Func<Type, object>)
@@ -173,7 +173,7 @@ namespace Orleans.Serialization
             RegisterBuiltInSerializers();
             UseStandardSerializer = useStandardSerializer;
 
-#if NETSTANDARD1_6
+#if NETSTANDARD
             if (!useJsonFallbackSerializer)
             {
                 logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
@@ -830,12 +830,7 @@ namespace Orleans.Serialization
                 typeInfo = type.GetTypeInfo();
             }
 
-            var constructor =
-                typeInfo.GetConstructor(
-                                BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
-                                null,
-                                new[] { typeof(GrainReference) },
-                                null);
+            var constructor = TypeUtils.GetConstructorThatMatches(type, new[] { typeof(GrainReference) });
 
             var ctorParam = Expression.Parameter(typeof(GrainReference), "grainRef");
             var lambda = Expression.Lambda(
@@ -2009,7 +2004,7 @@ namespace Orleans.Serialization
             }
             else
             {
-#if NETSTANDARD1_6
+#if NETSTANDARD
                 throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
 #else
                 serializer = new BinaryFormatterSerializer();
