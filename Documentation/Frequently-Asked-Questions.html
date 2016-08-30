@@ -8,7 +8,7 @@
     <title>Frequently Asked Questions | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Frequently Asked Questions | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,6 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Frequently-Asked-Questions.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="frequently-asked-questions">Frequently Asked Questions</h1>
               
 <h2 id="does-microsoft-support-orleans">Does Microsoft support Orleans?</h2>
@@ -99,7 +98,7 @@
 <p>No, not currently.</p>
 <h2 id="how-do-you-version-grains">How do you version grains?</h2>
 <p>Orleans currently does not support updating grain code on the fly. To upgrade to a new version of grain code, you need to provision and start a new deployment, switch incoming traffic to it, and then shut down the old deployment.</p>
-<h2 id="can-i-persist-a-grain-s-state-to-the-azure-cache-service">Can I persist a grain’s state to the Azure cache service?</h2>
+<h2 id="can-i-persist-a-grains-state-to-the-azure-cache-service">Can I persist a grain’s state to the Azure cache service?</h2>
 <p>This can be done though a storage provider for Azure Cache. We don’t have one but you can easily build your own.</p>
 <h2 id="can-i-connect-to-orleans-silos-from-the-public-internet">Can I Connect to Orleans silos from the public internet?</h2>
 <p>Orleans is designed to be hosted as the back-end part of a service and you are suposed to create a front-end in your servers which externa clients connect to. It can be an http based Web API project, a socket server, a SignalR server or anything else which you require. You can actually connect to Orleans from the internet, but it is not a good practice from the security point of view.</p>
@@ -121,9 +120,18 @@ You just need to consider the rare possibility of having two instances of an act
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Frequently-Asked-Questions.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

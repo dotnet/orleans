@@ -8,7 +8,7 @@
     <title>Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,6 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Grains.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h2 id="grains-actors-units-of-distribution">Grains (Actors): Units of Distribution</h2>
               
 <p>Distributed applications are inherently concurrent, which leads to complexity. One of the things that makes the actor model special and productive is that it helps reduce some of the complexities of having to grapple with concurrency.</p>
@@ -85,7 +84,7 @@ A typical grain encapsulates state and behavior of a single entity (e.g. a speci
 <h3 id="turns-units-of-execution">Turns: Units of Execution</h3>
 <p>The idea behind the single-threaded execution model for actors is that the invokers (remote) take turns &quot;calling&quot; its methods. Thus, a message coming to actor B from actor A will placed in a queue and the associated handler is invoked only when all prior messages have been serviced.</p>
 <p>This allows us to avoid all use of locks to protect actor state, as it is inherently protected against data races. However, it may also lead to problems when messages pass back and forth and the message graph forms cycles. If A sends a message to B from one of its methods and awaits its completion, and B sends a message to A, also awaiting its completion, the application will quickly lock up.</p>
-<h3 id="a-grain-activation-the-runtime-instance-of-a-grain">A Grain Activation - The runtime instance of a Grain</h3>
+<h3 id="a-grain-activation---the-runtime-instance-of-a-grain">A Grain Activation - The runtime instance of a Grain</h3>
 <p>When there is work for a grain, Orleans ensures there is an instance of the grain on one of <a href="Silos.html">Orleans Silos</a>. When there is no instance of the grain on any silo, the run-time creates one. This process is called Activation. In case a grain is using <a href="Grain-Persistence.html">Grain Persistence</a>, the run-time automatically reads the state from the backing-store upon activation. 
 Orleans controls the process of activating and deactivating grains transparently. When coding a grain, a developer assumes all grains are always activated.</p>
 <p>A grain activation performs work in chunks and finishes each chunk before it moves on to the next. Chunks of work include method invocations in response to requests from other grains or external clients, and closures scheduled on completion of a previous chunk. The basic unit of execution corresponding to a chunk of work is known as a turn.</p>
@@ -102,9 +101,18 @@ So this mode is appropriate for grains that hold no local state, or grains whose
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Getting-Started-With-Orleans/Grains.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

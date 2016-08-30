@@ -566,23 +566,41 @@ body .toc{
 .article img {
   max-width: 100%;
 }
-.affix {
+.sideaffix {
+  margin-top: 50px;
   font-size: 12px;
   max-height: 100%;
   overflow: hidden;
   top: 100px;
   bottom: 10px;
+  position: fixed;
+}
+.affix {
+  position: relative;
+  height: 100%;
+}
+.sideaffix > div.contribution {
+  margin-bottom: 20px;
+}
+.sideaffix > div.contribution > ul > li > a.contribution-link {
+  padding: 6px 10px;
+  font-weight: bold;
+  font-size: 14px;
+}
+.sideaffix > div.contribution > ul > li > a.contribution-link:hover {
+  background-color: #ffffff;
+}
+.sideaffix ul.nav > li > a:focus {
+  background: none;
 }
 .affix h5 {
   font-weight: bold;
   text-transform: uppercase;
-  margin-top: 50px;
   padding-left: 10px;
   font-size: 12px;
 }
 .affix > ul.level1 {
-  overflow-x: hidden;
-  overflow-y: -20px;
+  overflow: hidden;
   padding-bottom: 10px;
   height: calc(100% - 100px);
   margin-right: -20px;
@@ -602,6 +620,9 @@ body .toc{
 .affix ul > li > a {
   padding: 5px 12px;
   color: #666666;
+}
+.affix > ul > li.active:last-child {
+  margin-bottom: 50px;
 }
 .affix > ul > li > a:before {
   content: "|";
@@ -750,7 +771,7 @@ footer {
   /*.expand-all {
     display: none;
   }*/
-  .affix {
+  .sideaffix {
     display: none;
   }
   .mobile-hide {

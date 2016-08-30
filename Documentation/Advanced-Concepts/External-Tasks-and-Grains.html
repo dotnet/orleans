@@ -8,7 +8,7 @@
     <title>External Tasks and Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="External Tasks and Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,6 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/External-Tasks-and-Grains.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="external-tasks-and-grains">External Tasks and Grains</h1>
               
 <p>By design, any sub-Tasks spawned from grain code (for example, by using <code>await</code> or <code>ContinueWith</code> or <code>Task.Factory.StartNew</code>) will be dispatched on the same per-activation <a href="https://msdn.microsoft.com/en-us/library/dd997402(v=vs.110).aspx">TPL Task Scheduler</a> as the parent task and therefore inherit the same single-threaded execution model as the rest of grain code. This is the main point behind single threaded execution of <a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Concurrency">grain turn based concurency</a>.</p>
@@ -114,7 +113,7 @@
         // We are back to Orleans task scheduler.
         Assert.AreEqual(orleansTS, TaskScheduler.Current);
    }
-</code></pre><h3 id="advanced-example-making-grain-call-from-a-code-that-runs-on-thread-pool">Advanced Example - making grain call from a code that runs on thread pool</h3>
+</code></pre><h3 id="advanced-example---making-grain-call-from-a-code-that-runs-on-thread-pool">Advanced Example - making grain call from a code that runs on thread pool</h3>
 <p>There is sometimes an even more advanced scenario of a piece of grain code that needs to “break out” of the Orleans task scheduling model and run on a thread pool (or some other, non-Orleans context) but still needs an ability to make a grain call to another grain. If you will just try to make a grain call not from within Orleans context, you will get an exception telling you that you are &quot;trying to send a message on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext)&quot;.</p>
 <p>Below is a code that demonstrates how a grain call can be made from a piece of code that runs inside a grain but not in the grain context.</p>
 <pre><code class="lang-csharp">   public async Task MyGrainMethod()
@@ -190,9 +189,18 @@
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/External-Tasks-and-Grains.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

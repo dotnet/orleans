@@ -8,7 +8,7 @@
     <title>Using Consul as a Membership Provider | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Using Consul as a Membership Provider | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,7 +71,6 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Consul-Deployment.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="using-consul-as-a-membership-provider">Using Consul as a Membership Provider</h1>
               
 <h2 id="introduction-to-consul">Introduction to Consul</h2>
@@ -158,7 +157,7 @@
 <pre><code>&quot;2016-01-29T16:35:58.9193803Z&quot;
 </code></pre><p>When the Clients connect, they read the KVs for all silos in the cluster in one HTTP GET by using the uri <code>http://192.168.1.26:8500/v1/KV/orleans/MyOrleansDeployment/?recurse</code>.</p>
 <h2 id="limitations">Limitations</h2>
-<h3 id="orleans-extended-membership-protocol-table-version-etag">Orleans Extended Membership Protocol (Table Version &amp; ETag)</h3>
+<h3 id="orleans-extended-membership-protocol-table-version--etag">Orleans Extended Membership Protocol (Table Version &amp; ETag)</h3>
 <p>Consul KV currrently does not currently support atomic updates. Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described <a href="http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management">here</a> and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented. Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.</p>
 <h3 id="multiple-datacenters">Multiple Datacenters</h3>
 <p>The Key Value Pairs in Consul are not currently replicated between Consul datacenters.  There is a <a href="https://github.com/hashicorp/consul-replicate">separate project</a> to address this but it has not yet been proven to support Orleans.</p>
@@ -175,9 +174,18 @@
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Runtime-Implementation-Details/Consul-Deployment.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

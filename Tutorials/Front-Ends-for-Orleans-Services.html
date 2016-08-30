@@ -8,7 +8,7 @@
     <title>Front Ends for Orleans Services | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Front Ends for Orleans Services | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,14 +71,13 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Front-Ends-for-Orleans-Services.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="front-ends-for-orleans-services">Front Ends for Orleans Services</h1>
               
 <p>Exposing silo gateway ports as public endpoints of an Orleans cluster is not recommended.
 Instead, Orleans is intended to be fronted by your own API.</p>
 <p>Creating an HTTP API, or web application is a common scenario.
 Let&#39;s extend the Employee/Manager scenario from the  <a href="Declarative-Persistence.html">Declarative-Persistence</a> walk-through to see what steps are required to publish grain data over HTTP.</p>
-<h2 id="creating-the-asp-net-application">Creating the ASP.NET application</h2>
+<h2 id="creating-the-aspnet-application">Creating the ASP.NET application</h2>
 <p>First, you should add a new ASP.NET Web Application to your solution. Then, select the Web API template, although you could use MVC or Web Forms.</p>
 <h2 id="initializing-orleans">Initializing Orleans</h2>
 <p>Next, add a reference to the <em>Orleans.dll</em> file in the project references.</p>
@@ -149,9 +148,18 @@ This is best done in the <em>Global.asax.cs</em> file like this:</p>
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Front-Ends-for-Orleans-Services.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

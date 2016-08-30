@@ -8,7 +8,7 @@
     <title>Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,14 +71,13 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
               
 <p>This note shows how to manually convert a Visual Studio .csproj file which was created with Orleans v0.9 Visual Studio templates from using assembly references based on the $(OrleansSDK) environment variable to using Orleans NuGet packages.</p>
 <p>These examples assume you are using the latest v1.0.3 NuGet packages from Feb-2015.</p>
 <p>For simplicity I will use &quot;v0.9&quot; to refer to the &quot;old&quot; .csproj and &quot;v1.0&quot; to refer to the &quot;new&quot; .csproj although strictly speaking &quot;v1.0 really means &quot;&gt;= v1.0.3&quot; in practice because there was significant restructuring and changes in the Orleans NuGet packages before that point.</p>
 <h1 id="grain-interface-project">Grain Interface Project</h1>
-<h2 id="orleans-grain-interface-project-example-helloworldinterfaces-csproj">Orleans Grain Interface project -- Example: HelloWorldInterfaces.csproj</h2>
+<h2 id="orleans-grain-interface-project----example-helloworldinterfacescsproj">Orleans Grain Interface project -- Example: HelloWorldInterfaces.csproj</h2>
 <p><em>You might want to preserve a copy of the old .csproj file before you start, if you do not have a copy already preserved in your source code control system.</em></p>
 <p>Steps to to change Orleans Grain Interface project:</p>
 <ol>
@@ -109,7 +108,7 @@
 <li>Do Build-&gt;Rebuild on the project to rebuild with the new packages and binaries.</li>
 <li>Going forward, you should only need to change the version number in packages.config to use a newer package -- either manually edit the <code>packages.config</code> file or use NuGet Package Manager UI in Visual Studio.</li>
 </ol>
-<h2 id="orleans-grain-class-project-example-helloworldgrains-csproj">Orleans Grain Class project -- Example: HelloWorldGrains.csproj</h2>
+<h2 id="orleans-grain-class-project----example-helloworldgrainscsproj">Orleans Grain Class project -- Example: HelloWorldGrains.csproj</h2>
 <p>Steps to to change Orleans Grain Class project:</p>
 <p>Steps 1..4 and 6..8 are the same as for the grain interfaces .csproj above.</p>
 <ol>
@@ -127,9 +126,18 @@
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>

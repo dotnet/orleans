@@ -8,7 +8,7 @@
     <title>Minimal Orleans Application | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Minimal Orleans Application | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.3.1.0">
+    <meta name="generator" content="docfx 2.4.0.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,7 +71,6 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Minimal-Orleans-Application.md/#L1" class="btn btn-primary pull-right mobile-hide">Improve this Doc</a>
               <h1 id="minimal-orleans-application">Minimal Orleans Application</h1>
               
 <p>This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.</p>
@@ -133,7 +132,7 @@ class HelloGrain : Orleans.Grain, IHello
 </code></pre><h2 id="host">Host</h2>
 <p>The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).</p>
 <p>However this small implementation should demonstrate the basics of getting started.</p>
-<h4 id="host-app-config">Host – App.Config</h4>
+<h4 id="host--appconfig">Host – App.Config</h4>
 <p>Change App.config enable the recommended server style garbage collection</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;configuration&gt;
@@ -141,7 +140,7 @@ class HelloGrain : Orleans.Grain, IHello
     &lt;gcServer enabled=&quot;true&quot;/&gt;
   &lt;/runtime&gt;
 &lt;/configuration&gt;
-</code></pre><h4 id="host-orleansconfiguration-xml">Host – OrleansConfiguration.xml</h4>
+</code></pre><h4 id="host--orleansconfigurationxml">Host – OrleansConfiguration.xml</h4>
 <p>Within the Host project, add an XML file that will be used for cluster configuration called OrleansConfiguration.xml</p>
 <p>Make sure it is set to Copy to Output directory:</p>
 <pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
@@ -155,7 +154,7 @@ class HelloGrain : Orleans.Grain, IHello
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
 </code></pre><p>It is possible to configure this within the code, but it is fairly temperamental.</p>
-<h4 id="host-program-cs">Host – Program.cs</h4>
+<h4 id="host--programcs">Host – Program.cs</h4>
 <p>Program.cs is our most length code block. We are attempting to accomplish a number of objectives</p>
 <ol>
 <li>Initialize Orleans in its own AppDomain</li>
@@ -247,9 +246,18 @@ class Program
           </div>
           
           <div class="hidden-sm col-md-2" role="complementary">
-            <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-            <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
-            </nav>
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Minimal-Orleans-Application.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
           </div>
         </div>
       </div>
