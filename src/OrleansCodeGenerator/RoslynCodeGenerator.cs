@@ -256,7 +256,7 @@ namespace Orleans.CodeGenerator
         /// <returns>The compilation output.</returns>
         private static byte[] CompileAndLoad(GeneratedSyntax generatedSyntax)
         {
-            var rawAssembly = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen.dll");
+            var rawAssembly = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen");
             Assembly.Load(rawAssembly);
             return rawAssembly;
         }
