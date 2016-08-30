@@ -98,6 +98,11 @@ namespace Orleans
             get { throw new InvalidOperationException("Storage provider only available from inside grain"); }
         }
 
+        /// <summary>
+        /// The assembly catalog
+        /// </summary>
+        public IAssemblyCatalog AssemblyCatalog { get; private set; }
+
         internal IList<Uri> Gateways
         {
             get
@@ -115,7 +120,7 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
+        public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false, IAssemblyCatalog assemblyCatalog = null)
         {
             this.grainFactory = grainFactory;
             this.clientId = GrainId.NewClientId();
@@ -136,8 +141,25 @@ namespace Orleans
 
             try
             {
-                LoadAdditionalAssemblies();
-                
+                AssemblyCatalog = assemblyCatalog;
+
+                if (AssemblyCatalog == null)
+                {
+                    var catalog = new AssemblyCatalog();
+
+                    if (config.Assemblies == null ||
+                        config.Assemblies.Count == 0)
+                        catalog.WithAssembly(Assembly.GetEntryAssembly().FullName);
+
+                    foreach (var asmName in config.Assemblies)
+                    {
+                        catalog.WithAssembly(asmName);
+                    }
+                    AssemblyCatalog = catalog;
+                }
+
+                AssemblyLoader.NewAssemblyLoader(AssemblyCatalog);
+
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
@@ -211,34 +233,7 @@ namespace Orleans
                 .Wait();
             CurrentStreamProviderManager = streamProviderManager;
         }
-
-        private static void LoadAdditionalAssemblies()
-        {
-            var logger = LogManager.GetLogger("AssemblyLoader.Client", LoggerType.Runtime);
-
-            var directories =
-                new Dictionary<string, SearchOption>
-                    {
-                        {
-                            Path.GetDirectoryName(typeof(OutsideRuntimeClient).GetTypeInfo().Assembly.Location), 
-                            SearchOption.AllDirectories
-                        }
-                    };
-            var excludeCriteria =
-                new AssemblyLoaderPathNameCriterion[]
-                    {
-                        AssemblyLoaderCriteria.ExcludeResourceAssemblies,
-                        AssemblyLoaderCriteria.ExcludeSystemBinaries()
-                    };
-            var loadProvidersCriteria =
-                new AssemblyLoaderReflectionCriterion[]
-                    {
-                        AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
-                    };
-
-            AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
-        }
-        
+                
         private void UnhandledException(ISchedulingContext context, Exception exception)
         {
             logger.Error(ErrorCode.Runtime_Error_100007, String.Format("OutsideRuntimeClient caught an UnobservedException."), exception);

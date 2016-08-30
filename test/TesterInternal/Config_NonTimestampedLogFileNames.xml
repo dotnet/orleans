@@ -6,5 +6,8 @@
   <Defaults>
     <Networking Address="localhost" Port="0" />
     <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}.log" />
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
 </OrleansConfiguration>

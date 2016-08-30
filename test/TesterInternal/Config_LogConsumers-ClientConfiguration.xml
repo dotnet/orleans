@@ -22,4 +22,7 @@
     <Limit Name="NoHardLimit" SoftLimit="4" />
   </Limits>
   <Messaging ResponseTimeout="30" MaxResendCount="0"/>
+  <Assemblies>
+    <Assembly Name="TesterInternal"/>
+  </Assemblies>
 </ClientConfiguration>

@@ -7,4 +7,7 @@
   <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" WriteTraces="false">
     <TraceLevelOverride LogPrefix="Application" TraceLevel="Info" />
   </Tracing>
+  <Assemblies>
+    <Assembly Name="TesterInternal"/>
+  </Assemblies>
 </ClientConfiguration>

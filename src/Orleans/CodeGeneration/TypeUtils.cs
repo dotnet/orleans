@@ -188,7 +188,7 @@ namespace Orleans.Runtime
             {
                 return GetParameterizedTemplateName(GetSimpleTypeName(typeInfo, fullName), typeInfo, applyRecursively, fullName, language);
             }
-            
+
             var t = typeInfo.AsType();
             if (fullName != null && fullName(t) == true)
             {
@@ -593,6 +593,18 @@ namespace Orleans.Runtime
             var currentAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             var result = new List<Type>();
             foreach (var assembly in currentAssemblies.Where(loaded => !loaded.IsDynamic && assemblies.Contains(loaded.Location)))
+            {
+                // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
+                var types = GetTypes(assembly, whereFunc, logger);
+                result.AddRange(types);
+            }
+            return result;
+        }
+
+        public static IEnumerable<Type> GetTypes(List<Assembly> assemblies, Predicate<Type> whereFunc, Logger logger)
+        {
+            var result = new List<Type>();
+            foreach (var assembly in assemblies.Where(loaded => !loaded.IsDynamic))
             {
                 // there's no point in evaluating nested private types-- one of them fails to coerce to a reflection-only type anyhow.
                 var types = GetTypes(assembly, whereFunc, logger);

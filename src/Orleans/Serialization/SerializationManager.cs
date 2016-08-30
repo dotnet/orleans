@@ -158,7 +158,7 @@ namespace Orleans.Serialization
                 RegisterBuiltInSerializers();
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
-                AssemblyProcessor.Initialize();
+                
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     AssemblyProcessor.ProcessAssembly(assembly);
@@ -220,7 +220,6 @@ namespace Orleans.Serialization
             }
 
             RegisterSerializationProviders(serializationProviders);
-            AssemblyProcessor.Initialize();
         }
 
         internal static void RegisterBuiltInSerializers()

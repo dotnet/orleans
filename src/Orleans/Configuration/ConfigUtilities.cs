@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Configuration
                         throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
 
                     if (!grandchild.HasAttribute("Assembly"))
-                        throw new FormatException("Missing 'Type' attribute on TelemetryConsumer element.");
+                        throw new FormatException("Missing 'Assembly' attribute on TelemetryConsumer element.");
 
                     var className = grandchild.Attributes["Type"].Value;
                     var assemblyName = new AssemblyName(grandchild.Attributes["Assembly"].Value);
@@ -386,6 +386,38 @@ namespace Orleans.Runtime.Configuration
             {
                 throw new FormatException(string.Format("The serialization provider type {0} has a non-public parameterless constructor", type.FullName));
             }
+        }
+
+        internal static List<string> ParseAssemblyList(XmlElement root)
+        {
+            var assemblies = new List<string>();
+            //Load assemblies from XML
+            foreach (var node in root.ChildNodes)
+            {
+                var grandchild = node as XmlElement;
+                if (grandchild == null) continue;
+
+                if (!grandchild.LocalName.Equals("Assemblies"))
+                {
+                    continue;
+                }
+                else
+                {
+                    if (grandchild.LocalName != "Assembly")
+                        throw new FormatException("Invalid element in Assemblies list");
+
+                    if (!grandchild.HasAttribute("Name"))
+                        throw new FormatException("Missing 'Name' attribute on Assembly element.");
+
+                    var asmPath = grandchild.Attributes["Name"].Value;
+                    assemblies.Add(asmPath);
+                }
+            }
+
+            if (assemblies.Count == 0)
+                throw new FormatException("Missing <Assembly> entries on <Assemblies> element");
+
+            return assemblies;
         }
 
         // Time spans are entered as a string of decimal digits, optionally followed by a unit string: "ms", "s", "m", "hr"

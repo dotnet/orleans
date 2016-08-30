@@ -19,6 +19,9 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
+                options.ClusterConfiguration.Defaults.Assemblies = TestUtils.GetTestSiloAssemblyList();
+                options.ClientConfiguration.Assemblies = TestUtils.GetTestClientAssemblyList();
+
                 options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.StartupTypeName = typeof(TestStartup).AssemblyQualifiedName);
                 return new TestCluster(options);
             }

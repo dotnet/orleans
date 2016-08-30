@@ -29,6 +29,9 @@
       <TraceLevelOverride LogPrefix="PubSubRendezvousGrain" TraceLevel="Verbose" />
     </Tracing>
     <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s"/>
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />

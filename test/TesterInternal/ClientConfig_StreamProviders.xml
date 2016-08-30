@@ -16,4 +16,7 @@
     <Provider Type="Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider" Name="SMSProvider" FireAndForgetDelivery="false"/>
     <Provider Type="Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider" Name="AzureQueueProvider"/>
   </StreamProviders>
+  <Assemblies>
+    <Assembly Name="TesterInternal"/>
+  </Assemblies>
 </ClientConfiguration>

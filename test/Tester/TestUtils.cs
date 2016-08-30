@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Xunit;
+using System.Collections.Generic;
 
 namespace Tester
 {
@@ -37,6 +38,32 @@ namespace Tester
                 Console.WriteLine(errorMsg);
                 throw new SkipException(errorMsg);
             }
+        }
+
+        public static List<string> GetTestSiloAssemblyList()
+        {
+            return new List<string> {
+                    "Tester.dll",
+                    //@".\TestGrainInterfaces.dll",
+                    //@".\TestGrains.dll",
+                    //@".\TestInternalGrainInterfaces.dll",
+                    //@".\TestInternalGrains.dll",
+                    //@".\TestFSharpInterfaces.dll",
+                    //@".\Orleans.dll",
+                    //@".\OrleansRuntime.dll",
+                    //@".\TestFSharp.dll"
+            };
+        }
+
+        public static List<string> GetTestClientAssemblyList()
+        {
+            return new List<string> {
+                    "Tester.dll",
+                    //@".\TestGrainInterfaces.dll",
+                    //@".\TestFSharpInterfaces.dll",
+                    //@".\Orleans.dll",
+                    //@".\TestInternalGrainInterfaces.dll"
+            };
         }
 
         public static double CalibrateTimings()

@@ -200,7 +200,7 @@ namespace Orleans.Serialization
             }
         }
 
-        public static bool IsTypeIsInaccessibleForSerialization(Type type, Module fromModule, Assembly fromAssembly)
+        public static bool IsTypeIsInaccessibleForSerialization(Type type, Module fromModule, string serializationAssemblyName)
         {
             var typeInfo = type.GetTypeInfo();
 
@@ -220,19 +220,19 @@ namespace Orleans.Serialization
             {
                 foreach (var inner in typeInfo.GetGenericArguments())
                 {
-                    if (IsTypeIsInaccessibleForSerialization(inner, fromModule, fromAssembly))
+                    if (IsTypeIsInaccessibleForSerialization(inner, fromModule, serializationAssemblyName))
                     {
                         return true;
                     }
                 }
 
-                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetGenericTypeDefinition(), fromModule, fromAssembly))
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetGenericTypeDefinition(), fromModule, serializationAssemblyName))
                 {
                     return true;
                 }
             }
 
-            if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo.Assembly, fromAssembly))
+            if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo, serializationAssemblyName))
             {
                 // subtype is defined in a different assembly from the outer type
                 if (!typeInfo.Module.Equals(fromModule))
@@ -241,7 +241,7 @@ namespace Orleans.Serialization
                 }
 
                 // subtype defined in a different assembly from the one we are generating serializers for.
-                if (!typeInfo.Assembly.Equals(fromAssembly))
+                if (!typeInfo.Assembly.FullName.Equals(serializationAssemblyName))
                 {
                     return true;
                 }
@@ -250,7 +250,7 @@ namespace Orleans.Serialization
             // For arrays, check the element type.
             if (typeInfo.IsArray)
             {
-                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, fromAssembly))
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.GetElementType(), fromModule, serializationAssemblyName))
                 {
                     return true;
                 }
@@ -259,7 +259,7 @@ namespace Orleans.Serialization
             // For nested types, check that the declaring type is accessible.
             if (typeInfo.IsNested)
             {
-                if (IsTypeIsInaccessibleForSerialization(typeInfo.DeclaringType, fromModule, fromAssembly))
+                if (IsTypeIsInaccessibleForSerialization(typeInfo.DeclaringType, fromModule, serializationAssemblyName))
                 {
                     return true;
                 }
@@ -269,24 +269,30 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
-        /// Returns true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise.
+        /// Returns true if <paramref name="type"/> has is visible to <paramref name="serializationAssemblyName"/>, false otherwise.
         /// </summary>
-        /// <param name="fromAssembly">The assembly containing internal types.</param>
-        /// <param name="toAssembly">The assembly requiring access to internal types.</param>
+        /// <param name="type">The type.</param>
+        /// <param name="serializationAssemblyName">The full name of the assembly requiring access to internal types.</param>
         /// <returns>
-        /// true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise
+        /// true if <paramref name="type"/> is visible to <paramref name="serializationAssemblyName"/>, false otherwise
         /// </returns>
-        private static bool AreInternalsVisibleTo(Assembly fromAssembly, Assembly toAssembly)
+        private static bool AreInternalsVisibleTo(TypeInfo type, string serializationAssemblyName)
         {
+            if (type.IsVisible) return true;
+            if (type.IsConstructedGenericType)
+            {
+                if (!AreInternalsVisibleTo(type.GetGenericTypeDefinition().GetTypeInfo(), serializationAssemblyName)) return false;
+                return type.GetGenericArguments().All(innerType => AreInternalsVisibleTo(innerType.GetTypeInfo(), serializationAssemblyName));
+            }
+
             // If the to-assembly is null, it cannot have internals visible to it.
-            if (toAssembly == null)
+            if (string.IsNullOrWhiteSpace(serializationAssemblyName))
             {
                 return false;
             }
 
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
-            var serializationAssemblyName = toAssembly.GetName().FullName;
-            var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
+            var internalsVisibleTo = type.Assembly.GetCustomAttributes<InternalsVisibleToAttribute>();
             return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
         }
 

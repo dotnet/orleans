@@ -20,6 +20,9 @@
       -->
     </Tracing>
     <Statistics MetricsTableWriteInterval="1000m" PerfCounterWriteInterval="1000m" LogWriteInterval="1000m" StatisticsCollectionLevel="Verbose"/>
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />

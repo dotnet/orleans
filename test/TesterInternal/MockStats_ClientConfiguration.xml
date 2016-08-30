@@ -10,5 +10,8 @@
     <TraceLevelOverride LogPrefix="ClientLogStatistics" TraceLevel="Warning" />
   </Tracing>
   <Statistics MetricsTableWriteInterval="1s" LogWriteInterval="1s" WriteLogStatisticsToTable="true" />
+  <Assemblies>
+    <Assembly Name="TesterInternal"/>
+  </Assemblies>
 </ClientConfiguration>
 

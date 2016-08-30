@@ -9,5 +9,8 @@
 	<Defaults>
     <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="{0}-{1}.log" >
     </Tracing>
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
 	</Defaults>
 </OrleansConfiguration>

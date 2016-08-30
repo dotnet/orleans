@@ -44,6 +44,9 @@ namespace UnitTests.StreamingTests
                 // add pub/sub settting
                 settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
+                options.ClusterConfiguration.Defaults.Assemblies = TestUtils.GetTestSiloAssemblyList();
+                options.ClientConfiguration.Assemblies = TestUtils.GetTestClientAssemblyList();
+
                 // register stream provider
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
                 return new TestCluster(options);

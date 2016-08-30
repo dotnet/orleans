@@ -21,7 +21,9 @@
       <Directory Path="..\Test" IncludeSubFolders="true" />
       <Directory Path="c:\" IncludeSubFolders="false" />
     </AdditionalAssemblyDirectories>
-    
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />

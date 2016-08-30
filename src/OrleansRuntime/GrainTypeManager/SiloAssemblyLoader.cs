@@ -13,61 +13,19 @@ namespace Orleans.Runtime
     internal class SiloAssemblyLoader
     {
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
-        private List<string> discoveredAssemblyLocations;
-        private Dictionary<string, SearchOption> directories;
+        private AssemblyLoader assemblyLoader;
 
-        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories)
+        public SiloAssemblyLoader(IAssemblyCatalog assemblyCatalog)
         {
-            var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
-            var appRoot = Path.Combine(exeRoot, "Applications");
-            var cwd = Directory.GetCurrentDirectory();
-
-            directories = new Dictionary<string, SearchOption>
-                    {
-                        { exeRoot, SearchOption.TopDirectoryOnly },
-                        { appRoot, SearchOption.AllDirectories }
-                    };
-
-            foreach (var kvp in additionalDirectories)
-            {
-                // Make sure the path is clean (get rid of ..\'s)
-                directories[new DirectoryInfo(kvp.Key).FullName] = kvp.Value;
-            }
-
-
-            if (!directories.ContainsKey(cwd))
-            {
-                directories.Add(cwd, SearchOption.TopDirectoryOnly);
-            }
-
-            LoadApplicationAssemblies();
+            assemblyLoader = AssemblyLoader.NewAssemblyLoader(assemblyCatalog);
         }
-
-        private void LoadApplicationAssemblies()
-        {
-            AssemblyLoaderPathNameCriterion[] excludeCriteria =
-                {
-                    AssemblyLoaderCriteria.ExcludeResourceAssemblies,
-                    AssemblyLoaderCriteria.ExcludeSystemBinaries()
-                };
-            AssemblyLoaderReflectionCriterion[] loadCriteria =
-                {
-                    AssemblyLoaderReflectionCriterion.NewCriterion(
-                        TypeUtils.IsConcreteGrainClass,
-                        "Assembly does not contain any acceptable grain types."),
-                    AssemblyLoaderCriteria.LoadTypesAssignableFrom(
-                        typeof(IProvider))
-                };
-
-            discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
-        }
-
+        
         public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
         {
             var result = new Dictionary<string, GrainTypeData>();
             Type[] grainTypes = strict
                 ? TypeUtils.GetTypes(TypeUtils.IsConcreteGrainClass, logger).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsConcreteGrainClass, logger).ToArray();
+                : TypeUtils.GetTypes(assemblyLoader.AssemblyCatalog.GetAssemblies(), TypeUtils.IsConcreteGrainClass, logger).ToArray();
 
             foreach (var grainType in grainTypes)
             {
@@ -114,7 +72,7 @@ namespace Orleans.Runtime
             var result = new Dictionary<int, Type>();
             Type[] types = strict
                 ? TypeUtils.GetTypes(TypeUtils.IsGrainMethodInvokerType, logger).ToArray()
-                : TypeUtils.GetTypes(discoveredAssemblyLocations, TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
+                : TypeUtils.GetTypes(assemblyLoader.AssemblyCatalog.GetAssemblies(), TypeUtils.IsGrainMethodInvokerType, logger).ToArray();
 
             foreach (var type in types)
             {

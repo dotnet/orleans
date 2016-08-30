@@ -46,9 +46,9 @@ namespace Orleans.CodeGenerator
             return this.typesToProcess.Contains(type) || this.processedTypes.Contains(type);
         }
 
-        internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
+        internal bool RecordTypeToGenerate(Type t, Module module, string serializationAssemblyName)
         {
-            if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
+            if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, serializationAssemblyName))
             {
                 return false;
             }
@@ -62,7 +62,7 @@ namespace Orleans.CodeGenerator
 
             if (typeInfo.IsArray)
             {
-                RecordTypeToGenerate(typeInfo.GetElementType(), module, targetAssembly);
+                RecordTypeToGenerate(typeInfo.GetElementType(), module, serializationAssemblyName);
                 return false;
             }
 
@@ -79,7 +79,7 @@ namespace Orleans.CodeGenerator
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
                 {
-                    RecordTypeToGenerate(arg, module, targetAssembly);
+                    RecordTypeToGenerate(arg, module, serializationAssemblyName);
                 }
             }
 
@@ -88,7 +88,7 @@ namespace Orleans.CodeGenerator
 
             if (t.IsConstructedGenericType)
             {
-                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
+                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, serializationAssemblyName);
             }
 
             if (typeInfo.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
@@ -111,7 +111,7 @@ namespace Orleans.CodeGenerator
                         TypeUtilities.IsTypeIsInaccessibleForSerialization(
                             field.FieldType,
                             module,
-                            targetAssembly));
+                            serializationAssemblyName));
             if (skipSerialzerGeneration)
             {
                 return false;

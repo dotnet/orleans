@@ -7,6 +7,9 @@
   <Defaults>
     <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
     </Tracing>
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />

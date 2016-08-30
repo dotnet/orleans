@@ -52,12 +52,14 @@ namespace Orleans.CodeGeneration
         /// <param name="input">
         /// The input assembly.
         /// </param>
-        public static void GenerateAndCacheCodeForAssembly(Assembly input)
+        public static Assembly GenerateAndCacheCodeForAssembly(Assembly input)
         {
+            Assembly generatedAsm = null;
             if (CodeGeneratorInstance != null)
             {
-                CodeGeneratorInstance.GenerateAndLoadForAssembly(input);
+                generatedAsm = CodeGeneratorInstance.GenerateAndLoadForAssembly(input);
             }
+            return generatedAsm;
         }
 
         /// <summary>

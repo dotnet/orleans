@@ -22,6 +22,9 @@
       <TraceLevelOverride LogPrefix="ManagementGrain" TraceLevel="Verbose" />
     </Tracing>
     <Statistics MetricsTableWriteInterval="3600s" PerfCounterWriteInterval="30s" LogWriteInterval="3600s" WriteLogStatisticsToTable="false" />
+    <Assemblies>
+      <Assembly Name="TesterInternal"/>
+    </Assemblies>
   </Defaults>
   <Override Node="Primary">
     <Networking Port="22222" />
