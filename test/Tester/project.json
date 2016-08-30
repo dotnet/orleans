@@ -39,7 +39,6 @@
     "WindowsAzure.ServiceBus": "3.2.2",
     "WindowsAzure.Storage": "7.0.0",
     "xunit": "2.2.0-beta2-build3300",
-    "xunit.runner.visualstudio": "2.1.0",
     "Xunit.SkippableFact": "1.2.14"
   },
   "frameworks": {
