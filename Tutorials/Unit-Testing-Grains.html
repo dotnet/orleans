@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Unit Testing Grains | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Unit Testing Grains | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.4.0.0">
+    
+    <link rel="shortcut icon" href="../favicon.ico">
+    <link rel="stylesheet" href="../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../styles/docfx.css">
+    <link rel="stylesheet" href="../styles/main.css">
+    <meta property="docfx:navrel" content="../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    <meta property="docfx:rel" content="../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <h1 id="unit-testing-grains">Unit Testing Grains</h1>
+              
+<p>This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
+For a distributed application written in Orleans, you&#39;ll need load tests and integration tests as well but here we&#39;ll only focus on unit tests.</p>
+<p>Orleans makes it possible to mock many of its parts (<a href="https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal">example</a>) but here we only focus on simply running grains in test silos.</p>
+<p>The steps are</p>
+<ul>
+<li>You should create a test project in your favorite unit testing framework.</li>
+<li>Add references to Microsoft.Orleans.TestingHost and Microsoft.Orleans.OrleansProviders packages from NuGet to the project.</li>
+<li>Reference your interfaces and collection projects in the test project.</li>
+<li>Inherit your test classes from <code>Orleans.TestingHost.TestingSiloHost</code>.</li>
+<li>Shutdown the silo properly in each test class.</li>
+</ul>
+<h2 id="the-process">The process</h2>
+<p>The TestingSiloHost creates a mini cluster of 2 silos in 2 different AppDomains and initializes a client in the main AppDomain which test cases will run on, in its constructor.
+ Then it will run all of the test cases in the class and at cleanup time shuts the silos down.
+The test cases like ordinary grain code should call grains and then wait for the results using await and should not block the execution.</p>
+<h2 id="writing-the-code">Writing the code</h2>
+<p>The <code>TestingSiloHost</code> which we inherit from starts the silos up for us but we need to shutdown them ourselves.
+The samples here are using MS Test but you can use NUnit, XUnit or any other testing framework that you want. Let&#39;s use the hello world sample&#39;s code here as an example.</p>
+<pre><code class="lang-csharp">using System;
+using System.Threading.Tasks;
+using HelloWorldInterfaces;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
+using Orleans.TestingHost;
+
+namespace Tests
+{
+ [TestClass]
+    public class HelloWorldSiloTests : TestingSiloHost
+    {
+        [ClassCleanup]
+        public static void ClassCleanup()
+        {
+            // Optional.
+            // By default, the next test class which uses TestingSiloHost will
+            // cause a fresh Orleans silo environment to be created.
+            StopAllSilos();
+        }
+
+        [TestMethod]
+        public async Task SayHelloTest()
+        {
+            // The Orleans silo / client test environment is already set up at this point.
+
+            const long id = 0;
+            const string greeting = &quot;Bonjour&quot;;
+
+            IHello grain = GrainFactory.GetGrain&lt;IHello&gt;(id);
+
+            // This will create and call a Hello grain with specified &#39;id&#39; in one of the test silos.
+            string reply = await grain.SayHello(greeting);
+
+            Assert.IsNotNull(reply, &quot;Grain replied with some message&quot;);
+            string expected = string.Format(&quot;You said: &#39;{0}&#39;, I say: Hello!&quot;, greeting);
+            Assert.AreEqual(expected, reply, &quot;Grain replied with expected message&quot;);
+        }
+    }
+}
+</code></pre><p>Since this test method is asynchronous and leverages the <code>await</code> keyword, be sure the method is defined as <code>async</code> and returns a <code>Task</code>.
+As you can see having <code>ClassCleanup()</code> is optional but it&#39;s good to have it around.
+Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.</p>
+<p>So writing tests for Orleans is not much different from a normal test project.
+You just need to reference the two NuGet packages and derive your class from <code>TestingSiloHost</code>.</p>
+<h2 id="remarks">Remarks</h2>
+<ul>
+<li>Keep in mind that the silo will not be restarted after each test method so if your methods need a fully clean grain then make sure that they&#39;ll use different grain IDs.</li>
+<li>The <code>TestingSiloHost</code> class has multiple utility methods for starting and stopping silos which can be used for programmatic simulation of some failure situations.</li>
+<li>Starting and stopping the silo for each test case takes time and is not a good idea unless you really need it for a test.</li>
+<li>The two created silos will be named &quot;Primary&quot; and &quot;Secondary&quot;. It is important to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special <code>MembershipTableGrain</code> system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.</li>
+<li>Configurations of the environment are based on <code>TestSiloOptions</code> and <code>TestClientOptions</code> objects which can be passed to the constructor of the base class.</li>
+</ul>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Tutorials/Unit-Testing-Grains.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

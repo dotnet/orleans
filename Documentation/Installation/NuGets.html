@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+  
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Orleans NuGet Packages | Microsoft Orleans Website </title>
+    <meta name="viewport" content="width=device-width">
+    <meta name="title" content="Orleans NuGet Packages | Microsoft Orleans Website ">
+    <meta name="generator" content="docfx 2.4.0.0">
+    
+    <link rel="shortcut icon" href="../../favicon.ico">
+    <link rel="stylesheet" href="../../styles/docfx.vendor.css">
+    <link rel="stylesheet" href="../../styles/docfx.css">
+    <link rel="stylesheet" href="../../styles/main.css">
+    <meta property="docfx:navrel" content="../../toc.html">
+    <meta property="docfx:tocrel" content="toc.html">
+    <meta property="docfx:rel" content="../../">
+  </head>
+  <body data-spy="scroll" data-target="#affix">
+    <div id="wrapper">
+      <header>
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="../../index.html">
+                <img id="logo" class="svg" src="../../Images/logo-light.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+        
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+        
+        <div id="search-results">
+          <div class="search-list"></div>
+          <div class="sr-items"></div>
+          <ul id="pagination"></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+        
+        <div class="sidenav hide-when-search">
+          <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+          <div class="sidetoggle collapse" id="sidetoggle">
+            <div id="sidetoc"></div>
+          </div>
+        </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+              <h1 id="nuget-packages">Nuget Packages</h1>
+              
+<h2 id="orleans-nuget-packages-as-of-v120httpsgithubcomdotnetorleansreleasestagv120">Orleans NuGet packages as of <a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0">v1.2.0</a></h2>
+<p>There are 4 key NuGet packages you will need to use in most scenarios:</p>
+<h3 id="microsoftorleansorleanscodegeneratorbuildhttpwwwnugetorgpackagesmicrosoftorleansorleanscodegeneratorbuild"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator.Build/">Microsoft.Orleans.OrleansCodeGenerator.Build</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansCodeGenerator.Build
+</code></pre><p>Build support for grain interfaces and implementation projects. Add it to your grain interfaces and implementation projects to enable code generation of grain references and serializers. <code>Microsoft.Orleans.Templates.Interfaces</code> and <code>Microsoft.Orleans.Templates.Grains</code> packages are obsolete and provided only for backward compatibility and migration.</p>
+<h3 id="microsoftorleanscorehttpwwwnugetorgpackagesmicrosoftorleanscore"><a href="http://www.nuget.org/packages/Microsoft.Orleans.Core/">Microsoft.Orleans.Core</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Core
+</code></pre><p>Contains Orleans.dll, which defines most of Orleans public types and Orleans Client. Reference it for building libraries and client applications that use Orleans types but don&#39;t need any of the included providers.</p>
+<h3 id="microsoftorleansserverhttpwwwnugetorgpackagesmicrosoftorleansserver"><a href="http://www.nuget.org/packages/Microsoft.Orleans.Server/">Microsoft.Orleans.Server</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Server
+</code></pre><p>Includes everything you need to run a silo.</p>
+<h3 id="microsoftorleansclienthttpwwwnugetorgpackagesmicrosoftorleansclient"><a href="http://www.nuget.org/packages/Microsoft.Orleans.Client/">Microsoft.Orleans.Client</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Client
+</code></pre><p>Includes everything you need for an Orleans client (frontend).</p>
+<hr>
+<h2 id="additional-packages">Additional Packages</h2>
+<p>The below packages provide additional functionality.</p>
+<h3 id="microsoftorleansorleansservicebushttpwwwnugetorgpackagesmicrosoftorleansorleansservicebus"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansServiceBus/">Microsoft.Orleans.OrleansServiceBus</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansServiceBus
+</code></pre><p>Includes the stream provider for Azure Event Hubs.</p>
+<h3 id="microsoftorleansorleanshosthttpwwwnugetorgpackagesmicrosoftorleansorleanshost"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/">Microsoft.Orleans.OrleansHost</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansHost
+</code></pre><p>Includes the default silo host - OrleansHost.exe. Can be used for on-premises deployments or as an out-of-process silo host in Azure Worker Role. Included in Microsoft.Orleans.Server.</p>
+<h3 id="microsoftorleansorleansazureutilshttpwwwnugetorgpackagesmicrosoftorleansorleansazureutils"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansAzureUtils/">Microsoft.Orleans.OrleansAzureUtils</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansAzureUtils
+</code></pre><p>Contains a wrapper class that simplifies instantiation of silos and clients in Azure Worker/Web roles, Azure Table based membership provider, and persistence and stream providers for Azure Storage.</p>
+<h3 id="microsoftorleansorleansprovidershttpwwwnugetorgpackagesmicrosoftorleansorleansproviders"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansProviders/">Microsoft.Orleans.OrleansProviders</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansProviders
+</code></pre><p>Contains a set of built-in persistence and stream providers. Included in Microsoft.Orleans.Client and Microsoft.Orleans.Server.</p>
+<h3 id="microsoftorleanscountercontrolhttpwwwnugetorgpackagesmicrosoftorleanscountercontrol"><a href="http://www.nuget.org/packages/Microsoft.Orleans.CounterControl/">Microsoft.Orleans.CounterControl</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.CounterControl
+</code></pre><p>Includes OrleansCounterControl.exe, which registers Windows performance counter categories for Orleans statistics and for deployed grain classes. Requires elevation. Can be executed in Azure as part of a role startup task. Included in Microsoft.Orleans.Server.</p>
+<h3 id="microsoftorleansorleansmanagerhttpwwwnugetorgpackagesmicrosoftorleansorleansmanager"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansManager/">Microsoft.Orleans.OrleansManager</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansManager
+</code></pre><p>Includes Orleans management tool - OrleansManager.exe.</p>
+<h3 id="microsoftorleansorleansconsulutilshttpwwwnugetorgpackagesmicrosoftorleansorleansconsulutils"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansConsulUtils/">Microsoft.Orleans.OrleansConsulUtils</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansConsulUtils
+</code></pre><p>Includes the plugin for using Consul for storing cluster membership data.</p>
+<h3 id="microsoftorleansorleanszookeeperutilshttpwwwnugetorgpackagesmicrosoftorleansorleanszookeeperutils"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansZooKeeperUtils/">Microsoft.Orleans.OrleansZooKeeperUtils</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansZooKeeperUtils
+</code></pre><p>Includes the plugin for using ZooKeeper for storing cluster membership data.</p>
+<h3 id="microsoftorleanstestinghosthttpwwwnugetorgpackagesmicrosoftorleanstestinghost"><a href="http://www.nuget.org/packages/Microsoft.Orleans.TestingHost/">Microsoft.Orleans.TestingHost</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.TestingHost
+</code></pre><p>Includes the library for hosting silos in a testing project.</p>
+<h3 id="microsoftorleansorleanscodegeneratorhttpwwwnugetorgpackagesmicrosoftorleansorleanscodegenerator"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansCodeGenerator/">Microsoft.Orleans.OrleansCodeGenerator</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansCodeGenerator
+</code></pre><p>Includes the run time code generator. Included in Microsoft.Orleans.Server and Microsoft.Orleans.Client.</p>
+<h3 id="microsoftorleansorleanstelemetryconsumersaihttpwwwnugetorgpackagesmicrosoftorleansorleanstelemetryconsumersai"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.AI/">Microsoft.Orleans.OrleansTelemetryConsumers.AI</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.AI
+</code></pre><p>Includes the telemetry consumer for Azure Application Insights.</p>
+<h3 id="microsoftorleansorleanstelemetryconsumersnewrelichttpwwwnugetorgpackagesmicrosoftorleansorleanstelemetryconsumersnewrelic"><a href="http://www.nuget.org/packages/Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic/">Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic
+</code></pre><p>Includes the telemetry consumer for NewRelic.</p>
+<h3 id="microsoftorleansserializationbondhttpwwwnugetorgpackagesmicrosoftorleansserializationbond"><a href="http://www.nuget.org/packages/Microsoft.Orleans.Serialization.Bond/">Microsoft.Orleans.Serialization.Bond</a></h3>
+<pre><code>PM&gt; Install-Package Microsoft.Orleans.Serialization.Bond
+</code></pre><p>Includes support for <a href="https://github.com/microsoft/bond">Bond serializer</a>.</p>
+
+            </article>
+          </div>
+          
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Installation/NuGets.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+            
+            <span>Copyright © 2015-2016 Microsoft<br>Generated by <strong>DocFX</strong></span>
+          </div>
+        </div>
+      </footer>
+    </div>
+    
+    <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script type="text/javascript" src="../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../styles/main.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+  </body>
+</html>

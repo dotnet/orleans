@@ -1,0 +1,9 @@
+- name: Orleans Configuration Guide
+  href: index.md
+  items:
+    - name: Client Configuration
+      href: Client-Configuration.md
+    - name: Server Configuration
+      href: Server-Configuration.md
+    - name: Typical Configurations
+      href: Typical-Configurations.md

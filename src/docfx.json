@@ -1,0 +1,67 @@
+{
+
+  "build": {
+    "content": [
+      {
+        "files": [
+          "Documentation/**/**.yml",
+          "Documentation/**/**.md",
+          "Tutorials/**.yml",
+          "Tutorials/**.md",
+          "Community/**.yml",
+          "Community/**.md"
+        ]
+      },
+      {
+        "files": [
+          "toc.yml",
+          "*.md"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [
+          "images/**",
+          "logo.svg",
+          "logo-light.svg",
+          "Documentation/**/**.png",
+          "Tutorials/**.png",
+          "Community/**.png"
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "overwrite": [
+      {
+        "files": [
+        ],
+        "exclude": [
+          "obj/**",
+          "_site/**"
+        ]
+      }
+    ],
+    "dest": "../",
+    "template": [
+      "default", "template"
+    ],
+    "noLangKeyword": false,
+    "globalMetadata": {
+      "_appTitle": "Microsoft Orleans Website",
+      "_enableSearch": true,
+      "_gitContribute": {
+        "repo": "https://github.com/dotnet/orleans",
+        "branch": "gh-pages"
+      }
+    }
+  }
+
+}
