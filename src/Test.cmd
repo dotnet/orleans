@@ -20,7 +20,7 @@ if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait "Category=BVT" -trait "Category=
 @echo on
 call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
-packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTS% %TEST_FILTERS% -xml "%OutDir%/xUnit-Results.xml" -parallel none -noshadow
+packages\xunit.runner.console.2.1.0\tools\xunit.console %TESTS% %TEST_FILTERS% -xml "%OutDir%/xUnit-Results.xml" -parallel assemblies -noshadow -verbose
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%
