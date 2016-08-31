@@ -144,10 +144,10 @@ namespace Orleans.Runtime
         /// <param name="name">Name of this silo.</param>
         /// <param name="siloType">Type of this silo.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
-        public Silo(string name, SiloType siloType, ClusterConfiguration config)
-            : this(name, siloType, config, null)
+        public Silo(string name, SiloType siloType, ClusterConfiguration config, IServiceProvider services)
+            : this(name, siloType, config, null, services)
         {
-            
+            //TODO: inject real depedency here instead of ServiceProvider 
         }
 
         /// <summary>
@@ -159,8 +159,9 @@ namespace Orleans.Runtime
         /// <param name="keyStore">Local data store, mostly used for testing, shared between all silos running in same process.</param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
-        internal Silo(string name, SiloType siloType, ClusterConfiguration config, ILocalDataStore keyStore)
+        internal Silo(string name, SiloType siloType, ClusterConfiguration config, ILocalDataStore keyStore, IServiceProvider services)
         {
+            //TODO: inject real dependency, instead of IServiceProvider
             SystemStatus.Current = SystemStatus.Creating;
 
             CurrentSilo = this;
@@ -220,9 +221,7 @@ namespace Orleans.Runtime
                 LocalDataStoreInstance.LocalDataStore = keyStore;
             }
 
-            // Configure DI using Startup type
-            bool usingCustomServiceProvider;
-            Services = StartupBuilder.ConfigureStartup(nodeConfig.StartupTypeName, out usingCustomServiceProvider);
+            Services = services;
 
             healthCheckParticipants = new List<IHealthCheckParticipant>();
             allSiloProviders = new List<IProvider>();
@@ -234,7 +233,7 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
-            grainFactory = new GrainFactory();
+            grainFactory = (GrainFactory)services.GetService(typeof(GrainFactory));
             typeManager = new GrainTypeManager(
                 here.Address.Equals(IPAddress.Loopback),
                 grainFactory, 
@@ -285,7 +284,7 @@ namespace Orleans.Runtime
 
             // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
             // service provider, meaning that he is explicitly opting into it.
-            var grainCreator = new GrainCreator(grainRuntime, usingCustomServiceProvider ? Services : null);
+            var grainCreator = new GrainCreator(grainRuntime, Services);
 
             Action<Dispatcher> setDispatcher;
             catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);

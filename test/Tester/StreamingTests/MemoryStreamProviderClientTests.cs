@@ -6,6 +6,7 @@ using Orleans.Providers.Streams.Generator;
 using Orleans.Providers.Streams.Memory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using TestGrains;
 using UnitTests.Tester;
@@ -35,7 +36,7 @@ namespace Tester.StreamingTests
                 var options = new TestClusterOptions(1);
                 AdjustConfig(options.ClusterConfiguration);
                 AdjustConfig(options.ClientConfiguration);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
 
             private static void AdjustConfig(ClusterConfiguration config)

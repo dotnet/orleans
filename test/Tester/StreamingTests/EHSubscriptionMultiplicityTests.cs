@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
 using Orleans.Streams;
@@ -44,7 +45,7 @@ namespace UnitTests.StreamingTests
             {
                 var options = new TestClusterOptions(2);
                 AdjustClusterConfiguration(options.ClusterConfiguration);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
 
             public override void Dispose()

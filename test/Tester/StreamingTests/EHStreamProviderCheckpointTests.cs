@@ -9,6 +9,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -45,7 +46,7 @@ namespace UnitTests.StreamingTests
             var options = new TestClusterOptions(2);
             AdjustConfig(options.ClusterConfiguration);
             AdjustConfig(options.ClientConfiguration);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]

@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using UnitTests.GrainInterfaces;
@@ -242,7 +243,7 @@ namespace Tester.StreamingTests
 
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProvider, false);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
         }
 
@@ -297,7 +298,7 @@ namespace Tester.StreamingTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
 
                 options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-                return new TestCluster(options);
+                return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
             }
 
             public override void Dispose()

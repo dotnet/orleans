@@ -1,4 +1,5 @@
 ﻿using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 
 namespace Tester
@@ -10,7 +11,7 @@ namespace Tester
             var options = new TestClusterOptions();
             options.ClusterConfiguration.AddMemoryStorageProvider("Default");
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
     }
 }

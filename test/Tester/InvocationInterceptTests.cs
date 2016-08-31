@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
@@ -23,7 +24,7 @@ namespace UnitTests.General
             options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider");
             options.ClusterConfiguration.Globals.RegisterBootstrapProvider<PreInvokeCallbackBootrstrapProvider>(
                 "PreInvokeCallbackBootrstrapProvider");
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         /// <summary>

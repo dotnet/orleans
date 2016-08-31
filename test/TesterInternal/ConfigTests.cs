@@ -3,11 +3,13 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using Orleans.Runtime.Startup;
 using Orleans.TestingHost;
 using UnitTests.StorageTests;
 using Xunit;
@@ -22,6 +24,7 @@ namespace UnitTests
     public class ConfigTests : IDisposable
     {
         private readonly ITestOutputHelper output;
+        private IServiceProvider serviceProvider;
 
         public ConfigTests(ITestOutputHelper output)
         {
@@ -29,6 +32,8 @@ namespace UnitTests
             LogManager.UnInitialize();
             GrainClient.Uninitialize();
             GrainClient.TestOnlyNoConnect = false;
+            Startup startup = new Startup();
+            serviceProvider = startup.ConfigureServices(new ServiceCollection());
         }
 
         public void Dispose()
@@ -932,7 +937,7 @@ namespace UnitTests
 
             // Do same code that AzureSilo does for configuring silo host
 
-            var host = new SiloHost("SiloConfig_Azure_Default", initialConfig); // Use supplied config data + Initializes logger configurations
+            var host = new SiloHost("SiloConfig_Azure_Default", initialConfig, serviceProvider); // Use supplied config data + Initializes logger configurations
             host.SetSiloType(Silo.SiloType.Secondary);
             ////// Always use Azure table for membership when running silo in Azure
             host.SetSiloLivenessType(GlobalConfiguration.LivenessProviderType.AzureTable);
@@ -959,7 +964,7 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.Globals.CacheSize = 11;
 
-            var host = new SiloHost(siloName, config); // Use supplied config data + Initializes logger configurations
+            var host = new SiloHost(siloName, config, serviceProvider); // Use supplied config data + Initializes logger configurations
 
             ClusterConfiguration siloConfig = host.Config;
 
@@ -1085,6 +1090,20 @@ namespace UnitTests
         public void Log(Severity severity, LoggerType loggerType, string caller, string message, IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    public class Startup : IStartup
+    {
+        public Startup()
+        {
+        }
+
+        public IServiceProvider ConfigureServices(IServiceCollection svcCollection)
+        {
+            //TODO configure dependencies required by grains and external providers here too.
+            OrleansInternalServices.RegisterSystemTypes(svcCollection);
+            return svcCollection.BuildServiceProvider();
         }
     }
 }

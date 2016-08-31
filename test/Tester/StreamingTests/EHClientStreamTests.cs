@@ -6,6 +6,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Startup;
 using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
@@ -50,7 +51,7 @@ namespace Tester.StreamingTests
             var options = new TestClusterOptions(2);
             AdjustConfig(options.ClusterConfiguration);
             AdjustConfig(options.ClientConfiguration);
-            return new TestCluster(options);
+            return new TestCluster(options, OrleansInternalServices.DefaultServiceProvider());
         }
 
         public override void Dispose()

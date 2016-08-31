@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Runtime.Startup;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
@@ -19,8 +20,8 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.StartupTypeName = typeof(TestStartup).AssemblyQualifiedName);
-                return new TestCluster(options);
+                IServiceProvider serviceProvider = new TestStartup().ConfigureServices(new ServiceCollection());
+                return new TestCluster(options, serviceProvider);
             }
         }
 
@@ -53,7 +54,7 @@ namespace UnitTests.General
         }
     }
 
-    public class TestStartup
+    public class TestStartup : IStartup
     {
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
@@ -64,6 +65,7 @@ namespace UnitTests.General
                     sp.GetRequiredService<IInjectedService>(),
                     "some value"));
 
+            OrleansInternalServices.RegisterSystemTypes(services);
             return services.BuildServiceProvider();
         }
     }

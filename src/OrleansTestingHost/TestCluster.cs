@@ -37,6 +37,8 @@ namespace Orleans.TestingHost
 
         private readonly StringBuilder log = new StringBuilder();
 
+        private IServiceProvider serviceProvider;
+
         public string DeploymentId => this.ClusterConfiguration.Globals.DeploymentId;
 
         public IGrainFactory GrainFactory { get; private set; }
@@ -47,23 +49,23 @@ namespace Orleans.TestingHost
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
         public TestCluster()
-            : this(new TestClusterOptions())
+            : this(new TestClusterOptions(), null)
         {
         }
 
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
-        public TestCluster(TestClusterOptions options)
-            : this(options.ClusterConfiguration, options.ClientConfiguration)
+        public TestCluster(TestClusterOptions options, IServiceProvider serviceProvider)
+            : this(options.ClusterConfiguration, options.ClientConfiguration, serviceProvider)
         {
         }
 
         /// <summary>
         /// Configures the test cluster plus default client in-process.
         /// </summary>
-        public TestCluster(ClusterConfiguration clusterConfiguration)
-            : this(clusterConfiguration, TestClusterOptions.BuildClientConfiguration(clusterConfiguration))
+        public TestCluster(ClusterConfiguration clusterConfiguration, IServiceProvider serviceProvider)
+            : this(clusterConfiguration, TestClusterOptions.BuildClientConfiguration(clusterConfiguration), serviceProvider)
         {
         }
 
@@ -71,10 +73,11 @@ namespace Orleans.TestingHost
         /// Configures the test cluster plus client in-process,
         /// using the specified silo and client config configurations.
         /// </summary>
-        public TestCluster(ClusterConfiguration clusterConfiguration, ClientConfiguration clientConfiguration)
+        public TestCluster(ClusterConfiguration clusterConfiguration, ClientConfiguration clientConfiguration, IServiceProvider serviceProvider)
         {
             this.ClusterConfiguration = clusterConfiguration;
             this.ClientConfiguration = clientConfiguration;
+            this.serviceProvider = serviceProvider;
         }
 
         /// <summary>
@@ -94,7 +97,7 @@ namespace Orleans.TestingHost
         {
             try
             {
-                DeployAsync(siloNames).Wait();
+                DeployAsync(siloNames, serviceProvider).Wait();
             }
             catch (AggregateException ex)
             {
@@ -107,7 +110,7 @@ namespace Orleans.TestingHost
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// </summary>
         /// <param name="siloNames">Only deploy the specified silos which must also be present in the <see cref="Runtime.Configuration.ClusterConfiguration.Overrides"/> collection.</param>
-        public async Task DeployAsync(IEnumerable<string> siloNames)
+        public async Task DeployAsync(IEnumerable<string> siloNames, IServiceProvider serviceProvider)
         {
             if (Primary != null) throw new InvalidOperationException("Cluster host already deployed.");
 
@@ -231,7 +234,8 @@ namespace Orleans.TestingHost
             SiloHandle instance = StartOrleansSilo(
                 Silo.SiloType.Secondary,
                 this.ClusterConfiguration,
-                nodeConfig);
+                nodeConfig,
+                this.serviceProvider);
             additionalSilos.Add(instance);
             return instance;
         }
@@ -339,7 +343,7 @@ namespace Orleans.TestingHost
                 var type = instance.Silo.Type;
                 var siloName = instance.Name;
                 StopSilo(instance);
-                var newInstance = StartOrleansSilo(type, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName]);
+                var newInstance = StartOrleansSilo(type, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName], this.serviceProvider);
 
                 if (type == Silo.SiloType.Primary && siloName == Silo.PrimarySiloName)
                 {
@@ -363,7 +367,7 @@ namespace Orleans.TestingHost
         public SiloHandle RestartStoppedSecondarySilo(string siloName)
         {
             if (siloName == null) throw new ArgumentNullException(nameof(siloName));
-            var newInstance = StartOrleansSilo(Silo.SiloType.Secondary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName]);
+            var newInstance = StartOrleansSilo(Silo.SiloType.Secondary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName], this.serviceProvider);
             additionalSilos.Add(newInstance);
             return newInstance;
         }
@@ -452,7 +456,7 @@ namespace Orleans.TestingHost
 
             if (silos.Contains(Silo.PrimarySiloName))
             {
-                Primary = StartOrleansSilo(Silo.SiloType.Primary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[Silo.PrimarySiloName]);
+                Primary = StartOrleansSilo(Silo.SiloType.Primary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[Silo.PrimarySiloName], serviceProvider);
             }
 
             var secondarySiloNames = silos.Where(name => !string.Equals(Silo.PrimarySiloName, name)).ToList();
@@ -460,7 +464,7 @@ namespace Orleans.TestingHost
             {
                 var siloStartTasks = secondarySiloNames.Select(siloName =>
                 {
-                    return Task.Run(() => StartOrleansSilo(Silo.SiloType.Secondary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName]));
+                    return Task.Run(() => StartOrleansSilo(Silo.SiloType.Secondary, this.ClusterConfiguration, this.ClusterConfiguration.Overrides[siloName], serviceProvider));
                 }).ToList();
 
                 try
@@ -484,19 +488,19 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig)
+        private SiloHandle StartOrleansSilo(Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig, IServiceProvider serviceProvider)
         {
-            return StartOrleansSilo(this, type, clusterConfig, nodeConfig);
+            return StartOrleansSilo(this, type, clusterConfig, nodeConfig, serviceProvider);
         }
 
-        public static SiloHandle StartOrleansSilo(TestCluster cluster, Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig)
+        public static SiloHandle StartOrleansSilo(TestCluster cluster, Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig, IServiceProvider serviceProvider)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
             var siloName = nodeConfig.SiloName;
 
             cluster.WriteLog("Starting a new silo in app domain {0} with config {1}", siloName, clusterConfig.ToString(siloName));
             AppDomain appDomain;
-            Silo silo = cluster.LoadSiloInNewAppDomain(siloName, type, clusterConfig, out appDomain);
+            Silo silo = cluster.LoadSiloInNewAppDomain(siloName, type, clusterConfig, out appDomain, serviceProvider);
 
             silo.Start();
 
@@ -549,7 +553,7 @@ namespace Orleans.TestingHost
             instance.Process = null;
         }
 
-        private Silo LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, out AppDomain appDomain)
+        private Silo LoadSiloInNewAppDomain(string siloName, Silo.SiloType type, ClusterConfiguration config, out AppDomain appDomain, IServiceProvider svcProvider)
         {
             AppDomainSetup setup = GetAppDomainSetupInfo();
 
@@ -577,7 +581,7 @@ namespace Orleans.TestingHost
                 optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
             }
 
-            var args = new object[] { siloName, type, config };
+            var args = new object[] { siloName, type, config, svcProvider };
 
             var silo = (Silo)appDomain.CreateInstanceFromAndUnwrap(
                 "OrleansRuntime.dll", typeof(Silo).FullName, false,

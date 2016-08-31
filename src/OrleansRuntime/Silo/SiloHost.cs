@@ -75,6 +75,7 @@ namespace Orleans.Runtime.Host
         private EventWaitHandle startupEvent;
         private EventWaitHandle shutdownEvent;
         private bool disposed;
+        private IServiceProvider services;
 
         /// <summary>
         /// Constructor
@@ -90,21 +91,28 @@ namespace Orleans.Runtime.Host
         /// <summary> Constructor </summary>
         /// <param name="siloName">Name of this silo.</param>
         /// <param name="config">Silo config that will be used to initialize this silo.</param>
-        public SiloHost(string siloName, ClusterConfiguration config) : this(siloName)
+        public SiloHost(string siloName, ClusterConfiguration config, IServiceProvider svc) : this(siloName)
         {
             SetSiloConfig(config);
+            services = svc;
         }
 
         /// <summary> Constructor </summary>
         /// <param name="siloName">Name of this silo.</param>
         /// <param name="configFile">Silo config file that will be used to initialize this silo.</param>
-        public SiloHost(string siloName, FileInfo configFile)
+        public SiloHost(string siloName, FileInfo configFile, IServiceProvider svc)
             : this(siloName)
         {
             ConfigFileName = configFile.FullName;
             var config = new ClusterConfiguration();
             config.LoadFromFile(ConfigFileName);
             SetSiloConfig(config);
+            services = svc;
+        }
+
+        public void SetServiceProvier(IServiceProvider svc)
+        {
+            this.services = svc;
         }
 
         /// <summary>
@@ -119,7 +127,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
-                orleans = new Silo(Name, Type, Config);
+                orleans = new Silo(Name, Type, Config, services);
                 logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", orleans.Name, orleans.Type);
             }
             catch (Exception exc)
