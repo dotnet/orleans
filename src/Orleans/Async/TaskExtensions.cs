@@ -334,7 +334,7 @@ namespace Orleans
                     {
                         resolver.TrySetResult(t.GetResult());
                     }
-                });
+                }, TaskContinuationOptions.ExecuteSynchronously);
             }
             return resolver.Task;
         }
