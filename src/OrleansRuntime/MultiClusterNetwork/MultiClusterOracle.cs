@@ -62,12 +62,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public IEnumerable<string> GetActiveClusters()
         {
-            var clusters = localData.Current.Gateways.Values
-                 .Where(g => g.Status == GatewayStatus.Active)
-                 .Select(g => g.ClusterId)
-                 .Distinct();
-
-            return clusters;
+            return localData.ActiveGatewaysByCluster.Keys;
         }
 
         public IEnumerable<GatewayEntry> GetGateways()
@@ -77,15 +72,12 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public SiloAddress GetRandomClusterGateway(string cluster)
         {
-            var activeGateways = this.localData.Current.Gateways.Values
-                .Where(gw => gw.ClusterId == cluster && gw.Status == GatewayStatus.Active)
-                .Select(gw => gw.SiloAddress)
-                .ToList();
+            List<SiloAddress> gatewaylist;
 
-            if (activeGateways.Count == 0)
+            if (!localData.ActiveGatewaysByCluster.TryGetValue(cluster, out gatewaylist))
                 return null;
-
-            return activeGateways[random.Next(activeGateways.Count)];
+          
+            return gatewaylist[random.Next(gatewaylist.Count)];
         }
 
         public MultiClusterConfiguration GetMultiClusterConfiguration()

@@ -1,8 +1,18 @@
-﻿namespace Orleans.Runtime.MultiClusterNetwork
+﻿using Orleans.MultiCluster;
+using System.Collections.Generic;
+
+namespace Orleans.Runtime.MultiClusterNetwork
 {
-    internal class MultiClusterOracleData 
+    internal class MultiClusterOracleData
     {
         private volatile MultiClusterData localData;  // immutable, can read without lock
+
+        // for quick access, we precompute available gateways per cluster
+        public IReadOnlyDictionary<string, List<SiloAddress>> ActiveGatewaysByCluster
+        {
+            get { return activeGatewaysByCluster; }
+        }
+        private volatile IReadOnlyDictionary<string, List<SiloAddress>> activeGatewaysByCluster;
 
         private readonly Logger logger;
 
@@ -12,8 +22,24 @@
         {
             logger = log;
             localData = new MultiClusterData();
+            activeGatewaysByCluster = new Dictionary<string, List<SiloAddress>>();
         }
 
+        private void ComputeAvailableGatewaysPerCluster()
+        {
+            // organize active gateways by cluster
+            var gws = new Dictionary<string, List<SiloAddress>>();
+            foreach (var g in localData.Gateways)
+                if (g.Value.Status == GatewayStatus.Active)
+                {
+                    List<SiloAddress> list;
+                    if (!gws.TryGetValue(g.Value.ClusterId, out list))
+                        list = gws[g.Value.ClusterId] = new List<SiloAddress>();
+                    list.Add(g.Key);
+                }
+
+            activeGatewaysByCluster = gws;
+        }
 
         public MultiClusterData ApplyDataAndNotify(MultiClusterData data)
         {
@@ -30,6 +56,12 @@
 
             if (delta.IsEmpty)
                 return delta;
+
+            if (delta.Gateways.Count > 0)
+            {
+                // some gateways have changed
+                ComputeAvailableGatewaysPerCluster();
+            }
 
             if (delta.Configuration != null)
             {
