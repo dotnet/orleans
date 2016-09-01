@@ -121,14 +121,14 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo info, out bool was_removed)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo info, out bool wasRemoved)
         {
             info = null;
-            was_removed = false;
+            wasRemoved = false;
             if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause))
             {
                 Instances.Remove(act);
-                was_removed = true;
+                wasRemoved = true;
                 VersionTag = rand.Next();
             }
             return Instances.Count == 0;
@@ -325,20 +325,20 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="activation">the id of the activation</param>
         /// <param name="cause">reason for removing the activation</param>
         /// <param name="entry">returns the entry, if found </param>
-        /// <param name="was_removed">returns whether the entry was actually removed</param>
-        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause, out IActivationInfo entry, out bool was_removed)
+        /// <param name="wasRemoved">returns whether the entry was actually removed</param>
+        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause, out IActivationInfo entry, out bool wasRemoved)
         {
-            was_removed = false;
+            wasRemoved = false;
             entry = null;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, out entry, out was_removed))
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, out entry, out wasRemoved))
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);
 
             }
             if (log.IsVerbose3)
-                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, was_removed);
+                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
         }
 
    

@@ -157,13 +157,13 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (var address in addresses)
             {
                 IActivationInfo existingAct;
-                bool was_removed;
-                directoryPartition.RemoveActivation(address.Grain, address.Activation, cause, out existingAct, out was_removed);
+                bool wasRemoved;
+                directoryPartition.RemoveActivation(address.Grain, address.Activation, cause, out existingAct, out wasRemoved);
                 if (existingAct == null)
                 {
                     logger.Verbose2("GSIP:Unr {0} {1} ignored", cause, address);
                 }
-                else if (!was_removed)
+                else if (!wasRemoved)
                 {
                     logger.Verbose2("GSIP:Unr {0} {1} too fresh", cause, address);
                 }
@@ -216,9 +216,9 @@ namespace Orleans.Runtime.GrainDirectory
         public void InvalidateCache(ActivationAddress address)
         {
             IActivationInfo existingAct;
-            bool was_removed;
-            directoryPartition.RemoveActivation(address.Grain, address.Activation, UnregistrationCause.CacheInvalidation, out existingAct, out was_removed);
-            if (!was_removed)
+            bool wasRemoved;
+            directoryPartition.RemoveActivation(address.Grain, address.Activation, UnregistrationCause.CacheInvalidation, out existingAct, out wasRemoved);
+            if (!wasRemoved)
             {
                 logger.Verbose2("GSIP:Inv {0} ignored", address);
             }

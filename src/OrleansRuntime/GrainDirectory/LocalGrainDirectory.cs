@@ -36,9 +36,9 @@ namespace Orleans.Runtime.GrainDirectory
         internal IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> DirectoryCache { get; private set; }
         internal GrainDirectoryPartition DirectoryPartition { get; private set; }
 
-        public RemoteGrainDirectory RemGrainDirectory { get; private set; }
+        public RemoteGrainDirectory RemoteGrainDirectory { get; private set; }
         public RemoteGrainDirectory CacheValidator { get; private set; }
-        public ClusterGrainDirectory RemClusterGrainDirectory { get; private set; }
+        public ClusterGrainDirectory RemoteClusterGrainDirectory { get; private set; }
 
         private readonly TaskCompletionSource<bool> stopPreparationResolver;
         public Task StopPreparationCompletion { get { return stopPreparationResolver.Task; } }
@@ -112,9 +112,9 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = new GrainDirectoryPartition();
             HandoffManager = new GrainDirectoryHandoffManager(this, silo.GlobalConfig);
 
-            RemGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId);
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceId);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorId);
-            RemClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, silo.ClusterId);
+            RemoteClusterGrainDirectory = new ClusterGrainDirectory(this, Constants.ClusterDirectoryServiceId, silo.ClusterId);
 
             // add myself to the list of members
             AddServer(MyAddress);

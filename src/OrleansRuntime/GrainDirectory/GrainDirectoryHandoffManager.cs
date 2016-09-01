@@ -93,7 +93,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory.SchedulingContext);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -214,7 +214,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListSingle.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
 
                     if (splitPartListMulti.Count > 0)
@@ -226,7 +226,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListMulti.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
                 }
                 else
@@ -312,7 +312,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
         }
     }
 }

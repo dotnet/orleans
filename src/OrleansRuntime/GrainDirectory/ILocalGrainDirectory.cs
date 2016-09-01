@@ -17,9 +17,9 @@ namespace Orleans.Runtime.GrainDirectory
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
         void Stop(bool doOnStopHandoff);
 
-        RemoteGrainDirectory RemGrainDirectory { get; }
+        RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
-        ClusterGrainDirectory RemClusterGrainDirectory { get; }
+        ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
         Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
@@ -123,7 +123,4 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         string ClusterId { get; }
     }
-
-  
-
 }

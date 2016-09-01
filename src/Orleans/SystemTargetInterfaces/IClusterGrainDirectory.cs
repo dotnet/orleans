@@ -65,6 +65,7 @@ namespace Orleans.SystemTargetInterfaces
         /// </summary>
         /// <param name="grain">the grain to process</param>
         /// <param name="requestClusterId">the id of the origin cluster</param>
+        /// <param name="hopCount">how many times this request has been forwarded within the cluster</param>
         /// <returns></returns>
         Task<RemoteClusterActivationResponse> ProcessActivationRequest(
             GrainId grain,
