@@ -237,8 +237,10 @@ namespace Orleans.Runtime
                     fullString = String.Format("*grn/{0}/{1}", typeString, idString);
                     break;
                 case UniqueKey.Category.Client:
-                case UniqueKey.Category.GeoClient:
                     fullString = "*cli/" + idString;
+                    break;
+                case UniqueKey.Category.GeoClient:
+                    fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
                     break;
                 case UniqueKey.Category.SystemTarget:
                     string explicitName = Constants.SystemTargetName(this);

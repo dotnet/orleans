@@ -62,7 +62,8 @@ namespace Orleans.Runtime
         {
             get {
                 var category = IdCategory;
-                return category == Category.KeyExtGrain || category == Category.GeoClient;
+                return category == Category.KeyExtGrain       
+                    || category == Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
             }
         }
 
