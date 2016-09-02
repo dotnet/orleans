@@ -143,7 +143,7 @@ namespace Orleans.ServiceBus.Providers
         {
             if (bufferPool == null)
             {
-                throw new ArgumentNullException("bufferPool");
+                throw new ArgumentNullException(nameof(bufferPool));
             }
             this.bufferPool = bufferPool;
             this.timePurage = timePurage ?? TimePurgePredicate.Default;
@@ -229,10 +229,11 @@ namespace Orleans.ServiceBus.Providers
                 currentBuffer = null;
             }
 
-            TimeSpan timeInService = nowUtc - cachedMessage.DequeueTimeUtc;
+            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
+            // age of message relative to the most recent event in the cache.
             TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
 
-            return ShouldPurgeFromResource(ref cachedMessage, purgedResource) || timePurage.ShouldPurgFromTime(timeInService, relativeAge);
+            return ShouldPurgeFromResource(ref cachedMessage, purgedResource) || timePurage.ShouldPurgFromTime(timeInCache, relativeAge);
         }
 
         private static bool ShouldPurgeFromResource(ref CachedEventHubMessage cachedMessage, FixedSizeBuffer purgedResource)

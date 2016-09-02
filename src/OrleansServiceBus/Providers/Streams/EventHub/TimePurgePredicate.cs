@@ -29,15 +29,15 @@ namespace Orleans.ServiceBus.Providers
 
         /// <summary>
         /// Checks to see if the message should be purged.
-        /// Message should be purged if it has been in the queue longer than the minTimeInCache, but it's relative age is greater than maxRelativeMessageAge.
+        /// Message should be purged if its relative age is greater than maxRelativeMessageAge and has been in the cache longer than the minTimeInCache.
         /// </summary>
-        /// <param name="timeInService">amount of time message has been in this service</param>
+        /// <param name="timeInCache">amount of time message has been in this cache</param>
         /// <param name="relativeAge">Age of message relative to the most recent events read</param>
         /// <returns></returns>
-        public bool ShouldPurgFromTime(TimeSpan timeInService, TimeSpan relativeAge)
+        public bool ShouldPurgFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
         {
             // if time in cache exceeds the minimum and age of data is greater than max allowed, purge
-            return timeInService > minTimeInCache && relativeAge > maxRelativeMessageAge;
+            return timeInCache > minTimeInCache && relativeAge > maxRelativeMessageAge;
         }
     }
 }

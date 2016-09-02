@@ -7,11 +7,11 @@ namespace UnitTests.StreamingTests
 {
     public class TimePurgePredicateTests
     {
-        private static readonly TimeSpan minTimeInCache = TimeSpan.FromMinutes(5);
-        private static readonly TimeSpan maxRelitiveAgeInCache = TimeSpan.FromMinutes(30);
-        private static readonly TimePurgePredicate timePurge = new TimePurgePredicate(minTimeInCache, maxRelitiveAgeInCache);
-        private static readonly DateTime cacheMaxEnqueTime = new DateTime(2000, 3, 12, 10, 13, 32);
-        private static readonly DateTime nowUtc = DateTime.UtcNow;
+        private static readonly TimeSpan MinTimeInCache = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan MaxRelitiveAgeInCache = TimeSpan.FromMinutes(30);
+        private static readonly TimePurgePredicate TimePurge = new TimePurgePredicate(MinTimeInCache, MaxRelitiveAgeInCache);
+        private static readonly DateTime CacheMaxEnqueTime = new DateTime(2000, 3, 12, 10, 13, 32);
+        private static readonly DateTime NowUtc = DateTime.UtcNow;
 
         /// <summary>
         /// Message has not been in cache long enough to purge, and message age is not old enough to purge
@@ -19,11 +19,11 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void TimePurgePredicate_NoPurgeThreshold_Tests()
         {
-            DateTime messageEnqueTime = cacheMaxEnqueTime - maxRelitiveAgeInCache;
-            DateTime timeRead = nowUtc - minTimeInCache;
-            TimeSpan timeInService = nowUtc - timeRead;
-            TimeSpan relativeAge = cacheMaxEnqueTime - messageEnqueTime;
-            Assert.Equal(false, timePurge.ShouldPurgFromTime(timeInService, relativeAge));
+            DateTime messageEnqueTime = CacheMaxEnqueTime - MaxRelitiveAgeInCache;
+            DateTime timeRead = NowUtc - MinTimeInCache;
+            TimeSpan timeInCache = NowUtc - timeRead;
+            TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
+            Assert.Equal(false, TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -32,11 +32,11 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void TimePurgePredicate_PurgeDataThreshold_Tests()
         {
-            DateTime messageEnqueTime = cacheMaxEnqueTime - maxRelitiveAgeInCache - TimeSpan.FromTicks(1);
-            DateTime timeRead = nowUtc - minTimeInCache - TimeSpan.FromTicks(1);
-            TimeSpan timeInService = nowUtc - timeRead;
-            TimeSpan relativeAge = cacheMaxEnqueTime - messageEnqueTime;
-            Assert.Equal(true, timePurge.ShouldPurgFromTime(timeInService, relativeAge));
+            DateTime messageEnqueTime = CacheMaxEnqueTime - MaxRelitiveAgeInCache - TimeSpan.FromTicks(1);
+            DateTime timeRead = NowUtc - MinTimeInCache - TimeSpan.FromTicks(1);
+            TimeSpan timeInCache = NowUtc - timeRead;
+            TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
+            Assert.Equal(true, TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -45,11 +45,11 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void TimePurgePredicate_NoPurgeAgeThreshold_Tests()
         {
-            DateTime messageEnqueTime = cacheMaxEnqueTime - maxRelitiveAgeInCache;
-            DateTime timeRead = nowUtc - minTimeInCache - TimeSpan.FromTicks(1);
-            TimeSpan timeInService = nowUtc - timeRead;
-            TimeSpan relativeAge = cacheMaxEnqueTime - messageEnqueTime;
-            Assert.Equal(false, timePurge.ShouldPurgFromTime(timeInService, relativeAge));
+            DateTime messageEnqueTime = CacheMaxEnqueTime - MaxRelitiveAgeInCache;
+            DateTime timeRead = NowUtc - MinTimeInCache - TimeSpan.FromTicks(1);
+            TimeSpan timeInCache = NowUtc - timeRead;
+            TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
+            Assert.Equal(false, TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
@@ -58,11 +58,11 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void TimePurgePredicate_NoPurgeTimeInCacheThreshold_Tests()
         {
-            DateTime messageEnqueTime = cacheMaxEnqueTime - maxRelitiveAgeInCache - TimeSpan.FromTicks(1);
-            DateTime timeRead = nowUtc - minTimeInCache;
-            TimeSpan timeInService = nowUtc - timeRead;
-            TimeSpan relativeAge = cacheMaxEnqueTime - messageEnqueTime;
-            Assert.Equal(false, timePurge.ShouldPurgFromTime(timeInService, relativeAge));
+            DateTime messageEnqueTime = CacheMaxEnqueTime - MaxRelitiveAgeInCache - TimeSpan.FromTicks(1);
+            DateTime timeRead = NowUtc - MinTimeInCache;
+            TimeSpan timeInCache = NowUtc - timeRead;
+            TimeSpan relativeAge = CacheMaxEnqueTime - messageEnqueTime;
+            Assert.Equal(false, TimePurge.ShouldPurgFromTime(timeInCache, relativeAge));
         }
 
         /// <summary>
