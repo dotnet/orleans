@@ -28,7 +28,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private class TestBatchContainer : IBatchContainer
         {
             public Guid StreamGuid { get; set; }
-            public string StreamNamespace { get { return null; }}
+            public string StreamNamespace => null;
             public StreamSequenceToken SequenceToken { get; set; }
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
@@ -98,12 +98,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 return new StreamPosition(streamIdentity, sequenceToken);
             }
 
-            public bool IsInStream(ref TestCachedMessage cachedMessage, Guid streamGuid, string streamNamespace)
-            {
-                return cachedMessage.StreamGuid == streamGuid && streamNamespace == null;
-            }
-
-            public bool ShouldPurge(ref TestCachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref TestCachedMessage cachedMessage, ref TestCachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
             {
                 throw new NotImplementedException();
             }

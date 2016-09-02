@@ -16,7 +16,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private const int PooledBufferSize = 1 << 10; // 1K
         private const int MessageSize = 1 << 7; // 128
         private const int MessagesPerBuffer = 8;
-        private const string StreamNamespace = "blarg";
+        private const string TestStreamNamespace = "blarg";
         
         private class TestQueueMessage
         {
@@ -148,7 +148,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 return new StreamPosition(streamIdentity, sequenceToken);
             }
 
-            public bool ShouldPurge(ref TestCachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref TestCachedMessage cachedMessage, ref TestCachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
             {
                 var purgedResource = (FixedSizeBuffer)purgeRequest;
                 // if we're purging our current buffer, don't use it any more
@@ -215,8 +215,8 @@ namespace UnitTests.OrleansRuntime.Streams
             int sequenceNumber = startOfCache;
             IBatchContainer batch;
 
-            IStreamIdentity stream1 = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
-            IStreamIdentity stream2 = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
+            IStreamIdentity stream1 = new StreamIdentity(Guid.NewGuid(), TestStreamNamespace);
+            IStreamIdentity stream2 = new StreamIdentity(Guid.NewGuid(), TestStreamNamespace);
 
             // now add messages into cache newer than cursor
             // Adding enough to fill the pool
@@ -225,7 +225,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 cache.Add(new TestQueueMessage
                 {
                     StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
-                    StreamNamespace = StreamNamespace,
+                    StreamNamespace = TestStreamNamespace,
                     SequenceNumber = sequenceNumber++,
                 }, DateTime.UtcNow);
             }
@@ -238,7 +238,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.NotNull(stream1Cursor);
                 Assert.NotNull(batch);
                 Assert.Equal(stream1.Guid, batch.StreamGuid);
-                Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                Assert.Equal(TestStreamNamespace, batch.StreamNamespace);
                 Assert.NotNull(batch.SequenceToken);
                 stream1EventCount++;
             }
@@ -252,7 +252,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.NotNull(stream2Cursor);
                 Assert.NotNull(batch);
                 Assert.Equal(stream2.Guid, batch.StreamGuid);
-                Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                Assert.Equal(TestStreamNamespace, batch.StreamNamespace);
                 Assert.NotNull(batch.SequenceToken);
                 stream2EventCount++;
             }
@@ -266,7 +266,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     cache.Add(new TestQueueMessage
                     {
                         StreamGuid = i % 2 == 0 ? stream1.Guid : stream2.Guid,
-                        StreamNamespace = StreamNamespace,
+                        StreamNamespace = TestStreamNamespace,
                         SequenceNumber = sequenceNumber++,
                     }, DateTime.UtcNow);
                 }
@@ -277,7 +277,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     Assert.NotNull(stream1Cursor);
                     Assert.NotNull(batch);
                     Assert.Equal(stream1.Guid, batch.StreamGuid);
-                    Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                    Assert.Equal(TestStreamNamespace, batch.StreamNamespace);
                     Assert.NotNull(batch.SequenceToken);
                     stream1EventCount++;
                 }
@@ -289,7 +289,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     Assert.NotNull(stream2Cursor);
                     Assert.NotNull(batch);
                     Assert.Equal(stream2.Guid, batch.StreamGuid);
-                    Assert.Equal(StreamNamespace, batch.StreamNamespace);
+                    Assert.Equal(TestStreamNamespace, batch.StreamNamespace);
                     Assert.NotNull(batch.SequenceToken);
                     stream2EventCount++;
                 }
@@ -308,7 +308,7 @@ namespace UnitTests.OrleansRuntime.Streams
             int sequenceNumber = 10;
             IBatchContainer batch;
 
-            IStreamIdentity streamId = new StreamIdentity(Guid.NewGuid(), StreamNamespace);
+            IStreamIdentity streamId = new StreamIdentity(Guid.NewGuid(), TestStreamNamespace);
 
             // No data in cache, cursors should not throw.
             object cursor = cache.GetCursor(streamId, new EventSequenceToken(sequenceNumber++));
@@ -326,7 +326,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 cache.Add(new TestQueueMessage
                 {
                     StreamGuid = streamId.Guid,
-                    StreamNamespace = StreamNamespace,
+                    StreamNamespace = TestStreamNamespace,
                     SequenceNumber = sequenceNumber++,
                 }, DateTime.UtcNow);
             }
@@ -347,7 +347,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ex = null;
             try
             {
-                cursor = cache.GetCursor(streamId, new EventSequenceToken(10));
+                cache.GetCursor(streamId, new EventSequenceToken(10));
             }
             catch (QueueCacheMissException cacheMissException)
             {
@@ -365,8 +365,8 @@ namespace UnitTests.OrleansRuntime.Streams
             cache.Add(new TestQueueMessage
             {
                 StreamGuid = streamId.Guid,
-                StreamNamespace = StreamNamespace,
-                SequenceNumber = sequenceNumber++,
+                StreamNamespace = TestStreamNamespace,
+                SequenceNumber = sequenceNumber,
             }, DateTime.UtcNow);
             // After purge, use of cursor should throw.
             ex = null;
