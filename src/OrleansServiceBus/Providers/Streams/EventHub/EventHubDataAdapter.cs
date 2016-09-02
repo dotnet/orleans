@@ -126,6 +126,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubDataAdapter : ICacheDataAdapter<EventData, CachedEventHubMessage>
     {
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
+        private readonly TimePurgePredicate timePurage;
         private FixedSizeBuffer currentBuffer;
 
         /// <summary>
@@ -137,13 +138,15 @@ namespace Orleans.ServiceBus.Providers
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
         /// </summary>
         /// <param name="bufferPool"></param>
-        public EventHubDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool)
+        /// <param name="timePurage"></param>
+        public EventHubDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurage = null)
         {
             if (bufferPool == null)
             {
-                throw new ArgumentNullException("bufferPool");
+                throw new ArgumentNullException(nameof(bufferPool));
             }
             this.bufferPool = bufferPool;
+            this.timePurage = timePurage ?? TimePurgePredicate.Default;
         }
 
         /// <summary>
@@ -213,16 +216,29 @@ namespace Orleans.ServiceBus.Providers
         /// Given a purge request, indicates if a cached message should be purged from the cache
         /// </summary>
         /// <param name="cachedMessage"></param>
+        /// <param name="newestCachedMessage"></param>
         /// <param name="purgeRequest"></param>
+        /// <param name="nowUtc"></param>
         /// <returns></returns>
-        public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, IDisposable purgeRequest)
+        public bool ShouldPurge(ref CachedEventHubMessage cachedMessage, ref CachedEventHubMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
         {
-            var purgedResource = (FixedSizeBuffer) purgeRequest;
             // if we're purging our current buffer, don't use it any more
+            var purgedResource = (FixedSizeBuffer)purgeRequest;
             if (currentBuffer != null && currentBuffer.Id == purgedResource.Id)
             {
                 currentBuffer = null;
             }
+
+            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
+            // age of message relative to the most recent event in the cache.
+            TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
+
+            return ShouldPurgeFromResource(ref cachedMessage, purgedResource) || timePurage.ShouldPurgFromTime(timeInCache, relativeAge);
+        }
+
+        private static bool ShouldPurgeFromResource(ref CachedEventHubMessage cachedMessage, FixedSizeBuffer purgedResource)
+        {
+            // if message is from this resource, purge
             return cachedMessage.Segment.Array == purgedResource.Id;
         }
 

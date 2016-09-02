@@ -91,11 +91,12 @@ namespace Orleans.ServiceBus.Providers
                 checkpointerSettings = adapterConfig.GetCheckpointerSettings(providerConfig, serviceProvider);
                 CheckpointerFactory = partition => EventHubCheckpointer.Create(checkpointerSettings, adapterConfig.StreamProviderName, partition);
             }
-            
+
             if (CacheFactory == null)
             {
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, cacheLogger);
+                var timePurge = new TimePurgePredicate(adapterConfig.DataMinTimeInCache, adapterConfig.DataMaxAgeInCache);
+                CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger);
             }
 
             if (StreamFailureHandlerFactory == null)
