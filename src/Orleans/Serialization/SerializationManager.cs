@@ -13,6 +13,7 @@ using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters;
 using System.Text;
+using System.Threading;
 using Newtonsoft.Json;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
@@ -102,8 +103,9 @@ namespace Orleans.Serialization
         private static readonly object typeWriteLock = new object();
         private static bool addingComplete;
         private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
-
-
+        private static Dictionary<string, Type> batchTypes;
+        private static Dictionary<Type, SerializerMethods> batchRegisteredTypes;
+        
         private static IExternalSerializer fallbackSerializer;
         private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
@@ -367,23 +369,7 @@ namespace Orleans.Serialization
                 addingComplete = true;
             }
         }
-
-        public static void StartupStart()
-        {
-            lock(typeWriteLock)
-            {
-                addingComplete = false;
-            }
-        }
-
-        public static void StartupStop()
-        {
-            lock(typeWriteLock)
-            {
-                addingComplete = true;
-            }
-        }
-
+        
         #endregion
 
         #region Serialization info registration
@@ -543,30 +529,40 @@ namespace Orleans.Serialization
 
         private static void AddToNameToTypeMap(string name, Type type)
         {
-            if(types.ContainsKey(name))
+            if(batchTypes != null)
+            {
+                if(batchTypes.ContainsKey(name))
+                    return;
+                batchTypes.Add(name, type);
+                return;
+            }
+            else if(types.ContainsKey(name))
             {
                 return;
             }
+            
             if (addingComplete)
             {
                 var newDictionary = new Dictionary<string, Type>((Dictionary<string, Type>)types);
                 newDictionary.Add(name, type);
-                System.Threading.Thread.MemoryBarrier();
-                types = newDictionary;
+                Volatile.Write(ref types, newDictionary);
             }
             else
             {
                 ((Dictionary<string, Type>)types).Add(name, type);
             }
         }
-        private static int counter = 10;
-        private static int initialCounter = 10;
+
         private static bool TryUpdateOrAddRegisteredType(Type key, DeepCopier deepCopier, Serializer ser, Deserializer deser, bool forceOverride)
         {
             SerializerMethods methods;
-            bool wasInDictionary = registeredTypes.TryGetValue(key, out methods);
-            bool needToUpdate = !wasInDictionary;
+            bool wasInDictionary;
+            
+            if(batchRegisteredTypes != null) wasInDictionary = batchRegisteredTypes.TryGetValue(key, out methods);
+            else wasInDictionary = registeredTypes.TryGetValue(key, out methods);
 
+            bool needToUpdate = !wasInDictionary;
+            
             if (deepCopier != null && (methods.DeepCopy == null || forceOverride))
             {
                 methods = new SerializerMethods(deepCopier, methods.Serialize, methods.Deserialize);
@@ -580,13 +576,15 @@ namespace Orleans.Serialization
 
             if (needToUpdate)
             {
-                if (addingComplete)
+                if(batchRegisteredTypes != null)
+                {
+                    batchRegisteredTypes[key] = methods;
+                }
+                else if (addingComplete)
                 {
                     var newDictionary = new Dictionary<Type, SerializerMethods>((Dictionary<Type, SerializerMethods>)registeredTypes);
                     newDictionary[key] = methods;
-                    System.Threading.Thread.MemoryBarrier();
-                    registeredTypes = newDictionary;
-                    
+                    Volatile.Write(ref registeredTypes, newDictionary);
                 }
                 else
                 {
@@ -596,11 +594,35 @@ namespace Orleans.Serialization
 
             return wasInDictionary;
         }
+                        
+        internal static void FindSerializationInfo(List<Type> typesToProcess)
+        {
+            lock(typeWriteLock)
+            {
+                bool firstRun = batchRegisteredTypes == null;
+                if (firstRun)
+                {
+                    batchRegisteredTypes = new Dictionary<Type, SerializerMethods>((Dictionary<Type, SerializerMethods>)registeredTypes);
+                    batchTypes = new Dictionary<string, Type>((Dictionary<string, Type>)types);
+                }
+                foreach(var t in typesToProcess)
+                {
+                    FindSerializationInfo(t);
+                }
+                if (firstRun)
+                {
+                    Volatile.Write(ref registeredTypes, batchRegisteredTypes);
+                    Volatile.Write(ref types, batchTypes);
+                    batchRegisteredTypes = null;
+                    batchTypes = null;
+                }
+            }
+        }
 
         /// <summary>
         /// Looks for types with marked serializer and deserializer methods, and registers them if necessary.
         /// </summary>
-        internal static void FindSerializationInfo(Type type)
+        private static void FindSerializationInfo(Type type)
         {
             TypeInfo typeInfo = type.GetTypeInfo();
             var assembly = typeInfo.Assembly;
