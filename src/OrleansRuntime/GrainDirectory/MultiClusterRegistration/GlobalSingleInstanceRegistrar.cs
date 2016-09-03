@@ -273,15 +273,14 @@ namespace Orleans.Runtime.GrainDirectory
         public GlobalSingleInstanceResponseTracker SendRequestRound(ActivationAddress address, List<string> remoteClusters)
         {
             // array that holds the responses
-            var responses = new RemoteClusterActivationResponse[remoteClusters.Count];
-
-            // response processor
-            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
+            var responses = new Task<RemoteClusterActivationResponse>[remoteClusters.Count];
 
             // send all requests
             for (int i = 0; i < responses.Length; i++)
-                SendRequest(address.Grain, remoteClusters[i], responses, i, promise).Ignore(); // exceptions are tracked by the promise
+                responses[i] = SendRequest(address.Grain, remoteClusters[i]);
 
+            // response processor
+            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
             return promise;
         }
 
@@ -289,9 +288,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// Send GSI protocol request to the given remote cluster
         /// </summary>
         /// <param name="remotecluster"></param>
-        /// <param name="responses"></param>
-        /// <param name="index"></param>
-        public async Task SendRequest(GrainId grain, string remotecluster, RemoteClusterActivationResponse[] responses, int index, GlobalSingleInstanceResponseTracker responseprocessor)
+        public async Task<RemoteClusterActivationResponse> SendRequest(GrainId grain, string remotecluster)
         {
             try
             {
@@ -301,19 +298,15 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
-                responses[index] = await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);
-
-                responseprocessor.CheckIfDone();
+                return await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);
 
             }
             catch (Exception ex)
             {
-                responses[index] = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
+                return new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
                 {
                     ResponseException = ex
                 };
-
-                responseprocessor.CheckIfDone();
             }
         }
     }

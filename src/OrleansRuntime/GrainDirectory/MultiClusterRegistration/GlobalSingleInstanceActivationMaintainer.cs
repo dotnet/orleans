@@ -244,10 +244,10 @@ namespace Orleans.Runtime.GrainDirectory
                 var address = addresses[i];
 
                 // array that holds the responses
-                var responses = new RemoteClusterActivationResponse[remoteClusters.Count];
+                var responses = new Task<RemoteClusterActivationResponse>[remoteClusters.Count];
 
                 for (int j = 0; j < batchResponses.Count; j++)
-                    responses[j] = batchResponses[j][i];
+                    responses[j] = Task.FromResult(batchResponses[j][i]);
 
                 // response processor
                 var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);

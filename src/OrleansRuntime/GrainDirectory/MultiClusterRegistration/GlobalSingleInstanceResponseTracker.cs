@@ -21,15 +21,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         private readonly TaskCompletionSource<Outcome> tcs = new TaskCompletionSource<Outcome>();
         private readonly GrainId grain;
-        private RemoteClusterActivationResponse[] responses;
+        private readonly Task<RemoteClusterActivationResponse>[] responses;
         private Logger logger;
 
         public AddressAndTag RemoteOwner;
         public string RemoteOwnerCluster;
 
-        public GlobalSingleInstanceResponseTracker(RemoteClusterActivationResponse[] responses, GrainId grain, Logger logger)
+        public GlobalSingleInstanceResponseTracker(Task<RemoteClusterActivationResponse>[] responses, GrainId grain, Logger logger)
         {
             this.responses = responses;
+            Debug.Assert(this.responses.All(t => t != null));
             this.grain = grain;
             this.logger = logger;
 
@@ -50,29 +51,31 @@ namespace Orleans.Runtime.GrainDirectory
                 return "faulted";
             else
             {
-                return string.Format("[{0} {1}]",
-                     Task.Result.ToString(),
-                     (RemoteOwner.Address != null) ? RemoteOwner.Address.ToString() : "");
+                return
+                    $"[{Task.Result} {RemoteOwner.Address}]";
             }
         }
-
 
         /// <summary>
         /// Check responses; signal completion if we have received enough responses to determine outcome.
         /// </summary>
-        public void CheckIfDone()
+        private void CheckIfDone()
         {
             if (!Task.IsCompleted)
             {
-                if (responses.All(res => res != null && res.ResponseStatus == ActivationResponseStatus.Pass))
+                // store incomplete promises at this time (as they might be completed by the time the method finishes
+                var incompletePromises = responses.Where(t => !t.IsCompleted).ToArray();
+                if (incompletePromises.Length == 0 && responses.All(res => res.IsCompleted && res.Result.ResponseStatus == ActivationResponseStatus.Pass))
                 {
                    // All passed, or no other clusters exist
                    tcs.TrySetResult(Outcome.Succeed);
                    return;
                 }
 
-                var ownerResponses = responses.Where(
-                        res => (res != null && res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true)).ToList();
+                var ownerResponses = responses
+                    .Where(t => t.IsCompleted)
+                    .Select(t => t.Result)
+                    .Where(res => res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true).ToList();
 
                 if (ownerResponses.Count > 0)
                 {
@@ -82,14 +85,16 @@ namespace Orleans.Runtime.GrainDirectory
                     RemoteOwner = ownerResponses[0].ExistingActivationAddress;
                     RemoteOwnerCluster = ownerResponses[0].ClusterId;
                     tcs.TrySetResult(Outcome.RemoteOwner);
+                    return;
                 }
 
                 // are all responses here or have failed?
-                if (responses.All(res => res != null))
+                if (incompletePromises.Length == 0)
                 {
                     // determine best candidate
                     var candidates = responses
-                        .Where(res => (res.ResponseStatus == ActivationResponseStatus.Failed && res.ExistingActivationAddress.Address != null))
+                        .Select(t => t.Result)
+                        .Where(res => res.ResponseStatus == ActivationResponseStatus.Failed && res.ExistingActivationAddress.Address != null)
                         .ToList();
 
                     foreach (var res in candidates)
@@ -103,11 +108,12 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                     }
 
-                    if (RemoteOwner.Address != null)
-                        tcs.TrySetResult(Outcome.RemoteOwnerLikely);
-                    else
-                        tcs.TrySetResult(Outcome.Inconclusive);
+                    tcs.TrySetResult(RemoteOwner.Address != null ? Outcome.RemoteOwnerLikely : Outcome.Inconclusive);
+                    return;
                 }
+
+                // When any of the promises that where incomplete finishes, re-run the check
+                System.Threading.Tasks.Task.WhenAny(incompletePromises).ContinueWith(t => CheckIfDone());
             }
         }
     }
