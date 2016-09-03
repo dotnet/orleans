@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
-using Orleans.Runtime;
+using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -95,29 +95,27 @@ namespace Orleans.Runtime.GrainDirectory
                 if (logger.IsVerbose)
                     logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), numRetries - retries, myActivation.Address.ToString());
 
-                var responses = SendRequestRound(address, remoteClusters);
-
-                var outcome = await responses.Task;
+                var outcome = await SendRequestRound(address, remoteClusters);
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, responses);
+                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome.State);
 
-                switch (outcome)
+                switch (outcome.State)
                 {
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwner:
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwnerLikely:
+                    case OutcomeState.RemoteOwner:
+                    case OutcomeState.RemoteOwnerLikely:
                         {
-                            directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, responses.RemoteOwner.Address);
-                            return responses.RemoteOwner;
+                            directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, outcome.RemoteOwnerAddress.Address);
+                            return outcome.RemoteOwnerAddress;
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
+                    case OutcomeState.Succeed:
                         {
                             if (directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Owned, GrainDirectoryEntryStatus.RequestedOwnership))
                                 return myActivation;
                             else
                                 break; // concurrently moved to RACE_LOSER
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Inconclusive:
+                    case OutcomeState.Inconclusive:
                         {
                             break;
                         }
@@ -270,7 +268,7 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(tasks);
         }
 
-        public GlobalSingleInstanceResponseTracker SendRequestRound(ActivationAddress address, List<string> remoteClusters)
+        public Task<GlobalSingleInstanceResponseOutcome> SendRequestRound(ActivationAddress address, List<string> remoteClusters)
         {
             // array that holds the responses
             var responses = new Task<RemoteClusterActivationResponse>[remoteClusters.Count];
@@ -280,8 +278,7 @@ namespace Orleans.Runtime.GrainDirectory
                 responses[i] = SendRequest(address.Grain, remoteClusters[i]);
 
             // response processor
-            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
-            return promise;
+            return GlobalSingleInstanceResponseTracker.GetOutcomeAsync(responses, address.Grain, logger);
         }
 
         /// <summary>
