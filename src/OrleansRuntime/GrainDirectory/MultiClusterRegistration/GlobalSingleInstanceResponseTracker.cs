@@ -10,8 +10,8 @@ namespace Orleans.Runtime.GrainDirectory
     /// A class that encapsulates response processing logic.
     /// It is a promise that fires once it has enough responses to make a determination.
     /// </summary>
-    internal class GlobalSingleInstanceResponseTracker : TaskCompletionSource<GlobalSingleInstanceResponseTracker.Outcome> {
-
+    internal class GlobalSingleInstanceResponseTracker
+    {
         public enum Outcome {
             Succeed,
             RemoteOwner,
@@ -19,6 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
             Inconclusive
         }
 
+        private readonly TaskCompletionSource<Outcome> tcs = new TaskCompletionSource<Outcome>();
         private readonly GrainId grain;
         private RemoteClusterActivationResponse[] responses;
         private Logger logger;
@@ -35,6 +36,11 @@ namespace Orleans.Runtime.GrainDirectory
             CheckIfDone();
         }
 
+        /// <summary>
+        /// Returns the outcome of the response aggregation
+        /// </summary>
+        public Task<Outcome> Task => this.tcs.Task;
+
         // for tracing, display outcome
         public override string ToString()
         {
@@ -50,31 +56,32 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+
         /// <summary>
         /// Check responses; signal completion if we have received enough responses to determine outcome.
         /// </summary>
         public void CheckIfDone()
         {
-            if (!this.Task.IsCompleted)
+            if (!Task.IsCompleted)
             {
                 if (responses.All(res => res != null && res.ResponseStatus == ActivationResponseStatus.Pass))
                 {
                    // All passed, or no other clusters exist
-                    TrySetResult(Outcome.Succeed);
+                   tcs.TrySetResult(Outcome.Succeed);
                    return;
                 }
 
-                var ownerresponses = responses.Where(
+                var ownerResponses = responses.Where(
                         res => (res != null && res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true)).ToList();
 
-                if (ownerresponses.Count > 0)
+                if (ownerResponses.Count > 0)
                 {
-                    if (ownerresponses.Count > 1)
+                    if (ownerResponses.Count > 1)
                         logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occured. Multiple Owner Replies.", grain);
 
-                    RemoteOwner = ownerresponses[0].ExistingActivationAddress;
-                    RemoteOwnerCluster = ownerresponses[0].ClusterId;
-                    TrySetResult(Outcome.RemoteOwner);
+                    RemoteOwner = ownerResponses[0].ExistingActivationAddress;
+                    RemoteOwnerCluster = ownerResponses[0].ClusterId;
+                    tcs.TrySetResult(Outcome.RemoteOwner);
                 }
 
                 // are all responses here or have failed?
@@ -97,9 +104,9 @@ namespace Orleans.Runtime.GrainDirectory
                     }
 
                     if (RemoteOwner.Address != null)
-                        TrySetResult(Outcome.RemoteOwnerLikely);
+                        tcs.TrySetResult(Outcome.RemoteOwnerLikely);
                     else
-                        TrySetResult(Outcome.Inconclusive);
+                        tcs.TrySetResult(Outcome.Inconclusive);
                 }
             }
         }
