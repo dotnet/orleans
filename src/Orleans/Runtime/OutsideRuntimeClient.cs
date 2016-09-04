@@ -642,9 +642,11 @@ namespace Orleans
             
             if (!message.TargetGrain.IsSystemTarget)
             {
-                message.RemoveHeader(Message.Header.TARGET_ACTIVATION);
-                message.RemoveHeader(Message.Header.TARGET_SILO);
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
             }
+
             transport.SendMessage(message);
             return true;
         }

@@ -252,13 +252,14 @@ namespace Orleans.Runtime
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.RemoveHeader(Message.Header.IS_NEW_PLACEMENT);
+                message.IsNewPlacement = null;
                 dispatcher.Transport.SendMessage(message);
             }
             else
             {
-                message.RemoveHeader(Message.Header.TARGET_ACTIVATION);
-                message.RemoveHeader(Message.Header.TARGET_SILO);
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
                 dispatcher.SendMessage(message);
             }
         }

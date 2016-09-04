@@ -83,7 +83,7 @@ namespace Orleans.Runtime
                 Task ignore;
                 ActivationData target = catalog.GetOrCreateActivation(
                     message.TargetAddress, 
-                    message.IsNewPlacement, 
+                    message.IsNewPlacement == true,
                     message.NewGrainType,
                     String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
