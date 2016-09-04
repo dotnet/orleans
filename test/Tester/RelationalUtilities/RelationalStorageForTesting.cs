@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.SqlUtils;
+using Tester.RelationalUtilities;
 
 namespace UnitTests.General
 {
@@ -14,7 +15,8 @@ namespace UnitTests.General
             new Dictionary<string, Func<string, RelationalStorageForTesting>>
             {
                 {AdoNetInvariants.InvariantNameSqlServer, cs => new SqlServerStorageForTesting(cs)},
-                {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)}
+                {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
+                {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
 
         public IRelationalStorage Storage { get; private set; }

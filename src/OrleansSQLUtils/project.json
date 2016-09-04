@@ -1,5 +1,6 @@
-{
+﻿{
   "dependencies": {
+    "Npgsql": "3.1.7"
   },
   "frameworks": {
     "net451": {}

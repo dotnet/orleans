@@ -192,14 +192,18 @@ namespace OrleansSQLUtils.Storage
             /// </summary>
             private static string TryGetSiloName(IDataRecord record)
             {
-                for (var i = 0; i < record.FieldCount; ++i)
+                int pos;
+                try
                 {
-                    if (record.GetName(i) == nameof(Columns.SiloName))
-                    {
-                        return (string) record.GetValue(i);
-                    }
+                    pos = record.GetOrdinal(nameof(Columns.SiloName));
                 }
-                return null;
+                catch (IndexOutOfRangeException)
+                {
+                    return null;
+                }
+
+                return (string)record.GetValue(pos);
+
             }
 
             internal static int GetVersion(IDataRecord record)
