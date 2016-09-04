@@ -43,6 +43,8 @@ namespace Orleans
         private IGrainTypeResolver grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
+        private readonly ManualResetEvent Completion = new ManualResetEvent(false);
+
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
@@ -50,8 +52,6 @@ namespace Orleans
         private const string BARS = "----------";
 
         private readonly GrainFactory grainFactory;
-
-        private ActionBlock<Message> _messageHandler;
 
         public GrainFactory InternalGrainFactory
         {
@@ -301,18 +301,11 @@ namespace Orleans
                 incomingMessagesThreadTimeTracking.OnStartExecution();
             }
 
-            _messageHandler = new ActionBlock<Message>(m => HandleMessage(m),
-                new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = 1,
-                    MaxMessagesPerTask = 100000,
-                    CancellationToken = ct
-                });
-
-            transport.AddTargetBlock(Message.Categories.Application, _messageHandler);
+            var pool = new DedicatedThreadPool(new DedicatedThreadPoolSettings(1));
+            transport.AddTargetBlock(Message.Categories.Application, message => pool.QueueSystemWorkItem(() => HandleMessage(message)));
             try
             {
-                _messageHandler.Completion.Wait();
+                Completion.WaitOne();
 
             }
             catch (AggregateException)
@@ -333,7 +326,7 @@ namespace Orleans
         {
             if (!listenForMessages)
             {
-                _messageHandler.Complete();
+                Completion.Set();
             }
 
 #if TRACK_DETAILED_STATS

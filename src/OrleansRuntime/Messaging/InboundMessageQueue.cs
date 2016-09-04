@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Messaging
     internal class InboundMessageQueue : IInboundMessageQueue
     {
         private readonly ITargetBlock<Message>[] messageQueues;
+        private readonly Action<Message>[] messageHandlers;
         private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
@@ -31,6 +32,11 @@ namespace Orleans.Runtime.Messaging
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
             messageQueues = new ITargetBlock<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
+            messageHandlers = new Action<Message>[n];
+            for (int g = 0; g < n; g++)
+            {
+                messageHandlers[g]= new Action<Message>(message => log.Error(0, "Message recieved before start"));
+            }
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
@@ -66,23 +72,16 @@ namespace Orleans.Runtime.Messaging
                 queueTracking[(int)msg.Category].OnEnQueueRequest(1, messageQueues[(int)msg.Category].Count, msg);
             }
 #endif
-            messageQueues[(int)msg.Category].Post(msg);
+            messageHandlers[(int)msg.Category](msg);
            
             if (log.IsVerbose3) log.Verbose3("Queued incoming {0} message", msg.Category.ToString());
         }
 
-        public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
+        public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
         {
-            if (!(messageQueues[(int) type] is BufferBlock<Message>))
-            {
-                // handler for this message category has been already attached
-                return;
-            }
-
-            // buffer block used for temporary storing of the messages that arrived before
-            (messageQueues[(int) type] as BufferBlock<Message>).LinkTo(actionBlock);
-            messageQueues[(int) type] = actionBlock;
+            messageHandlers[(int) type] = actionBlock;
         }
+
 
 //#if TRACK_DETAILED_STATS
 //                if (StatisticsCollector.CollectQueueStats)

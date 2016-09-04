@@ -67,9 +67,10 @@ namespace Orleans.Messaging
         #endregion
         internal GrainId ClientId { get; private set; }
         internal bool Running { get; private set; }
-
         internal readonly GatewayManager GatewayManager;
         internal readonly BufferBlock<Message> PendingInboundMessages;
+
+        internal  Action<Message> MessageHandler;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -79,9 +80,11 @@ namespace Orleans.Messaging
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference[] grainBuckets;
         private readonly Logger logger;
+        internal bool _initialized;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
+        public  ManualResetEvent Completion { get; } = new ManualResetEvent(false);
         private readonly QueueTrackingStatistic queueTracking;
 
         public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
@@ -287,9 +290,18 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-        public void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock)
+        public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
         {
-            PendingInboundMessages.LinkTo(actionBlock);
+            MessageHandler = actionBlock;
+            _initialized = true;
+            IList<Message> msgs;
+            if (PendingInboundMessages.TryReceiveAll(out msgs))
+            {
+                foreach (var msg in msgs)
+                {
+                    MessageHandler(msg);
+                }
+            }
         }
 
         internal void QueueIncomingMessage(Message msg)
@@ -300,7 +312,14 @@ namespace Orleans.Messaging
                 queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
             }
 #endif
-            PendingInboundMessages.Post(msg);
+            if (_initialized)
+            {
+                MessageHandler(msg);
+            }
+            else
+            {
+                PendingInboundMessages.Post(msg);
+            }
         }
 
         private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)

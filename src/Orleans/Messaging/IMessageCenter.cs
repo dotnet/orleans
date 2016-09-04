@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Configuration;
@@ -16,12 +17,14 @@ namespace Orleans.Runtime
 
         void SendMessage(Message msg);
 
-        void AddTargetBlock(Message.Categories type, ITargetBlock<Message> actionBlock);
+        void AddTargetBlock(Message.Categories type, Action<Message> actionBlock);
 
         int SendQueueLength { get; }
 
         int ReceiveQueueLength { get; }
 
         IMessagingConfiguration MessagingConfiguration { get; }
+
+        ManualResetEvent Completion { get; }
     }
 }
