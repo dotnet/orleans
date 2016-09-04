@@ -310,9 +310,9 @@ namespace Orleans.Runtime
         {
             bool canInterleave = 
                    catalog.IsReentrantGrain(targetActivation.ActivationId)
-                || incoming.IsAlwaysInterleave
+                || incoming.IsAlwaysInterleave == true
                 || targetActivation.Running == null
-                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly);
+                || (targetActivation.Running.IsReadOnly == true && incoming.IsReadOnly == true);
 
             return canInterleave;
         }

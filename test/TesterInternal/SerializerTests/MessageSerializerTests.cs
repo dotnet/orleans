@@ -41,8 +41,8 @@ namespace UnitTests.SerializerTests
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
-            resp.SetHeader(Message.Header.ALWAYS_INTERLEAVE, true);
-            resp.SetHeader(Message.Header.CACHE_INVALIDATION_HEADER, "TestBar");
+            resp.IsAlwaysInterleave = true;
+          // wtf  resp.CacheInvalidationHeader = "TestBar";
             //resp.SetStringBody("This is test data");
 
             List<object> requestBody = new List<object>();
@@ -84,7 +84,7 @@ namespace UnitTests.SerializerTests
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
             Assert.Equal<Message.Categories>(resp.Category, resp1.Category); //Category is incorrect"
-            Assert.Equal<Message.Directions>(resp.Direction, resp1.Direction); //Direction is incorrect
+            Assert.Equal<Message.Directions?>(resp.Direction, resp1.Direction); //Direction is incorrect
             Assert.Equal<CorrelationId>(resp.Id, resp1.Id); //Correlation ID is incorrect
             Assert.Equal<bool>((bool)resp.GetHeader(Message.Header.ALWAYS_INTERLEAVE), (bool)resp1.GetHeader(Message.Header.ALWAYS_INTERLEAVE)); //Foo Boolean is incorrect
             Assert.Equal<string>((string)resp.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER), (string)resp1.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER)); //Bar string is incorrect

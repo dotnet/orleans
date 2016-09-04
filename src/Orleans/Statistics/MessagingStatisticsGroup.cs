@@ -149,14 +149,14 @@ namespace Orleans.Runtime
             perSiloPingReplyMissedCounters = new ConcurrentDictionary<string, CounterStatistic>();
         }
 
-        internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
+        internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
         {
             if (numTotalBytes < 0)
                 throw new ArgumentException(String.Format("OnMessageSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
             OnMessageSend_Impl(targetSilo, direction, numTotalBytes, headerBytes, 1);
         }
 
-        internal static void OnMessageBatchSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection, int numMsgsInBatch)
+        internal static void OnMessageBatchSend(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection, int numMsgsInBatch)
         {
             if (numTotalBytes < 0)
                 throw new ArgumentException(String.Format("OnMessageBatchSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
@@ -164,10 +164,14 @@ namespace Orleans.Runtime
             perSocketDirectionStatsSend[(int)socketDirection].OnMessage(numMsgsInBatch, numTotalBytes);
         }
 
-        private static void OnMessageSend_Impl(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, int numMsgsInBatch)
+        private static void OnMessageSend_Impl(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, int numMsgsInBatch)
         {
             MessagesSentTotal.IncrementBy(numMsgsInBatch);
-            MessagesSentPerDirection[(int)direction].IncrementBy(numMsgsInBatch);
+            if (direction.HasValue)
+            {
+                MessagesSentPerDirection[(int) direction.Value].IncrementBy(numMsgsInBatch);
+            }
+
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
@@ -246,7 +250,7 @@ namespace Orleans.Runtime
 
         internal static void OnFailedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg == null || msg.Direction == null) return;
             int direction = (int)msg.Direction;
             if (FailedSentMessages[direction] == null)
             {
@@ -258,7 +262,7 @@ namespace Orleans.Runtime
 
         internal static void OnDroppedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg?.Direction == null) return;
             int direction = (int)msg.Direction;
             if (DroppedSentMessages[direction] == null)
             {
@@ -270,7 +274,7 @@ namespace Orleans.Runtime
 
         internal static void OnRejectedMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg?.Direction == null) return;
             int direction = (int)msg.Direction;
             if (RejectedMessages[direction] == null)
             {

@@ -277,7 +277,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                if (message.CacheInvalidationHeader != null)
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
@@ -534,7 +534,7 @@ namespace Orleans.Runtime
                     case Message.RejectionTypes.Unrecoverable:
                     // fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (!message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                        if (message.CacheInvalidationHeader == null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 

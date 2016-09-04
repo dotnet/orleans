@@ -76,7 +76,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.ContainsHeader(Message.Header.TARGET_SILO))
+            if (msg.TargetSilo == null)
             {
                 logger.Error(ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + Utils.GetStackTrace());
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");

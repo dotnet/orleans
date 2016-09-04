@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
-            if (!msg.ContainsHeader(Message.Header.SENDING_SILO))
+            if (msg.SendingSilo == null)
                 msg.SendingSilo = messageCenter.MyAddress;
             
 
