@@ -252,7 +252,7 @@ namespace Orleans.Runtime
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.IsNewPlacement = null;
+                message.IsNewPlacement = false;
                 dispatcher.Transport.SendMessage(message);
             }
             else

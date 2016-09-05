@@ -1785,7 +1785,7 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static void DeserializeMessageHeaders(BinaryTokenStreamReader stream, Message message)
+        internal static Message.HeadersContainer DeserializeMessageHeaders(BinaryTokenStreamReader stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1818,7 +1818,7 @@ namespace Orleans.Serialization
 
 
             // var des = GetDeserializer(typeof(Message.HeadersContainer));
-            message.Headers =(Message.HeadersContainer) (new OrleansJsonSerializer().Deserialize(typeof(Message.HeadersContainer), stream));
+           var headers =(Message.HeadersContainer) (new OrleansJsonSerializer().Deserialize(typeof(Message.HeadersContainer), stream));
            // message.Headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), stream);
 
             if (timer != null)
@@ -1827,6 +1827,7 @@ namespace Orleans.Serialization
                 HeaderDesers.Increment();
                 HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
             }
+            return headers;
         }
         
         private static bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)

@@ -67,8 +67,6 @@ namespace Orleans.Runtime
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
-        private readonly object headersLockObj = new object();
-
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
         /// </summary>
@@ -122,78 +120,78 @@ namespace Orleans.Runtime
 
         public Categories Category
         {
-            get { return Headers.Category; }
-            set { Headers.Category = value; }
+            get { lock (Headers) return Headers.Category; }
+            set { lock (Headers) Headers.Category = value; }
         }
 
-        public Directions? Direction
+        public Directions Direction
         {
-            get { return Headers.Direction; }
-            set { Headers.Direction = value; }
+            get { lock (Headers) return Headers.Direction; }
+            set { lock (Headers) Headers.Direction = value; }
         }
 
         public bool IsReadOnly
         {
-            get { return Headers.IsReadOnly; }
-            set { Headers.IsReadOnly = value; }
+            get { lock(Headers) return Headers.IsReadOnly; }
+            set { lock (Headers) Headers.IsReadOnly = value; }
         }
 
         public bool IsAlwaysInterleave
         {
-            get { return Headers.IsAlwaysInterleave; }
-            set { Headers.IsAlwaysInterleave = value; }
+            get { lock (Headers) return Headers.IsAlwaysInterleave; }
+            set { lock (Headers) Headers.IsAlwaysInterleave = value; }
         }
 
         public bool IsUnordered
         {
-            get { return Headers.IsUnordered; }
-            set { Headers.IsUnordered = value; }
+            get { lock (Headers) return Headers.IsUnordered; }
+            set { lock (Headers) Headers.IsUnordered = value; }
         } // todo
 
         public CorrelationId Id
         {
-            get { return Headers.Id; }
-            set { Headers.Id = value; }
+            get { lock (Headers) return Headers.Id; }
+            set { lock (Headers) Headers.Id = value; }
         }
 
         public int ResendCount
         {
-            get { return Headers.ResendCount; }
-            set { Headers.ResendCount = value; }
+            get { lock (Headers) return Headers.ResendCount; }
+            set { lock (Headers) Headers.ResendCount = value; }
         }
 
         public int ForwardCount
         {
-            get { return Headers.ForwardCount; }
-            set { Headers.ForwardCount = value; }
+            get { lock (Headers) return Headers.ForwardCount; }
+            set { lock (Headers) Headers.ForwardCount = value; }
         }
         
         public SiloAddress TargetSilo
         {
-            get { return Headers.TargetSilo; }
+            get { lock (Headers) return Headers.TargetSilo; }
             set
             {
-                Headers.TargetSilo = value;
+                lock (Headers) Headers.TargetSilo = value;
                 targetAddress = null;
             }
         }
         
         public GrainId TargetGrain
         {
-            get { return Headers.TargetGrain; }
+            get { lock (Headers) return Headers.TargetGrain; }
             set
             {
-                Headers.TargetGrain = value;
+                lock (Headers) Headers.TargetGrain = value;
                 targetAddress = null;
             }
         }
         
         public ActivationId TargetActivation
         {
-            get { return Headers.TargetActivation; }
+            get { lock (Headers) return Headers.TargetActivation; }
             set
             {
-                Headers.TargetActivation = value;
+                lock (Headers) Headers.TargetActivation = value;
                 targetAddress = null;
             }
         }
@@ -212,40 +210,40 @@ namespace Orleans.Runtime
         
         public GuidId TargetObserverId
         {
-            get { return Headers.TargetObserverId; }
+            get { lock (Headers) return Headers.TargetObserverId; }
             set
             {
-                Headers.TargetObserverId = value;
+                lock (Headers) Headers.TargetObserverId = value;
                 targetAddress = null;
             }
         }
         
         public SiloAddress SendingSilo
         {
-            get { return Headers.SendingSilo; }
+            get { lock (Headers) return Headers.SendingSilo; }
             set
             {
-                Headers.SendingSilo = value;
+                lock (Headers) Headers.SendingSilo = value;
                 sendingAddress = null;
             }
         }
         
         public GrainId SendingGrain
         {
-            get { return Headers.SendingGrain; }
+            get { lock (Headers) return Headers.SendingGrain; }
             set
             {
-                Headers.SendingGrain = value;
+                lock (Headers) Headers.SendingGrain = value;
                 sendingAddress = null;
             }
         }
         
         public ActivationId SendingActivation
         {
-            get { return Headers.SendingActivation; }
+            get { lock (Headers) return Headers.SendingActivation; }
             set
             {
-                Headers.SendingActivation = value;
+                lock (Headers) Headers.SendingActivation = value;
                 sendingAddress = null;
             }
         }
@@ -262,29 +260,28 @@ namespace Orleans.Runtime
             }
         }
         
-        public bool? IsNewPlacement
+        public bool IsNewPlacement
         {
-            get { return Headers.IsNewPlacement; }
+            get { lock (Headers) return Headers.IsNewPlacement; }
             set
             {
-               // todo: recheck if (value == true)
-                    Headers.IsNewPlacement = value;
+                lock (Headers) Headers.IsNewPlacement = value;
             }
         }
 
         public ResponseTypes Result
         {
-            get { return Headers.Result; }
-            set { Headers.Result = value; }
+            get { lock (Headers) return Headers.Result; }
+            set { lock (Headers) Headers.Result = value; }
         }
 
         public DateTime? Expiration
         {
-            get { return Headers.Expiration; }
-            set { Headers.Expiration = value; }
+            get { lock (Headers) return Headers.Expiration; }
+            set { lock (Headers) Headers.Expiration = value; }
         }
 
-        public bool IsExpired => DateTime.UtcNow > Expiration;
+        public bool IsExpired => Expiration.HasValue && DateTime.UtcNow > Expiration.Value;
 
         public bool IsExpirableMessage(IMessagingConfiguration config)
         {
@@ -299,14 +296,14 @@ namespace Orleans.Runtime
 
         public string DebugContext
         {
-            get { return Headers.DebugContext; }
-            set { Headers.DebugContext = value; }
+            get { lock (Headers) return GetNotNullString(Headers.DebugContext); }
+            set { lock (Headers) Headers.DebugContext = value; }
         }
 
         public IEnumerable<ActivationAddress> CacheInvalidationHeader
         {
-            get { return Headers.CacheInvalidationHeader; }
-            set { Headers.CacheInvalidationHeader = value; }
+            get { lock (Headers) return Headers.CacheInvalidationHeader; }
+            set { lock (Headers) Headers.CacheInvalidationHeader = value; }
         }
 
         //{
@@ -348,7 +345,7 @@ namespace Orleans.Runtime
         /// </summary>
         public string NewGrainType
         {
-            get { return Headers.NewGrainType; }
+            get { return GetNotNullString(Headers.NewGrainType); }
             set { Headers.NewGrainType = value; }
         }
         
@@ -435,7 +432,7 @@ namespace Orleans.Runtime
             // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
             // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
             //headers = new Dictionary<Header, object>(17);
-            //metadata = new Dictionary<string, object>();
+            metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
@@ -478,7 +475,7 @@ namespace Orleans.Runtime
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
-            SerializationManager.DeserializeMessageHeaders(input, this);
+            Headers = SerializationManager.DeserializeMessageHeaders(input);
             if (deserializeBody)
             {
                 bodyObject = DeserializeBody(body);
@@ -528,10 +525,7 @@ namespace Orleans.Runtime
             }
 
             response.CacheInvalidationHeader = CacheInvalidationHeader;
-            if (Expiration.HasValue)
-            {
-                response.Expiration = Expiration;
-            }
+            response.Expiration = Expiration;
 
             var contextData = RequestContext.Export();
             if (contextData != null)
@@ -624,7 +618,8 @@ namespace Orleans.Runtime
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
             var headerStream = new BinaryTokenStreamWriter();
-           //todo lock (headers) // Guard against any attempts to modify message headers while we are serializing them
+            lock (Headers)
+            //todo lock (headers) // Guard against any attempts to modify message headers while we are serializing them
             {
                 SerializationManager.SerializeMessageHeaders(Headers, headerStream);
             }
@@ -829,7 +824,7 @@ namespace Orleans.Runtime
         {
             public Categories Category { get; set; }
 
-            public Directions? Direction { get; set; }
+            public Directions Direction { get; set; }
 
             public bool IsReadOnly { get; set; }
 
@@ -857,7 +852,7 @@ namespace Orleans.Runtime
 
             public ActivationId SendingActivation { get; set; }
 
-            public bool? IsNewPlacement { get; set; }
+            public bool IsNewPlacement { get; set; }
 
             public ResponseTypes Result { get; set; }
 
