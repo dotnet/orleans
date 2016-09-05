@@ -126,9 +126,11 @@ namespace Orleans.Runtime
 
         public Directions Direction
         {
-            get { lock (Headers) return Headers.Direction; }
+            get { lock (Headers) return Headers.Direction ?? default(Directions); }
             set { lock (Headers) Headers.Direction = value; }
         }
+
+        public bool HasDirection => Headers.Direction.HasValue;
 
         public bool IsReadOnly
         {
@@ -824,7 +826,7 @@ namespace Orleans.Runtime
         {
             public Categories Category { get; set; }
 
-            public Directions Direction { get; set; }
+            public Directions? Direction { get; set; }
 
             public bool IsReadOnly { get; set; }
 
