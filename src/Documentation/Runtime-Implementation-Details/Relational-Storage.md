@@ -5,7 +5,7 @@ title: Relational Storage
 
 # Relational Storage
 
-Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in [Runtime Tables](Runtime-Tables.md). Setting up the connection strings are done as explained in [Orleans Configuration Guide ](http://dotnet.github.io/orleans/Orleans-Configuration-Guide/) and [SQL Tables](http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables).
+Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in [Runtime Tables](Runtime-Tables.md). Setting up the connection strings are done as explained in [Orleans Configuration Guide ](http://dotnet.github.io/orleans/Documentation/Orleans-Configuration-Guide/) and [SQL Tables](http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Configuring-SQL-Tables).
 
 To make Orleans code function with a given relational database backend, the following is required:
 
@@ -101,7 +101,7 @@ These principles are also [included in the database scripts](https://github.com/
 
 ## Some ideas on applying customized scripts
 
-1. Alter scripts in `OrleansQuery` for [grain persistence](http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Grain-Persistence) with `IF ELSE`
+1. Alter scripts in `OrleansQuery` for [grain persistence](http://dotnet.github.io/orleans/Documentation/Getting-Started-With-Orleans/Grain-Persistence) with `IF ELSE`
    so that some state is saved using the default `INSERT` while some grain state uses, for instance, [memory optimized tables](https://msdn.microsoft.com/en-us/library/dn133165.aspx).
    The `SELECT` queries need to be altered accordingly.
 2. The idea in `1.` can be used to take advantage of other deployment or vendor specific aspects. Such as splitting data between `SSD` or `HDD`, putting some data on encrypted tables,
