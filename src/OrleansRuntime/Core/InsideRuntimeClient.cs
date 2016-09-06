@@ -243,7 +243,7 @@ namespace Orleans.Runtime
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
             if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
-            message.SetMetadata(Message.Metadata.TARGET_HISTORY, message.GetTargetHistory());
+            message.TargetHistory = message.GetTargetHistory();
 
             if (message.TargetGrain.IsSystemTarget)
             {

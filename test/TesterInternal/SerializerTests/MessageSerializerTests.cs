@@ -88,7 +88,9 @@ namespace UnitTests.SerializerTests
             Assert.Equal<CorrelationId>(resp.Id, resp1.Id); //Correlation ID is incorrect
             Assert.Equal<bool>((bool)resp.IsAlwaysInterleave, (bool)resp1.IsAlwaysInterleave); //Foo Boolean is incorrect
             Assert.Equal(resp.CacheInvalidationHeader, resp1.CacheInvalidationHeader); //Bar string is incorrect
-            Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo)); //TargetSilo is incorrect
+            Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo));
+            Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
+            Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
             List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries

@@ -638,7 +638,7 @@ namespace Orleans
             if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
 
             message.ResendCount = message.ResendCount + 1;
-            message.SetMetadata(Message.Metadata.TARGET_HISTORY, message.GetTargetHistory());
+            message.TargetHistory = message.GetTargetHistory();
             
             if (!message.TargetGrain.IsSystemTarget)
             {

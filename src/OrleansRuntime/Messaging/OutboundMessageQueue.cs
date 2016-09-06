@@ -65,9 +65,9 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.ContainsMetadata(QUEUED_TIME_METADATA))
+            if (!msg.QueuedTime.HasValue)
             {
-                msg.SetMetadata(QUEUED_TIME_METADATA, DateTime.UtcNow);
+                msg.QueuedTime = DateTime.UtcNow;
             }
 
             // First check to see if it's really destined for a proxied client, instead of a local grain.

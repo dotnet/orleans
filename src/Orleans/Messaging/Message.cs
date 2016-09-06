@@ -51,21 +51,50 @@ namespace Orleans.Runtime
             // Do not add over byte.MaxValue of these.
         }
 
-        public static class Metadata
-        {
-            public const string MAX_RETRIES = "MaxRetries";
-            public const string EXCLUDE_TARGET_ACTIVATIONS = "#XA";
-            public const string TARGET_HISTORY = "TargetHistory";
-            public const string ACTIVATION_DATA = "ActivationData";
-        }
-
-
         public static int LargeMessageSizeThreshold { get; set; }
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
+        #region metadata
+
         [NonSerialized]
-        private Dictionary<string, object> metadata;
+        private string _targetHistory;
+
+        [NonSerialized]
+        private DateTime? _queuedTime;
+
+        [NonSerialized]
+        private int? _retryCount;
+
+        [NonSerialized]
+        private int? _maxRetries;
+
+        public string TargetHistory
+        {
+            get { return _targetHistory; }
+            set { _targetHistory = value; }
+        }
+
+        
+        public DateTime? QueuedTime
+        {
+            get { return _queuedTime; }
+            set { _queuedTime = value; }
+        }
+
+        public int? RetryCount
+        {
+            get { return _retryCount; }
+            set { _retryCount = value; }
+        }
+
+        public int? MaxRetries
+        {
+            get { return _maxRetries; }
+            set { _maxRetries = value; }
+        }
+
+        #endregion
 
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
@@ -430,11 +459,6 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            // average headers items count is 14 items, and while the Header enum contains 18 entries
-            // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
-            // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
-            //headers = new Dictionary<Header, object>(17);
-            metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
@@ -474,8 +498,6 @@ namespace Orleans.Runtime
         // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
-            metadata = new Dictionary<string, object>();
-
             var input = new BinaryTokenStreamReader(header);
             Headers = SerializationManager.DeserializeMessageHeaders(input);
             if (deserializeBody)
@@ -560,43 +582,12 @@ namespace Orleans.Runtime
 
         public void ClearTargetAddress()
         {
-            targetAddress = null; // todo
-            //if (tag == Header.TARGET_ACTIVATION || tag == Header.TARGET_GRAIN | tag == Header.TARGET_SILO)
-            //    targetAddress = null;
+            targetAddress = null;
         }
 
         private static string GetNotNullString(string s)
         {
             return s ?? string.Empty;
-        }
-
-        public bool ContainsMetadata(string tag)
-        {
-            return metadata != null && metadata.ContainsKey(tag);
-        }
-
-        public void SetMetadata(string tag, object data)
-        {
-            metadata = metadata ?? new Dictionary<string, object>();
-            metadata[tag] = data;
-        }
-
-        public void RemoveMetadata(string tag)
-        {
-            if (metadata != null)
-            {
-                metadata.Remove(tag);
-            }
-        }
-
-        public object GetMetadata(string tag)
-        {
-            object data;
-            if (metadata != null && metadata.TryGetValue(tag, out data))
-            {
-                return data;
-            }
-            return null;
         }
 
         /// <summary>
@@ -776,9 +767,9 @@ namespace Orleans.Runtime
                 history.Append(TargetActivation);
             }
             history.Append(">");
-            if (ContainsMetadata(Message.Metadata.TARGET_HISTORY))
+            if (!string.IsNullOrEmpty(TargetHistory))
             {
-                history.Append("    ").Append(GetMetadata(Message.Metadata.TARGET_HISTORY));
+                history.Append("    ").Append(TargetHistory);
             }
             return history.ToString();
         }
@@ -971,4 +962,5 @@ namespace Orleans.Runtime
             }
         }
     }
+    public class HeadersContainerq { }
 }
