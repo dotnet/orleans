@@ -160,6 +160,7 @@ namespace Orleans.TestingHost
             }
 
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
+            config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
             if (Debugger.IsAttached)
