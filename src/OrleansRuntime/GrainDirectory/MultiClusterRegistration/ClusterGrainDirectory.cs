@@ -81,17 +81,17 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 ActivationAddress address;
                 int version;
-                MultiClusterStatus existingActivationStatus = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
+                GrainDirectoryEntryStatus existingActivationStatus = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
 
 
                 //Return appropriate protocol response, given current mc status   
                 switch (existingActivationStatus)
                 {
-                    case MultiClusterStatus.Invalid:
+                    case GrainDirectoryEntryStatus.Invalid:
                         response = RemoteClusterActivationResponse.Pass;
                         break;
 
-                    case MultiClusterStatus.Owned:
+                    case GrainDirectoryEntryStatus.Owned:
                         response = new RemoteClusterActivationResponse(ActivationResponseStatus.Failed)
                         {
                             ExistingActivationAddress = new AddressAndTag()
@@ -104,13 +104,13 @@ namespace Orleans.Runtime.GrainDirectory
                         };
                         break;
 
-                    case MultiClusterStatus.Cached:
-                    case MultiClusterStatus.RaceLoser:
+                    case GrainDirectoryEntryStatus.Cached:
+                    case GrainDirectoryEntryStatus.RaceLoser:
                         response = RemoteClusterActivationResponse.Pass;
                         break;
 
-                    case MultiClusterStatus.RequestedOwnership:
-                    case MultiClusterStatus.Doubtful:
+                    case GrainDirectoryEntryStatus.RequestedOwnership:
+                    case GrainDirectoryEntryStatus.Doubtful:
                         var iWin = MultiClusterUtils.ActivationPrecedenceFunc(grain, clusterId, requestClusterId);
                         if (iWin)
                         {
@@ -129,10 +129,10 @@ namespace Orleans.Runtime.GrainDirectory
                         {
                             response = RemoteClusterActivationResponse.Pass;
                             //update own activation status to race loser.
-                            if (existingActivationStatus == MultiClusterStatus.RequestedOwnership)
+                            if (existingActivationStatus == GrainDirectoryEntryStatus.RequestedOwnership)
                             {
                                 logger.Verbose2("GSIP:Rsp {0} Origin={1} RaceLoser", grain.ToString(), requestClusterId);
-                                var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, MultiClusterStatus.RaceLoser, MultiClusterStatus.RequestedOwnership);
+                                var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, GrainDirectoryEntryStatus.RaceLoser, GrainDirectoryEntryStatus.RequestedOwnership);
                                 if (!success)
                                 {
                                     // there was a race. retry.

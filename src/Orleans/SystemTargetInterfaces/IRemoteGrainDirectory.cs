@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     {
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
-        MultiClusterStatus RegistrationStatus { get; set; }
+        GrainDirectoryEntryStatus RegistrationStatus { get; set; }
         bool OkToRemove(UnregistrationCause cause);
     }
 
@@ -20,11 +20,11 @@ namespace Orleans.Runtime
         int VersionTag { get; }
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
-        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus);
+        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
         bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo entry, out bool wasRemoved);
         bool Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
-        bool UpdateClusterRegistrationStatus(ActivationId activationId, MultiClusterStatus registrationStatus, MultiClusterStatus? compareWith = null);
+        bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null);
     }
 
     /// <summary>

@@ -141,12 +141,12 @@ namespace Tests.GeoClusterTests
         {
             int offset = random.Next();
 
-            int base_own0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
-            int base_own1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
-            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.RequestedOwnership).Count;
-            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.RequestedOwnership).Count;
-            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count;
-            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count;
+            int base_own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
+            int base_own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
+            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
+            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2}", base_own0, base_requested0, base_doubtful0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2}", base_own1, base_requested1, base_doubtful1);
@@ -162,12 +162,12 @@ namespace Tests.GeoClusterTests
 
             // We expect all requests to resolve, and all created activations are in state OWNED
 
-            int own0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
-            int own1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
-            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count;
-            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count;
-            int requested0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.RequestedOwnership).Count;
-            int requested1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.RequestedOwnership).Count;
+            int own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
+            int own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
+            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
+            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
+            int requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2}", own0, requested0, doubtful0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2}", own1, requested1, doubtful1);
@@ -308,12 +308,12 @@ namespace Tests.GeoClusterTests
                 // one should be owned and the other cached
                 switch (activations[0].RegistrationStatus)
                 {
-                    case MultiClusterStatus.Owned:
-                        if (activations[1].RegistrationStatus != MultiClusterStatus.Cached)
+                    case GrainDirectoryEntryStatus.Owned:
+                        if (activations[1].RegistrationStatus != GrainDirectoryEntryStatus.Cached)
                             error();
                         break;
-                    case MultiClusterStatus.Cached:
-                        if (activations[1].RegistrationStatus != MultiClusterStatus.Owned)
+                    case GrainDirectoryEntryStatus.Cached:
+                        if (activations[1].RegistrationStatus != GrainDirectoryEntryStatus.Owned)
                             error();
                         break;
                     default:
@@ -354,14 +354,14 @@ namespace Tests.GeoClusterTests
         {
             int offset = random.Next();
 
-            int base_own0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
-            int base_own1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
-            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.RequestedOwnership).Count;
-            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.RequestedOwnership).Count;
-            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count;
-            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count;
-            int base_cached0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Cached).Count;
-            int base_cached1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Cached).Count;
+            int base_own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
+            int base_own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
+            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
+            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
+            int base_cached0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached).Count;
+            int base_cached1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2} Cached={3}", base_own0, base_requested0, base_doubtful0, base_cached0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2} Cached={3}", base_own1, base_requested1, base_doubtful1, base_cached1);
@@ -401,8 +401,8 @@ namespace Tests.GeoClusterTests
             });
 
             // Validate that all the created grains are in DOUBTFUL, one activation in each cluster.
-            Assert.True(GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count == numGrains);
-            Assert.True(GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count == numGrains);
+            Assert.True(GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count == numGrains);
+            Assert.True(GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count == numGrains);
 
             WriteLog("Restoring inter-cluster communication");
 
@@ -416,14 +416,14 @@ namespace Tests.GeoClusterTests
 
             WriteLog("Validation of conflict resolution");
 
-            int own0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Owned).Count;
-            int own1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Owned).Count;
-            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Doubtful).Count;
-            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Doubtful).Count;
-            int requested0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.RequestedOwnership).Count;
-            int requested1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.RequestedOwnership).Count;
-            int cached0 = GetGrainsInClusterWithStatus(cluster0, MultiClusterStatus.Cached).Count;
-            int cached1 = GetGrainsInClusterWithStatus(cluster1, MultiClusterStatus.Cached).Count;
+            int own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
+            int own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
+            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
+            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
+            int requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int cached0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached).Count;
+            int cached1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own0, requested0, doubtful0, cached0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own1, requested1, doubtful1, cached1);
@@ -456,12 +456,12 @@ namespace Tests.GeoClusterTests
                 // one should be owned and the other cached
                 switch (activations[0].RegistrationStatus)
                 {
-                    case MultiClusterStatus.Owned:
-                        if (activations[1].RegistrationStatus != MultiClusterStatus.Cached)
+                    case GrainDirectoryEntryStatus.Owned:
+                        if (activations[1].RegistrationStatus != GrainDirectoryEntryStatus.Cached)
                             error();
                         break;
-                    case MultiClusterStatus.Cached:
-                        if (activations[1].RegistrationStatus != MultiClusterStatus.Owned)
+                    case GrainDirectoryEntryStatus.Cached:
+                        if (activations[1].RegistrationStatus != GrainDirectoryEntryStatus.Owned)
                             error();
                         break;
                     default:
@@ -502,7 +502,7 @@ namespace Tests.GeoClusterTests
 
         #region Helper methods 
 
-        private List<GrainId> GetGrainsInClusterWithStatus(string clusterId, MultiClusterStatus? status = null)
+        private List<GrainId> GetGrainsInClusterWithStatus(string clusterId, GrainDirectoryEntryStatus? status = null)
         {
             List<GrainId> grains = new List<GrainId>();
             var silos = Clusters[clusterId].Silos;

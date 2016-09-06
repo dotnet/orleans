@@ -23,7 +23,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (singleActivation)
             {
-                var result = directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, MultiClusterStatus.ClusterLocal);
+                var result = directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, GrainDirectoryEntryStatus.ClusterLocal);
                 return result;
             }
             else

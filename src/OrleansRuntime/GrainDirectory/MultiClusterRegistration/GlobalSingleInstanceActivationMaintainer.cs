@@ -40,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void TrackDoubtfulGrains(Dictionary<GrainId, IGrainInfo> newstuff)
         {
-            var newdoubtful = FilterByMultiClusterStatus(newstuff, MultiClusterStatus.Doubtful)
+            var newdoubtful = FilterByMultiClusterStatus(newstuff, GrainDirectoryEntryStatus.Doubtful)
                 .Select(kvp => kvp.Key)
                 .ToList();
 
@@ -50,7 +50,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public static IEnumerable<KeyValuePair<GrainId, IGrainInfo>> FilterByMultiClusterStatus(Dictionary<GrainId, IGrainInfo> collection, MultiClusterStatus status)
+        public static IEnumerable<KeyValuePair<GrainId, IGrainInfo>> FilterByMultiClusterStatus(Dictionary<GrainId, IGrainInfo> collection, GrainDirectoryEntryStatus status)
         {
             foreach (var kvp in collection)
             {
@@ -94,7 +94,7 @@ namespace Orleans.Runtime.GrainDirectory
                         // but if it happens anyway, this is the correct thing to do
 
                         var allEntries = router.DirectoryPartition.GetItems();
-                        var ownedEntries = FilterByMultiClusterStatus(allEntries, MultiClusterStatus.Owned)
+                        var ownedEntries = FilterByMultiClusterStatus(allEntries, GrainDirectoryEntryStatus.Owned)
                             .Select(kp => Tuple.Create(kp.Key, kp.Value.Instances.FirstOrDefault()))
                             .ToList();
 
@@ -185,7 +185,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             foreach (var entry in entries)
             {
-                router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, MultiClusterStatus.Doubtful, MultiClusterStatus.Owned);
+                router.DirectoryPartition.UpdateClusterRegistrationStatus(entry.Item1, entry.Item2.Key, GrainDirectoryEntryStatus.Doubtful, GrainDirectoryEntryStatus.Owned);
                 TrackDoubtfulGrain(entry.Item1);
             }
 
@@ -204,10 +204,10 @@ namespace Orleans.Runtime.GrainDirectory
                 var mcstate = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
 
                 // work on the doubtful ones only
-                if (mcstate == MultiClusterStatus.Doubtful)
+                if (mcstate == GrainDirectoryEntryStatus.Doubtful)
                 {
                     // try to start retry by moving into requested_ownership state
-                    if (router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, MultiClusterStatus.RequestedOwnership, MultiClusterStatus.Doubtful))
+                    if (router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, GrainDirectoryEntryStatus.RequestedOwnership, GrainDirectoryEntryStatus.Doubtful))
                     {
                         addresses.Add(address);
                     }
@@ -321,7 +321,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
                     {
-                        var ok = (router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Owned, MultiClusterStatus.RequestedOwnership));
+                        var ok = (router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Owned, GrainDirectoryEntryStatus.RequestedOwnership));
                         if (ok)
                             continue;
                         else
@@ -338,16 +338,16 @@ namespace Orleans.Runtime.GrainDirectory
                 var mcstatus = router.DirectoryPartition.TryGetActivation(address.Grain, out address, out version);
 
                 // in each case, go back to DOUBTFUL
-                if (mcstatus == MultiClusterStatus.RequestedOwnership)
+                if (mcstatus == GrainDirectoryEntryStatus.RequestedOwnership)
                 {
                     // we failed because of inconclusive answers
-                    var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RequestedOwnership);
+                    var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Doubtful, GrainDirectoryEntryStatus.RequestedOwnership);
                     if (!success) ProtocolError(address, "unable to transition from REQUESTED_OWNERSHIP to DOUBTFUL");
                 }
-                else if (mcstatus == MultiClusterStatus.RaceLoser)
+                else if (mcstatus == GrainDirectoryEntryStatus.RaceLoser)
                 {
                     // we failed because an external request moved us to RACE_LOSER
-                    var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, MultiClusterStatus.Doubtful, MultiClusterStatus.RaceLoser);
+                    var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Doubtful, GrainDirectoryEntryStatus.RaceLoser);
                     if (!success) ProtocolError(address, "unable to transition from RACE_LOSER to DOUBTFUL");
                 }
                 else

@@ -449,10 +449,10 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
-        internal MultiClusterStatus ReadMultiClusterStatus()
+        internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
         {
             byte val = ReadByte();
-            return (MultiClusterStatus)val;
+            return (GrainDirectoryEntryStatus)val;
         }
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>

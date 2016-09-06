@@ -3,7 +3,7 @@
     /// <summary>
     /// Status of a directory entry with respect to multi-cluster registration
     /// </summary>
-    internal enum MultiClusterStatus : byte
+    internal enum GrainDirectoryEntryStatus : byte
     {
         /// <summary>
         /// Used as a return value, indicating no registration present in directory.
