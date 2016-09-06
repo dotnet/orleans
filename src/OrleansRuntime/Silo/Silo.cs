@@ -963,6 +963,7 @@ namespace Orleans.Runtime
                 ExecuteFastKillInProcessExit = false;
             }
           
+            // used for testing only: returns directory entries whose type name contains the given string
             internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
             {
                 var x = new Dictionary<GrainId, IGrainInfo>();

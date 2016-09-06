@@ -127,52 +127,6 @@ namespace Orleans.Runtime.GrainDirectory
                             router.CacheValidator.SchedulingContext
                         );
                     }
-              
-                    // NOT DOING CACHE INVALIDATION for now. it is not required for correctness
-
-                    //3. For "CACHED" status:
-                    //3a. If the entry is removed from the cached cluster, remove the cached entry. On next grain call, the protocol should handle the scenario.
-
-
-                    /*
-                    //STEP 3.. (TODO: Merge step 2 and 3)?
-                    var cahcedEntries =
-                        allEntries.Where(t => t.Item2.ActivationStatus == MultiClusterStatus.Cached);
-
-                    results = await router.Scheduler.QueueTask(async () =>
-                    {
-                        return await RunAntiEntropy(cahcedEntries.ToList());
-                    }, router.CacheValidator.SchedulingContext);
-                   
-
-                    if (results != null)
-                    {
-                        foreach (var kvp in results)
-                        {
-                            var ownedbyOther = kvp.Value.FirstOrDefault(r => r.ResponseStatus == ActivationResponseStatus.FAILED &&
-                                                                        r.ExistingActivationAddress != null &&
-                                                                        r.Owned == true);
-
-                            var currentActivation =
-                                router.DirectoryPartition.LookUpGrain(kvp.Key).Item1.FirstOrDefault(); //this will be non null.
-
-                            if (ownedbyOther == null)
-                            {
-                                //remove the cached entry.
-                                //Debug.Assert(false, "Removed CACHED entry");
-                                router.DirectoryPartition.RemoveActivation(kvp.Key, currentActivation.Activation, true);
-                            }
-                            else
-                            {
-                                //update the cached entry to the new OWNED cluster.
-                                router.DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(
-                                    kvp.Key, currentActivation != null ? currentActivation.Activation : null,
-                                    ownedbyOther.ExistingActivationAddress);
-                            }
-                        }
-                    }
-                    */
-
                 }
                 catch (Exception e)
                 {

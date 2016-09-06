@@ -9,6 +9,16 @@ using Orleans.Runtime;
 
 namespace Orleans.Runtime.GrainDirectory
 {
+    /// <summary>
+    /// A grain registrar that coordinates the directory entries for a grain between
+    /// all the clusters in the current multi-cluster configuration.
+    /// It uses the global-single-instance protocol to ensure that there is eventually
+    /// only a single owner for each grain. When a new grain is registered, all other clusters are
+    /// contacted to see if an activation already exists. If so, a pointer to that activation is 
+    /// stored in the directory and returned. Otherwise, the new activation is registered.
+    /// The protocol uses special states to track the status of directory entries, as listed in 
+    /// <see cref="GrainDirectoryEntryStatus"/>.
+    /// </summary>
     internal class GlobalSingleInstanceRegistrar : IGrainRegistrar
     {
         private static int NUM_RETRIES = 3;
