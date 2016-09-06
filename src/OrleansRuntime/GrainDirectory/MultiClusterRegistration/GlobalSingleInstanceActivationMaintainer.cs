@@ -296,9 +296,11 @@ namespace Orleans.Runtime.GrainDirectory
                     responses[j] = batchResponses[j][i];
 
                 // response processor
-                var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain);
+                var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
 
-                Debug.Assert(tracker.Task.IsCompleted);
+                // since the tracker has all responses already, it is in completed state
+                if (!tracker.Task.IsCompleted)
+                    ProtocolError(address, "assertion error: tracker did not complete");
 
                 var outcome = tracker.Task.Result;
 
@@ -368,8 +370,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void ProtocolError(ActivationAddress address, string msg)
         {
-            logger.Error((int) ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:R {0} {1}", address.Grain.ToString(), msg));
-            Debugger.Break();
+            logger.Error((int) ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:Req {0} {1}", address.Grain.ToString(), msg));
         }
+
     }
 }

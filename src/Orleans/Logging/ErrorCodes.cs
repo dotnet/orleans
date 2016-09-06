@@ -1088,6 +1088,7 @@ namespace Orleans
         GlobalSingleInstance_ProtocolError = GlobalSingleInstanceBase + 1,
         GlobalSingleInstance_WarningInvalidOrigin = GlobalSingleInstanceBase + 2,
         GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
+        GlobalSingleInstance_MultipleOwners = GlobalSingleInstanceBase + 4,
 
     }
 }

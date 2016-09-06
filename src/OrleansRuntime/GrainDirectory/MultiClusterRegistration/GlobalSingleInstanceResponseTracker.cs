@@ -21,14 +21,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         private readonly GrainId grain;
         private RemoteClusterActivationResponse[] responses;
+        private Logger logger;
 
         public AddressAndTag RemoteOwner;
         public string RemoteOwnerCluster;
 
-        public GlobalSingleInstanceResponseTracker(RemoteClusterActivationResponse[] responses, GrainId grain)
+        public GlobalSingleInstanceResponseTracker(RemoteClusterActivationResponse[] responses, GrainId grain, Logger logger)
         {
             this.responses = responses;
             this.grain = grain;
+            this.logger = logger;
 
             CheckIfDone();
         }
@@ -67,12 +69,9 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (ownerresponses.Count > 0)
                 {
-                    Debug.Assert(ownerresponses.Count == 1);
+                    if (ownerresponses.Count > 1)
+                        logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occured. Multiple Owner Replies.", grain);
 
-                    //TODO find a way to actually report errors
-                    // if (ownerresponses.Count > 1)
-                    //     logger.Warn((int) ErrorCode.GlobalSingleInstance_MultipleOwners, "Unexpected error occured. Multiple Owner Replies.");
-                    
                     RemoteOwner = ownerresponses[0].ExistingActivationAddress;
                     RemoteOwnerCluster = ownerresponses[0].ClusterId;
                     TrySetResult(Outcome.RemoteOwner);

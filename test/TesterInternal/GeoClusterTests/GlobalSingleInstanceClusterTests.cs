@@ -298,7 +298,6 @@ namespace Tests.GeoClusterTests
                     Assert.True(false, string.Format("grain {0} has wrong activations {1}",
                         key, string.Join(",", activations.Select(x =>
                             string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus)))));
-                    Debugger.Break();
                 };
 
                 // each grain has one activation per cluster
@@ -446,7 +445,6 @@ namespace Tests.GeoClusterTests
                     Assert.True(false, string.Format("grain {0} has wrong activations {1}",
                         key, string.Join(",", activations.Select(x =>
                             string.Format("{0}={1}", x.SiloAddress, x.RegistrationStatus)))));
-                    Debugger.Break();
                 };
 
                 // each grain has one activation per cluster

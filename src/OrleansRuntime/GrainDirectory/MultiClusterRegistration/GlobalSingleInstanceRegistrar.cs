@@ -147,7 +147,6 @@ namespace Orleans.Runtime.GrainDirectory
         private void ProtocolError(ActivationAddress address, string msg)
         {
             logger.Error((int)ErrorCode.GlobalSingleInstance_ProtocolError, string.Format("GSIP:Req {0} PROTOCOL ERROR {1}", address.Grain.ToString(), msg));
-            Debugger.Break();
         }
 
         public Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause)
@@ -266,7 +265,7 @@ namespace Orleans.Runtime.GrainDirectory
             var responses = new RemoteClusterActivationResponse[remoteClusters.Count];
 
             // response processor
-            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain);
+            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
 
             // send all requests
             for (int i = 0; i < responses.Length; i++)
