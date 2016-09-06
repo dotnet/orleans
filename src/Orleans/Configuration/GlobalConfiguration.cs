@@ -247,11 +247,17 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public bool UseGlobalSingleInstanceByDefault { get; set; }
         
+       /// <summary>
+        /// The number of quick retries before going into DOUBTFUL state.
+        /// </summary>
+        public int GlobalSingleInstanceNumberRetries { get; set; }
+
         /// <summary>
-        /// The time between retries for DOUBTFUL activations.
+        /// The time between the slow retries for DOUBTFUL activations.
         /// </summary>
         public TimeSpan GlobalSingleInstanceRetryInterval { get; set; }
 
+ 
         /// <summary>
         /// A list of connection strings for gossip channels.
         /// </summary>
@@ -472,6 +478,7 @@ namespace Orleans.Runtime.Configuration
         private const bool DEFAULT_USE_GLOBAL_SINGLE_INSTANCE = true;
         private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL = TimeSpan.FromSeconds(30);
+        private const int DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES = 10;
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
         private const int DEFAULT_CACHE_SIZE = 1000000;
         private static readonly TimeSpan DEFAULT_INITIAL_CACHE_TTL = TimeSpan.FromSeconds(30);
@@ -517,6 +524,7 @@ namespace Orleans.Runtime.Configuration
             BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
             UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
             GlobalSingleInstanceRetryInterval = DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
+            GlobalSingleInstanceNumberRetries = DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
             ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
             ServiceId = Guid.Empty;
             DeploymentId = Environment.UserName;
@@ -593,6 +601,7 @@ namespace Orleans.Runtime.Configuration
                 sb.AppendFormat("      BackgroundGossipInterval: {0}", BackgroundGossipInterval).AppendLine();
                 sb.AppendFormat("      UseGlobalSingleInstanceByDefault: {0}", UseGlobalSingleInstanceByDefault).AppendLine();
                 sb.AppendFormat("      GlobalSingleInstanceRetryInterval: {0}", GlobalSingleInstanceRetryInterval).AppendLine();
+                sb.AppendFormat("      GlobalSingleInstanceNumberRetries: {0}", GlobalSingleInstanceNumberRetries).AppendLine();
                 sb.AppendFormat("      GossipChannels: {0}", string.Join(",", GossipChannels.Select(conf => conf.ChannelType.ToString() + ":" + conf.ConnectionString))).AppendLine();
             }
             else
@@ -864,10 +873,15 @@ namespace Orleans.Runtime.Configuration
                             GlobalSingleInstanceRetryInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("GlobalSingleInstanceRetryInterval"),
                                 "Invalid time value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
                         }
+                        if (child.HasAttribute("GlobalSingleInstanceNumberRetries"))
+                        {
+                            GlobalSingleInstanceNumberRetries = ConfigUtilities.ParseInt(child.GetAttribute("GlobalSingleInstanceNumberRetries"),
+                                "Invalid value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
+                        }
                         if (child.HasAttribute("MaxMultiClusterGateways"))
                         {
                             MaxMultiClusterGateways = ConfigUtilities.ParseInt(child.GetAttribute("MaxMultiClusterGateways"),
-                                "Invalid time value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
+                                "Invalid value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
                         }
                         var channels = new List<GossipChannelConfiguration>();
                         foreach (XmlNode childchild in child.ChildNodes)

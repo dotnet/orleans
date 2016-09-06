@@ -272,7 +272,7 @@ namespace Orleans.Runtime
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = new LocalGrainDirectory(this); 
 
-            RegistrarManager.InitializeGrainDirectoryManager(localGrainDirectory);
+            RegistrarManager.InitializeGrainDirectoryManager(localGrainDirectory, globalConfig.GlobalSingleInstanceNumberRetries);
 
             // Now the activation directory.
             // This needs to know which router to use so that it can keep the global directory in synch with the local one.

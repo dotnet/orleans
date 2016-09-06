@@ -21,17 +21,18 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class GlobalSingleInstanceRegistrar : IGrainRegistrar
     {
-        private static int NUM_RETRIES = 3;
+        private readonly int numRetries;
         private readonly Logger logger;
         private readonly GrainDirectoryPartition directoryPartition;
         private readonly GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer;
 
-        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer)
+        public GlobalSingleInstanceRegistrar(GrainDirectoryPartition partition, Logger logger, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, int numRetries)
              
         {
             this.directoryPartition = partition;
             this.logger = logger;
             this.gsiActivationMaintainer = gsiActivationMaintainer;
+            this.numRetries = numRetries;
         }
 
         public bool IsSynchronous { get { return false; } }
@@ -87,19 +88,19 @@ namespace Orleans.Runtime.GrainDirectory
 
             // Do request rounds until successful or we run out of retries
 
-            int retries = NUM_RETRIES;
+            int retries = numRetries;
 
             while (retries-- > 0)
             {
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), NUM_RETRIES - retries, myActivation.Address.ToString());
+                    logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), numRetries - retries, myActivation.Address.ToString());
 
                 var responses = SendRequestRound(address, remoteClusters);
 
                 var outcome = await responses.Task;
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), NUM_RETRIES - retries, responses);
+                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, responses);
 
                 switch (outcome)
                 {
