@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
         protected override string GetConnectionString()
         {
             return
-                RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName.ToLowerInvariant())
+                RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName)
                     .Result.CurrentConnectionString;
         }
 

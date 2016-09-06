@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using Orleans.SqlUtils;
 using UnitTests.General;
 
@@ -33,7 +29,7 @@ namespace Tester.RelationalUtilities
         {
             get
             {
-                return @"CREATE DATABASE {0} WITH ENCODING='UTF8' CONNECTION LIMIT=-1;";
+                return @"CREATE DATABASE ""{0}"" WITH ENCODING='UTF8' CONNECTION LIMIT=-1;";
             }
         }
 
@@ -45,7 +41,7 @@ namespace Tester.RelationalUtilities
 FROM pg_stat_activity
 WHERE pg_stat_activity.datname = '{0}'
   AND pid <> pg_backend_pid();
-DROP DATABASE {0};";
+DROP DATABASE ""{0}"";";
             }
         }
 
@@ -59,7 +55,7 @@ DROP DATABASE {0};";
         {
             get
             {
-                return "SELECT COUNT(1)::int::boolean FROM pg_database WHERE datname = lower('{0}');";
+                return "SELECT COUNT(1)::int::boolean FROM pg_database WHERE datname = '{0}';";
             }
         }
 

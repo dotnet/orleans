@@ -61,6 +61,8 @@
     <Compile Include="MembershipTests\PostgreSqlMembershipTableTests.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
+    <Compile Include="RemindersTest\PostgreSqlRemindersTableTests.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />

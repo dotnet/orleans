@@ -16,13 +16,6 @@ namespace Orleans.SqlUtils
             // Seeks for database provider factory classes from GAC or as indicated by
             // the configuration file, see at <see href="https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx">Obtaining a DbProviderFactory</see>.       
 
-            if (invariantName == AdoNetInvariants.InvariantNamePostgreSql)
-            {
-                DbProviderFactory pgFactory = Npgsql.NpgsqlFactory.Instance;
-
-                return new CachedFactory(pgFactory, "Npgsql Data Provider", "Data Provider for PostgreSQL", "Npgsql.NpgsqlFactory, Npgsql");
-            }
-
             DataRow factoryData = DbProviderFactories.GetFactoryClasses().Rows.Find(invariantName);
             var factoryName = factoryData["Name"].ToString();
             var description = factoryData["Description"].ToString();

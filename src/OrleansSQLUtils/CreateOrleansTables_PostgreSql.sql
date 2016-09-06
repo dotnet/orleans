@@ -563,7 +563,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpsertReportClientMetricsKey','
-	PERFORM upsert_report_client_metrics(
+	SELECT * FROM upsert_report_client_metrics(
         @DeploymentId,
         @ClientId,
         @Address,
@@ -680,7 +680,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'UpsertSiloMetricsKey','
-	PERFORM upsert_silo_metrics(
+	SELECT * FROM upsert_silo_metrics(
         @DeploymentId,
         @SiloId,
         @Address,
@@ -869,15 +869,17 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
 	'InsertOrleansStatisticsKey','
+
+	START TRANSACTION;
 	INSERT INTO OrleansStatisticsTable
 	(
-		DeploymentId,
-		Id,
-		HostName,
-		Name,
-		IsValueDelta,
-		StatValue,
-		Statistic
+		deploymentid,
+		id,
+		hostname,
+		name,
+		isvaluedelta,
+		statvalue,
+		statistic
 	)
 	SELECT
 		@DeploymentId,
@@ -887,6 +889,7 @@ VALUES
 		@IsValueDelta,
 		@StatValue,
 		@Statistic;
+	COMMIT;
 ')
 ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
 
