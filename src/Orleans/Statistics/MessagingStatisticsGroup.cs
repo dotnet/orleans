@@ -250,7 +250,7 @@ namespace Orleans.Runtime
 
         internal static void OnFailedSentMessage(Message msg)
         {
-            if (msg == null || msg.Direction == null) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (FailedSentMessages[direction] == null)
             {
@@ -262,7 +262,7 @@ namespace Orleans.Runtime
 
         internal static void OnDroppedSentMessage(Message msg)
         {
-            if (msg?.Direction == null) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (DroppedSentMessages[direction] == null)
             {
@@ -274,7 +274,7 @@ namespace Orleans.Runtime
 
         internal static void OnRejectedMessage(Message msg)
         {
-            if (msg?.Direction == null) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (RejectedMessages[direction] == null)
             {

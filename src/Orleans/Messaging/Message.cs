@@ -888,6 +888,87 @@ namespace Orleans.Runtime
             public string RejectionInfo { get; set; }
 
             public Dictionary<string, object> RequestContextData { get; set; }
+
+            static HeadersContainer()
+            {
+                Register();
+            }
+
+
+            [global::Orleans.CodeGeneration.CopierMethodAttribute]
+            public static global::System.Object DeepCopier(global::System.Object original)
+            {
+                return original;
+            }
+
+            [global::Orleans.CodeGeneration.SerializerMethodAttribute]
+            public static void Serializer(global::System.Object untypedInput, global::Orleans.Serialization.BinaryTokenStreamWriter stream, global::System.Type expected)
+            {
+                HeadersContainer input = (HeadersContainer)untypedInput;
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@CacheInvalidationHeader, stream, typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Category, stream, typeof(global::Orleans.Runtime.Message.Categories));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@DebugContext, stream, typeof(global::System.String));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Direction, stream, typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Expiration, stream, typeof(global::System.Nullable<global::System.DateTime>));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@ForwardCount, stream, typeof(global::System.Int32));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@GenericGrainType, stream, typeof(global::System.String));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Id, stream, typeof(global::Orleans.Runtime.CorrelationId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsAlwaysInterleave, stream, typeof(global::System.Boolean));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsNewPlacement, stream, typeof(global::System.Boolean));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsReadOnly, stream, typeof(global::System.Boolean));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsUnordered, stream, typeof(global::System.Boolean));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@NewGrainType, stream, typeof(global::System.String));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RejectionInfo, stream, typeof(global::System.String));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RejectionType, stream, typeof(global::Orleans.Runtime.Message.RejectionTypes));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RequestContextData, stream, typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@ResendCount, stream, typeof(global::System.Int32));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Result, stream, typeof(global::Orleans.Runtime.Message.ResponseTypes));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetObserverId, stream, typeof(global::Orleans.Runtime.GuidId));
+                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+            }
+
+            [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
+            public static global::System.Object Deserializer(global::System.Type expected, global::Orleans.Serialization.BinaryTokenStreamReader stream)
+            {
+                var result = new HeadersContainer();
+                global::Orleans.@Serialization.@DeserializationContext.@Current.@RecordObject(result);
+                result.@CacheInvalidationHeader = (global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>), stream);
+                result.@Category = (global::Orleans.Runtime.Message.Categories)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.Categories), stream);
+                result.@DebugContext = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                result.@Direction = (global::System.Nullable<global::Orleans.Runtime.Message.Directions>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>), stream);
+                result.@Expiration = (global::System.Nullable<global::System.DateTime>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::System.DateTime>), stream);
+                result.@ForwardCount = (global::System.Int32)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+                result.@GenericGrainType = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                result.@Id = (global::Orleans.Runtime.CorrelationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.CorrelationId), stream);
+                result.@IsAlwaysInterleave = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                result.@IsNewPlacement = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                result.@IsReadOnly = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                result.@IsUnordered = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                result.@NewGrainType = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                result.@RejectionInfo = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                result.@RejectionType = (global::Orleans.Runtime.Message.RejectionTypes)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.RejectionTypes), stream);
+                result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
+                result.@ResendCount = (global::System.Int32)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+                result.@Result = (global::Orleans.Runtime.Message.ResponseTypes)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.ResponseTypes), stream);
+                result.@SendingActivation = (global::Orleans.Runtime.ActivationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+                result.@SendingGrain = (global::Orleans.Runtime.GrainId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+                result.@SendingSilo = (global::Orleans.Runtime.SiloAddress)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                result.@TargetActivation = (global::Orleans.Runtime.ActivationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+                result.@TargetGrain = (global::Orleans.Runtime.GrainId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+                result.@TargetObserverId = (global::Orleans.Runtime.GuidId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GuidId), stream);
+                result.@TargetSilo = (global::Orleans.Runtime.SiloAddress)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                return (HeadersContainer)result;
+            }
+
+            public static void Register()
+            {
+                global::Orleans.Serialization.SerializationManager.@Register(typeof(HeadersContainer), DeepCopier, Serializer, Deserializer);
+            }
         }
     }
 }

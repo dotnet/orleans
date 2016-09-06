@@ -1769,13 +1769,8 @@ namespace Orleans.Serialization
                 timer.Start();
             }
 
-            //var ser = GetSerializer(typeof(Message.HeadersContainer));
-            //ser(headers, stream, typeof(Message.HeadersContainer));
-            new OrleansJsonSerializer().Serialize(headers, stream, typeof(Message.HeadersContainer)) ;
-            //if (ser != null)
-            {
-                // ????? stream.WriteTypeHeader(t);
-            }
+            var ser = GetSerializer(typeof(Message.HeadersContainer));
+            ser(headers, stream, typeof(Message.HeadersContainer));
 
             if (timer != null)
             {
@@ -1793,33 +1788,9 @@ namespace Orleans.Serialization
                 timer = new Stopwatch();
                 timer.Start();
             }
-         //   var token = stream.ReadToken();
-            //if (token != SerializationTokenType.StringObjDict)
-            //{
-            //    if (token == SerializationTokenType.SpecifiedType)
-            //    {
-            //        Type t = null;
-            //        try
-            //        {
-            //            t = stream.ReadSpecifiedTypeHeader();
-            //        }
-            //        catch (Exception) { }
 
-            //        if(t != null)
-            //            throw new SerializationException(String.Format("Introductory token for message headers is incorrect: token = {0}, SpecifiedTypeHeader = {1} ", token, t));
-            //    }
-            //    throw new SerializationException(String.Format("Introductory token for message headers is incorrect: {0}", token));
-            //}
-
-
-            //   var result = DeserializeMessageHeaderDictHelper(stream);
-
-            //var tq = stream.ReadSpecifiedTypeHeader();
-
-
-            // var des = GetDeserializer(typeof(Message.HeadersContainer));
-           var headers =(Message.HeadersContainer) (new OrleansJsonSerializer().Deserialize(typeof(Message.HeadersContainer), stream));
-           // message.Headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), stream);
+             var des = GetDeserializer(typeof(Message.HeadersContainer));
+             var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), stream);
 
             if (timer != null)
             {
@@ -1827,6 +1798,7 @@ namespace Orleans.Serialization
                 HeaderDesers.Increment();
                 HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
             }
+
             return headers;
         }
         
