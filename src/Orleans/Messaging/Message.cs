@@ -11,46 +11,6 @@ namespace Orleans.Runtime
 {
     internal class Message : IOutgoingMessage
     {
-        // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
-        // This means we can't have over byte.MaxValue of them.
-        public enum Header
-        {
-            ALWAYS_INTERLEAVE = 1,
-            CACHE_INVALIDATION_HEADER,
-            CATEGORY,
-            CORRELATION_ID,
-            DEBUG_CONTEXT,
-            DIRECTION,
-            EXPIRATION,
-            FORWARD_COUNT,
-            INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-            METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-            NEW_GRAIN_TYPE,
-            GENERIC_GRAIN_TYPE,
-            RESULT,
-            REJECTION_INFO,
-            REJECTION_TYPE,
-            READ_ONLY,
-            RESEND_COUNT,
-            SENDING_ACTIVATION,
-            SENDING_GRAIN,
-            SENDING_SILO,
-            IS_NEW_PLACEMENT,
-
-            TARGET_ACTIVATION,
-            TARGET_GRAIN,
-            TARGET_SILO,
-            TARGET_OBSERVER,
-            TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
-            IS_UNORDERED,
-
-            PRIOR_MESSAGE_ID, // Unused
-            PRIOR_MESSAGE_TIMES, // Unused
-
-            REQUEST_CONTEXT,
-            // Do not add over byte.MaxValue of these.
-        }
-
         public static int LargeMessageSizeThreshold { get; set; }
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -815,70 +775,333 @@ namespace Orleans.Runtime
         [Serializable]
         public class HeadersContainer
         {
-            public Categories Category { get; set; }
+            // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
+            // This means we can't have over byte.MaxValue of them.
+            [Flags]
+            public enum Header
+            {
+                NONE = 0,
+                ALWAYS_INTERLEAVE = 1,
+                CACHE_INVALIDATION_HEADER,
+                CATEGORY,
+                CORRELATION_ID,
+                DEBUG_CONTEXT,
+                DIRECTION,
+                EXPIRATION,
+                FORWARD_COUNT,
+                INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+                METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
+                NEW_GRAIN_TYPE,
+                GENERIC_GRAIN_TYPE,
+                RESULT,
+                REJECTION_INFO,
+                REJECTION_TYPE,
+                READ_ONLY,
+                RESEND_COUNT,
+                SENDING_ACTIVATION,
+                SENDING_GRAIN,
+                SENDING_SILO,
+                IS_NEW_PLACEMENT,
 
-            public Directions? Direction { get; set; }
+                TARGET_ACTIVATION,
+                TARGET_GRAIN,
+                TARGET_SILO,
+                TARGET_OBSERVER,
+                TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
+                IS_UNORDERED,
 
-            public bool IsReadOnly { get; set; }
+                PRIOR_MESSAGE_ID, // Unused
+                PRIOR_MESSAGE_TIMES, // Unused
 
-            public bool IsAlwaysInterleave { get; set; }
+                REQUEST_CONTEXT,
+                // Do not add over byte.MaxValue of these.
+            }
 
-            public bool IsUnordered { get; set; } // todo
+            private Header headers;
 
-            public CorrelationId Id { get; set; }
+            private Categories _category;
+            private Directions? _direction;
+            private bool _isReadOnly;
+            private bool _isAlwaysInterleave;
+            private bool _isUnordered;
+            private CorrelationId _id;
+            private int _resendCount;
+            private int _forwardCount;
+            private SiloAddress _targetSilo;
+            private GrainId _targetGrain;
+            private ActivationId _targetActivation;
+            private GuidId _targetObserverId;
+            private SiloAddress _sendingSilo;
+            private GrainId _sendingGrain;
+            private ActivationId _sendingActivation;
+            private bool _isNewPlacement;
+            private ResponseTypes _result;
+            private DateTime? _expiration;
+            private string _debugContext;
+            private IEnumerable<ActivationAddress> _cacheInvalidationHeader;
+            private string _newGrainType;
+            private string _genericGrainType;
+            private RejectionTypes _rejectionType;
+            private string _rejectionInfo;
+            private Dictionary<string, object> _requestContextData;
 
-            public int ResendCount { get; set; }
+            public Categories Category
+            {
+                get { return _category; }
+                set
+                {
+                    _category = value;
+                    headers = headers | Header.CATEGORY;
+                }
+            }
 
-            public int ForwardCount { get; set; }
+            public Directions? Direction
+            {
+                get { return _direction; }
+                set
+                {
+                    _direction = value;
+                    headers = headers | Header.DIRECTION;
+                }
+            }
 
-            public SiloAddress TargetSilo { get; set; }
+            public bool IsReadOnly
+            {
+                get { return _isReadOnly; }
+                set
+                {
+                    _isReadOnly = value;
+                    headers = headers | Header.READ_ONLY;
+                }
+            }
 
-            public GrainId TargetGrain { get; set; }
+            public bool IsAlwaysInterleave
+            {
+                get { return _isAlwaysInterleave; }
+                set
+                {
+                    _isAlwaysInterleave = value;
+                    headers = headers | Header.ALWAYS_INTERLEAVE;
+                }
+            }
 
-            public ActivationId TargetActivation { get; set; }
+            public bool IsUnordered
+            {
+                get { return _isUnordered; }
+                set
+                {
+                    _isUnordered = value;
+                    headers = headers | Header.IS_UNORDERED;
+                }
+            }
 
-            public GuidId TargetObserverId { get; set; }
+            public CorrelationId Id
+            {
+                get { return _id; }
+                set
+                {
+                    _id = value;
+                    headers = headers | Header.CORRELATION_ID;
+                }
+            }
 
-            public SiloAddress SendingSilo { get; set; }
+            public int ResendCount
+            {
+                get { return _resendCount; }
+                set
+                {
+                    _resendCount = value;
+                    headers = headers | Header.RESEND_COUNT;
+                }
+            }
 
-            public GrainId SendingGrain { get; set; }
+            public int ForwardCount
+            {
+                get { return _forwardCount; }
+                set
+                {
+                    _forwardCount = value;
+                    headers = headers | Header.FORWARD_COUNT;
+                }
+            }
 
-            public ActivationId SendingActivation { get; set; }
+            public SiloAddress TargetSilo
+            {
+                get { return _targetSilo; }
+                set
+                {
+                    _targetSilo = value;
+                    headers = headers | Header.TARGET_SILO;
+                }
+            }
 
-            public bool IsNewPlacement { get; set; }
+            public GrainId TargetGrain
+            {
+                get { return _targetGrain; }
+                set
+                {
+                    _targetGrain = value;
+                    headers = headers | Header.TARGET_GRAIN;
+                }
+            }
 
-            public ResponseTypes Result { get; set; }
+            public ActivationId TargetActivation
+            {
+                get { return _targetActivation; }
+                set
+                {
+                    _targetActivation = value;
+                    headers = headers | Header.TARGET_ACTIVATION;
+                }
+            }
 
-            public DateTime? Expiration { get; set; }
+            public GuidId TargetObserverId
+            {
+                get { return _targetObserverId; }
+                set
+                {
+                    _targetObserverId = value;
+                    headers = headers | Header.TARGET_OBSERVER;
+                }
+            }
+
+            public SiloAddress SendingSilo
+            {
+                get { return _sendingSilo; }
+                set
+                {
+                    _sendingSilo = value;
+                    headers = headers | Header.SENDING_SILO;
+                }
+            }
+
+            public GrainId SendingGrain
+            {
+                get { return _sendingGrain; }
+                set
+                {
+                    _sendingGrain = value;
+                    headers = headers | Header.SENDING_GRAIN;
+                }
+            }
+
+            public ActivationId SendingActivation
+            {
+                get { return _sendingActivation; }
+                set
+                {
+                    _sendingActivation = value;
+                    headers = headers | Header.SENDING_ACTIVATION;
+                }
+            }
+
+            public bool IsNewPlacement
+            {
+                get { return _isNewPlacement; }
+                set
+                {
+                    _isNewPlacement = value;
+                    headers = headers | Header.IS_NEW_PLACEMENT;
+                }
+            }
+
+            public ResponseTypes Result
+            {
+                get { return _result; }
+                set
+                {
+                    _result = value;
+                    headers = headers | Header.RESULT;
+                }
+            }
+
+            public DateTime? Expiration
+            {
+                get { return _expiration; }
+                set
+                {
+                    _expiration = value;
+                    headers = headers | Header.EXPIRATION;
+                }
+            }
 
 
-            public string DebugContext { get; set; }
+            public string DebugContext
+            {
+                get { return _debugContext; }
+                set
+                {
+                    _debugContext = value;
+                    headers = headers | Header.DEBUG_CONTEXT;
+                }
+            }
 
-            public IEnumerable<ActivationAddress> CacheInvalidationHeader { get; set; }
-            //{
-            //    get
-            //    { //todo
-            //        object obj =  GetHeader(Header.CACHE_INVALIDATION_HEADER);
-            //        return obj == null ? null : ((IEnumerable)obj).Cast<ActivationAddress>();
-            //    }
-            //}
-            
+            public IEnumerable<ActivationAddress> CacheInvalidationHeader
+            {
+                get { return _cacheInvalidationHeader; }
+                set
+                {
+                    _cacheInvalidationHeader = value;
+                    headers = headers | Header.CACHE_INVALIDATION_HEADER;
+                }
+            }
+
             /// <summary>
             /// Set by sender's placement logic when NewPlacementRequested is true
             /// so that receiver knows desired grain type
             /// </summary>
-            public string NewGrainType { get; set; }
+            public string NewGrainType
+            {
+                get { return _newGrainType; }
+                set
+                {
+                    _newGrainType = value;
+                    headers = headers | Header.NEW_GRAIN_TYPE;
+                }
+            }
 
             /// <summary>
             /// Set by caller's grain reference 
             /// </summary>
-            public string GenericGrainType { get; set; }
+            public string GenericGrainType
+            {
+                get { return _genericGrainType; }
+                set
+                {
+                    _genericGrainType = value;
+                    headers = headers | Header.GENERIC_GRAIN_TYPE;
+                }
+            }
 
-            public RejectionTypes RejectionType { get; set; }
+            public RejectionTypes RejectionType
+            {
+                get { return _rejectionType; }
+                set
+                {
+                    _rejectionType = value;
+                    headers = headers | Header.REJECTION_TYPE;
+                }
+            }
 
-            public string RejectionInfo { get; set; }
+            public string RejectionInfo
+            {
+                get { return _rejectionInfo; }
+                set
+                {
+                    _rejectionInfo = value;
+                    headers = headers | Header.REJECTION_INFO;
+                }
+            }
 
-            public Dictionary<string, object> RequestContextData { get; set; }
+            public Dictionary<string, object> RequestContextData
+            {
+                get { return _requestContextData; }
+                set
+                {
+                    _requestContextData = value;
+                    headers = headers | Header.REQUEST_CONTEXT;
+                }
+            }
 
             static HeadersContainer()
             {
@@ -893,74 +1116,176 @@ namespace Orleans.Runtime
             }
 
             [global::Orleans.CodeGeneration.SerializerMethodAttribute]
-            public static void Serializer(global::System.Object untypedInput, global::Orleans.Serialization.BinaryTokenStreamWriter stream, global::System.Type expected)
+            public static void Serializer(global::System.Object untypedInput,  BinaryTokenStreamWriter stream, global::System.Type expected)
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@CacheInvalidationHeader, stream, typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Category, stream, typeof(global::Orleans.Runtime.Message.Categories));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@DebugContext, stream, typeof(global::System.String));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Direction, stream, typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Expiration, stream, typeof(global::System.Nullable<global::System.DateTime>));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@ForwardCount, stream, typeof(global::System.Int32));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@GenericGrainType, stream, typeof(global::System.String));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Id, stream, typeof(global::Orleans.Runtime.CorrelationId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsAlwaysInterleave, stream, typeof(global::System.Boolean));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsNewPlacement, stream, typeof(global::System.Boolean));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsReadOnly, stream, typeof(global::System.Boolean));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@IsUnordered, stream, typeof(global::System.Boolean));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@NewGrainType, stream, typeof(global::System.String));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RejectionInfo, stream, typeof(global::System.String));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RejectionType, stream, typeof(global::Orleans.Runtime.Message.RejectionTypes));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@RequestContextData, stream, typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@ResendCount, stream, typeof(global::System.Int32));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@Result, stream, typeof(global::Orleans.Runtime.Message.ResponseTypes));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingGrain, stream, typeof(global::Orleans.Runtime.GrainId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@SendingSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetGrain, stream, typeof(global::Orleans.Runtime.GrainId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetObserverId, stream, typeof(global::Orleans.Runtime.GuidId));
-                global::Orleans.Serialization.SerializationManager.@SerializeInner(input.@TargetSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+                var headers = input.headers;
+                SerializationManager.@SerializeInner(input.headers, stream, typeof(Header));
+                if ((headers & Header.CACHE_INVALIDATION_HEADER) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@CacheInvalidationHeader, stream, typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>));
+
+                if ((headers & Header.CATEGORY) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@Category, stream, typeof(global::Orleans.Runtime.Message.Categories));
+
+                if ((headers & Header.DEBUG_CONTEXT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@DebugContext, stream, typeof(global::System.String));
+
+                if ((headers & Header.DIRECTION) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@Direction, stream, typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>));
+
+                if ((headers & Header.EXPIRATION) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@Expiration, stream, typeof(global::System.Nullable<global::System.DateTime>));
+
+                if ((headers & Header.FORWARD_COUNT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@ForwardCount, stream, typeof(global::System.Int32));
+
+                if ((headers & Header.GENERIC_GRAIN_TYPE) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@GenericGrainType, stream, typeof(global::System.String));
+
+                if ((headers & Header.CORRELATION_ID) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@Id, stream, typeof(global::Orleans.Runtime.CorrelationId));
+
+                if ((headers & Header.ALWAYS_INTERLEAVE) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@IsAlwaysInterleave, stream, typeof(global::System.Boolean));
+
+                if ((headers & Header.IS_NEW_PLACEMENT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@IsNewPlacement, stream, typeof(global::System.Boolean));
+
+                if ((headers & Header.READ_ONLY) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@IsReadOnly, stream, typeof(global::System.Boolean));
+
+                if ((headers & Header.IS_UNORDERED) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@IsUnordered, stream, typeof(global::System.Boolean));
+
+                if ((headers & Header.NEW_GRAIN_TYPE) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@NewGrainType, stream, typeof(global::System.String));
+
+                if ((headers & Header.REJECTION_INFO) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@RejectionInfo, stream, typeof(global::System.String));
+
+                if ((headers & Header.REJECTION_TYPE) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@RejectionType, stream, typeof(global::Orleans.Runtime.Message.RejectionTypes));
+
+                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@RequestContextData, stream, typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>));
+
+                if ((headers & Header.RESEND_COUNT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@ResendCount, stream, typeof(global::System.Int32));
+
+                if ((headers & Header.RESULT) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@Result, stream, typeof(global::Orleans.Runtime.Message.ResponseTypes));
+
+                if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@SendingActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+
+                if ((headers & Header.SENDING_GRAIN) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@SendingGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+
+                if ((headers & Header.SENDING_SILO) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@SendingSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+
+                if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@TargetActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+
+                if ((headers & Header.TARGET_GRAIN) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@TargetGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+
+                if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@TargetObserverId, stream, typeof(global::Orleans.Runtime.GuidId));
+
+                if ((headers & Header.TARGET_SILO) != Header.NONE)
+                    SerializationManager.@SerializeInner(input.@TargetSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
             }
 
             [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
-            public static global::System.Object Deserializer(global::System.Type expected, global::Orleans.Serialization.BinaryTokenStreamReader stream)
+            public static global::System.Object Deserializer(global::System.Type expected,  BinaryTokenStreamReader stream)
             {
                 var result = new HeadersContainer();
                 global::Orleans.@Serialization.@DeserializationContext.@Current.@RecordObject(result);
-                result.@CacheInvalidationHeader = (global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>), stream);
-                result.@Category = (global::Orleans.Runtime.Message.Categories)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.Categories), stream);
-                result.@DebugContext = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
-                result.@Direction = (global::System.Nullable<global::Orleans.Runtime.Message.Directions>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>), stream);
-                result.@Expiration = (global::System.Nullable<global::System.DateTime>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::System.DateTime>), stream);
-                result.@ForwardCount = (global::System.Int32)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
-                result.@GenericGrainType = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
-                result.@Id = (global::Orleans.Runtime.CorrelationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.CorrelationId), stream);
-                result.@IsAlwaysInterleave = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
-                result.@IsNewPlacement = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
-                result.@IsReadOnly = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
-                result.@IsUnordered = (global::System.Boolean)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
-                result.@NewGrainType = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
-                result.@RejectionInfo = (global::System.String)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
-                result.@RejectionType = (global::Orleans.Runtime.Message.RejectionTypes)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.RejectionTypes), stream);
-                result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
-                result.@ResendCount = (global::System.Int32)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
-                result.@Result = (global::Orleans.Runtime.Message.ResponseTypes)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.ResponseTypes), stream);
-                result.@SendingActivation = (global::Orleans.Runtime.ActivationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
-                result.@SendingGrain = (global::Orleans.Runtime.GrainId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
-                result.@SendingSilo = (global::Orleans.Runtime.SiloAddress)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
-                result.@TargetActivation = (global::Orleans.Runtime.ActivationId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
-                result.@TargetGrain = (global::Orleans.Runtime.GrainId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
-                result.@TargetObserverId = (global::Orleans.Runtime.GuidId)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GuidId), stream);
-                result.@TargetSilo = (global::Orleans.Runtime.SiloAddress)global::Orleans.Serialization.SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                var headers = (Header)SerializationManager.@DeserializeInner(typeof(Header), stream);
+
+                if ((headers & Header.CACHE_INVALIDATION_HEADER) != Header.NONE)
+                    result.@CacheInvalidationHeader = (global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>) SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>), stream);
+
+                if ((headers & Header.CATEGORY) != Header.NONE)
+                    result.@Category = (global::Orleans.Runtime.Message.Categories) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.Categories), stream);
+
+                if ((headers & Header.DEBUG_CONTEXT) != Header.NONE)
+                    result.@DebugContext = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+
+                if ((headers & Header.DIRECTION) != Header.NONE)
+                    result.@Direction = (global::System.Nullable<global::Orleans.Runtime.Message.Directions>) SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>), stream);
+
+                if ((headers & Header.EXPIRATION) != Header.NONE)
+                    result.@Expiration = (global::System.Nullable<global::System.DateTime>) SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::System.DateTime>), stream);
+
+                if ((headers & Header.FORWARD_COUNT) != Header.NONE)
+                    result.@ForwardCount = (global::System.Int32) SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+
+                if ((headers & Header.GENERIC_GRAIN_TYPE) != Header.NONE)
+                    result.@GenericGrainType = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+
+                if ((headers & Header.CORRELATION_ID) != Header.NONE)
+                    result.@Id = (global::Orleans.Runtime.CorrelationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.CorrelationId), stream);
+
+                if ((headers & Header.ALWAYS_INTERLEAVE) != Header.NONE)
+                    result.@IsAlwaysInterleave = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+
+                if ((headers & Header.IS_NEW_PLACEMENT) != Header.NONE)
+                    result.@IsNewPlacement = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+
+                if ((headers & Header.READ_ONLY) != Header.NONE)
+                    result.@IsReadOnly = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+
+                if ((headers & Header.IS_UNORDERED) != Header.NONE)
+                    result.@IsUnordered = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+
+                if ((headers & Header.NEW_GRAIN_TYPE) != Header.NONE)
+                    result.@NewGrainType = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+
+                if ((headers & Header.REJECTION_INFO) != Header.NONE)
+                    result.@RejectionInfo = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+
+                if ((headers & Header.REJECTION_TYPE) != Header.NONE)
+                    result.@RejectionType = (global::Orleans.Runtime.Message.RejectionTypes) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.RejectionTypes), stream);
+
+                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
+                    result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>) SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
+
+                if ((headers & Header.RESEND_COUNT) != Header.NONE)
+                    result.@ResendCount = (global::System.Int32) SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+
+                if ((headers & Header.RESULT) != Header.NONE)
+                    result.@Result = (global::Orleans.Runtime.Message.ResponseTypes) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.ResponseTypes), stream);
+
+                if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
+                    result.@SendingActivation = (global::Orleans.Runtime.ActivationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+
+                if ((headers & Header.SENDING_GRAIN) != Header.NONE)
+                    result.@SendingGrain = (global::Orleans.Runtime.GrainId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+
+                if ((headers & Header.SENDING_SILO) != Header.NONE)
+                    result.@SendingSilo = (global::Orleans.Runtime.SiloAddress) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+
+                if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
+                    result.@TargetActivation = (global::Orleans.Runtime.ActivationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+
+                if ((headers & Header.TARGET_GRAIN) != Header.NONE)
+                    result.@TargetGrain = (global::Orleans.Runtime.GrainId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+
+                if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
+                    result.@TargetObserverId = (global::Orleans.Runtime.GuidId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GuidId), stream);
+
+                if ((headers & Header.TARGET_SILO) != Header.NONE)
+                    result.@TargetSilo = (global::Orleans.Runtime.SiloAddress) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+
                 return (HeadersContainer)result;
             }
 
             public static void Register()
             {
-                global::Orleans.Serialization.SerializationManager.@Register(typeof(HeadersContainer), DeepCopier, Serializer, Deserializer);
+                 SerializationManager.@Register(typeof(HeadersContainer), DeepCopier, Serializer, Deserializer);
             }
         }
     }
-    public class HeadersContainerq { }
 }
