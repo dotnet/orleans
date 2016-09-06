@@ -7,6 +7,13 @@ using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
+    /// <summary>
+    /// This system target provides an entry point for remote clusters to call directory functions.
+    /// Since remote clusters do not have ring information about this cluster, they cannot send 
+    /// requests directly to the silo with the right directory partition
+    /// unless they know the activation address already. Therefore,
+    /// This class serves as an intermediary that forwards the requests to the correct silo.
+    /// </summary>
     internal class ClusterGrainDirectory : SystemTarget, IClusterGrainDirectory
     {
         private readonly LocalGrainDirectory router;
@@ -70,16 +77,8 @@ namespace Orleans.Runtime.GrainDirectory
             RemoteClusterActivationResponse response;
 
             //This function will be called only on the Owner silo.
-
-            //Optimize? Look in the cache first?
-            //NOTE: THIS COMMENT IS FROM LOOKUP. HAS IMPLICATIONS ON "OWNED" INVARIANCE.
-            //// It can happen that we cannot find the grain in our partition if there were 
-            // some recent changes in the membership. Return empty list in such case (and not null) to avoid
-            // NullReference exceptions in the code of invokers
             try
             {
-                //var activations = await LookUp(grain, LocalGrainDirectory.NUM_RETRIES);
-                //since we are the owner, we can look directly into the partition. No need to lookinto the cache.
                 ActivationAddress address;
                 int version;
                 MultiClusterStatus existingActivationStatus = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
@@ -193,18 +192,6 @@ namespace Orleans.Runtime.GrainDirectory
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
             return router.UnregisterManyAsync(addresses, UnregistrationCause.Force, 0);
-        }
-
-        /// <summary>
-        /// Called by remote cluster to unregister a directory entry in this cluster that is pointing
-        /// to a non-existing activation
-        /// </summary>
-        /// <param name="address">The address of the non-existing activation</param>
-        /// <returns></returns>
-        public Task UnregisterAfterNonexistingActivation(ActivationAddress address)
-        {
-            // call local grain directory to unregister activation in this cluster
-            return router.UnregisterAsync(address, UnregistrationCause.NonexistentActivation, 0);
         }
 
         /// <summary>
