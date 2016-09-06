@@ -259,7 +259,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var outcome = tracker.Task.Result;
 
                 if (logger.IsVerbose2)
-                    logger.Verbose("GSIP:M {0} Result={1}", address.Grain.ToString(), outcome.ToString());
+                    logger.Verbose2("GSIP:M {0} Result={1}", address.Grain.ToString(), outcome.ToString());
 
                 switch (outcome)
                 {
