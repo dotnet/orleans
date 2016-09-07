@@ -291,7 +291,7 @@ namespace Orleans.Runtime
             set { lock (Headers) Headers.DebugContext = value; }
         }
 
-        public IEnumerable<ActivationAddress> CacheInvalidationHeader
+        public List<ActivationAddress> CacheInvalidationHeader
         {
             get { lock (Headers) return Headers.CacheInvalidationHeader; }
             set { lock (Headers) Headers.CacheInvalidationHeader = value; }
@@ -781,43 +781,36 @@ namespace Orleans.Runtime
             public enum Header
             {
                 NONE = 0,
-                ALWAYS_INTERLEAVE = 1,
-                CACHE_INVALIDATION_HEADER,
-                CATEGORY,
-                CORRELATION_ID,
-                DEBUG_CONTEXT,
-                DIRECTION,
-                EXPIRATION,
-                FORWARD_COUNT,
-                INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-                METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-                NEW_GRAIN_TYPE,
-                GENERIC_GRAIN_TYPE,
-                RESULT,
-                REJECTION_INFO,
-                REJECTION_TYPE,
-                READ_ONLY,
-                RESEND_COUNT,
-                SENDING_ACTIVATION,
-                SENDING_GRAIN,
-                SENDING_SILO,
-                IS_NEW_PLACEMENT,
+                ALWAYS_INTERLEAVE = 1 << 0,
+                CACHE_INVALIDATION_HEADER = 1 << 1,
+                CATEGORY = 1 << 2,
+                CORRELATION_ID = 1 << 3,
+                DEBUG_CONTEXT = 1 << 4,
+                DIRECTION = 1 << 5,
+                EXPIRATION = 1 << 6,
+                FORWARD_COUNT = 1 << 7,
+                NEW_GRAIN_TYPE = 1 << 8,
+                GENERIC_GRAIN_TYPE = 1 << 9,
+                RESULT = 1 << 10,
+                REJECTION_INFO = 1 << 11,
+                REJECTION_TYPE = 1 << 12,
+                READ_ONLY = 1 << 13,
+                RESEND_COUNT = 1 << 14,
+                SENDING_ACTIVATION = 1 << 15,
+                SENDING_GRAIN = 1 <<16,
+                SENDING_SILO = 1 << 17,
+                IS_NEW_PLACEMENT = 1 << 18,
 
-                TARGET_ACTIVATION,
-                TARGET_GRAIN,
-                TARGET_SILO,
-                TARGET_OBSERVER,
-                TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
-                IS_UNORDERED,
-
-                PRIOR_MESSAGE_ID, // Unused
-                PRIOR_MESSAGE_TIMES, // Unused
-
-                REQUEST_CONTEXT,
+                TARGET_ACTIVATION = 1 << 19,
+                TARGET_GRAIN = 1 << 20,
+                TARGET_SILO = 1 << 21,
+                TARGET_OBSERVER = 1 << 22,
+                IS_UNORDERED = 1 << 23,
+                REQUEST_CONTEXT = 1 << 24,
                 // Do not add over byte.MaxValue of these.
             }
 
-            private Header headers;
+            private Header headers = default(Header);
 
             private Categories _category;
             private Directions? _direction;
@@ -838,7 +831,7 @@ namespace Orleans.Runtime
             private ResponseTypes _result;
             private DateTime? _expiration;
             private string _debugContext;
-            private IEnumerable<ActivationAddress> _cacheInvalidationHeader;
+            private List<ActivationAddress> _cacheInvalidationHeader;
             private string _newGrainType;
             private string _genericGrainType;
             private RejectionTypes _rejectionType;
@@ -861,7 +854,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _direction = value;
-                    headers = headers | Header.DIRECTION;
+                    headers = value == null ? headers & ~Header.DIRECTION : headers | Header.DIRECTION;
                 }
             }
 
@@ -901,7 +894,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _id = value;
-                    headers = headers | Header.CORRELATION_ID;
+                    headers = value == null ? headers & ~Header.CORRELATION_ID : headers | Header.CORRELATION_ID;
                 }
             }
 
@@ -931,7 +924,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _targetSilo = value;
-                    headers = headers | Header.TARGET_SILO;
+                    headers = value == null ? headers & ~Header.TARGET_SILO :  headers | Header.TARGET_SILO;
                 }
             }
 
@@ -941,7 +934,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _targetGrain = value;
-                    headers = headers | Header.TARGET_GRAIN;
+                    headers = value == null ? headers & ~Header.TARGET_GRAIN : headers | Header.TARGET_GRAIN;
                 }
             }
 
@@ -951,7 +944,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _targetActivation = value;
-                    headers = headers | Header.TARGET_ACTIVATION;
+                    headers = value == null ? headers & ~Header.TARGET_ACTIVATION : headers | Header.TARGET_ACTIVATION;
                 }
             }
 
@@ -961,7 +954,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _targetObserverId = value;
-                    headers = headers | Header.TARGET_OBSERVER;
+                    headers = value == null ? headers & ~Header.TARGET_OBSERVER : headers | Header.TARGET_OBSERVER;
                 }
             }
 
@@ -971,7 +964,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _sendingSilo = value;
-                    headers = headers | Header.SENDING_SILO;
+                    headers = value == null ? headers & ~Header.SENDING_SILO : headers | Header.SENDING_SILO;
                 }
             }
 
@@ -981,7 +974,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _sendingGrain = value;
-                    headers = headers | Header.SENDING_GRAIN;
+                    headers = value == null ? headers & ~Header.SENDING_GRAIN : headers | Header.SENDING_GRAIN;
                 }
             }
 
@@ -991,7 +984,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _sendingActivation = value;
-                    headers = headers | Header.SENDING_ACTIVATION;
+                    headers = value == null ? headers & ~Header.SENDING_ACTIVATION : headers | Header.SENDING_ACTIVATION;
                 }
             }
 
@@ -1021,7 +1014,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _expiration = value;
-                    headers = headers | Header.EXPIRATION;
+                    headers = value == null ? headers & ~Header.EXPIRATION : headers | Header.EXPIRATION;
                 }
             }
 
@@ -1032,17 +1025,17 @@ namespace Orleans.Runtime
                 set
                 {
                     _debugContext = value;
-                    headers = headers | Header.DEBUG_CONTEXT;
+                    headers = string.IsNullOrEmpty(value) ? headers & ~Header.DEBUG_CONTEXT : headers | Header.DEBUG_CONTEXT;
                 }
             }
 
-            public IEnumerable<ActivationAddress> CacheInvalidationHeader
+            public List<ActivationAddress> CacheInvalidationHeader
             {
                 get { return _cacheInvalidationHeader; }
                 set
                 {
                     _cacheInvalidationHeader = value;
-                    headers = headers | Header.CACHE_INVALIDATION_HEADER;
+                    headers = value == null || value.Count == 0 ? headers & ~Header.CACHE_INVALIDATION_HEADER : headers | Header.CACHE_INVALIDATION_HEADER;
                 }
             }
 
@@ -1056,7 +1049,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _newGrainType = value;
-                    headers = headers | Header.NEW_GRAIN_TYPE;
+                    headers = string.IsNullOrEmpty(value) ? headers & ~Header.NEW_GRAIN_TYPE : headers | Header.NEW_GRAIN_TYPE;
                 }
             }
 
@@ -1069,7 +1062,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _genericGrainType = value;
-                    headers = headers | Header.GENERIC_GRAIN_TYPE;
+                    headers = string.IsNullOrEmpty(value) ? headers & ~Header.GENERIC_GRAIN_TYPE : headers | Header.GENERIC_GRAIN_TYPE;
                 }
             }
 
@@ -1089,7 +1082,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _rejectionInfo = value;
-                    headers = headers | Header.REJECTION_INFO;
+                    headers = string.IsNullOrEmpty(value) ? headers & ~Header.REJECTION_INFO : headers | Header.REJECTION_INFO;
                 }
             }
 
@@ -1099,7 +1092,7 @@ namespace Orleans.Runtime
                 set
                 {
                     _requestContextData = value;
-                    headers = headers | Header.REQUEST_CONTEXT;
+                    headers = value  == null || value.Count == 0 ? headers & ~Header.REQUEST_CONTEXT : headers | Header.REQUEST_CONTEXT;
                 }
             }
 
@@ -1120,81 +1113,111 @@ namespace Orleans.Runtime
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
                 var headers = input.headers;
-                SerializationManager.@SerializeInner(input.headers, stream, typeof(Header));
+                stream.Write((int)input.headers);
+              //  SerializationManager.@SerializeInner(input.headers, stream, typeof(Header));
                 if ((headers & Header.CACHE_INVALIDATION_HEADER) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@CacheInvalidationHeader, stream, typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>));
+                {
+                    var count = input.@CacheInvalidationHeader.Count;
+                    stream.Write(input.@CacheInvalidationHeader.Count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        WriteObj(stream, typeof(ActivationAddress), input.@CacheInvalidationHeader[i]);
+                    }
+                }
 
                 if ((headers & Header.CATEGORY) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@Category, stream, typeof(global::Orleans.Runtime.Message.Categories));
+                {
+                    stream.Write((byte)input.@Category);
+                }
 
                 if ((headers & Header.DEBUG_CONTEXT) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@DebugContext, stream, typeof(global::System.String));
+                    stream.Write(input.DebugContext);
 
                 if ((headers & Header.DIRECTION) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@Direction, stream, typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>));
+                    stream.Write((byte)input.Direction.Value); // todo
 
                 if ((headers & Header.EXPIRATION) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@Expiration, stream, typeof(global::System.Nullable<global::System.DateTime>));
+                    stream.Write(input.@Expiration.Value);
 
                 if ((headers & Header.FORWARD_COUNT) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@ForwardCount, stream, typeof(global::System.Int32));
+                    stream.Write(input.@ForwardCount);
 
                 if ((headers & Header.GENERIC_GRAIN_TYPE) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@GenericGrainType, stream, typeof(global::System.String));
+                    stream.Write(input.@GenericGrainType);
 
                 if ((headers & Header.CORRELATION_ID) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@Id, stream, typeof(global::Orleans.Runtime.CorrelationId));
+                    stream.Write(input.@Id);
 
                 if ((headers & Header.ALWAYS_INTERLEAVE) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@IsAlwaysInterleave, stream, typeof(global::System.Boolean));
+                    stream.Write(input.@IsAlwaysInterleave);
 
                 if ((headers & Header.IS_NEW_PLACEMENT) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@IsNewPlacement, stream, typeof(global::System.Boolean));
+                    stream.Write(input.@IsNewPlacement);
 
                 if ((headers & Header.READ_ONLY) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@IsReadOnly, stream, typeof(global::System.Boolean));
+                    stream.Write(input.@IsReadOnly);
 
                 if ((headers & Header.IS_UNORDERED) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@IsUnordered, stream, typeof(global::System.Boolean));
+                    stream.Write(input.@IsUnordered);
 
                 if ((headers & Header.NEW_GRAIN_TYPE) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@NewGrainType, stream, typeof(global::System.String));
+                    stream.Write(input.@NewGrainType);
 
                 if ((headers & Header.REJECTION_INFO) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@RejectionInfo, stream, typeof(global::System.String));
+                    stream.Write(input.@RejectionInfo);
 
                 if ((headers & Header.REJECTION_TYPE) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@RejectionType, stream, typeof(global::Orleans.Runtime.Message.RejectionTypes));
+                    stream.Write((byte)input.@RejectionType);
 
-                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
+                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE) // todo
                     SerializationManager.@SerializeInner(input.@RequestContextData, stream, typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>));
 
                 if ((headers & Header.RESEND_COUNT) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@ResendCount, stream, typeof(global::System.Int32));
+                    stream.Write(input.@ResendCount);
 
                 if ((headers & Header.RESULT) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@Result, stream, typeof(global::Orleans.Runtime.Message.ResponseTypes));
+                    stream.Write((byte)input.@Result);
 
                 if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@SendingActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+                {
+                    WriteObj(stream, typeof(ActivationId), input.@SendingActivation);
+                }
 
                 if ((headers & Header.SENDING_GRAIN) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@SendingGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+                {
+                    WriteObj(stream, typeof(GrainId), input.@SendingGrain);
+                }
 
                 if ((headers & Header.SENDING_SILO) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@SendingSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+                {
+                    WriteObj(stream, typeof(SiloAddress), input.@SendingSilo);
+                }
 
                 if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@TargetActivation, stream, typeof(global::Orleans.Runtime.ActivationId));
+                {
+                    WriteObj(stream, typeof(ActivationId), input.@TargetActivation);
+                }
 
                 if ((headers & Header.TARGET_GRAIN) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@TargetGrain, stream, typeof(global::Orleans.Runtime.GrainId));
+                {
+                    WriteObj(stream, typeof(GrainId), input.@TargetGrain);
+                }
 
                 if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@TargetObserverId, stream, typeof(global::Orleans.Runtime.GuidId));
+                {
+                    WriteObj(stream, typeof(GuidId), input.@TargetObserverId);
+                }
 
                 if ((headers & Header.TARGET_SILO) != Header.NONE)
-                    SerializationManager.@SerializeInner(input.@TargetSilo, stream, typeof(global::Orleans.Runtime.SiloAddress));
+                {
+                    WriteObj(stream, typeof(SiloAddress), input.@TargetSilo);
+                }
+            }
+
+            private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
+            {
+                var ser = SerializationManager.GetSerializer(type);
+                ser.Invoke(input, stream, type);
             }
 
             [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
@@ -1202,84 +1225,105 @@ namespace Orleans.Runtime
             {
                 var result = new HeadersContainer();
                 global::Orleans.@Serialization.@DeserializationContext.@Current.@RecordObject(result);
-                var headers = (Header)SerializationManager.@DeserializeInner(typeof(Header), stream);
+                var headers = (Header)stream.ReadInt();
 
                 if ((headers & Header.CACHE_INVALIDATION_HEADER) != Header.NONE)
-                    result.@CacheInvalidationHeader = (global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>) SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.IEnumerable<global::Orleans.Runtime.ActivationAddress>), stream);
+                {
+                    var n = stream.ReadInt();
+                    if (n > 0)
+                    {
+                       var list = result.@CacheInvalidationHeader = new List<ActivationAddress>(n);
+                        for (int i = 0; i < n; i++)
+                        {
+                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), stream));
+                        }
+                    }
+                }
 
                 if ((headers & Header.CATEGORY) != Header.NONE)
-                    result.@Category = (global::Orleans.Runtime.Message.Categories) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.Categories), stream);
+                    result.@Category = (Categories)stream.ReadByte();
 
                 if ((headers & Header.DEBUG_CONTEXT) != Header.NONE)
-                    result.@DebugContext = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                    result.@DebugContext = stream.ReadString();
 
                 if ((headers & Header.DIRECTION) != Header.NONE)
-                    result.@Direction = (global::System.Nullable<global::Orleans.Runtime.Message.Directions>) SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::Orleans.Runtime.Message.Directions>), stream);
+                    result.@Direction = (Message.Directions)stream.ReadByte();
 
                 if ((headers & Header.EXPIRATION) != Header.NONE)
-                    result.@Expiration = (global::System.Nullable<global::System.DateTime>) SerializationManager.@DeserializeInner(typeof(global::System.Nullable<global::System.DateTime>), stream);
+                    result.@Expiration = stream.ReadDateTime();
 
                 if ((headers & Header.FORWARD_COUNT) != Header.NONE)
-                    result.@ForwardCount = (global::System.Int32) SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+                    result.@ForwardCount = stream.ReadInt();
 
                 if ((headers & Header.GENERIC_GRAIN_TYPE) != Header.NONE)
-                    result.@GenericGrainType = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                    result.@GenericGrainType = stream.ReadString();
 
                 if ((headers & Header.CORRELATION_ID) != Header.NONE)
-                    result.@Id = (global::Orleans.Runtime.CorrelationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.CorrelationId), stream);
+                    result.@Id = (global::Orleans.Runtime.CorrelationId)ReadObj(typeof(global::Orleans.Runtime.CorrelationId), stream);
 
                 if ((headers & Header.ALWAYS_INTERLEAVE) != Header.NONE)
-                    result.@IsAlwaysInterleave = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                    result.@IsAlwaysInterleave = ReadBool(stream);
 
                 if ((headers & Header.IS_NEW_PLACEMENT) != Header.NONE)
-                    result.@IsNewPlacement = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                    result.@IsNewPlacement = ReadBool(stream);
 
                 if ((headers & Header.READ_ONLY) != Header.NONE)
-                    result.@IsReadOnly = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                    result.@IsReadOnly = ReadBool(stream);
 
                 if ((headers & Header.IS_UNORDERED) != Header.NONE)
-                    result.@IsUnordered = (global::System.Boolean) SerializationManager.@DeserializeInner(typeof(global::System.Boolean), stream);
+                    result.@IsUnordered = ReadBool(stream);
 
                 if ((headers & Header.NEW_GRAIN_TYPE) != Header.NONE)
-                    result.@NewGrainType = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                    result.@NewGrainType = stream.ReadString();
 
                 if ((headers & Header.REJECTION_INFO) != Header.NONE)
-                    result.@RejectionInfo = (global::System.String) SerializationManager.@DeserializeInner(typeof(global::System.String), stream);
+                    result.@RejectionInfo = stream.ReadString();
 
                 if ((headers & Header.REJECTION_TYPE) != Header.NONE)
-                    result.@RejectionType = (global::Orleans.Runtime.Message.RejectionTypes) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.RejectionTypes), stream);
+                    result.@RejectionType = (RejectionTypes)stream.ReadByte();
 
                 if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
-                    result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>) SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
+                    result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>)SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
 
                 if ((headers & Header.RESEND_COUNT) != Header.NONE)
-                    result.@ResendCount = (global::System.Int32) SerializationManager.@DeserializeInner(typeof(global::System.Int32), stream);
+                    result.@ResendCount = stream.ReadInt();
 
                 if ((headers & Header.RESULT) != Header.NONE)
-                    result.@Result = (global::Orleans.Runtime.Message.ResponseTypes) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.Message.ResponseTypes), stream);
+                    result.@Result = (global::Orleans.Runtime.Message.ResponseTypes)stream.ReadByte();
 
                 if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
-                    result.@SendingActivation = (global::Orleans.Runtime.ActivationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+                    result.@SendingActivation = (global::Orleans.Runtime.ActivationId)ReadObj(typeof(global::Orleans.Runtime.ActivationId), stream);
 
                 if ((headers & Header.SENDING_GRAIN) != Header.NONE)
-                    result.@SendingGrain = (global::Orleans.Runtime.GrainId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+                    result.@SendingGrain = (global::Orleans.Runtime.GrainId)ReadObj(typeof(global::Orleans.Runtime.GrainId), stream);
 
                 if ((headers & Header.SENDING_SILO) != Header.NONE)
-                    result.@SendingSilo = (global::Orleans.Runtime.SiloAddress) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                    result.@SendingSilo = (global::Orleans.Runtime.SiloAddress)ReadObj(typeof(global::Orleans.Runtime.SiloAddress), stream);
 
                 if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
-                    result.@TargetActivation = (global::Orleans.Runtime.ActivationId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.ActivationId), stream);
+                    result.@TargetActivation = (global::Orleans.Runtime.ActivationId)ReadObj(typeof(global::Orleans.Runtime.ActivationId), stream);
 
                 if ((headers & Header.TARGET_GRAIN) != Header.NONE)
-                    result.@TargetGrain = (global::Orleans.Runtime.GrainId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GrainId), stream);
+                    result.@TargetGrain = (global::Orleans.Runtime.GrainId)ReadObj(typeof(global::Orleans.Runtime.GrainId), stream);
 
                 if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
-                    result.@TargetObserverId = (global::Orleans.Runtime.GuidId) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.GuidId), stream);
+                    result.@TargetObserverId = (global::Orleans.Runtime.GuidId)ReadObj(typeof(global::Orleans.Runtime.GuidId), stream);
 
                 if ((headers & Header.TARGET_SILO) != Header.NONE)
-                    result.@TargetSilo = (global::Orleans.Runtime.SiloAddress) SerializationManager.@DeserializeInner(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                    result.@TargetSilo = (global::Orleans.Runtime.SiloAddress)ReadObj(typeof(global::Orleans.Runtime.SiloAddress), stream);
 
                 return (HeadersContainer)result;
+            }
+
+            private static bool ReadBool(BinaryTokenStreamReader stream)
+            {
+                return stream.ReadByte() == (byte) SerializationTokenType.True;
+            }
+
+            private static object ReadObj(Type t, BinaryTokenStreamReader stream)
+            {
+                var des = SerializationManager.GetDeserializer(t);
+                return des.Invoke(t, stream);
             }
 
             public static void Register()
