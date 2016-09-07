@@ -59,7 +59,9 @@ namespace Orleans.CodeGenerator
                         SF.AttributeArgument(grainType.GetParseableName().GetLiteralExpression()),
                         SF.AttributeArgument(interfaceIdArgument),
                         SF.AttributeArgument(grainTypeArgument)),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
+#endif
             };
 
             var members = new List<MemberDeclarationSyntax>

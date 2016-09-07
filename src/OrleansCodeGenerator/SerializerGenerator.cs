@@ -59,7 +59,9 @@ namespace Orleans.CodeGenerator
             var attributes = new List<AttributeSyntax>
             {
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                 SF.Attribute(typeof(SerializerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
@@ -125,7 +127,9 @@ namespace Orleans.CodeGenerator
                             SF.AttributeList()
                                 .AddAttributes(
                                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
