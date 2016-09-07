@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Counters
     /// Updates to counters needs to be very fast, so are all in-memory operations.
     /// This class then follows up to periodically write the counter values to OS
     /// </summary>
-    internal class PerfCountersStatistics
+    internal class CountersStatistics
     {
         private static readonly Logger logger = LogManager.GetLogger("WindowsPerfCountersStatistics", LoggerType.Runtime);
 
@@ -25,51 +25,21 @@ namespace Orleans.Runtime.Counters
         /// Initialize the counter publisher framework. Start the background stats writer thread.
         /// </summary>
         /// <param name="writeInterval">Frequency of writing to Windows perf counters</param>
-        public PerfCountersStatistics(TimeSpan writeInterval)
+        public CountersStatistics(TimeSpan writeInterval)
         {
             if (writeInterval <= TimeSpan.Zero)
                 throw new ArgumentException("Creating CounterStatsPublisher with negative or zero writeInterval", "writeInterval");
 
             PerfCountersWriteInterval = writeInterval;
         }
-
-        /// <summary>
-        /// Prepare for stats collection
-        /// </summary>
-        private void Prepare()
-        {
-            if (Environment.OSVersion.ToString().StartsWith("unix", StringComparison.InvariantCultureIgnoreCase))
-            {
-                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters are only available on Windows :) -- defaulting to in-memory counters.");
-                shouldWritePerfCounters = false;
-                return;
-            }
-
-            if (!OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
-            {
-                logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
-                shouldWritePerfCounters = false;
-                return;
-            }
-            
-            try
-            {
-                OrleansPerfCounterManager.PrecreateCounters();
-            }
-            catch(Exception exc)
-            {
-                logger.Warn(ErrorCode.PerfCounterFailedToInitialize, "Failed to initialize perf counters -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters, exc);
-                shouldWritePerfCounters = false;
-            }
-        }
-
+        
         /// <summary>
         /// Start stats collection
         /// </summary>
         public void Start()
         {
             logger.Info(ErrorCode.PerfCounterStarting, "Starting Windows perf counter stats collection with frequency={0}", PerfCountersWriteInterval);
-            Prepare();
+            
             // Start the timer
             timer = new SafeTimer(TimerTick, null, PerfCountersWriteInterval, PerfCountersWriteInterval);
         }
@@ -95,7 +65,7 @@ namespace Orleans.Runtime.Counters
             if (shouldWritePerfCounters)
             {
                 // Write counters to Windows perf counters
-                int numErrors = OrleansPerfCounterManager.WriteCounters();
+                int numErrors = OrleansCounterManager.WriteCounters();
 
                 if (numErrors > 0)
                 {

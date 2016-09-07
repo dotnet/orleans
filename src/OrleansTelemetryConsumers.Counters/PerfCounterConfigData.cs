@@ -1,12 +1,12 @@
+﻿using Orleans.Runtime;
 using System.Diagnostics;
 
-namespace Orleans.Runtime.Counters
+namespace OrleansTelemetryConsumers.Counters
 {
     internal class PerfCounterConfigData
     {
         public StatisticName Name;
         public bool UseDeltaValue;
-        internal ICounter<long> CounterStat;
         internal PerformanceCounter PerfCounter;
 
         // TODO: Move this list to some kind of config file
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Counters
             new PerfCounterConfigData {Name = StatisticNames.MESSAGING_SENT_BYTES_TOTAL, UseDeltaValue = true},
             new PerfCounterConfigData {Name = StatisticNames.MESSAGING_SENT_MESSAGES_TOTAL, UseDeltaValue = true},
             new PerfCounterConfigData {Name = StatisticNames.MESSAGING_SENT_LOCALMESSAGES, UseDeltaValue = true},
-            
+
             new PerfCounterConfigData
             {
                 Name =
@@ -109,4 +109,3 @@ namespace Orleans.Runtime.Counters
         };
     }
 }
-        

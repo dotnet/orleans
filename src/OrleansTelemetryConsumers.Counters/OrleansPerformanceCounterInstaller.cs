@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Configuration.Install;
 using System.Diagnostics;
 
-namespace Orleans.Runtime.Counters
+namespace OrleansTelemetryConsumers.Counters
 {
     /// <summary>
     /// Providers installer hooks for registering Orleans custom performance counters.
@@ -21,9 +21,10 @@ namespace Orleans.Runtime.Counters
             {
                 using (var myPerformanceCounterInstaller = new PerformanceCounterInstaller())
                 {
-                    myPerformanceCounterInstaller.CategoryName = OrleansPerfCounterManager.CATEGORY_NAME;
+                    myPerformanceCounterInstaller.CategoryName = PerfCounterTelemetryConsumer.CATEGORY_NAME;
                     myPerformanceCounterInstaller.CategoryType = PerformanceCounterCategoryType.MultiInstance;
-                    myPerformanceCounterInstaller.Counters.AddRange(OrleansPerfCounterManager.GetCounterCreationData());
+                    var consumer = new PerfCounterTelemetryConsumer();
+                    myPerformanceCounterInstaller.Counters.AddRange(consumer.GetCounterCreationData());
                     Installers.Add(myPerformanceCounterInstaller);
                 }
             }
