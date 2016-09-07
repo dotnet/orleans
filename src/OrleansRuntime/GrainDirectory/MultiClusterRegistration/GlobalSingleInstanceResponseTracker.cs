@@ -37,8 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
     }
 
     /// <summary>
-    /// A class that encapsulates response processing logic.
-    /// It is a promise that fires once it has enough responses to make a determination.
+    /// Utility that encapsulates Global Single Instance response processing logic.
     /// </summary>
     internal class GlobalSingleInstanceResponseTracker
     {
@@ -56,16 +55,30 @@ namespace Orleans.Runtime.GrainDirectory
             CheckIfDone();
         }
 
+        /// <summary>
+        /// Gets the outcome for a full round of responses from all the clusters.
+        /// </summary>
+        /// <param name="responses">Responses for a particular grain from all of the clusters in the multi-cluster network</param>
+        /// <param name="grainId">The ID of the grain that we want to know its owner status</param>
+        /// <param name="logger">The logger in case there is useful information to log.</param>
+        /// <returns>The outcome of aggregating all of the responses.</returns>
         public static GlobalSingleInstanceResponseOutcome GetOutcome(RemoteClusterActivationResponse[] responses, GrainId grainId, Logger logger)
         {
             if (responses.Any(t => t == null)) throw new ArgumentException("All responses should have a value", nameof(responses));
             return GetOutcome(responses, grainId, logger, hasPendingResponses: false).Value;
         }
 
-        public static Task<GlobalSingleInstanceResponseOutcome> GetOutcomeAsync(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grain, Logger logger)
+        /// <summary>
+        /// Gets the outcome for a full round of responses from all the clusters.
+        /// </summary>
+        /// <param name="responsePromises">Promises fot the responses for a particular grain from all of the clusters in the multi-cluster network</param>
+        /// <param name="grainId">The ID of the grain that we want to know its owner status</param>
+        /// <param name="logger">The logger in case there is useful information to log.</param>
+        /// <returns>The outcome of aggregating all of the responses. The task will complete as soon as it has enough responses to make a determination, even if not all of the clusters responded yet.</returns>
+        public static Task<GlobalSingleInstanceResponseOutcome> GetOutcomeAsync(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grainId, Logger logger)
         {
             if (responsePromises.Any(t => t == null)) throw new ArgumentException("All response promises should have been initiated", nameof(responsePromises));
-            var details = new GlobalSingleInstanceResponseTracker(responsePromises, grain, logger);
+            var details = new GlobalSingleInstanceResponseTracker(responsePromises, grainId, logger);
             return details.Task;
         }
 
