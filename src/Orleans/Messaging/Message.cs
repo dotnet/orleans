@@ -792,8 +792,6 @@ namespace Orleans.Runtime
         [Serializable]
         public class HeadersContainer
         {
-            // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
-            // This means we can't have over byte.MaxValue of them.
             [Flags]
             public enum Header
             {
