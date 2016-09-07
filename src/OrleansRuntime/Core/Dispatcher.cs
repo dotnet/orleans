@@ -83,7 +83,7 @@ namespace Orleans.Runtime
                 Task ignore;
                 ActivationData target = catalog.GetOrCreateActivation(
                     message.TargetAddress, 
-                    message.IsNewPlacement == true,
+                    message.IsNewPlacement,
                     message.NewGrainType,
                     String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
@@ -310,9 +310,9 @@ namespace Orleans.Runtime
         {
             bool canInterleave = 
                    catalog.IsReentrantGrain(targetActivation.ActivationId)
-                || incoming.IsAlwaysInterleave == true
+                || incoming.IsAlwaysInterleave
                 || targetActivation.Running == null
-                || (targetActivation.Running.IsReadOnly == true && incoming.IsReadOnly == true);
+                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly);
 
             return canInterleave;
         }

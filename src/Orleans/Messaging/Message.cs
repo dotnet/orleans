@@ -137,7 +137,7 @@ namespace Orleans.Runtime
         {
             get { lock (Headers) return Headers.IsUnordered; }
             set { lock (Headers) Headers.IsUnordered = value; }
-        } // todo
+        }
 
         public CorrelationId Id
         {
@@ -296,14 +296,6 @@ namespace Orleans.Runtime
             get { lock (Headers) return Headers.CacheInvalidationHeader; }
             set { lock (Headers) Headers.CacheInvalidationHeader = value; }
         }
-
-        //{
-        //    get
-        //    { //todo
-        //        object obj =  GetHeader(Header.CACHE_INVALIDATION_HEADER);
-        //        return obj == null ? null : ((IEnumerable)obj).Cast<ActivationAddress>();
-        //    }
-        //}
 
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
@@ -571,8 +563,7 @@ namespace Orleans.Runtime
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
             var headerStream = new BinaryTokenStreamWriter();
-            lock (Headers)
-            //todo lock (headers) // Guard against any attempts to modify message headers while we are serializing them
+            lock (Headers) // Guard against any attempts to modify message headers while we are serializing them
             {
                 SerializationManager.SerializeMessageHeaders(Headers, headerStream);
             }
@@ -652,16 +643,42 @@ namespace Orleans.Runtime
                 sb.Append(debugContex).Append(".");
             }
 
-          // todo
-                //foreach (var pair in headers)
-                //{
-                //    if (pair.Key != Header.DEBUG_CONTEXT)
-                //    {
-                //        sb.AppendFormat("{0}={1};", pair.Key, pair.Value);
-                //    }
-                //    sb.AppendLine();
-                //}
+            AppendIfExists(HeadersContainer.Header.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
+
+            AppendIfExists(HeadersContainer.Header.CATEGORY, sb, (m) => m.Category);
+            AppendIfExists(HeadersContainer.Header.DIRECTION, sb, (m) => m.Direction);
+            AppendIfExists(HeadersContainer.Header.EXPIRATION, sb, (m) => m.Expiration);
+            AppendIfExists(HeadersContainer.Header.FORWARD_COUNT, sb, (m) => m.ForwardCount);
+            AppendIfExists(HeadersContainer.Header.GENERIC_GRAIN_TYPE, sb, (m) => m.GenericGrainType);
+            AppendIfExists(HeadersContainer.Header.CORRELATION_ID, sb, (m) => m.Id);
+            AppendIfExists(HeadersContainer.Header.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
+            AppendIfExists(HeadersContainer.Header.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
+            AppendIfExists(HeadersContainer.Header.READ_ONLY, sb, (m) => m.IsReadOnly);
+            AppendIfExists(HeadersContainer.Header.IS_UNORDERED, sb, (m) => m.IsUnordered);
+            AppendIfExists(HeadersContainer.Header.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
+            AppendIfExists(HeadersContainer.Header.REJECTION_INFO, sb, (m) => m.RejectionInfo);
+            AppendIfExists(HeadersContainer.Header.REJECTION_TYPE, sb, (m) => m.RejectionType);
+            AppendIfExists(HeadersContainer.Header.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
+            AppendIfExists(HeadersContainer.Header.RESEND_COUNT, sb, (m) => m.ResendCount);
+            AppendIfExists(HeadersContainer.Header.RESULT, sb, (m) => m.Result);
+            AppendIfExists(HeadersContainer.Header.SENDING_ACTIVATION, sb, (m) => m.SendingActivation);
+            AppendIfExists(HeadersContainer.Header.SENDING_GRAIN, sb, (m) => m.SendingGrain);
+            AppendIfExists(HeadersContainer.Header.SENDING_SILO, sb, (m) => m.SendingSilo);
+            AppendIfExists(HeadersContainer.Header.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
+            AppendIfExists(HeadersContainer.Header.TARGET_GRAIN, sb, (m) => m.TargetGrain);
+            AppendIfExists(HeadersContainer.Header.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
+            AppendIfExists(HeadersContainer.Header.TARGET_SILO, sb, (m) => m.TargetSilo);
+
             return sb.ToString();
+        }
+        
+        private void AppendIfExists(HeadersContainer.Header header, StringBuilder sb, Func<Message, object> valueProvider)
+        {
+            if ((Headers.Headers & header) != HeadersContainer.Header.NONE)
+            {
+                sb.AppendFormat("{0}={1};", header, valueProvider(this));
+                sb.AppendLine();
+            }
         }
 
         public override string ToString()
@@ -684,9 +701,9 @@ namespace Orleans.Runtime
                 }
             }
             return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
-                IsReadOnly == true ? "ReadOnly " : "", //0
-                IsAlwaysInterleave == true ? "IsAlwaysInterleave " : "", //1
-                IsNewPlacement == true ? "NewPlacement " : "", // 2
+                IsReadOnly ? "ReadOnly " : "", //0
+                IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
+                IsNewPlacement ? "NewPlacement " : "", // 2
                 response,  //3
                 Direction, //4
                 String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
@@ -807,7 +824,7 @@ namespace Orleans.Runtime
                 TARGET_OBSERVER = 1 << 22,
                 IS_UNORDERED = 1 << 23,
                 REQUEST_CONTEXT = 1 << 24,
-                // Do not add over byte.MaxValue of these.
+                // Do not add over int.MaxValue of these.
             }
 
             private Header headers = default(Header);
@@ -837,6 +854,8 @@ namespace Orleans.Runtime
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
+
+            public Header Headers => headers;
 
             public Categories Category
             {
@@ -1134,7 +1153,7 @@ namespace Orleans.Runtime
                     stream.Write(input.DebugContext);
 
                 if ((headers & Header.DIRECTION) != Header.NONE)
-                    stream.Write((byte)input.Direction.Value); // todo
+                    stream.Write((byte)input.Direction.Value);
 
                 if ((headers & Header.EXPIRATION) != Header.NONE)
                     stream.Write(input.@Expiration.Value);
@@ -1169,8 +1188,17 @@ namespace Orleans.Runtime
                 if ((headers & Header.REJECTION_TYPE) != Header.NONE)
                     stream.Write((byte)input.@RejectionType);
 
-                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE) // todo
-                    SerializationManager.@SerializeInner(input.@RequestContextData, stream, typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>));
+                if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
+                {
+                    var requestData = input.@RequestContextData;
+                    var count = requestData.Count;
+                    stream.Write(count);
+                    foreach (var d in requestData)
+                    {
+                        stream.Write(d.Key);
+                        SerializationManager.@SerializeInner(d.Value, stream, typeof(object));
+                    }
+                }
 
                 if ((headers & Header.RESEND_COUNT) != Header.NONE)
                     stream.Write(input.@ResendCount);
@@ -1212,12 +1240,6 @@ namespace Orleans.Runtime
                 {
                     stream.Write(input.@TargetSilo);
                 }
-            }
-
-            private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
-            {
-                var ser = SerializationManager.GetSerializer(type);
-                ser.Invoke(input, stream, type);
             }
 
             [global::Orleans.CodeGeneration.DeserializerMethodAttribute]
@@ -1283,7 +1305,15 @@ namespace Orleans.Runtime
                     result.@RejectionType = (RejectionTypes)stream.ReadByte();
 
                 if ((headers & Header.REQUEST_CONTEXT) != Header.NONE)
-                    result.@RequestContextData = (global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>)SerializationManager.@DeserializeInner(typeof(global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object>), stream);
+                {
+                    var c = stream.ReadInt();
+                    var requestData = new Dictionary<string, object>(c);
+                    for (int i = 0; i < c; i++)
+                    {
+                        requestData[stream.ReadString()] = SerializationManager.DeserializeInner(null, stream);
+                    }
+                    result.@RequestContextData = requestData;
+                }
 
                 if ((headers & Header.RESEND_COUNT) != Header.NONE)
                     result.@ResendCount = stream.ReadInt();
@@ -1318,6 +1348,12 @@ namespace Orleans.Runtime
             private static bool ReadBool(BinaryTokenStreamReader stream)
             {
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
+            }
+
+            private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
+            {
+                var ser = SerializationManager.GetSerializer(type);
+                ser.Invoke(input, stream, type);
             }
 
             private static object ReadObj(Type t, BinaryTokenStreamReader stream)

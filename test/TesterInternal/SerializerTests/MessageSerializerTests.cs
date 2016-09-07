@@ -42,8 +42,6 @@ namespace UnitTests.SerializerTests
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
             resp.IsAlwaysInterleave = true;
-          // wtf  resp.CacheInvalidationHeader = "TestBar";
-            //resp.SetStringBody("This is test data");
 
             List<object> requestBody = new List<object>();
             for (int k = 0; k < numItems; k++)
