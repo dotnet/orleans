@@ -472,7 +472,6 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
-            options.ClientConfiguration.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
             return new TestCluster(options);
         }
 
