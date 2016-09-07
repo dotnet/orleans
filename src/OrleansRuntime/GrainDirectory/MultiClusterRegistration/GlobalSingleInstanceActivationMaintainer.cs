@@ -254,7 +254,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var outcome = outcomeDetails.State;
 
                 if (logger.IsVerbose2)
-                    logger.Verbose2("GSIP:M {0} Result={1}", address.Grain.ToString(), outcome.ToString());
+                    logger.Verbose2("GSIP:M {0} Result={1}", address.Grain, outcomeDetails);
 
                 switch (outcome)
                 {

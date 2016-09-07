@@ -98,7 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var outcome = await SendRequestRound(address, remoteClusters);
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome.State);
+                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome);
 
                 switch (outcome.State)
                 {

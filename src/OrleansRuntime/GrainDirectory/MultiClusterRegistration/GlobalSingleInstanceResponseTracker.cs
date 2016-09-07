@@ -29,6 +29,11 @@ namespace Orleans.Runtime.GrainDirectory
             this.RemoteOwnerAddress = remoteOwnerAddress;
             this.RemoteOwnerCluster = remoteOwnerCluster;
         }
+
+        public override string ToString()
+        {
+            return $"[{this.State} {this.RemoteOwnerAddress.Address}]";
+        }
     }
 
     /// <summary>
