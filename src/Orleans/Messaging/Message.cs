@@ -1180,27 +1180,27 @@ namespace Orleans.Runtime
 
                 if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(ActivationId), input.@SendingActivation);
+                    stream.Write(input.@SendingActivation);
                 }
 
                 if ((headers & Header.SENDING_GRAIN) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(GrainId), input.@SendingGrain);
+                    stream.Write(input.@SendingGrain);
                 }
 
                 if ((headers & Header.SENDING_SILO) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(SiloAddress), input.@SendingSilo);
+                    stream.Write(input.@SendingSilo);
                 }
 
                 if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(ActivationId), input.@TargetActivation);
+                    stream.Write(input.@TargetActivation);
                 }
 
                 if ((headers & Header.TARGET_GRAIN) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(GrainId), input.@TargetGrain);
+                    stream.Write(input.@TargetGrain);
                 }
 
                 if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
@@ -1210,7 +1210,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Header.TARGET_SILO) != Header.NONE)
                 {
-                    WriteObj(stream, typeof(SiloAddress), input.@TargetSilo);
+                    stream.Write(input.@TargetSilo);
                 }
             }
 
@@ -1292,25 +1292,25 @@ namespace Orleans.Runtime
                     result.@Result = (global::Orleans.Runtime.Message.ResponseTypes)stream.ReadByte();
 
                 if ((headers & Header.SENDING_ACTIVATION) != Header.NONE)
-                    result.@SendingActivation = (global::Orleans.Runtime.ActivationId)ReadObj(typeof(global::Orleans.Runtime.ActivationId), stream);
+                    result.@SendingActivation = stream.ReadActivationId();
 
                 if ((headers & Header.SENDING_GRAIN) != Header.NONE)
-                    result.@SendingGrain = (global::Orleans.Runtime.GrainId)ReadObj(typeof(global::Orleans.Runtime.GrainId), stream);
+                    result.@SendingGrain = stream.ReadGrainId();
 
                 if ((headers & Header.SENDING_SILO) != Header.NONE)
-                    result.@SendingSilo = (global::Orleans.Runtime.SiloAddress)ReadObj(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                    result.@SendingSilo = stream.ReadSiloAddress();
 
-                if ((headers & Header.TARGET_ACTIVATION) != Header.NONE)
-                    result.@TargetActivation = (global::Orleans.Runtime.ActivationId)ReadObj(typeof(global::Orleans.Runtime.ActivationId), stream);
+                if ((headers & Header.TARGET_ACTIVATION) != Header.NONE) 
+                    result.@TargetActivation = stream.ReadActivationId();
 
                 if ((headers & Header.TARGET_GRAIN) != Header.NONE)
-                    result.@TargetGrain = (global::Orleans.Runtime.GrainId)ReadObj(typeof(global::Orleans.Runtime.GrainId), stream);
+                    result.@TargetGrain = stream.ReadGrainId();
 
                 if ((headers & Header.TARGET_OBSERVER) != Header.NONE)
                     result.@TargetObserverId = (global::Orleans.Runtime.GuidId)ReadObj(typeof(global::Orleans.Runtime.GuidId), stream);
 
                 if ((headers & Header.TARGET_SILO) != Header.NONE)
-                    result.@TargetSilo = (global::Orleans.Runtime.SiloAddress)ReadObj(typeof(global::Orleans.Runtime.SiloAddress), stream);
+                    result.@TargetSilo = stream.ReadSiloAddress();
 
                 return (HeadersContainer)result;
             }
