@@ -216,9 +216,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="checkpointer"></param>
         /// <param name="bufferPool"></param>
+        /// <param name="timePurge"></param>
         /// <param name="logger"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
-            : this(checkpointer, new EventHubDataAdapter(bufferPool), logger)
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger)
+            : this(checkpointer, new EventHubDataAdapter(bufferPool, timePurge), logger)
         {
         }
 

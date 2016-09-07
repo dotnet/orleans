@@ -122,7 +122,7 @@ namespace Orleans.Providers.Streams.Memory
                     queueMessage.SequenceToken);
             }
 
-            public bool ShouldPurge(ref CachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
             {
                 var purgedResource = (FixedSizeBuffer) purgeRequest;
                 // if we're purging our current buffer, don't use it any more
