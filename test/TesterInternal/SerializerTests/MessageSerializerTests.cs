@@ -81,10 +81,10 @@ namespace UnitTests.SerializerTests
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
-            Assert.Equal<Message.Categories>(resp.Category, resp1.Category); //Category is incorrect"
-            Assert.Equal<Message.Directions?>(resp.Direction, resp1.Direction); //Direction is incorrect
-            Assert.Equal<CorrelationId>(resp.Id, resp1.Id); //Correlation ID is incorrect
-            Assert.Equal<bool>((bool)resp.IsAlwaysInterleave, (bool)resp1.IsAlwaysInterleave); //Foo Boolean is incorrect
+            Assert.Equal(resp.Category, resp1.Category); //Category is incorrect"
+            Assert.Equal(resp.Direction, resp1.Direction); //Direction is incorrect
+            Assert.Equal(resp.Id, resp1.Id); //Correlation ID is incorrect
+            Assert.Equal(resp.IsAlwaysInterleave, resp1.IsAlwaysInterleave); //Foo Boolean is incorrect
             Assert.Equal(resp.CacheInvalidationHeader, resp1.CacheInvalidationHeader); //Bar string is incorrect
             Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo));
             Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));

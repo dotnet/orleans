@@ -1131,7 +1131,6 @@ namespace Orleans.Runtime
                 HeadersContainer input = (HeadersContainer)untypedInput;
                 var headers = input.headers;
                 stream.Write((int)input.headers);
-              //  SerializationManager.@SerializeInner(input.headers, stream, typeof(Header));
                 if ((headers & Header.CACHE_INVALIDATION_HEADER) != Header.NONE)
                 {
                     var count = input.@CacheInvalidationHeader.Count;
