@@ -61,7 +61,6 @@ namespace Orleans.Providers
         {
             List<Task> tasks = new List<Task>();
             int count = providers.Count;
-            TProvider provider;
 
             if (providerConfigs != null) count = providerConfigs.Count;
             foreach (string providerName in providerNames)
@@ -222,18 +221,21 @@ namespace Orleans.Providers
                 if (fullConfig.Type != typeName) continue;
                 
                 // Found one! Now look for an appropriate constructor; try TProvider(string, Dictionary<string,string>) first
-                var constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, constructorBindingTypes, null);
+                var constructor = TypeUtils.GetConstructorThatMatches(t, constructorBindingTypes);
                 var parms = new object[] { typeName, entry.Properties };
 
                 if (constructor == null)
                 {
                     // See if there's a default constructor to use, if there's no two-parameter constructor
-                    constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                        null, Type.EmptyTypes, null);
+                    constructor = TypeUtils.GetConstructorThatMatches(t, Type.EmptyTypes);
                     parms = new object[0];
                 }
-                if (constructor == null) continue;
+                if (constructor == null)
+                {
+                    logger.Warn(ErrorCode.Provider_InstanceConstructionError1, $"Accessible constructor does not exist for type {t.Name}");
+
+                    continue;
+                }
 
                 TProvider instance;
                 try

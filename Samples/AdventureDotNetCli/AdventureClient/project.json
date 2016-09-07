@@ -1,0 +1,24 @@
+﻿{
+  "version": "1.0.0-*",
+  "buildOptions": {
+    "emitEntryPoint": true
+  },
+
+  "dependencies": {
+    "AdventureGrainInterfaces": "1.0.0-*"
+  },
+
+  "frameworks": {
+    "net452": {
+      "dependencies": {
+      }
+    }
+  },
+
+  "runtimeOptions": {
+    "configProperties": {
+      "System.GC.Server": true,
+      "System.GC.Concurrent": false
+    }
+  }
+}

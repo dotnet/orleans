@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "Newtonsoft.Json": "7.0.1",
     "WindowsAzure.Storage": "7.0.0"
   },
   "frameworks": {

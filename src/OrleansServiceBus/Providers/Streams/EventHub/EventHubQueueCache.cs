@@ -216,9 +216,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="checkpointer"></param>
         /// <param name="bufferPool"></param>
+        /// <param name="timePurge"></param>
         /// <param name="logger"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
-            : this(checkpointer, new EventHubDataAdapter(bufferPool), logger)
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger)
+            : this(checkpointer, new EventHubDataAdapter(bufferPool, timePurge), logger)
         {
         }
 
@@ -241,9 +242,9 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="newestItem"></param>
         protected override void OnPurge(CachedEventHubMessage? lastItemPurged, CachedEventHubMessage? newestItem)
         {
-            if (log.IsInfo && lastItemPurged.HasValue && newestItem.HasValue)
+            if (log.IsVerbose && lastItemPurged.HasValue && newestItem.HasValue)
             {
-                log.Info($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
+                log.Verbose($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
             }
         }
 

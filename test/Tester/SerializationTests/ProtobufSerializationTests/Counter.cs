@@ -4,46 +4,48 @@
 #region Designer generated code
 
 using pb = global::Google.Protobuf;
+using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
-namespace UnitTests.Serialization
-{
+using scg = global::System.Collections.Generic;
+namespace UnitTests.Serialization {
 
-    namespace Proto
-    {
+  /// <summary>Holder for reflection information generated from counter.proto</summary>
+  [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+  public static partial class CounterReflection {
 
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-    public static partial class Counter {
-
-      #region Descriptor
-      public static pbr::FileDescriptor Descriptor {
-        get { return descriptor; }
-      }
-      private static pbr::FileDescriptor descriptor;
-
-      static Counter() {
-        byte[] descriptorData = global::System.Convert.FromBase64String(
-            string.Concat(
-              "Cg1jb3VudGVyLnByb3RvEgh0dXRvcmlhbCIjCgdDb3VudGVyEgwKBG5hbWUY", 
-              "ASABKAkSCgoCaWQYAiABKAVCGqoCF1VuaXRUZXN0cy5TZXJpYWxpemF0aW9u", 
-              "YgZwcm90bzM="));
-        descriptor = pbr::FileDescriptor.InternalBuildGeneratedFileFrom(descriptorData,
-            new pbr::FileDescriptor[] { },
-            new pbr::GeneratedCodeInfo(null, new pbr::GeneratedCodeInfo[] {
-              new pbr::GeneratedCodeInfo(typeof(global::UnitTests.Serialization.Counter), new[]{ "Name", "Id" }, null, null, null)
-            }));
-      }
-      #endregion
-
+    #region Descriptor
+    /// <summary>File descriptor for counter.proto</summary>
+    public static pbr::FileDescriptor Descriptor {
+      get { return descriptor; }
     }
+    private static pbr::FileDescriptor descriptor;
+
+    static CounterReflection() {
+      byte[] descriptorData = global::System.Convert.FromBase64String(
+          string.Concat(
+            "Cg1jb3VudGVyLnByb3RvEgh0dXRvcmlhbCIjCgdDb3VudGVyEgwKBG5hbWUY",
+            "ASABKAkSCgoCaWQYAiABKAVCGqoCF1VuaXRUZXN0cy5TZXJpYWxpemF0aW9u",
+            "YgZwcm90bzM="));
+      descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
+          new pbr::FileDescriptor[] { },
+          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::UnitTests.Serialization.Counter), global::UnitTests.Serialization.Counter.Parser, new[]{ "Name", "Id" }, null, null, null)
+          }));
+    }
+    #endregion
+
   }
   #region Messages
+  /// <summary>
+  ///  [START messages]
+  /// </summary>
   [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
   public sealed partial class Counter : pb::IMessage<Counter> {
     private static readonly pb::MessageParser<Counter> _parser = new pb::MessageParser<Counter>(() => new Counter());
     public static pb::MessageParser<Counter> Parser { get { return _parser; } }
 
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::UnitTests.Serialization.Proto.Counter.Descriptor.MessageTypes[0]; }
+      get { return global::UnitTests.Serialization.CounterReflection.Descriptor.MessageTypes[0]; }
     }
 
     pbr::MessageDescriptor pb::IMessage.Descriptor {
@@ -65,15 +67,17 @@ namespace UnitTests.Serialization
       return new Counter(this);
     }
 
+    /// <summary>Field number for the "name" field.</summary>
     public const int NameFieldNumber = 1;
     private string name_ = "";
     public string Name {
       get { return name_; }
       set {
-        name_ = pb::Preconditions.CheckNotNull(value, "value");
+        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
+    /// <summary>Field number for the "id" field.</summary>
     public const int IdFieldNumber = 2;
     private int id_;
     public int Id {
@@ -107,7 +111,7 @@ namespace UnitTests.Serialization
     }
 
     public override string ToString() {
-      return pb::JsonFormatter.Default.Format(this);
+      return pb::JsonFormatter.ToDiagnosticString(this);
     }
 
     public void WriteTo(pb::CodedOutputStream output) {

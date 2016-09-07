@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests.AWSUtils
 {
+    [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb"), TestCategory("Stress")]
     public class DynamoDBStorageStressTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private readonly ITestOutputHelper output;
@@ -19,6 +20,9 @@ namespace UnitTests.StorageTests.AWSUtils
 
         public DynamoDBStorageStressTests(DynamoDBStorageTestsFixture fixture, ITestOutputHelper output)
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+
             this.output = output;
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
 
@@ -26,7 +30,7 @@ namespace UnitTests.StorageTests.AWSUtils
             PartitionKey = "PK-DynamoDBDataManagerStressTests-" + Guid.NewGuid();
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void DynamoDBDataManagerStressTests_WriteAlot_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_SinglePartition";
@@ -38,7 +42,7 @@ namespace UnitTests.StorageTests.AWSUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void DynamoDBDataManagerStressTests_WriteAlot_MultiPartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_WriteAlot_MultiPartition";
@@ -50,7 +54,7 @@ namespace UnitTests.StorageTests.AWSUtils
             WriteAlot_Async(testName, numPartitions, iterations, batchSize);
         }
 
-        [Fact, TestCategory("AWS"), TestCategory("Storage"), TestCategory("Stress")]
+        [SkippableFact]
         public void DynamoDBDataManagerStressTests_ReadAll_SinglePartition()
         {
             const string testName = "DynamoDBDataManagerStressTests_ReadAll";

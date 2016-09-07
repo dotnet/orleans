@@ -29,6 +29,9 @@ namespace UnitTests.StorageTests.AWSUtils
 
         public Base_PersistenceGrainTests_AWSStore(ITestOutputHelper output, BaseClusterFixture fixture)
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw new SkipException("Unable to connect to DynamoDB simulator");
+
             this.output = output;
             HostedCluster = fixture.HostedCluster;
             timingFactor = TestUtils.CalibrateTimings();

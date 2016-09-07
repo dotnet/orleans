@@ -55,6 +55,8 @@
     <Compile Include="PSClientTests\PSClientTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
+    <Compile Include="StreamingTests\SQSClientStreamTests.cs" />
+    <Compile Include="StreamingTests\SQSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\AQClientStreamTests.cs" />
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
     <Compile Include="StreamingTests\EHClientStreamTests.cs" />
@@ -117,6 +119,7 @@
     <Compile Include="StreamingTests\DeactivationTestRunner.cs" />
     <Compile Include="StreamingTests\EHSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\GeneratedStreamRecoveryTests.cs" />
+    <Compile Include="StreamingTests\MemoryStreamProviderClientTests.cs" />
     <Compile Include="StreamingTests\PullingAgentManagementTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />
@@ -128,6 +131,7 @@
     <Compile Include="StreamingTests\StreamFilteringTests.cs" />
     <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
+    <Compile Include="StreamingTests\TimePurgePredicateTests.cs" />
     <Compile Include="TestStreamProviders\AzureQueue\TestAzureQueueStreamProvider.cs" />
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
@@ -297,6 +301,7 @@
     <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
+    <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

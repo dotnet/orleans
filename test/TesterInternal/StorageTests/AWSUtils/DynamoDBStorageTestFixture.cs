@@ -6,7 +6,10 @@
 
         public DynamoDBStorageTestsFixture()
         {
-            DataManager = new UnitTestDynamoDBStorage();
+            if (AWSTestConstants.IsDynamoDbAvailable)
+            {
+                DataManager = new UnitTestDynamoDBStorage();
+            }
         }
     }
 }

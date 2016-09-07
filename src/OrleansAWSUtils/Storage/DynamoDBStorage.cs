@@ -14,7 +14,7 @@ namespace OrleansAWSUtils.Storage
     /// <summary>
     /// Wrapper around AWS DynamoDB SDK.
     /// </summary>
-    internal class DynamoDBStorage
+    public class DynamoDBStorage
     {
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
@@ -48,13 +48,14 @@ namespace OrleansAWSUtils.Storage
         /// <param name="tableName">The name of the table</param>
         /// <param name="keys">The keys definitions</param>
         /// <param name="attributes">The attributes used on the key definition</param>
+        /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
         {
             try
             {
                 if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes);
+                    await CreateTable(tableName, keys, attributes, secondaryIndexes);
             }
             catch (Exception exc)
             {
@@ -139,7 +140,7 @@ namespace OrleansAWSUtils.Storage
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes)
+        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
         {
             var request = new CreateTableRequest
             {
@@ -152,6 +153,16 @@ namespace OrleansAWSUtils.Storage
                     WriteCapacityUnits = writeCapacityUnits
                 }
             };
+
+            if (secondaryIndexes != null && secondaryIndexes.Count > 0)
+            {
+                var indexThroughput = new ProvisionedThroughput { ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits };
+                secondaryIndexes.ForEach(i =>
+                {
+                    i.ProvisionedThroughput = indexThroughput;
+                });
+                request.GlobalSecondaryIndexes = secondaryIndexes;
+            }
 
             try
             {
@@ -435,8 +446,10 @@ namespace OrleansAWSUtils.Storage
         /// <param name="keys">The table entry keys to search for</param>
         /// <param name="keyConditionExpression">the expression that will filter the keys</param>
         /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
+        /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
-        public async Task<List<TResult>> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        public async Task<List<TResult>> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true) where TResult : class
         {
             try
             {
@@ -448,6 +461,12 @@ namespace OrleansAWSUtils.Storage
                     KeyConditionExpression = keyConditionExpression,
                     Select = Select.ALL_ATTRIBUTES
                 };
+
+                if (!string.IsNullOrWhiteSpace(indexName))
+                {
+                    request.ScanIndexForward = scanIndexForward;
+                    request.IndexName = indexName;
+                }
 
                 var response = await ddbClient.QueryAsync(request);
 

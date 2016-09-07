@@ -50,6 +50,24 @@ namespace Orleans.Providers.Streams.Common
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
+        // this is a workaround until we address "Dependency Injection: register IGrainFactory #988"
+        private class GrainFactoryServiceProvider : IServiceProvider
+        {
+            private IStreamProviderRuntime providerRuntime;
+            public GrainFactoryServiceProvider(IStreamProviderRuntime providerRuntime)
+            {
+                this.providerRuntime = providerRuntime;
+            }
+            public object GetService(Type serviceType)
+            {
+                if (serviceType == typeof (GrainFactory))
+                {
+                    return providerRuntime.GrainFactory;
+                }
+                return providerRuntime == null ? null:providerRuntime.ServiceProvider.GetService(serviceType);
+            }
+        }
+
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
             if(!stateManager.PresetState(ProviderState.Initialized)) return;
@@ -61,7 +79,9 @@ namespace Orleans.Providers.Streams.Common
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
             logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
+            // Temporary change, but we need GrainFactory inside ServiceProvider for now, 
+            // so will change it back as soon as we have an action item to add GrainFactory to ServiceProvider.
+            adapterFactory.Init(config, Name, logger, new GrainFactoryServiceProvider(providerRuntime));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             string startup;

@@ -34,7 +34,7 @@ namespace UnitTests.StreamingTests
             EHConsumerGroup, EHPath);
 
         private static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName, 3);
+            new EventHubStreamProviderConfig(StreamProviderName) { CacheSizeMb = 3 };
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
             new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,

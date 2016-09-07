@@ -100,7 +100,7 @@ namespace Orleans.Runtime
                 promotedFinalizationMemoryFromGen0PF = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
 #endif
                 
-#if !(NETSTANDARD1_6 || __MonoCS__)
+#if !(NETSTANDARD || __MonoCS__)
                 //.NET on Windows without mono
                 const string Query = "SELECT Capacity FROM Win32_PhysicalMemory";
                 var searcher = new ManagementObjectSearcher(Query);
@@ -116,7 +116,7 @@ namespace Orleans.Runtime
                 //Cross platform mono
                 var totalPhysicalMemory = new PerformanceCounter("Mono Memory", "Total Physical Memory");
                 TotalPhysicalMemory = Convert.ToInt64(totalPhysicalMemory.NextValue());
-#elif NETSTANDARD1_6
+#elif NETSTANDARD
                 //Cross platform CoreCLR
 #endif
                 countersAvailable = true;

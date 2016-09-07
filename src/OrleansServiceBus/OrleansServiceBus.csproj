@@ -65,6 +65,7 @@
     <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\SegmentBuilder.cs" />
+    <Compile Include="Providers\Streams\EventHub\TimePurgePredicate.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansAzureUtils\OrleansAzureUtils.csproj">

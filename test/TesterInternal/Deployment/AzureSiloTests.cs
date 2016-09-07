@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Orleans.TestingHost.Utils;
@@ -11,7 +12,7 @@ namespace UnitTests.Deployment
     public class AzureSiloTests
     {
         [SkippableFact, TestCategory("Functional")]
-        public async void ValidateConfiguration_Startup()
+        public async Task ValidateConfiguration_Startup()
         {
             Skip.IfNot(StorageEmulator.TryStart(), "This test explicitly requires the Azure Storage emulator to run");
 
@@ -30,7 +31,7 @@ namespace UnitTests.Deployment
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
-        public async void ValidateConfiguration_InvalidConnectionString()
+        public async Task ValidateConfiguration_InvalidConnectionString()
         {
             var serviceRuntime = new TestServiceRuntimeWrapper();
             serviceRuntime.DeploymentId = "bar";
@@ -47,7 +48,7 @@ namespace UnitTests.Deployment
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
-        public async void ValidateConfiguration_IncorrectKey()
+        public async Task ValidateConfiguration_IncorrectKey()
         {
             var serviceRuntime = new TestServiceRuntimeWrapper();
             serviceRuntime.DeploymentId = "bar";

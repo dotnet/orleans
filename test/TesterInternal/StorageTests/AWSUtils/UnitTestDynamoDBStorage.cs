@@ -1,14 +1,16 @@
 ﻿using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Orleans;
 using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Xunit;
 
 namespace UnitTests.StorageTests.AWSUtils
 {
     [Serializable]
-    internal class UnitTestDynamoDBTableData 
+    internal class UnitTestDynamoDBTableData
     {
         private const string DATA_FIELD = "Data";
         private const string STRING_DATA_FIELD = "StringData";
@@ -52,7 +54,7 @@ namespace UnitTests.StorageTests.AWSUtils
                 BinaryData = fields["BinaryData"].B.ToArray();
             }
         }
-        
+
         public UnitTestDynamoDBTableData(string data, string partitionKey, string rowKey)
         {
             StringData = data;
@@ -89,17 +91,20 @@ namespace UnitTests.StorageTests.AWSUtils
         public UnitTestDynamoDBStorage()
             : base($"Service={AWSTestConstants.Service}")
         {
-            InitializeTable(INSTANCE_TABLE_NAME,
-                new List<KeySchemaElement>
-                {
+            if (AWSTestConstants.IsDynamoDbAvailable)
+            {
+                InitializeTable(INSTANCE_TABLE_NAME,
+                               new List<KeySchemaElement>
+                               {
                     new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH },
                     new KeySchemaElement { AttributeName = "RowKey", KeyType = KeyType.RANGE }
-                },
-                new List<AttributeDefinition>
-                {
+                               },
+                               new List<AttributeDefinition>
+                               {
                     new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = "RowKey", AttributeType = ScalarAttributeType.S }
-                }).Wait();
+                               }).Wait();
+            }
         }
     }
 }

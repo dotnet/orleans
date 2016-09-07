@@ -289,7 +289,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentNullException("message");
             }
 
-            PerformPendingPurges();
+            PerformPendingPurges(dequeueTimeUtc);
 
             StreamPosition streamPosition;
             // allocate message from pool
@@ -299,7 +299,8 @@ namespace Orleans.Providers.Streams.Common
             if (block != messageBlocks.FirstOrDefault())
                 messageBlocks.AddFirst(block.Node);
             itemCount++;
-            PerformPendingPurges();
+
+            PerformPendingPurges(dequeueTimeUtc);
 
             return streamPosition;
         }
@@ -313,25 +314,26 @@ namespace Orleans.Providers.Streams.Common
             purgeQueue.Enqueue(purgeRequest);
         }
 
-        private void PerformPendingPurges()
+        private void PerformPendingPurges(DateTime nowUtc)
         {
             IDisposable purgeRequest;
             if (purgeQueue.IsEmpty) return;
             while (purgeQueue.TryDequeue(out purgeRequest))
             {
                 int currentItemCount = itemCount;
-                PerformBlockPurge(purgeRequest);
+                PerformBlockPurge(purgeRequest, nowUtc);
                 ReportBlockPurge(currentItemCount);
             }
         }
 
-        private void PerformBlockPurge(IDisposable purgeRequest)
+        private void PerformBlockPurge(IDisposable purgeRequest, DateTime nowUtc)
         {
+            TCachedMessage neweswtMessageInCache = messageBlocks.First.Value.NewestMessage;
             TCachedMessage? lastMessagePurged = null;
             while (!IsEmpty)
             {
                 var oldestMessageInCache = messageBlocks.Last.Value.OldestMessage;
-                if (!cacheDataAdapter.ShouldPurge(ref oldestMessageInCache, purgeRequest))
+                if (!cacheDataAdapter.ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest, nowUtc))
                 {
                     break;
                 }
@@ -359,9 +361,9 @@ namespace Orleans.Providers.Streams.Common
         {
             if (IsEmpty)
             {
-                logger.Info("BlockPurged: cache empty");
+                logger.Verbose("BlockPurged: cache empty");
             }
-            logger.Info($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
+            logger.Verbose($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
         }
 
         private enum CursorStates
