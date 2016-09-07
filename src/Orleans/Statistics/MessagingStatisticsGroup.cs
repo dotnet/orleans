@@ -149,14 +149,14 @@ namespace Orleans.Runtime
             perSiloPingReplyMissedCounters = new ConcurrentDictionary<string, CounterStatistic>();
         }
 
-        internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
+        internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
         {
             if (numTotalBytes < 0)
                 throw new ArgumentException(String.Format("OnMessageSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
             OnMessageSend_Impl(targetSilo, direction, numTotalBytes, headerBytes, 1);
         }
 
-        internal static void OnMessageBatchSend(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection, int numMsgsInBatch)
+        internal static void OnMessageBatchSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection, int numMsgsInBatch)
         {
             if (numTotalBytes < 0)
                 throw new ArgumentException(String.Format("OnMessageBatchSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
@@ -164,13 +164,10 @@ namespace Orleans.Runtime
             perSocketDirectionStatsSend[(int)socketDirection].OnMessage(numMsgsInBatch, numTotalBytes);
         }
 
-        private static void OnMessageSend_Impl(SiloAddress targetSilo, Message.Directions? direction, int numTotalBytes, int headerBytes, int numMsgsInBatch)
+        private static void OnMessageSend_Impl(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, int numMsgsInBatch)
         {
             MessagesSentTotal.IncrementBy(numMsgsInBatch);
-            if (direction.HasValue)
-            {
-                MessagesSentPerDirection[(int) direction.Value].IncrementBy(numMsgsInBatch);
-            }
+            MessagesSentPerDirection[(int)direction].IncrementBy(numMsgsInBatch);
 
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
