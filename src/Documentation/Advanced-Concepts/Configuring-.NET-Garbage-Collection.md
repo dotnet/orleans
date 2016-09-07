@@ -5,7 +5,7 @@ title: Configuring .NET Garbage Collection
 
 # Configuring .NET Garbage Collection
 
-For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found if to set gcServer=true and gcConcurrent=false. The are easy to set via the application config file in case a silo runs as a standalone process. You can use OrleansHost.exe.config included in the [Microsoft.Orleans.OrleansHost](https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/) NuGet package as an example.
+For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found is to set gcServer=true and gcConcurrent=false. These are easy to set via the application config file when a silo runs as a standalone process. You can use OrleansHost.exe.config included in the [Microsoft.Orleans.OrleansHost](https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/) NuGet package as an example.
 
 ``` xml
 <configuration>
