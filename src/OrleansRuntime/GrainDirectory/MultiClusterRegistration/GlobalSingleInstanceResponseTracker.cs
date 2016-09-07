@@ -1,107 +1,157 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
+using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 
 namespace Orleans.Runtime.GrainDirectory 
 {
-    /// <summary>
-    /// A class that encapsulates response processing logic.
-    /// It is a promise that fires once it has enough responses to make a determination.
-    /// </summary>
-    internal class GlobalSingleInstanceResponseTracker : TaskCompletionSource<GlobalSingleInstanceResponseTracker.Outcome> {
-
-        public enum Outcome {
+    internal struct GlobalSingleInstanceResponseOutcome
+    {
+        public enum OutcomeState
+        {
             Succeed,
             RemoteOwner,
             RemoteOwnerLikely,
             Inconclusive
         }
 
+        public static readonly GlobalSingleInstanceResponseOutcome Succeed = new GlobalSingleInstanceResponseOutcome(OutcomeState.Succeed, default(AddressAndTag), null);
+
+        public readonly OutcomeState State;
+        public readonly AddressAndTag RemoteOwnerAddress;
+        public readonly string RemoteOwnerCluster;
+        public GlobalSingleInstanceResponseOutcome(OutcomeState state, AddressAndTag remoteOwnerAddress, string remoteOwnerCluster)
+        {
+            this.State = state;
+            this.RemoteOwnerAddress = remoteOwnerAddress;
+            this.RemoteOwnerCluster = remoteOwnerCluster;
+        }
+
+        public override string ToString()
+        {
+            return $"[{this.State} {this.RemoteOwnerAddress.Address}]";
+        }
+    }
+
+    /// <summary>
+    /// A class that encapsulates response processing logic.
+    /// It is a promise that fires once it has enough responses to make a determination.
+    /// </summary>
+    internal class GlobalSingleInstanceResponseTracker
+    {
+        private readonly TaskCompletionSource<GlobalSingleInstanceResponseOutcome> tcs = new TaskCompletionSource<GlobalSingleInstanceResponseOutcome>();
         private readonly GrainId grain;
-        private RemoteClusterActivationResponse[] responses;
+        private readonly Task<RemoteClusterActivationResponse>[] responsePromises;
         private Logger logger;
 
-        public AddressAndTag RemoteOwner;
-        public string RemoteOwnerCluster;
-
-        public GlobalSingleInstanceResponseTracker(RemoteClusterActivationResponse[] responses, GrainId grain, Logger logger)
+        private GlobalSingleInstanceResponseTracker(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grain, Logger logger)
         {
-            this.responses = responses;
+            this.responsePromises = responsePromises;
             this.grain = grain;
             this.logger = logger;
 
             CheckIfDone();
         }
 
-        // for tracing, display outcome
-        public override string ToString()
+        public static GlobalSingleInstanceResponseOutcome GetOutcome(RemoteClusterActivationResponse[] responses, GrainId grainId, Logger logger)
         {
-            if (!this.Task.IsCompleted)
-                return "pending";
-            else if (Task.IsFaulted)
-                return "faulted";
-            else
-            {
-                return string.Format("[{0} {1}]",
-                     Task.Result.ToString(),
-                     (RemoteOwner.Address != null) ? RemoteOwner.Address.ToString() : "");
-            }
+            if (responses.Any(t => t == null)) throw new ArgumentException("All responses should have a value", nameof(responses));
+            return GetOutcome(responses, grainId, logger, hasPendingResponses: false).Value;
         }
+
+        public static Task<GlobalSingleInstanceResponseOutcome> GetOutcomeAsync(Task<RemoteClusterActivationResponse>[] responsePromises, GrainId grain, Logger logger)
+        {
+            if (responsePromises.Any(t => t == null)) throw new ArgumentException("All response promises should have been initiated", nameof(responsePromises));
+            var details = new GlobalSingleInstanceResponseTracker(responsePromises, grain, logger);
+            return details.Task;
+        }
+
+        /// <summary>
+        /// Returns the outcome of the response aggregation
+        /// </summary>
+        private Task<GlobalSingleInstanceResponseOutcome> Task => this.tcs.Task;
 
         /// <summary>
         /// Check responses; signal completion if we have received enough responses to determine outcome.
         /// </summary>
-        public void CheckIfDone()
+        private void CheckIfDone()
         {
-            if (!this.Task.IsCompleted)
+            if (!tcs.Task.IsCompleted)
             {
-                if (responses.All(res => res != null && res.ResponseStatus == ActivationResponseStatus.Pass))
+                // store incomplete promises at this time (as they might be completed by the time the method finishes
+                var incompletePromises = new List<Task<RemoteClusterActivationResponse>>();
+                var completedPromises = new List<RemoteClusterActivationResponse>();
+                foreach (var promise in this.responsePromises)
                 {
-                   // All passed, or no other clusters exist
-                    TrySetResult(Outcome.Succeed);
-                   return;
-                }
-
-                var ownerresponses = responses.Where(
-                        res => (res != null && res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true)).ToList();
-
-                if (ownerresponses.Count > 0)
-                {
-                    if (ownerresponses.Count > 1)
-                        logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occured. Multiple Owner Replies.", grain);
-
-                    RemoteOwner = ownerresponses[0].ExistingActivationAddress;
-                    RemoteOwnerCluster = ownerresponses[0].ClusterId;
-                    TrySetResult(Outcome.RemoteOwner);
-                }
-
-                // are all responses here or have failed?
-                if (responses.All(res => res != null))
-                {
-                    // determine best candidate
-                    var candidates = responses
-                        .Where(res => (res.ResponseStatus == ActivationResponseStatus.Failed && res.ExistingActivationAddress.Address != null))
-                        .ToList();
-
-                    foreach (var res in candidates)
+                    if (promise.IsCompleted)
                     {
-                        if (RemoteOwner.Address == null ||
-                            MultiClusterUtils.ActivationPrecedenceFunc(grain,
-                                res.ClusterId, RemoteOwnerCluster))
-                        {
-                            RemoteOwner = res.ExistingActivationAddress;
-                            RemoteOwnerCluster = res.ClusterId;
-                        }
+                        completedPromises.Add(promise.Result);
                     }
-
-                    if (RemoteOwner.Address != null)
-                        TrySetResult(Outcome.RemoteOwnerLikely);
                     else
-                        TrySetResult(Outcome.Inconclusive);
+                    {
+                        incompletePromises.Add(promise);
+                    }
+                }
+                var outcome = GetOutcome(completedPromises, this.grain, this.logger, incompletePromises.Count > 0);
+                if (outcome.HasValue)
+                {
+                    tcs.TrySetResult(outcome.Value);
+                }
+                else
+                {
+                    // When any of the promises that where incomplete finishes, re-run the check
+                    System.Threading.Tasks.Task.WhenAny(incompletePromises).ContinueWith(t => CheckIfDone());
                 }
             }
+        }
+
+        private static GlobalSingleInstanceResponseOutcome? GetOutcome(ICollection<RemoteClusterActivationResponse> responses, GrainId grainId, Logger logger, bool hasPendingResponses)
+        {
+            if (!hasPendingResponses && responses.All(res => res.ResponseStatus == ActivationResponseStatus.Pass))
+            {
+                // All passed, or no other clusters exist
+                return GlobalSingleInstanceResponseOutcome.Succeed;
+            }
+
+            var ownerResponses = responses
+                .Where(res => res.ResponseStatus == ActivationResponseStatus.Failed && res.Owned == true).ToList();
+
+            if (ownerResponses.Count > 0)
+            {
+                if (ownerResponses.Count > 1)
+                    logger.Warn((int)ErrorCode.GlobalSingleInstance_MultipleOwners, "GSIP:Req {0} Unexpected error occured. Multiple Owner Replies.", grainId);
+
+                return new GlobalSingleInstanceResponseOutcome(OutcomeState.RemoteOwner, ownerResponses[0].ExistingActivationAddress, ownerResponses[0].ClusterId);
+            }
+
+            // are all responses here or have failed?
+            if (!hasPendingResponses)
+            {
+                // determine best candidate
+                var candidates = responses
+                    .Where(res => res.ResponseStatus == ActivationResponseStatus.Failed && res.ExistingActivationAddress.Address != null)
+                    .ToList();
+
+                AddressAndTag remoteOwner = new AddressAndTag();
+                string remoteOwnerCluster = null;
+                foreach (var res in candidates)
+                {
+                    if (remoteOwner.Address == null ||
+                        MultiClusterUtils.ActivationPrecedenceFunc(grainId, res.ClusterId, remoteOwnerCluster))
+                    {
+                        remoteOwner = res.ExistingActivationAddress;
+                        remoteOwnerCluster = res.ClusterId;
+                    }
+                }
+
+                var outcome = remoteOwner.Address != null ? OutcomeState.RemoteOwnerLikely : OutcomeState.Inconclusive;
+                return new GlobalSingleInstanceResponseOutcome(outcome, remoteOwner, remoteOwnerCluster);
+            }
+
+            return null;
         }
     }
 }

@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -250,21 +250,16 @@ namespace Orleans.Runtime.GrainDirectory
                     responses[j] = batchResponses[j][i];
 
                 // response processor
-                var tracker = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
-
-                // since the tracker has all responses already, it is in completed state
-                if (!tracker.Task.IsCompleted)
-                    ProtocolError(address, "assertion error: tracker did not complete");
-
-                var outcome = tracker.Task.Result;
+                var outcomeDetails = GlobalSingleInstanceResponseTracker.GetOutcome(responses, address.Grain, logger);
+                var outcome = outcomeDetails.State;
 
                 if (logger.IsVerbose2)
-                    logger.Verbose2("GSIP:M {0} Result={1}", address.Grain.ToString(), outcome.ToString());
+                    logger.Verbose2("GSIP:M {0} Result={1}", address.Grain, outcomeDetails);
 
                 switch (outcome)
                 {
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwner:
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwnerLikely:
+                    case OutcomeState.RemoteOwner:
+                    case OutcomeState.RemoteOwnerLikely:
                     {
                         // record activations that lost and need to be deactivated
                         List<ActivationAddress> losers;
@@ -272,10 +267,10 @@ namespace Orleans.Runtime.GrainDirectory
                             loser_activations_per_silo[address.Silo] = losers = new List<ActivationAddress>();
                         losers.Add(address);
 
-                        router.DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, tracker.RemoteOwner.Address);
+                        router.DirectoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, outcomeDetails.RemoteOwnerAddress.Address);
                         continue;
                     }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
+                    case OutcomeState.Succeed:
                     {
                         var ok = (router.DirectoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Owned, GrainDirectoryEntryStatus.RequestedOwnership));
                         if (ok)
@@ -283,7 +278,7 @@ namespace Orleans.Runtime.GrainDirectory
                         else
                             break;
                     }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Inconclusive:
+                    case OutcomeState.Inconclusive:
                     {
                         break;
                     }

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.SystemTargetInterfaces;
-using Orleans.Runtime;
+using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponseOutcome.OutcomeState;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -95,29 +95,27 @@ namespace Orleans.Runtime.GrainDirectory
                 if (logger.IsVerbose)
                     logger.Verbose("GSIP:Req {0} Round={1} Act={2}", address.Grain.ToString(), numRetries - retries, myActivation.Address.ToString());
 
-                var responses = SendRequestRound(address, remoteClusters);
-
-                var outcome = await responses.Task;
+                var outcome = await SendRequestRound(address, remoteClusters);
 
                 if (logger.IsVerbose)
-                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, responses);
+                    logger.Verbose("GSIP:End {0} Round={1} Outcome={2}", address.Grain.ToString(), numRetries - retries, outcome);
 
-                switch (outcome)
+                switch (outcome.State)
                 {
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwner:
-                    case GlobalSingleInstanceResponseTracker.Outcome.RemoteOwnerLikely:
+                    case OutcomeState.RemoteOwner:
+                    case OutcomeState.RemoteOwnerLikely:
                         {
-                            directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, responses.RemoteOwner.Address);
-                            return responses.RemoteOwner;
+                            directoryPartition.CacheOrUpdateRemoteClusterRegistration(address.Grain, address.Activation, outcome.RemoteOwnerAddress.Address);
+                            return outcome.RemoteOwnerAddress;
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Succeed:
+                    case OutcomeState.Succeed:
                         {
                             if (directoryPartition.UpdateClusterRegistrationStatus(address.Grain, address.Activation, GrainDirectoryEntryStatus.Owned, GrainDirectoryEntryStatus.RequestedOwnership))
                                 return myActivation;
                             else
                                 break; // concurrently moved to RACE_LOSER
                         }
-                    case GlobalSingleInstanceResponseTracker.Outcome.Inconclusive:
+                    case OutcomeState.Inconclusive:
                         {
                             break;
                         }
@@ -270,28 +268,24 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(tasks);
         }
 
-        public GlobalSingleInstanceResponseTracker SendRequestRound(ActivationAddress address, List<string> remoteClusters)
+        public Task<GlobalSingleInstanceResponseOutcome> SendRequestRound(ActivationAddress address, List<string> remoteClusters)
         {
             // array that holds the responses
-            var responses = new RemoteClusterActivationResponse[remoteClusters.Count];
-
-            // response processor
-            var promise = new GlobalSingleInstanceResponseTracker(responses, address.Grain, logger);
+            var responses = new Task<RemoteClusterActivationResponse>[remoteClusters.Count];
 
             // send all requests
             for (int i = 0; i < responses.Length; i++)
-                SendRequest(address.Grain, remoteClusters[i], responses, i, promise).Ignore(); // exceptions are tracked by the promise
+                responses[i] = SendRequest(address.Grain, remoteClusters[i]);
 
-            return promise;
+            // response processor
+            return GlobalSingleInstanceResponseTracker.GetOutcomeAsync(responses, address.Grain, logger);
         }
 
         /// <summary>
         /// Send GSI protocol request to the given remote cluster
         /// </summary>
         /// <param name="remotecluster"></param>
-        /// <param name="responses"></param>
-        /// <param name="index"></param>
-        public async Task SendRequest(GrainId grain, string remotecluster, RemoteClusterActivationResponse[] responses, int index, GlobalSingleInstanceResponseTracker responseprocessor)
+        public async Task<RemoteClusterActivationResponse> SendRequest(GrainId grain, string remotecluster)
         {
             try
             {
@@ -301,19 +295,15 @@ namespace Orleans.Runtime.GrainDirectory
                 var clusterGrainDir = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IClusterGrainDirectory>(Constants.ClusterDirectoryServiceId, clusterGatewayAddress);
 
                 // try to send request
-                responses[index] = await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);
-
-                responseprocessor.CheckIfDone();
+                return await clusterGrainDir.ProcessActivationRequest(grain, Silo.CurrentSilo.ClusterId, 0);
 
             }
             catch (Exception ex)
             {
-                responses[index] = new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
+                return new RemoteClusterActivationResponse(ActivationResponseStatus.Faulted)
                 {
                     ResponseException = ex
                 };
-
-                responseprocessor.CheckIfDone();
             }
         }
     }
