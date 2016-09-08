@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams

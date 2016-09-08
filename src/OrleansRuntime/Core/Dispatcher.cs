@@ -563,6 +563,7 @@ namespace Orleans.Runtime
         {
             // create the response
             var message = request.CreateResponseMessage();
+            if(!request.DisposeScheduled) request.Dispose();
             message.BodyObject = response;
 
             if (message.TargetGrain.IsSystemTarget)

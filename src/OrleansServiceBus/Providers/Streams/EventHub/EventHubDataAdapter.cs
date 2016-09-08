@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using Microsoft.ServiceBus.Messaging;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers

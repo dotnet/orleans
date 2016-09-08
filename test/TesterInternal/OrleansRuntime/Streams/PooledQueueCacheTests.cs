@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Xunit;

@@ -396,6 +396,7 @@ namespace Orleans.Runtime
                         rejection = new GatewayTooBusyException();
                         break;
                     case Message.RejectionTypes.DuplicateRequest:
+                        message.Dispose();
                         return; // Ignore duplicates
                     
                     default:
@@ -421,6 +422,8 @@ namespace Orleans.Runtime
             {
                 context.TrySetException(response.Exception);
             }
+
+            message.Dispose();
         }
 
         private bool GetUnordered()

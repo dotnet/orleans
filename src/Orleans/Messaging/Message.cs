@@ -9,7 +9,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class Message : IOutgoingMessage
+    internal class Message : PooledResource<Message>, IOutgoingMessage, IDisposable
     {
         // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
         // This means we can't have over byte.MaxValue of them.
@@ -64,7 +64,15 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        private readonly Dictionary<Header, object> headers;
+        public bool DisposeScheduled
+        {
+            get { return _disposeScheduled; }
+            set { _disposeScheduled = value; }
+        }
+
+        [NonSerialized]
+        private bool _disposeScheduled;
+        private Dictionary<Header, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
@@ -81,10 +89,12 @@ namespace Orleans.Runtime
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
         private static readonly Logger logger;
-        
+        private static readonly IObjectPool<Message> globalPool;
+
         static Message()
         {
             logger = LogManager.GetLogger("Message", LoggerType.Runtime);
+            globalPool = new ConcurrentObjectPool<Message>(() => new Message());
         }
 
         public enum Categories
@@ -440,24 +450,15 @@ namespace Orleans.Runtime
             headerBytes = null;
         }
 
-        private Message(Categories type, Directions subtype)
-            : this()
-        {
-            Category = type;
-            Direction = subtype;
-        }
-
         internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            var message = new Message(
-                Categories.Application,
-                (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request)
-            {
-                Id = CorrelationId.GetNext(),
-                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
-                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request
-            };
+            var message = globalPool.Allocate();
+            message.Category = Categories.Application;
+            message.Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Directions.OneWay : Directions.Request;
+            message.Id = CorrelationId.GetNext();
+            message.IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0;
+            message.IsUnordered = (options & InvokeMethodOptions.Unordered) != 0;
+            message.BodyObject = request;
 
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
@@ -472,32 +473,45 @@ namespace Orleans.Runtime
 
         // Initializes body and header but does not take ownership of byte.
         // Caller must clean up bytes
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
+        public static Message CreateMessage(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
-            metadata = new Dictionary<string, object>();
+            var message = globalPool.Allocate();
+            if (message.metadata == null)
+            {
+                message.metadata = new Dictionary<string, object>();
+            }
 
             var input = new BinaryTokenStreamReader(header);
-            headers = SerializationManager.DeserializeMessageHeaders(input);
+            if (message.headers == null)
+            {
+                // 17: see line 440
+                message.headers = new Dictionary<Header, object>(17);
+            }
+
+            SerializationManager.DeserializeMessageHeaders(input, message.headers);
+
             if (deserializeBody)
             {
-                bodyObject = DeserializeBody(body);
+                message.bodyObject = DeserializeBody(body);
             }
             else
             {
-                bodyBytes = body;
+                message.bodyBytes = body;
             }
+
+            return message;
         }
 
         public Message CreateResponseMessage()
         {
-            var response = new Message(this.Category, Directions.Response)
-            {
-                Id = this.Id,
-                IsReadOnly = this.IsReadOnly,
-                IsAlwaysInterleave = this.IsAlwaysInterleave,
-                TargetSilo = this.SendingSilo
-            };
-
+            var response = globalPool.Allocate();
+            response.Category = Category;
+            response.Direction = Directions.Response;
+            response.Id = this.Id;
+            response.IsReadOnly = this.IsReadOnly;
+            response.IsAlwaysInterleave = this.IsAlwaysInterleave;
+            response.TargetSilo = this.SendingSilo;
+          
             if (this.ContainsHeader(Header.SENDING_GRAIN))
             {
                 response.SetHeader(Header.TARGET_GRAIN, this.GetHeader(Header.SENDING_GRAIN));
@@ -555,11 +569,12 @@ namespace Orleans.Runtime
 
         public Message CreatePromptExceptionResponse(Exception exception)
         {
-            return new Message(Category, Directions.Response)
-            {
-                Result = ResponseTypes.Error,
-                BodyObject = Response.ExceptionResponse(exception)
-            };
+            var message = globalPool.Allocate();
+            message.Category = Category;
+            message.Direction = Directions.Response;
+            message.Result = ResponseTypes.Error;
+            message.BodyObject = Response.ExceptionResponse(exception);
+            return message;
         }
 
         public bool ContainsHeader(Header tag)
@@ -880,6 +895,18 @@ namespace Orleans.Runtime
             MessagingStatisticsGroup.OnMessageExpired(phase);
             if (logger.IsVerbose2) logger.Verbose2("Dropping an expired message: {0}", this);
             ReleaseBodyAndHeaderBuffers();
+        }
+
+        public override void OnResetState()
+        {
+            DisposeScheduled = false;
+            headers?.Clear();
+            metadata?.Clear();
+            bodyObject = null;
+            bodyBytes = null;
+            headerBytes = null;
+            targetAddress = null;
+            sendingAddress = null;
         }
     }
 }

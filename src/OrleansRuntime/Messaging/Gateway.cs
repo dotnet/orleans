@@ -429,6 +429,7 @@ namespace Orleans.Runtime.Messaging
                 else
                 {
                     if (Log.IsVerbose3) Log.Verbose3("Sent message {0} to client {1}", msg, client);
+                    if(!msg.DisposeScheduled) msg.Dispose();
                 }
             }
 

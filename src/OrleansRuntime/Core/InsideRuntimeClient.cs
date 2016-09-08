@@ -174,17 +174,22 @@ namespace Orleans.Runtime
 
             if (message.IsExpirableMessage(Config.Globals))
                 message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
-            
+
+            var messageId = message.Id;
             if (!oneWay)
             {
+                message.DisposeScheduled = true;
                 var callbackData = new CallbackData(
                     callback, 
                     TryResendMessage, 
                     context,
                     message,
-                    () => UnRegisterCallback(message.Id),
+                    () =>
+                    {
+                        UnRegisterCallback(messageId);
+                    },
                     Config.Globals);
-                callbacks.TryAdd(message.Id, callbackData);
+                callbacks.TryAdd(messageId, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
             }
 
@@ -270,7 +275,10 @@ namespace Orleans.Runtime
         private void UnRegisterCallback(CorrelationId id)
         {
             CallbackData ignore;
-            callbacks.TryRemove(id, out ignore);
+            if (callbacks.TryRemove(id, out ignore))
+            {
+                ignore.Message.Dispose();
+            }
         }
 
         public void SniffIncomingMessage(Message message)
@@ -387,7 +395,7 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
                 if (message.Direction != Message.Directions.OneWay)
-                    SafeSendExceptionResponse(message, exc2);             
+                    SafeSendExceptionResponse(message, exc2);
             }
         }
 
@@ -556,7 +564,7 @@ namespace Orleans.Runtime
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
-                callbackData.DoCallback(message);
+                callbackData.DoCallback(message); 
             }
             else
             {
