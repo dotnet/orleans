@@ -21,7 +21,7 @@ It was created by [Microsoft Research](http://research.microsoft.com/projects/or
 implementing the [Virtual Actor Model](http://research.microsoft.com/apps/pubs/default.aspx?id=210931) 
 and designed for use in the cloud. 
 
-Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by [343 Industries](https://www.halowaypoint.com/) as a platform for all of Halo 4 and Halo 5 cloud services, as well as by [a number of other projects and companies](http://dotnet.github.io/orleans/Who-Is-Using-Orleans).
+Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by [343 Industries](https://www.halowaypoint.com/) as a platform for all of Halo 4 and Halo 5 cloud services, as well as by [a number of other projects and companies](http://dotnet.github.io/orleans/Community/Who-Is-Using-Orleans.html).
 
 Installation
 ============
