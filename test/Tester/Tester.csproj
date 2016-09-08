@@ -55,6 +55,7 @@
     <Compile Include="PSClientTests\PSClientTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
+    <Compile Include="SiloInitializationTests.cs" />
     <Compile Include="StreamingTests\SQSClientStreamTests.cs" />
     <Compile Include="StreamingTests\SQSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\AQClientStreamTests.cs" />
