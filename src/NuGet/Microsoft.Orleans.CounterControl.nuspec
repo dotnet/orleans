@@ -10,9 +10,16 @@
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
     <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
+      [DEPRECATED]
       Tool for registering performance counters of Microsoft Orleans - OrleansCounterControl.exe.
+      [DEPRECATED]
     </summary>
     <description>
+      [DEPRECATED]
+      This package was deprecated.
+      Please use the package "Microsoft.Orleans.OrleansTelemetryConsumers.Counters" and "OrleansCounterControl.exe" will be under "tools\" directory of it.
+      [DEPRECATED]
+      
       Tool that registers performance counter categories for performance counters published
       by Orleans runtime.
     </description>
