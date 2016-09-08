@@ -48,7 +48,7 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="PerfCounterConfigData.cs" />
-    <Compile Include="PerfCounterTelemetryConsumer.cs" />
+    <Compile Include="OrleansPerfCounterTelemetryConsumer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

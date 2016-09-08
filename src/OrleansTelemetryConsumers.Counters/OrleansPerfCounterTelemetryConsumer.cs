@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace OrleansTelemetryConsumers.Counters
 {
-    public class PerfCounterTelemetryConsumer : IMetricTelemetryConsumer
+    public class OrleansPerfCounterTelemetryConsumer : IMetricTelemetryConsumer
     {
         internal const string CATEGORY_NAME = "OrleansRuntime";
         internal const string CATEGORY_DESCRIPTION = "Orleans Runtime Counters";
@@ -15,50 +15,59 @@ namespace OrleansTelemetryConsumers.Counters
         private const string ExplainHowToCreateOrleansPerfCounters = "Run " + CounterControlProgName + " as Administrator to create perf counters for Orleans.";
 
         private static readonly Logger logger = LogManager.GetLogger("OrleansPerfCounterManager", LoggerType.Runtime);
-        private readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
+        private static readonly List<PerfCounterConfigData> perfCounterData = new List<PerfCounterConfigData>();
+        private static bool isInstalling = false;
+        private readonly Lazy<bool> isInitialized = new Lazy<bool>(() => 
+        {
+            try
+            {
+                perfCounterData.Clear();
 
-        public PerfCounterTelemetryConsumer(bool installMode = false)
+                // (1) Start with list of static counters
+                perfCounterData.AddRange(PerfCounterConfigData.StaticPerfCounters);
+
+                if (GrainTypeManager.Instance != null && GrainTypeManager.Instance.GrainClassTypeData != null)
+                {
+                    // (2) Then search for grain DLLs and pre-create activation counters for any grain types found
+                    var loadedGrainClasses = GrainTypeManager.Instance.GrainClassTypeData;
+                    foreach (var grainClass in loadedGrainClasses)
+                    {
+                        var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainClass.Key);
+                        perfCounterData.Add(new PerfCounterConfigData
+                        {
+                            Name = counterName,
+                            UseDeltaValue = false
+                        });
+                    }
+                }
+
+                if (!isInstalling)
+                {
+                    foreach (var cd in perfCounterData)
+                    {
+                        var perfCounterName = GetPerfCounterName(cd);
+                        cd.PerfCounter = CreatePerfCounter(perfCounterName);
+                    } 
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }, true);
+
+        public OrleansPerfCounterTelemetryConsumer()
         {
             if (!AreWindowsPerfCountersAvailable())
             {
                 logger.Warn(ErrorCode.PerfCounterNotFound, "Windows perf counters not found -- defaulting to in-memory counters. " + ExplainHowToCreateOrleansPerfCounters);
-                return;
-            }
-
-            GetCounterData(installMode);
-
-            foreach (var cd in perfCounterData)
-            {
-                var perfCounterName = GetPerfCounterName(cd);
-                cd.PerfCounter = CreatePerfCounter(perfCounterName);
-            }
+            }            
         }
 
         #region Counter Management methods
-
-        private void GetCounterData(bool installMode)
-        {
-            perfCounterData.Clear();
-
-            // (1) Start with list of static counters
-            perfCounterData.AddRange(PerfCounterConfigData.StaticPerfCounters);
-
-            if (!installMode)
-            {
-                // (2) Then search for grain DLLs and pre-create activation counters for any grain types found
-                var loadedGrainClasses = GrainTypeManager.Instance.GrainClassTypeData;
-                foreach (var grainClass in loadedGrainClasses)
-                {
-                    var counterName = new StatisticName(StatisticNames.GRAIN_COUNTS_PER_GRAIN, grainClass.Key);
-                    perfCounterData.Add(new PerfCounterConfigData
-                    {
-                        Name = counterName,
-                        UseDeltaValue = false
-                    });
-                }
-            }
-        }
-
+        
         public static bool AreWindowsPerfCountersAvailable()
         {
             try
@@ -79,20 +88,19 @@ namespace OrleansTelemetryConsumers.Counters
             return false;
         }
 
-        private PerformanceCounter CreatePerfCounter(string perfCounterName)
+        private static PerformanceCounter CreatePerfCounter(string perfCounterName)
         {
             logger.Verbose(ErrorCode.PerfCounterRegistering, "Creating perf counter {0}", perfCounterName);
             return new PerformanceCounter(CATEGORY_NAME, perfCounterName, false);
         }
 
-        private string GetPerfCounterName(PerfCounterConfigData cd)
+        private static string GetPerfCounterName(PerfCounterConfigData cd)
         {
             return cd.Name.Name + "." + (cd.UseDeltaValue ? "Delta" : "Current");
         }
-
+        
         internal CounterCreationData[] GetCounterCreationData()
         {
-            GetCounterData(false);
             var ctrCreationData = new List<CounterCreationData>();
             foreach (PerfCounterConfigData cd in perfCounterData)
             {
@@ -113,6 +121,14 @@ namespace OrleansTelemetryConsumers.Counters
         /// <remarks>Note: Program needs to be running as Administrator to be able to delete Windows perf counters.</remarks>
         public void InstallCounters()
         {
+            isInstalling = true;
+            if (!isInitialized.Value)
+            {
+                var msg = "Unable to install Windows Performance counters";
+                logger.Warn(ErrorCode.PerfCounterNotFound, msg);
+                throw new InvalidOperationException(msg);
+            }
+
             var collection = new CounterCreationDataCollection();
             collection.AddRange(GetCounterCreationData());
 
@@ -159,23 +175,18 @@ namespace OrleansTelemetryConsumers.Counters
 
         private void WriteMetric(string name, UpdateMode mode = UpdateMode.Increment, double? value = null)
         {
+            if (!isInitialized.Value)
+                return;
+
             PerfCounterConfigData cd = GetCounter(name);
             if (cd == null)
-            {
-                if (logger.IsVerbose) logger.Verbose(ErrorCode.PerfCounterNotFound, "No perf counter found for {0}", name);
                 return;
-            }
 
             StatisticName statsName = cd.Name;
             string perfCounterName = GetPerfCounterName(cd);
 
             try
             {
-                if (cd.PerfCounter == null)
-                {
-                    if (logger.IsVerbose) logger.Verbose(ErrorCode.PerfCounterUnableToConnect, "No perf counter found for {0}", name);
-                    cd.PerfCounter = CreatePerfCounter(perfCounterName);
-                }
                 
                 if (logger.IsVerbose3) logger.Verbose3(ErrorCode.PerfCounterWriting, "Writing perf counter {0}", perfCounterName);
 

@@ -24,7 +24,7 @@ namespace Orleans.Counter.Control
         public bool IsRunningAsAdministrator { get; private set; }
         public bool PauseAtEnd { get; private set; }
 
-        private static PerfCounterTelemetryConsumer perfCounterConsumer;
+        private static OrleansPerfCounterTelemetryConsumer perfCounterConsumer;
 
         public CounterControl()
         {
@@ -32,7 +32,7 @@ namespace Orleans.Counter.Control
             var userIdent = WindowsIdentity.GetCurrent();
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
-            perfCounterConsumer = new PerfCounterTelemetryConsumer(true);
+            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer();
         }
 
         public void PrintUsage()
@@ -162,7 +162,7 @@ namespace Orleans.Counter.Control
         {
             try
             {
-                if (PerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
+                if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
                 {
                     if (!useBruteForce)
                     {
@@ -183,7 +183,7 @@ namespace Orleans.Counter.Control
                 // Register perf counters
                 perfCounterConsumer.InstallCounters();
 
-                if (PerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
+                if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
                     ConsoleText.WriteStatus("Orleans counters registered successfully");
                 else
                     ConsoleText.WriteError("Orleans counters are NOT registered");
@@ -202,7 +202,7 @@ namespace Orleans.Counter.Control
         /// <remarks>Note: Program needs to be running as Administrator to be able to unregister Windows perf counters.</remarks>
         private static void UnregisterWindowsPerfCounters(bool useBruteForce)
         {
-            if (!PerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
+            if (!OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
             {
                 ConsoleText.WriteStatus("Orleans counters are already unregistered");
                 return;

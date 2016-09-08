@@ -21,9 +21,9 @@ namespace OrleansTelemetryConsumers.Counters
             {
                 using (var myPerformanceCounterInstaller = new PerformanceCounterInstaller())
                 {
-                    myPerformanceCounterInstaller.CategoryName = PerfCounterTelemetryConsumer.CATEGORY_NAME;
+                    myPerformanceCounterInstaller.CategoryName = OrleansPerfCounterTelemetryConsumer.CATEGORY_NAME;
                     myPerformanceCounterInstaller.CategoryType = PerformanceCounterCategoryType.MultiInstance;
-                    var consumer = new PerfCounterTelemetryConsumer();
+                    var consumer = new OrleansPerfCounterTelemetryConsumer();
                     myPerformanceCounterInstaller.Counters.AddRange(consumer.GetCounterCreationData());
                     Installers.Add(myPerformanceCounterInstaller);
                 }
