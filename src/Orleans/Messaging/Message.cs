@@ -282,7 +282,7 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-           return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
+            return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
         }
 
         public string DebugContext
@@ -312,14 +312,14 @@ namespace Orleans.Runtime
         // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
         public bool MayResend(IMessagingConfiguration config)
         {
-           return ResendCount < config.MaxResendCount;
+            return ResendCount < config.MaxResendCount;
         }
 
         // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing
         // (got here due to outdated cache, silo is shutting down/overloaded, ...).
         public bool MayForward(GlobalConfiguration config)
         {
-           return ForwardCount < config.MaxForwardCount;
+            return ForwardCount < config.MaxForwardCount;
         }
 
         /// <summary>
@@ -365,7 +365,7 @@ namespace Orleans.Runtime
             {
                 if (bodyObject != null)
                 {
-                   return bodyObject;
+                    return bodyObject;
                 }
                 try
                 {
@@ -379,7 +379,7 @@ namespace Orleans.Runtime
                         bodyBytes = null;
                     }
                 }
-               return bodyObject;
+                return bodyObject;
             }
             set
             {
@@ -395,12 +395,12 @@ namespace Orleans.Runtime
         {
             if (bytes == null)
             {
-               return null;
+                return null;
             }
             try
             {
                 var stream = new BinaryTokenStreamReader(bytes);
-               return SerializationManager.Deserialize(stream);
+                return SerializationManager.Deserialize(stream);
             }
             catch (Exception ex)
             {
@@ -443,7 +443,7 @@ namespace Orleans.Runtime
             {
                 message.RequestContextData = contextData;
             }
-           return message;
+            return message;
         }
 
         // Initializes body and header but does not take ownership of byte.
@@ -509,7 +509,7 @@ namespace Orleans.Runtime
                 response.RequestContextData = contextData;
             }
 
-           return response;
+            return response;
         }
 
         public Message CreateRejectionResponse(RejectionTypes type, string info, OrleansException ex = null)
@@ -520,12 +520,12 @@ namespace Orleans.Runtime
             response.RejectionInfo = info;
             response.BodyObject = ex;
             if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
-           return response;
+            return response;
         }
 
         public Message CreatePromptExceptionResponse(Exception exception)
         {
-           return new Message(Category, Directions.Response)
+            return new Message(Category, Directions.Response)
             {
                 Result = ResponseTypes.Error,
                 BodyObject = Response.ExceptionResponse(exception)
@@ -539,7 +539,7 @@ namespace Orleans.Runtime
 
         private static string GetNotNullString(string s)
         {
-           return s ?? string.Empty;
+            return s ?? string.Empty;
         }
 
         /// <summary>
@@ -549,7 +549,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public bool IsDuplicate(Message other)
         {
-           return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
+            return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
 
         #region Serialization
@@ -557,7 +557,7 @@ namespace Orleans.Runtime
         public List<ArraySegment<byte>> Serialize(out int headerLength)
         {
             int dummy;
-           return Serialize_Impl(out headerLength, out dummy);
+            return Serialize_Impl(out headerLength, out dummy);
         }
 
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
@@ -600,7 +600,7 @@ namespace Orleans.Runtime
 
             headerLengthOut = headerLength;
             bodyLengthOut = bodyLength;
-           return bytes;
+            return bytes;
         }
 
 
@@ -665,7 +665,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
-           return sb.ToString();
+            return sb.ToString();
         }
         
         private void AppendIfExists(HeadersContainer.Headers header, StringBuilder sb, Func<Message, object> valueProvider)
@@ -697,7 +697,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-           return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
@@ -745,13 +745,13 @@ namespace Orleans.Runtime
             {
                 history.Append("    ").Append(TargetHistory);
             }
-           return history.ToString();
+            return history.ToString();
         }
 
         public bool IsSameDestination(IOutgoingMessage other)
         {
             var msg = (Message)other;
-           return msg != null && Object.Equals(TargetSilo, msg.TargetSilo);
+            return msg != null && Object.Equals(TargetSilo, msg.TargetSilo);
         }
 
         // For statistical measuring of time spent in queues.
@@ -1119,7 +1119,7 @@ namespace Orleans.Runtime
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
-               return headers;
+                return headers;
             }
 
             static HeadersContainer()
@@ -1131,7 +1131,7 @@ namespace Orleans.Runtime
             [Orleans.CodeGeneration.CopierMethodAttribute]
             public static System.Object DeepCopier(System.Object original)
             {
-               return original;
+                return original;
             }
 
             [Orleans.CodeGeneration.SerializerMethodAttribute]
@@ -1348,12 +1348,12 @@ namespace Orleans.Runtime
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                     result.TargetSilo = stream.ReadSiloAddress();
 
-               return (HeadersContainer)result;
+                return (HeadersContainer)result;
             }
 
             private static bool ReadBool(BinaryTokenStreamReader stream)
             {
-               return stream.ReadByte() == (byte) SerializationTokenType.True;
+                return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
             private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
@@ -1365,7 +1365,7 @@ namespace Orleans.Runtime
             private static object ReadObj(Type t, BinaryTokenStreamReader stream)
             {
                 var des = SerializationManager.GetDeserializer(t);
-               return des.Invoke(t, stream);
+                return des.Invoke(t, stream);
             }
 
             public static void Register()
