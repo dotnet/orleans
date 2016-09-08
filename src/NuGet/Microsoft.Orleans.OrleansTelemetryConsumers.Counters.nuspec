@@ -28,5 +28,11 @@
     <file src="$SRC_DIR$OrleansTelemetryConsumers.Counters\**\*.cs" target="src" />
     <file src="OrleansCounterControl.exe" target="tools" />
     <file src="OrleansCounterControl.exe.config" target="tools" />
+    <file src="Orleans.dll" target="tools" />
+    <file src="Orleans.pdb" target="tools" />
+    <file src="OrleansRuntime.dll" target="tools" />
+    <file src="OrleansRuntime.pdb" target="tools" />
+    <file src="OrleansTelemetryConsumers.Counters.dll" target="tools" />
+    <file src="OrleansTelemetryConsumers.Counters.pdb" target="tools" />
   </files>
 </package>
