@@ -23,10 +23,10 @@
   </metadata>
   <files>
     <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net451" />    
-    <file src="OrleansTelemetryConsumers.Counter.XML" target="lib\net451" />
-    <file src="OrleansTelemetryConsumers.Counter.dll" target="lib\net451" />
-    <file src="OrleansTelemetryConsumers.Counter.pdb" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.Counters.XML" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.Counters.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansTelemetryConsumers.Counters\**\*.cs" target="src" />
     <file src="OrleansCounterControl.exe" target="tools" />
+    <file src="OrleansCounterControl.exe.config" target="tools" />
   </files>
 </package>

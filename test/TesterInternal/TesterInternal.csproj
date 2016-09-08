@@ -260,10 +260,6 @@
       <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
       <Name>OrleansSQLUtils</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj">
-      <Project>{69f40a37-4a2f-44d4-a994-cc165c12fb91}</Project>
-      <Name>OrleansTelemetryConsumers.Counters</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
       <Name>OrleansTestingHost</Name>
