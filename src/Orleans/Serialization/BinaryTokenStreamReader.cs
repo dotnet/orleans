@@ -270,6 +270,12 @@ namespace Orleans.Serialization
             return new decimal(raw);
         }
 
+        public DateTime ReadDateTime()
+        {
+            var n = ReadLong();
+            return n == 0 ? default(DateTime) : DateTime.FromBinary(n);
+        }
+
         /// <summary> Read an <c>string</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public string ReadString()

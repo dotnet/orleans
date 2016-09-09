@@ -243,7 +243,7 @@ namespace Orleans.Runtime
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
             if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
-            message.SetMetadata(Message.Metadata.TARGET_HISTORY, message.GetTargetHistory());
+            message.TargetHistory = message.GetTargetHistory();
 
             if (message.TargetGrain.IsSystemTarget)
             {
@@ -252,13 +252,14 @@ namespace Orleans.Runtime
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.RemoveHeader(Message.Header.IS_NEW_PLACEMENT);
+                message.IsNewPlacement = false;
                 dispatcher.Transport.SendMessage(message);
             }
             else
             {
-                message.RemoveHeader(Message.Header.TARGET_ACTIVATION);
-                message.RemoveHeader(Message.Header.TARGET_SILO);
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
                 dispatcher.SendMessage(message);
             }
         }
@@ -277,11 +278,11 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                if (message.CacheInvalidationHeader != null)
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address, message.ReturnedFromRemoteCluster);
+                        directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
    
@@ -535,7 +536,7 @@ namespace Orleans.Runtime
                     case Message.RejectionTypes.Unrecoverable:
                     // fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (!message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                        if (message.CacheInvalidationHeader == null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 

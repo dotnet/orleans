@@ -662,13 +662,15 @@ namespace Orleans
             if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
 
             message.ResendCount = message.ResendCount + 1;
-            message.SetMetadata(Message.Metadata.TARGET_HISTORY, message.GetTargetHistory());
+            message.TargetHistory = message.GetTargetHistory();
             
             if (!message.TargetGrain.IsSystemTarget)
             {
-                message.RemoveHeader(Message.Header.TARGET_ACTIVATION);
-                message.RemoveHeader(Message.Header.TARGET_SILO);
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
             }
+
             transport.SendMessage(message);
             return true;
         }

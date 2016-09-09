@@ -83,7 +83,7 @@ namespace Orleans.Runtime
                 Task ignore;
                 ActivationData target = catalog.GetOrCreateActivation(
                     message.TargetAddress, 
-                    message.IsNewPlacement, 
+                    message.IsNewPlacement,
                     message.NewGrainType,
                     String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
@@ -463,7 +463,7 @@ namespace Orleans.Runtime
                     && message.TargetSilo != message.SendingSilo
                     && !Silo.CurrentSilo.LocalGrainDirectory.IsSiloInCluster(message.SendingSilo))
                 {
-                    message.ReturnedFromRemoteCluster = true; // marks message to force invalidation of stale directory entry
+                    message.IsReturnedFromRemoteCluster = true; // marks message to force invalidation of stale directory entry
                     forwardingAddress = ActivationAddress.NewActivationAddress(message.SendingSilo, message.TargetGrain);
                     logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster,
                         String.Format("Forwarding back to origin cluster, to fictional activation {0}", message));

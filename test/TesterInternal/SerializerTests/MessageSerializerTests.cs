@@ -41,9 +41,7 @@ namespace UnitTests.SerializerTests
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
             resp.SendingGrain = GrainId.NewId();
             resp.TargetGrain = GrainId.NewId();
-            resp.SetHeader(Message.Header.ALWAYS_INTERLEAVE, true);
-            resp.SetHeader(Message.Header.CACHE_INVALIDATION_HEADER, "TestBar");
-            //resp.SetStringBody("This is test data");
+            resp.IsAlwaysInterleave = true;
 
             List<object> requestBody = new List<object>();
             for (int k = 0; k < numItems; k++)
@@ -83,12 +81,14 @@ namespace UnitTests.SerializerTests
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
-            Assert.Equal<Message.Categories>(resp.Category, resp1.Category); //Category is incorrect"
-            Assert.Equal<Message.Directions>(resp.Direction, resp1.Direction); //Direction is incorrect
-            Assert.Equal<CorrelationId>(resp.Id, resp1.Id); //Correlation ID is incorrect
-            Assert.Equal<bool>((bool)resp.GetHeader(Message.Header.ALWAYS_INTERLEAVE), (bool)resp1.GetHeader(Message.Header.ALWAYS_INTERLEAVE)); //Foo Boolean is incorrect
-            Assert.Equal<string>((string)resp.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER), (string)resp1.GetHeader(Message.Header.CACHE_INVALIDATION_HEADER)); //Bar string is incorrect
-            Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo)); //TargetSilo is incorrect
+            Assert.Equal(resp.Category, resp1.Category); //Category is incorrect"
+            Assert.Equal(resp.Direction, resp1.Direction); //Direction is incorrect
+            Assert.Equal(resp.Id, resp1.Id); //Correlation ID is incorrect
+            Assert.Equal(resp.IsAlwaysInterleave, resp1.IsAlwaysInterleave); //Foo Boolean is incorrect
+            Assert.Equal(resp.CacheInvalidationHeader, resp1.CacheInvalidationHeader); //Bar string is incorrect
+            Assert.True(resp.TargetSilo.Equals(resp1.TargetSilo));
+            Assert.True(resp.TargetGrain.Equals(resp1.TargetGrain));
+            Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
             List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
