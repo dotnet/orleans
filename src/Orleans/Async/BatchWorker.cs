@@ -60,7 +60,7 @@ namespace Orleans
         private void CheckForMoreWork()
         {
             TaskCompletionSource<Task> signal = null;
-            Task task_to_signal = null; ;
+            Task taskToSignal = null;
 
             lock (this)
             {
@@ -77,7 +77,7 @@ namespace Orleans
                     Start();
 
                     // the current cycle is what we need to signal
-                    task_to_signal = currentWorkCycle;
+                    taskToSignal = currentWorkCycle;
                 }
                 else
                 {
@@ -86,8 +86,7 @@ namespace Orleans
             }
 
             // to be safe, must do the signalling out here so it is not under the lock
-            if (signal != null)
-                signal.SetResult(task_to_signal);
+            signal?.SetResult(taskToSignal);
         }
 
         /// <summary>
