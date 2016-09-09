@@ -179,7 +179,7 @@ namespace OrleansTelemetryConsumers.Counters
                 return;
 
             PerfCounterConfigData cd = GetCounter(name);
-            if (cd == null)
+            if (cd == null || cd.PerfCounter == null)
                 return;
 
             StatisticName statsName = cd.Name;
