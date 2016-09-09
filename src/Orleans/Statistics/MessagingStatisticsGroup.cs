@@ -168,6 +168,7 @@ namespace Orleans.Runtime
         {
             MessagesSentTotal.IncrementBy(numMsgsInBatch);
             MessagesSentPerDirection[(int)direction].IncrementBy(numMsgsInBatch);
+
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
@@ -246,7 +247,7 @@ namespace Orleans.Runtime
 
         internal static void OnFailedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (FailedSentMessages[direction] == null)
             {
@@ -258,7 +259,7 @@ namespace Orleans.Runtime
 
         internal static void OnDroppedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (DroppedSentMessages[direction] == null)
             {
@@ -270,7 +271,7 @@ namespace Orleans.Runtime
 
         internal static void OnRejectedMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(Message.Header.DIRECTION)) return;
+            if (msg == null || !msg.HasDirection) return;
             int direction = (int)msg.Direction;
             if (RejectedMessages[direction] == null)
             {
