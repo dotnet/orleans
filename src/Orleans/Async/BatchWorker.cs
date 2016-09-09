@@ -59,7 +59,8 @@ namespace Orleans
         // on the same task scheduler
         private void CheckForMoreWork()
         {
-            Action signalThunk = null;
+            TaskCompletionSource<Task> signal = null;
+            Task task_to_signal = null; ;
 
             lock (this)
             {
@@ -69,15 +70,14 @@ namespace Orleans
 
                     // see if someone created a promise for waiting for the next work cycle
                     // if so, take it and remove it
-                    var x = this.nextWorkCyclePromise;
+                    signal = this.nextWorkCyclePromise;
                     this.nextWorkCyclePromise = null;
 
                     // start the next work cycle
                     Start();
 
-                    // if someone is waiting, signal them
-                    if (x != null)
-                        signalThunk = () => { x.SetResult(currentWorkCycle); };
+                    // the current cycle is what we need to signal
+                    task_to_signal = currentWorkCycle;
                 }
                 else
                 {
@@ -86,8 +86,8 @@ namespace Orleans
             }
 
             // to be safe, must do the signalling out here so it is not under the lock
-            if (signalThunk != null)
-                signalThunk();
+            if (signal != null)
+                signal.SetResult(task_to_signal);
         }
 
         /// <summary>
