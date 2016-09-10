@@ -9,6 +9,7 @@ namespace Orleans.CodeGenerator
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
+
     using Orleans;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
@@ -51,7 +52,7 @@ namespace Orleans.CodeGenerator
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static byte[] CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
@@ -87,9 +88,12 @@ namespace Orleans.CodeGenerator
                     .AddSyntaxTrees(code.SyntaxTree)
                     .AddReferences(assemblies)
                     .WithOptions(options);
-            using (var stream = new MemoryStream())
+
+            var outputStream = new MemoryStream();
+            var symbolStream = RuntimeVersion.IsDebugBuild ? new MemoryStream() : null;
+            try
             {
-                var compilationResult = compilation.Emit(stream);
+                var compilationResult = compilation.Emit(outputStream, symbolStream);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
@@ -102,9 +106,21 @@ namespace Orleans.CodeGenerator
                         source);
                     throw new CodeGenerationException(errors);
                 }
-                
-                logger.Verbose(ErrorCode.CodeGenCompilationSucceeded, "Compilation of assembly {0} succeeded.", assemblyName);
-                return stream.ToArray();
+
+                logger.Verbose(
+                    ErrorCode.CodeGenCompilationSucceeded,
+                    "Compilation of assembly {0} succeeded.",
+                    assemblyName);
+                return new GeneratedAssembly
+                {
+                    RawBytes = outputStream.ToArray(),
+                    DebugSymbolRawBytes = symbolStream?.ToArray()
+                };
+            }
+            finally
+            {
+                outputStream.Dispose();
+                symbolStream?.Dispose();
             }
         }
 

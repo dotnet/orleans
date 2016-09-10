@@ -16,8 +16,7 @@ namespace Orleans.Runtime
             {
                 Assembly thisProg = typeof(RuntimeVersion).GetTypeInfo().Assembly;
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
-                bool isDebug = IsAssemblyDebugBuild(thisProg);
-                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
+                string productVersion = progVersionInfo.ProductVersion + (IsDebugBuild ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
                 return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
             }
         }
@@ -59,6 +58,18 @@ namespace Orleans.Runtime
                 Assembly thisProg = Assembly.GetEntryAssembly() ?? typeof(RuntimeVersion).GetTypeInfo().Assembly;
                 AssemblyName progInfo = thisProg.GetName();
                 return progInfo.Name;
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether or not this is a debug build.
+        /// </summary>
+        public static bool IsDebugBuild
+        {
+            get
+            {
+                var thisProg = Assembly.GetEntryAssembly() ?? typeof(RuntimeVersion).GetTypeInfo().Assembly;
+                return IsAssemblyDebugBuild(thisProg);
             }
         }
 

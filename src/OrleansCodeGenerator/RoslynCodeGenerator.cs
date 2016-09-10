@@ -22,8 +22,8 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The compiled assemblies.
         /// </summary>
-        private static readonly ConcurrentDictionary<string, GeneratedAssembly> CompiledAssemblies =
-            new ConcurrentDictionary<string, GeneratedAssembly>();
+        private static readonly ConcurrentDictionary<string, CachedAssembly> CompiledAssemblies =
+            new ConcurrentDictionary<string, CachedAssembly>();
 
         /// <summary>
         /// The logger.
@@ -64,9 +64,9 @@ namespace Orleans.CodeGenerator
         /// <param name="generatedAssembly">
         /// The generated assembly.
         /// </param>
-        public void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly)
+        public void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly)
         {
-            CompiledAssemblies.TryAdd(targetAssemblyName, new GeneratedAssembly { RawBytes = generatedAssembly });
+            CompiledAssemblies.TryAdd(targetAssemblyName, new CachedAssembly(generatedAssembly));
         }
 
         /// <summary>
@@ -107,15 +107,18 @@ namespace Orleans.CodeGenerator
                 // Generate code for newly loaded assemblies.
                 var generatedSyntax = GenerateForAssemblies(grainAssemblies, true);
 
-                var compiled = default(byte[]);
+                CachedAssembly generatedAssembly;
                 if (generatedSyntax.Syntax != null)
                 {
-                    compiled = CompileAndLoad(generatedSyntax);
+                    generatedAssembly = CompileAndLoad(generatedSyntax);
+                }
+                else
+                {
+                    generatedAssembly = new CachedAssembly { Loaded = true };
                 }
 
                 foreach (var assembly in generatedSyntax.SourceAssemblies)
                 {
-                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
                     CompiledAssemblies.AddOrUpdate(
                         assembly.GetName().FullName,
                         generatedAssembly,
@@ -162,15 +165,18 @@ namespace Orleans.CodeGenerator
                 var timer = Stopwatch.StartNew();
                 var generated = GenerateForAssemblies(new List<Assembly> { input }, true);
 
-                var compiled = default(byte[]);
+                CachedAssembly generatedAssembly;
                 if (generated.Syntax != null)
                 {
-                    compiled = CompileAndLoad(generated);
+                    generatedAssembly = CompileAndLoad(generated);
+                }
+                else
+                {
+                    generatedAssembly = new CachedAssembly { Loaded = true };
                 }
 
                 foreach (var assembly in generated.SourceAssemblies)
                 {
-                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
                     CompiledAssemblies.AddOrUpdate(
                         assembly.GetName().FullName,
                         generatedAssembly,
@@ -224,9 +230,9 @@ namespace Orleans.CodeGenerator
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
         /// </summary>
         /// <returns>The collection of generated assemblies.</returns>
-        public IDictionary<string, byte[]> GetGeneratedAssemblies()
+        public IDictionary<string, GeneratedAssembly> GetGeneratedAssemblies()
         {
-            return CompiledAssemblies.ToDictionary(_ => _.Key, _ => _.Value.RawBytes);
+            return CompiledAssemblies.ToDictionary(_ => _.Key, _ => (GeneratedAssembly)_.Value);
         }
 
         /// <summary>
@@ -237,7 +243,7 @@ namespace Orleans.CodeGenerator
         /// </param>
         private static void TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
         {
-            GeneratedAssembly cached;
+            CachedAssembly cached;
             if (!CompiledAssemblies.TryGetValue(targetAssembly.GetName().FullName, out cached)
                 || cached.RawBytes == null || cached.Loaded)
             {
@@ -245,7 +251,7 @@ namespace Orleans.CodeGenerator
             }
 
             // Load the assembly and mark it as being loaded.
-            Assembly.Load(cached.RawBytes);
+            Assembly.Load(cached.RawBytes, cached.DebugSymbolRawBytes);
             cached.Loaded = true;
         }
 
@@ -254,11 +260,14 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="generatedSyntax">The syntax tree.</param>
         /// <returns>The compilation output.</returns>
-        private static byte[] CompileAndLoad(GeneratedSyntax generatedSyntax)
+        private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax)
         {
-            var rawAssembly = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen");
-            Assembly.Load(rawAssembly);
-            return rawAssembly;
+            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen");
+            Assembly.Load(generated.RawBytes, generated.DebugSymbolRawBytes);
+            return new CachedAssembly(generated)
+            {
+                Loaded = true
+            };
         }
 
         /// <summary>
@@ -546,24 +555,24 @@ namespace Orleans.CodeGenerator
             var targets = input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>();
             foreach (var target in targets)
             {
-                CompiledAssemblies.TryAdd(target.AssemblyName, new GeneratedAssembly { Loaded = true });
+                CompiledAssemblies.TryAdd(target.AssemblyName, new CachedAssembly { Loaded = true });
             }
         }
 
-        /// <summary>
-        /// Represents a generated assembly.
-        /// </summary>
-        private class GeneratedAssembly
+        private class CachedAssembly : GeneratedAssembly
         {
+            public CachedAssembly()
+            {
+            }
+
+            public CachedAssembly(GeneratedAssembly generated) : base(generated)
+            {
+            }
+
             /// <summary>
             /// Gets or sets a value indicating whether or not the assembly has been loaded.
             /// </summary>
             public bool Loaded { get; set; }
-
-            /// <summary>
-            /// Gets or sets a serialized representation of the assembly.
-            /// </summary>
-            public byte[] RawBytes { get; set; }
         }
     }
 }
