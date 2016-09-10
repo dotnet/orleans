@@ -11,7 +11,7 @@ namespace Orleans.Serialization
     /// </summary>
     public class ProtobufSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, object> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, object>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, MessageParser>();
 
         private Logger logger;
 
@@ -42,7 +42,7 @@ namespace Orleans.Serialization
                     }
 
                     var parser = prop.GetValue(null, null);
-                    Parsers.TryAdd(itemType.TypeHandle, parser);
+                    Parsers.TryAdd(itemType.TypeHandle, parser as MessageParser);
                 }
                 return true;
             }
@@ -126,7 +126,7 @@ namespace Orleans.Serialization
             }
 
             var typeHandle = expectedType.TypeHandle;
-            object parser = null;
+            MessageParser parser = null;
             if (!Parsers.TryGetValue(typeHandle, out parser))
             {
                 throw new ArgumentException("No parser found for the expected type " + expectedType, "expectedType");
@@ -140,8 +140,7 @@ namespace Orleans.Serialization
             }
             byte[] data = reader.ReadBytes(length);
 
-            dynamic dynamicParser = parser;
-            object message = dynamicParser.ParseFrom(data);
+            object message = parser.ParseFrom(data);
 
             return message;
         }
