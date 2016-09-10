@@ -893,6 +893,32 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Returns the <see cref="PropertyInfo"/> for the simple member access in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the property.
+        /// </typeparam>
+        /// <typeparam name="TResult">
+        /// The return type of the property.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="PropertyInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static PropertyInfo Property<T, TResult>(Expression<Func<T, TResult>> expression)
+        {
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member as PropertyInfo;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
         /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.
         /// </summary>
         /// <typeparam name="T">
@@ -966,6 +992,26 @@ namespace Orleans.Runtime
         /// <param name="expression">The expression.</param>
         /// <returns>The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.</returns>
         public static MethodInfo Method<T>(Expression<Action<T>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>
+        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MethodInfo Method(Expression<Action> expression)
         {
             var methodCall = expression.Body as MethodCallExpression;
             if (methodCall != null)

@@ -1021,40 +1021,6 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Func()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Func();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Predicate();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate_Class()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Predicate_Class();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate_Class_Param()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-
-            IMyPredicate pred = new MyPredicate(42);
-            await grain.Test_Serialize_Predicate_Class_Param(pred);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public void Serialize_GrainState_DeepCopy()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.

@@ -40,7 +40,7 @@ namespace Tester.CodeGenTests
 
             // Test abstract class serialization.
             var input = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
-            input.Classes = new List<SomeAbstractClass>
+            input.Classes = new SomeAbstractClass[]
             {
                 input,
                 new AnotherConcreteClass
@@ -49,25 +49,19 @@ namespace Tester.CodeGenTests
                     Interfaces = new List<ISomeInterface> { input }
                 }
             };
-
-            // Set fields which should not be serialized.
-#pragma warning disable 618
-            input.ObsoleteInt = 38;
-#pragma warning restore 618
-
+            input.SetObsoleteInt(38);
+            input.Enum = SomeAbstractClass.SomeEnum.SomethingElse;
             input.NonSerializedInt = 39;
 
             var output = await grain.RoundTripClass(input);
 
             Assert.Equal(input.Int, output.Int);
+            Assert.Equal(input.Enum, output.Enum);
             Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.Equal(input.Classes.Count, output.Classes.Count);
+            Assert.Equal(input.Classes.Length, output.Classes.Length);
             Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
             Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
-
-#pragma warning disable 618
-            Assert.Equal(input.ObsoleteInt, output.ObsoleteInt);
-#pragma warning restore 618
+            Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
             
             Assert.Equal(0, output.NonSerializedInt);
 
@@ -76,12 +70,10 @@ namespace Tester.CodeGenTests
             output = await grain.GetState();
             Assert.Equal(input.Int, output.Int);
             Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.Equal(input.Classes.Count, output.Classes.Count);
+            Assert.Equal(input.Classes.Length, output.Classes.Length);
             Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
             Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
-#pragma warning disable 618
-            Assert.Equal(input.ObsoleteInt, output.ObsoleteInt);
-#pragma warning restore 618
+            Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
             Assert.Equal(0, output.NonSerializedInt);
 
             // Test interface serialization.

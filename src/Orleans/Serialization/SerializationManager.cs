@@ -138,7 +138,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, IExternalSerializer fallback = null)
         {
             try
             {
@@ -146,10 +146,7 @@ namespace Orleans.Serialization
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
                 AssemblyProcessor.Initialize();
-#if !NETSTANDARD_TODO
-                 //blocked by Cannot use binary formatter as fallback serializer while running on .Net Core
-                fallbackSerializer = GetFallbackSerializer();
-#endif
+                fallbackSerializer = fallback ?? GetFallbackSerializer();
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -157,14 +154,10 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static void Initialize(List<TypeInfo> serializationProviders)
+        internal static void Initialize(List<TypeInfo> serializationProviders, IExternalSerializer fallback = null)
         {
             RegisterBuiltInSerializers();
-#if NETSTANDARD
-            logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
-                "Cann't use binary formatter as fallback serializer while running on .Net Core, will use Json.Net instead");
-#endif
-            fallbackSerializer = GetFallbackSerializer();
+            fallbackSerializer = fallback ?? GetFallbackSerializer();
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -1060,7 +1053,7 @@ namespace Orleans.Serialization
 
             }
 
-            if (t.GetTypeInfo().IsSerializable)
+            if (fallbackSerializer.IsSupportedType(t))
                 return FallbackSerializationDeepCopy(original);
 
             throw new OrleansException("No copier found for object of type " + t.OrleansTypeName() + 
@@ -1188,14 +1181,7 @@ namespace Orleans.Serialization
             if (typeInfo.IsArray)
             {
                 var et = t.GetElementType();
-                if (HasOrleansSerialization(et))
-                {
-                    SerializeArray((Array)obj, stream, expected, et);
-                }
-                else
-                {
-                    FallbackSerializer(obj, stream, et);
-                }
+                SerializeArray((Array)obj, stream, expected, et);
                 return;
             }
 
@@ -1215,13 +1201,13 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (typeInfo.IsSerializable)
+            if (fallbackSerializer.IsSupportedType(t))
             {
-                FallbackSerializer(obj, stream, t);
+                FallbackSerializer(obj, stream, expected);
                 return;
             }
 
-            if ((obj is Exception) && !typeInfo.IsSerializable)
+            if (obj is Exception && !fallbackSerializer.IsSupportedType(t))
             {
                 // Exceptions should always be serializable, and thus handled by the prior if.
                 // In case someone creates a non-serializable exception, though, we don't want to 
@@ -1232,7 +1218,7 @@ namespace Orleans.Serialization
                 var foo = new Exception(String.Format("Non-serializable exception of type {0}: {1}" + Environment.NewLine + "at {2}",
                                                       t.OrleansTypeName(), rawException.Message,
                                                       rawException.StackTrace));
-                FallbackSerializer(foo, stream, t);
+                FallbackSerializer(foo, stream, expected);
                 return;
             }
 
@@ -1550,7 +1536,7 @@ namespace Orleans.Serialization
                 }
                 if (token == SerializationTokenType.Fallback)
                 {
-                    var fallbackResult = FallbackDeserializer(stream);
+                    var fallbackResult = FallbackDeserializer(stream, expected);
                     DeserializationContext.Current.RecordObject(fallbackResult);
                     return fallbackResult;
                 }
@@ -1893,7 +1879,7 @@ namespace Orleans.Serialization
             }
         }
 
-        private static object FallbackDeserializer(BinaryTokenStreamReader stream)
+        private static object FallbackDeserializer(BinaryTokenStreamReader stream, Type expectedType)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1902,7 +1888,7 @@ namespace Orleans.Serialization
                 timer.Start();
                 FallbackDeserializations.Increment();
             }
-            var retVal = fallbackSerializer.Deserialize(null, stream);
+            var retVal = fallbackSerializer.Deserialize(expectedType, stream);
             if (timer != null)
             {
                 timer.Stop();
@@ -1915,12 +1901,12 @@ namespace Orleans.Serialization
         private static IExternalSerializer GetFallbackSerializer()
         {
 #if NETSTANDARD
-            throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
+            var serializer = new IlBasedFallbackSerializer();
 #else
             var serializer = new BinaryFormatterSerializer();
+#endif
             serializer.Initialize(logger);
             return serializer;
-#endif
         }
 
 #if !NETSTANDARD_TODO

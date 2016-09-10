@@ -589,6 +589,27 @@
     <Compile Include="..\..\..\src\Orleans\Serialization\TypeUtilities.cs">
       <Link>Serialization\TypeUtilities.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedFallbackSerializer.cs">
+      <Link>Serialization\IlBasedFallbackSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializerGenerator.cs">
+      <Link>Serialization\IlBasedSerializerGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializers.cs">
+      <Link>Serialization\IlBasedSerializers.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializerTypeChecker.cs">
+      <Link>Serialization\IlBasedSerializerTypeChecker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlCodeGenerationException.cs">
+      <Link>Serialization\IlCodeGenerationException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IlDelegateBuilder.cs">
+      <Link>Serialization\IlDelegateBuilder.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ReflectedSerializationMethodInfo.cs">
+      <Link>Serialization\ReflectedSerializationMethodInfo.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\Orleans\Statistics\ApplicationRequestsStatisticsGroup.cs">
       <Link>Statistics\ApplicationRequestsStatisticsGroup.cs</Link>
     </Compile>

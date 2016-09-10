@@ -21,6 +21,8 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Serialization
 {
+    using System.Reflection;
+
     using TestGrainInterfaces;
 
     /// <summary>
@@ -33,20 +35,40 @@ namespace UnitTests.Serialization
         public enum SerializerToUse
         {
             Default,
+            BinaryFormatterFallbackSerializer,
+            IlBasedFallbackSerializer,
         }
+
+        public static object[] Serializers =
+        {
+            new object[] { SerializerToUse.Default },
+#if !NETSTANDARD_TODO
+            new object[] { SerializerToUse.BinaryFormatterFallbackSerializer },
+#endif
+            new object[] { SerializerToUse.IlBasedFallbackSerializer }
+        };
 
         private void InitializeSerializer(SerializerToUse serializerToUse)
         {
-            List<System.Reflection.TypeInfo> serializationProviders = null;
+            List<TypeInfo> serializationProviders = null;
+            IExternalSerializer fallback = null;
             switch (serializerToUse)
             {
-                case SerializerToUse.Default:            
+                case SerializerToUse.Default:
                     break;
+                case SerializerToUse.IlBasedFallbackSerializer:
+                    fallback = new IlBasedFallbackSerializer();
+                    break;
+#if !NETSTANDARD_TODO
+                case SerializerToUse.BinaryFormatterFallbackSerializer:
+                    fallback = new BinaryFormatterSerializer();
+                    break;
+#endif
                 default:
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }
 
-            SerializationManager.Initialize(serializationProviders);
+            SerializationManager.Initialize(serializationProviders, fallback);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
@@ -57,7 +79,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -76,7 +98,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_EmptyList(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -90,7 +112,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_BasicDictionaries(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -107,9 +129,9 @@ namespace UnitTests.Serialization
             deserialized = OrleansSerializationLoop(source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
         }
-        
+
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ReadOnlyDictionary(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -158,7 +180,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_DictionaryWithComparer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -241,7 +263,7 @@ namespace UnitTests.Serialization
         }*/
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_SortedDictionaryWithComparer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -254,7 +276,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_SortedListWithComparer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -267,7 +289,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_HashSetWithComparer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -288,7 +310,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_Stack(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -311,7 +333,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_SortedSetWithComparer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -332,7 +354,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_Array(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -355,7 +377,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ArrayOfArrays(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -420,21 +442,21 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ArrayOfArrayOfArrays(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
 
-            var source1 = new[] {new[] {1, 3, 5}, new[] {10, 20, 30}, new[] {17, 13, 11, 7, 5, 3, 2}};
+            var source1 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 }, new[] { 17, 13, 11, 7, 5, 3, 2 } };
             var source2 = new[] { new[] { 1, 3 }, new[] { 10, 20 }, new[] { 17, 13, 11, 7, 5 } };
             var source3 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 } };
-            var source = new[] {source1, source2, source3};
+            var source = new[] { source1, source2, source3 };
             object deserialized = OrleansSerializationLoop(source);
             ValidateArrayOfArrayOfArrays(source, deserialized, "int");
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ReadOnlyCollection(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -448,7 +470,7 @@ namespace UnitTests.Serialization
         public class UnserializableException : Exception
         {
             public UnserializableException(string message) : base(message)
-            {}
+            { }
 
             [CopierMethod]
             static private object Copy(object input)
@@ -457,30 +479,50 @@ namespace UnitTests.Serialization
             }
         }
 
+#if !NETSTANDARD_TODO // On .NET Standard, the IL-based fallback serializer is used, so this is expected to fail (because serialization succeeds).
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.Default)]
+        [InlineData(SerializerToUse.BinaryFormatterFallbackSerializer)]
         public void Serialize_UnserializableException(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
+            const string Message = "This is a test message";
 
-            const string message = "This is a test message";
             // throw the exception so that stack trace is populated
-            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(message); }));
+            Exception source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(Message); }));
             object deserialized = OrleansSerializationLoop(source);
             var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
             var expectedMessage = "Non-serializable exception of type " +
-                                  typeof(UnserializableException).OrleansTypeName() + ": " + message;
+                                    typeof(UnserializableException).OrleansTypeName() + ": " + Message;
             Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
+        }
+#endif
+
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+#if NETSTANDARD_TODO // On .NET Standard, the IL-based fallback serializer is used, so this is expected to pass.
+        [InlineData(SerializerToUse.Default)]
+#endif
+        [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
+        public void Serialize_UnserializableException_IlFallback(SerializerToUse serializerToUse)
+        {
+            InitializeSerializer(serializerToUse);
+            const string Message = "This is a test message";
+
+            // throw the exception so that stack trace is populated
+            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(Message); }));
+            object deserialized = OrleansSerializationLoop(source);
+            var result = Assert.IsAssignableFrom<UnserializableException>(deserialized);
+            Assert.Contains(Message, result.Message);
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ObjectIdentity(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
-            var val = new List<string> {"first", "second"};
+            var val = new List<string> { "first", "second" };
 
-            var val2 = new List<string> {"first", "second"};
+            var val2 = new List<string> { "first", "second" };
 
             var source = new Dictionary<string, List<string>>();
             source["one"] = val;
@@ -516,7 +558,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_Unrecognized(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -543,7 +585,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_Immutable(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -569,7 +611,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_Uri_Multithreaded(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -627,7 +669,7 @@ namespace UnitTests.Serialization
         //}
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_GrainReference(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -643,7 +685,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -657,23 +699,10 @@ namespace UnitTests.Serialization
             Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
+        
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
-        public void Serialize_GrainBase(SerializerToUse serializerToUse)
-        {
-            InitializeSerializer(serializerToUse);
-            Grain input = new EchoTaskGrain();
-
-            // Expected exception:
-            // OrleansException: No copier found for object of type EchoTaskGrain. Perhaps you need to mark it [Serializable]?
-            var exc = Assert.Throws<OrleansException>(() => OrleansSerializationLoop(input));
-
-            Assert.Contains("No copier found for object of type", exc.Message);
-        }
-
-        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_GrainBase_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -686,183 +715,9 @@ namespace UnitTests.Serialization
 
             Assert.Contains("is not marked as serializable", exc.Message);
         }
-
-        private static int staticFilterValue1 = 41;
-        private static int staticFilterValue2 = 42;
-        private static int staticFilterValue3 = 43;
-        private static int staticFilterValue4 = 44;
-
+        
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
-        // [InlineData(SerializerToUse.Fallback)] // there's no ability to serialize expressions with Json.Net serializer yet.
-        public void Serialize_Func(SerializerToUse serializerToUse)
-        {
-            InitializeSerializer(serializerToUse);
-            int instanceFilterValue2 = staticFilterValue2;
-
-            Func<int, bool> staticFilterFunc = i => i == staticFilterValue3;
-            Func<int, bool> instanceFilterFunc = i => i == instanceFilterValue2;
-
-            var serCls = new FuncClass_Serializable();
-            Func<int, bool> instanceFuncInSerializableClass = serCls.PredFunc;
-            Func<int, bool> staticFuncInSerializableClass = FuncClass_Serializable.StaticPredFunc;
-            var nonSerCls = new FuncClass_NotSerializable();
-            Func<int, bool> instanceFuncInNonSerializableClass = nonSerCls.PredFunc;
-            Func<int, bool> staticFuncInNonSerializableClass = FuncClass_NotSerializable.StaticPredFunc;
-
-            // Works OK
-            TestSerializeFuncPtr("Func Lambda - Static field", staticFilterFunc);
-            TestSerializeFuncPtr("Static Func In Non Serializable Class", staticFuncInNonSerializableClass);
-            TestSerializeFuncPtr("Static Func In Serializable Class", staticFuncInSerializableClass);
-            TestSerializeFuncPtr("Func In Serializable Class", instanceFuncInSerializableClass);
-
-            // Fails
-            try
-            {
-                TestSerializeFuncPtr("Func In Non Serializable Class", instanceFuncInNonSerializableClass);
-            }
-            catch (SerializationException exc)
-            {
-                output.WriteLine(exc);
-            }
-            try
-            {
-                TestSerializeFuncPtr("Func Lambda - Instance field", instanceFilterFunc);
-            }
-            catch (SerializationException exc)
-            {
-                output.WriteLine(exc);
-            }
-        }
-
-        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
-        // [InlineData(SerializerToUse.Fallback)] // there's no ability to serialize expressions with Json.Net serializer yet.
-        public void Serialize_Predicate(SerializerToUse serializerToUse)
-        {
-            InitializeSerializer(serializerToUse);
-            int instanceFilterValue2 = staticFilterValue2;
-
-            Predicate<int> staticPredicate = i => i == staticFilterValue2;
-            Predicate<int> instancePredicate = i => i == instanceFilterValue2;
-            
-            // Works OK
-            TestSerializePredicate("Predicate Lambda - Static field", staticPredicate);
-
-            // Fails
-            try
-            {
-                TestSerializePredicate("Predicate Lambda - Instance field", instancePredicate);
-            }
-            catch (SerializationException exc)
-            {
-                output.WriteLine(exc);
-            }
-        }
-
-        //private static int staticNum;
-
-        //[Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        //public void Serialize_Expression()
-        //{
-        //    int instanceFilterValue4 = staticFilterValue4;
-        //    int instanceNum = 0;
-
-        //    Expression staticExpression = Expression.Condition(
-        //        Expression.Constant(staticNum == staticFilterValue4),
-        //        Expression.Constant(true),
-        //        Expression.Constant(false),
-        //        typeof(bool));
-        //    Expression instanceExpression = Expression.Condition(
-        //        Expression.Constant(instanceNum == instanceFilterValue4),
-        //        Expression.Constant(true),
-        //        Expression.Constant(false),
-        //        typeof(bool));
-
-        //    LambdaExpression staticExpressionLambda = Expression.Lambda<Func<bool>>(staticExpression);
-        //    LambdaExpression instanceExpressionLambda = Expression.Lambda<Func<bool>>(instanceExpression);
-
-        //    TestExpression(Expression.Lambda(typeof(bool), staticNum == staticFilterValue4));
-
-        //    // Works OK
-        //    TestSerializeExpression("Expression - Static fields", staticExpression);
-        //    TestSerializeExpression("Expression - Static Lambda", staticExpressionLambda);
-
-        //    // Fails
-        //    TestSerializeExpression("Expression - Instance fields", instanceExpression);
-        //    TestSerializeExpression("Expression - Instance Lambda", instanceExpressionLambda);
-        //}
-
-        //private void TestExpression(Expression expr)
-        //{
-        //}
-
-        //private void TestSerializeExpression(string what, Expression expr1)
-        //{
-        //    object obj2 = OrleansSerializationLoop(expr1);
-        //    var expr2 = (Expression) obj2;
-
-        //    foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
-        //    {
-        //        output.WriteLine("{0} -- Compare value={1}", what, val);
-        //        Assert.Equal(Expression..ev expr1(), expr1(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val);
-        //    }
-        //}
-
-        private void TestSerializeFuncPtr(string what, Func<int, bool> func1)
-        {
-            object obj2 = OrleansSerializationLoop(func1);
-            Func<int, bool> func2 = (Func<int, bool>) obj2;
-
-            foreach (int val in new[] {staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4})
-            {
-                output.WriteLine("{0} -- Compare value={1}", what, val);
-                Assert.Equal(func1(val), func2(val));  //"{0} -- Wrong function after round-trip of {1} with value={2}", what, func1, val
-            }
-        }
-
-        private void TestSerializePredicate(string what, Predicate<int> pred1)
-        {
-            object obj2 = OrleansSerializationLoop(pred1);
-            Predicate<int> pred2 = (Predicate<int>) obj2;
-
-            foreach (int val in new[] { staticFilterValue1, staticFilterValue2, staticFilterValue3, staticFilterValue4 })
-            {
-                output.WriteLine("{0} -- Compare value={1}", what, val);
-                Assert.Equal(pred1(val), pred2(val));  //"{0} -- Wrong predicate after round-trip of {1} with value={2}", what, pred1, val
-            }
-        }
-
-        [Serializable]
-        internal class FuncClass_Serializable
-        {
-            public bool PredFunc(int i)
-            {
-                return i == staticFilterValue2;
-            }
-
-            public static bool StaticPredFunc(int i)
-            {
-                return i == staticFilterValue2;
-            }
-        }
-
-        internal class FuncClass_NotSerializable
-        {
-            public bool PredFunc(int i)
-            {
-                return i == staticFilterValue2;
-            }
-
-            public static bool StaticPredFunc(int i)
-            {
-                int filterValue2 = 42;
-                return i == filterValue2;
-            }
-        }
-
-        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -926,7 +781,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void SerializationTests_IsOrleansShallowCopyable(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -954,7 +809,7 @@ namespace UnitTests.Serialization
             public int AnotherValueType;
         }
 
-        private object OrleansSerializationLoop(object input, bool includeWire = true)
+        internal static object OrleansSerializationLoop(object input, bool includeWire = true)
         {
             var copy = SerializationManager.DeepCopy(input);
             if (includeWire)
@@ -1060,7 +915,7 @@ namespace UnitTests.Serialization
 
         private void ValidateArray<T>(T[] expected, object deserialized, string type)
         {
-            var result = Assert.IsAssignableFrom<T[]> (deserialized);
+            var result = Assert.IsAssignableFrom<T[]>(deserialized);
             Assert.Equal(expected.Length, result.Length);  //Length is wrong after round-trip of " + type + " array"
             for (int i = 0; i < expected.Length; i++)
             {
@@ -1089,7 +944,7 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
-        [InlineData(SerializerToUse.Default)]
+        [MemberData(nameof(Serializers))]
         public void Serialize_CircularReference(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
@@ -1100,11 +955,11 @@ namespace UnitTests.Serialization
 
             var deserialized = (CircularTest1)OrleansSerializationLoop(c1);
             Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Equal(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
 
             deserialized = (CircularTest1)OrleansSerializationLoop(c1, true);
             Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
-            Assert.Equal(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
+            Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
         }
     }
 }
