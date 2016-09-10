@@ -63,6 +63,7 @@
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
     <Compile Include="RemindersTest\PostgreSqlRemindersTableTests.cs" />
+    <Compile Include="Serialization\IlBasedSerializerTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
