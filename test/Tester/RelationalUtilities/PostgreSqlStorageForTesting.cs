@@ -37,19 +37,10 @@ namespace Tester.RelationalUtilities
         {
             get
             {
-                return @"SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = '{0}'
-  AND pid <> pg_backend_pid();
-DROP DATABASE ""{0}"";";
+                return @"DROP DATABASE ""{0}"";";
             }
         }
-
-//        protected override Task DropDatabaseAsync(string databaseName)
-//        {
-//            var storage = RelationalStorage.CreateInstance(AdoNetInvariants.InvariantNamePostgreSql, DefaultConnectionString);
-//            return storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
-//        }
+        
 
         protected override string ExistsDatabaseTemplate
         {
