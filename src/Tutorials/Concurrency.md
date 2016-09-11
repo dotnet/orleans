@@ -124,7 +124,7 @@ Messages are simply data passed from one actor to another, we just created the `
 In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn't work well with concurrency, and definitely not with distribution.
 
 When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain.
-This prohibits the mutation of state from one grain to another, one of the main tenants in the actor model is that state shouldn't be shared, and message passing is the only mechanism for exchanging data.
+This prohibits the mutation of state from one grain to another, one of the main tenets in the actor model is that state shouldn't be shared, and message passing is the only mechanism for exchanging data.
 
 When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.
 
