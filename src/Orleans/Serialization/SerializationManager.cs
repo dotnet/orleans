@@ -1760,7 +1760,7 @@ namespace Orleans.Serialization
 
 #region Special case code for message headers
 
-        internal static void SerializeMessageHeaders(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
+        internal static void SerializeMessageHeaders(Message.HeadersContainer headers, BinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1768,80 +1768,19 @@ namespace Orleans.Serialization
                 timer = new Stopwatch();
                 timer.Start();
             }
-            SerializeMessageHeaderDictHelper(headers, stream);
+
+            var ser = GetSerializer(typeof(Message.HeadersContainer));
+            ser(headers, stream, typeof(Message.HeadersContainer));
 
             if (timer != null)
             {
                 timer.Stop();
                 HeaderSers.Increment();
-                HeaderSersNumHeaders.IncrementBy(headers.Count);
                 HeaderSerTime.IncrementBy(timer.ElapsedTicks);
             }
         }
 
-        private static void SerializeMessageHeaderDictHelper(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
-        {
-            stream.Write(SerializationTokenType.StringObjDict);
-            stream.Write(headers.Count);
-            foreach (var header in headers)
-            {
-                stream.Write((byte)header.Key);
-                SerializeMessageHeaderValueHelper(header.Value, stream);
-            }
-        }
-
-        private static void SerializeMessageHeaderListHelper(List<object> list, BinaryTokenStreamWriter stream)
-        {
-            stream.Write(SerializationTokenType.ObjList);
-            stream.Write(list.Count);
-            foreach (var item in list)
-                SerializeMessageHeaderValueHelper(item, stream);
-        }
-
-        private static void SerializeMessageHeaderValueHelper(object value, BinaryTokenStreamWriter stream)
-        {
-            if (value == null)
-            {
-                stream.WriteNull();
-                return;
-            }
-
-            if (value is Enum)
-            {
-                // Within message headers, enums get serialized as integers, and get re-cast in the code
-                stream.Write(SerializationTokenType.Int);
-                stream.Write(Convert.ToInt32(value));
-                return;
-            }
-
-            if (stream.TryWriteSimpleObject(value))
-                return;
-
-            if (value is Dictionary<Message.Header, object>)
-            {
-                SerializeMessageHeaderDictHelper((Dictionary<Message.Header, object>)value, stream);
-                return;
-            }
-
-            if (value is List<object>)
-            {
-                SerializeMessageHeaderListHelper((List<object>)value, stream);
-                return;
-            }
-
-            var t = value.GetType();
-            var ser = GetSerializer(t);
-            if (ser != null)
-            {
-                stream.WriteTypeHeader(t);
-                ser(value, stream, null);
-                return;
-            }
-
-            throw new ArgumentException("Invalid message header passed to SerializeMessageHeaders; type is " + value.GetType().Name, "value");
-        }
-
-        internal static Dictionary<Message.Header, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
+        internal static Message.HeadersContainer DeserializeMessageHeaders(BinaryTokenStreamReader stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1849,81 +1788,20 @@ namespace Orleans.Serialization
                 timer = new Stopwatch();
                 timer.Start();
             }
-            var token = stream.ReadToken();
-            if (token != SerializationTokenType.StringObjDict)
-            {
-                if (token == SerializationTokenType.SpecifiedType)
-                {
-                    Type t = null;
-                    try
-                    {
-                        t = stream.ReadSpecifiedTypeHeader();
-                    }
-                    catch (Exception) { }
 
-                    if(t != null)
-                        throw new SerializationException(String.Format("Introductory token for message headers is incorrect: token = {0}, SpecifiedTypeHeader = {1} ", token, t));
-                }
-                throw new SerializationException(String.Format("Introductory token for message headers is incorrect: {0}", token));
-            }
-            var result = DeserializeMessageHeaderDictHelper(stream);
+             var des = GetDeserializer(typeof(Message.HeadersContainer));
+             var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), stream);
 
             if (timer != null)
             {
                 timer.Stop();
                 HeaderDesers.Increment();
-                HeaderDesersNumHeaders.IncrementBy(result.Count);
                 HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
             }
-            return result;
+
+            return headers;
         }
-
-        private static Dictionary<Message.Header, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
-        {
-            var count = stream.ReadInt();
-            var result = new Dictionary<Message.Header, object>(count);
-            for (var i = 0; i < count; i++)
-            {
-                var key = stream.ReadByte();
-                result.Add((Message.Header)key, DeserializeMessageHeaderHelper(stream));
-            }
-            return result;
-        }
-
-        private static List<object> DeserializeMessageHeaderListHelper(BinaryTokenStreamReader stream)
-        {
-            var count = stream.ReadInt();
-            var result = new List<object>(count);
-            for (var i = 0; i < count; i++)
-                result.Add(DeserializeMessageHeaderHelper(stream));
-
-            return result;
-        }
-
-
-        private static object DeserializeMessageHeaderHelper(BinaryTokenStreamReader stream)
-        {
-            object result;
-            SerializationTokenType token;
-            if (stream.TryReadSimpleType(out result, out token))
-                return result;
-
-            if (token == SerializationTokenType.ObjList)
-                return DeserializeMessageHeaderListHelper(stream);
-
-            if (token == SerializationTokenType.StringObjDict)
-                return DeserializeMessageHeaderDictHelper(stream);
-
-            if (token == SerializationTokenType.SpecifiedType)
-            {
-                var t = stream.ReadSpecifiedTypeHeader();
-                var des = GetDeserializer(t);
-                if (des != null)
-                    return des(t, stream);
-            }
-            throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
-        }
-
+        
         private static bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
             // essentially a no-op if there are no external serializers registered

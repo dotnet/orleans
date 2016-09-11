@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
-            if (!msg.ContainsHeader(Message.Header.SENDING_SILO))
+            if (msg.SendingSilo == null)
                 msg.SendingSilo = messageCenter.MyAddress;
             
 
@@ -145,7 +145,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 msg.ReleaseBodyAndHeaderBuffers();
-                if (Log.IsVerbose3) Log.Verbose3("Sending queue delay time for: {0} is {1}", msg, DateTime.UtcNow.Subtract((DateTime)msg.GetMetadata(OutboundMessageQueue.QUEUED_TIME_METADATA)));
+                if (Log.IsVerbose3) Log.Verbose3("Sending queue delay time for: {0} is {1}", msg, DateTime.UtcNow.Subtract(msg.QueuedTime ?? DateTime.UtcNow));
             }
         }
 
@@ -170,16 +170,16 @@ namespace Orleans.Runtime.Messaging
             if (msg == null) return;
 
             int maxRetries = DEFAULT_MAX_RETRIES;
-            if (msg.ContainsMetadata(Message.Metadata.MAX_RETRIES))
-                maxRetries = (int)msg.GetMetadata(Message.Metadata.MAX_RETRIES);
+            if (msg.MaxRetries.HasValue)
+                maxRetries = msg.MaxRetries.Value;
             
             int retryCount = 0;
-            if (msg.ContainsMetadata(RETRY_COUNT_TAG))
-                retryCount = (int)msg.GetMetadata(RETRY_COUNT_TAG);
+            if (msg.RetryCount.HasValue)
+                retryCount = msg.RetryCount.Value;
             
             if (retryCount < maxRetries)
             {
-                msg.SetMetadata(RETRY_COUNT_TAG, retryCount + 1);
+                msg.RetryCount = retryCount + 1;
                 messageCenter.OutboundQueue.SendMessage(msg);
             }
             else
