@@ -377,6 +377,14 @@ namespace UnitTests.Serialization
             var source2 = new string[] { "hello", "goodbye", "yes", "no", "", "I don't know" };
             deserialized = OrleansSerializationLoop(source2);
             ValidateArray<string>(source2, deserialized, "string");
+
+            var source3 = new sbyte[] { 1, 3, 5 };
+            deserialized = OrleansSerializationLoop(source3);
+            ValidateArray<sbyte>(source3, deserialized, "sbyte");
+
+            var source4 = new byte[] { 1, 3, 5 };
+            deserialized = OrleansSerializationLoop(source4);
+            ValidateArray<byte>(source4, deserialized, "byte");
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

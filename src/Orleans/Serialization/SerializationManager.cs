@@ -124,6 +124,7 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle charTypeHandle = typeof(char).TypeHandle;
         private static readonly RuntimeTypeHandle boolTypeHandle = typeof(bool).TypeHandle;
         private static readonly RuntimeTypeHandle objectTypeHandle = typeof(object).TypeHandle;
+        private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
 
         internal static CounterStatistic Copies;
         internal static CounterStatistic Serializations;
@@ -999,7 +1000,7 @@ namespace Orleans.Serialization
                     return originalArray;
                 }
                 // A common special case
-                if ((original is byte[]) && (originalArray.Rank == 1))
+                if (t.TypeHandle.Equals(byteArrayTypeHandle) && (originalArray.Rank == 1))
                 {
                     var source = (byte[])original;
                     if (source.Length > LARGE_OBJECT_LIMIT)
@@ -1264,6 +1265,14 @@ namespace Orleans.Serialization
                     stream.Write(SerializationTokenType.ByteArray);
                     stream.Write(array.Length);
                     stream.Write((byte[])array);
+                    return;
+                }
+                if (et.TypeHandle.Equals(sbyteTypeHandle))
+                {
+                    stream.Write(SerializationTokenType.SpecifiedType);
+                    stream.Write(SerializationTokenType.SByteArray);
+                    stream.Write(array.Length);
+                    stream.Write((sbyte[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(boolTypeHandle))

@@ -877,6 +877,8 @@ namespace Orleans.Serialization
                     return typeof(char[]);
                 case SerializationTokenType.BoolArray:
                     return typeof(bool[]);
+                case SerializationTokenType.SByteArray:
+                    return typeof(sbyte[]);
                 case SerializationTokenType.NamedType:
                     var typeName = ReadString();
                     try
