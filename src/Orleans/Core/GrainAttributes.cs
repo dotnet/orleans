@@ -171,6 +171,17 @@ namespace Orleans
                 base(ActivationCountBasedPlacement.Singleton)
             { }
         }
+
+        /// <summary>
+        /// Marks a grain class as using the <c>ConsistentPartitionPlacement</c> policy.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+        public sealed class ConsistentPartitionPlacementAttribute : PlacementAttribute
+        {
+            public ConsistentPartitionPlacementAttribute() :
+                base(ConsistentPartitionPlacement.Singleton)
+            { }
+        }
     }
 
     namespace CodeGeneration

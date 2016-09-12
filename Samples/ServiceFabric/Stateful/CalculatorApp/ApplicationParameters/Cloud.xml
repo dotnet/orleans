@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Application xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="fabric:/CalculatorApp" xmlns="http://schemas.microsoft.com/2011/01/fabric">
+  <Parameters>
+    <Parameter Name="StatefulCalculatorService_PartitionCount" Value="1" />
+    <Parameter Name="StatefulCalculatorService_MinReplicaSetSize" Value="3" />
+    <Parameter Name="StatefulCalculatorService_TargetReplicaSetSize" Value="3" />
+  </Parameters>
+</Application>

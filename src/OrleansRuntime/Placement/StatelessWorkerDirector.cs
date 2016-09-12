@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class StatelessWorkerDirector : PlacementDirector
+    internal class StatelessWorkerDirector : PlacementDirector, IPlacementDirector<StatelessWorkerPlacement>
     {
         private static readonly SafeRandom random = new SafeRandom();
 
-        internal override Task<PlacementResult> OnSelectActivation(
+        public override Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementContext context)
         {
             if (target.IsClient)
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Placement
             return Task.FromResult((PlacementResult)null);
         }
 
-        internal override Task<PlacementResult> OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
+        public override Task<PlacementResult> OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             var grainType = context.GetGrainTypeName(grain);
             return Task.FromResult(

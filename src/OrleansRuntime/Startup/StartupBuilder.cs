@@ -2,24 +2,38 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Runtime.Startup
 {
+    using Orleans.Runtime.Configuration;
+
     /// <summary>
     /// Configure dependency injection at startup
     /// </summary>
     internal class StartupBuilder
     {
-        internal static IServiceProvider ConfigureStartup(string startupTypeName, out bool usingCustomServiceProvider)
+        internal static IServiceProvider ConfigureStartup(NodeConfiguration config, Action<IServiceCollection> configureServices, out bool usingCustomServiceProvider)
         {
-            usingCustomServiceProvider = false;
-            IServiceCollection serviceCollection = new ServiceCollection();
+            if (config.ServiceProviderBuilder != null)
+            {
+                if (!string.IsNullOrWhiteSpace(config.StartupTypeName))
+                {
+                    throw new ArgumentException($"Only one of {nameof(config.ServiceProviderBuilder)} and {nameof(config.StartupTypeName)} may be specified.");
+                }
+
+                return ConfigureStartup(out usingCustomServiceProvider, configureServices, config.ServiceProviderBuilder);
+            }
+
+            return ConfigureStartup(config.StartupTypeName, configureServices, out usingCustomServiceProvider);
+        }
+
+        private static IServiceProvider ConfigureStartup(string startupTypeName, Action<IServiceCollection> configureServices, out bool usingCustomServiceProvider)
+        {
+            var hasValidServiceBuilderMethod = false;
             ConfigureServicesBuilder servicesMethod = null;
             Type startupType = null;
 
-            if (!String.IsNullOrWhiteSpace(startupTypeName))
+            if (!string.IsNullOrWhiteSpace(startupTypeName))
             {
                 startupType = Type.GetType(startupTypeName);
                 if (startupType == null)
@@ -30,30 +44,33 @@ namespace Orleans.Runtime.Startup
                 servicesMethod = FindConfigureServicesDelegate(startupType);
                 if (servicesMethod != null && !servicesMethod.MethodInfo.IsStatic)
                 {
-                    usingCustomServiceProvider = true;
+                    hasValidServiceBuilderMethod = true;
                 }
             }
-
-            RegisterSystemTypes(serviceCollection);
-
-            if (usingCustomServiceProvider)
+            Func<IServiceCollection, IServiceProvider> serviceProviderBuilder = null;
+            if (hasValidServiceBuilderMethod)
             {
                 var instance = Activator.CreateInstance(startupType);
-                return servicesMethod.Build(instance, serviceCollection);
+                serviceProviderBuilder = serviceCollection => servicesMethod.Build(instance, serviceCollection);
+            }
+
+            return ConfigureStartup(out usingCustomServiceProvider, configureServices, serviceProviderBuilder);
+        }
+
+        private static IServiceProvider ConfigureStartup(out bool usingCustomServiceProvider, Action<IServiceCollection> configureServices, Func<IServiceCollection, IServiceProvider> serviceProviderBuilder)
+        {
+            usingCustomServiceProvider = false;
+            IServiceCollection serviceCollection = new ServiceCollection();
+            
+            configureServices(serviceCollection);
+
+            if (serviceProviderBuilder != null)
+            {
+                return serviceProviderBuilder(serviceCollection);
             }
 
             return serviceCollection.BuildServiceProvider();
         }
-
-        private static void RegisterSystemTypes(IServiceCollection serviceCollection)
-        {
-            // Register the system classes and grains in this method.
-            // Note: this method will probably have to be moved out into the Silo class to include internal runtime types.
-
-            serviceCollection.AddTransient<GrainBasedMembershipTable>();
-            serviceCollection.AddTransient<GrainBasedReminderTable>();
-        }
-
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)
         {
             var servicesMethod = FindMethod(startupType, "ConfigureServices", typeof(IServiceProvider), false);
