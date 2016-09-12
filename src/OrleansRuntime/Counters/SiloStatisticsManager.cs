@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Counters
     {
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private PerfCountersStatistics perfCountersPublisher;
+        private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
         private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Counters
             runtimeStats = new RuntimeStatisticsGroup();
             logStatistics = new LogStatistics(nodeConfig.StatisticsLogWriteInterval, true);
             MetricsTable = new SiloPerformanceMetrics(runtimeStats, nodeConfig);
-            perfCountersPublisher = new PerfCountersStatistics(nodeConfig.StatisticsPerfCountersWriteInterval);
+            countersPublisher = new CountersStatistics(nodeConfig.StatisticsPerfCountersWriteInterval);
         }
 
         internal async Task SetSiloMetricsTableDataManager(Silo silo, NodeConfiguration nodeConfig)
@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Counters
 
         internal void Start(NodeConfiguration config)
         {
-            perfCountersPublisher.Start();
+            countersPublisher.Start();
             logStatistics.Start();
             runtimeStats.Start();
             // Start performance metrics publisher
@@ -129,9 +129,9 @@ namespace Orleans.Runtime.Counters
             if (MetricsTable != null)
                 MetricsTable.Dispose();
             MetricsTable = null;
-            if (perfCountersPublisher != null)
-                perfCountersPublisher.Stop();
-            perfCountersPublisher = null;
+            if (countersPublisher != null)
+                countersPublisher.Stop();
+            countersPublisher = null;
             if (logStatistics != null)
             {
                 logStatistics.Stop();

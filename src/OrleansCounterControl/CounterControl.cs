@@ -5,13 +5,14 @@ using System.Reflection;
 using System.Security.Principal;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Counters;
 
 
 namespace Orleans.Counter.Control
 {
     using System.Collections.Generic;
     using Orleans.Serialization;
+    using OrleansTelemetryConsumers.Counters;
+
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>
@@ -23,12 +24,15 @@ namespace Orleans.Counter.Control
         public bool IsRunningAsAdministrator { get; private set; }
         public bool PauseAtEnd { get; private set; }
 
+        private static OrleansPerfCounterTelemetryConsumer perfCounterConsumer;
+
         public CounterControl()
         {
             // Check user is Administrator and has granted UAC elevation permission to run this app
             var userIdent = WindowsIdentity.GetCurrent();
             var userPrincipal = new WindowsPrincipal(userIdent);
             IsRunningAsAdministrator = userPrincipal.IsInRole(WindowsBuiltInRole.Administrator);
+            perfCounterConsumer = new OrleansPerfCounterTelemetryConsumer();
         }
 
         public void PrintUsage()
@@ -158,7 +162,7 @@ namespace Orleans.Counter.Control
         {
             try
             {
-                if (OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
+                if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
                 {
                     if (!useBruteForce)
                     {
@@ -177,9 +181,9 @@ namespace Orleans.Counter.Control
                     GrainTypeManager.Instance.Start(false);
                 }
                 // Register perf counters
-                OrleansPerfCounterManager.InstallCounters();
+                perfCounterConsumer.InstallCounters();
 
-                if (OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
+                if (OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
                     ConsoleText.WriteStatus("Orleans counters registered successfully");
                 else
                     ConsoleText.WriteError("Orleans counters are NOT registered");
@@ -198,7 +202,7 @@ namespace Orleans.Counter.Control
         /// <remarks>Note: Program needs to be running as Administrator to be able to unregister Windows perf counters.</remarks>
         private static void UnregisterWindowsPerfCounters(bool useBruteForce)
         {
-            if (!OrleansPerfCounterManager.AreWindowsPerfCountersAvailable())
+            if (!OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())
             {
                 ConsoleText.WriteStatus("Orleans counters are already unregistered");
                 return;
@@ -207,7 +211,7 @@ namespace Orleans.Counter.Control
             // Delete any old perf counters
             try
             {
-                OrleansPerfCounterManager.DeleteCounters();
+                perfCounterConsumer.DeleteCounters();
             }
             catch (Exception exc)
             {
