@@ -32,7 +32,7 @@ Implementation notes:
 -- This table defines Orleans operational queries. Orleans uses these to manage its operations,
 -- these are the only queries Orleans issues to the database.
 -- These can be redefined (e.g. to provide non-destructive updates) provided the stated interface principles hold.
-CREATE TABLE IF NOT EXISTS OrleansQuery 
+CREATE TABLE OrleansQuery 
 (
 	QueryKey varchar(64) NOT NULL,
 	QueryText varchar(8000) NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS OrleansQuery
 
 
 -- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
-CREATE TABLE IF NOT EXISTS OrleansMembershipVersionTable 
+CREATE TABLE OrleansMembershipVersionTable 
 (
 	DeploymentId varchar(150) NOT NULL,
 	Timestamp timestamp(3) NOT NULL DEFAULT (now() at time zone 'utc'),
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS OrleansMembershipVersionTable
 
 
 -- Every silo instance has a row in the membership table.
-CREATE TABLE IF NOT EXISTS OrleansMembershipTable 
+CREATE TABLE OrleansMembershipTable 
 (
 	DeploymentId varchar(150) NOT NULL,
 	Address varchar(45) NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS OrleansMembershipTable
 );
 
 -- Orleans Reminders table - http://dotnet.github.io/orleans/Advanced-Concepts/Timers-and-Reminders
-CREATE TABLE IF NOT EXISTS OrleansRemindersTable 
+CREATE TABLE OrleansRemindersTable 
 (
 	ServiceId varchar(150) NOT NULL,
 	GrainId varchar(150) NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS OrleansRemindersTable
 	CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
 
-CREATE TABLE IF NOT EXISTS OrleansStatisticsTable 
+CREATE TABLE OrleansStatisticsTable 
 (
 	OrleansStatisticsTableId SERIAL NOT NULL ,
 	DeploymentId varchar(150) NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS OrleansStatisticsTable
 	CONSTRAINT StatisticsTable_StatisticsTableId PRIMARY KEY(OrleansStatisticsTableId)
 );
 
-CREATE TABLE IF NOT EXISTS OrleansClientMetricsTable 
+CREATE TABLE OrleansClientMetricsTable 
 (
 	DeploymentId varchar(150) NOT NULL,
 	ClientId varchar(150) NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS OrleansClientMetricsTable
 	CONSTRAINT PK_ClientMetricsTable_DeploymentId_ClientId PRIMARY KEY (DeploymentId , ClientId)
 );
 
-CREATE TABLE IF NOT EXISTS OrleansSiloMetricsTable 
+CREATE TABLE OrleansSiloMetricsTable 
 (
 	DeploymentId varchar(150) NOT NULL,
 	SiloId varchar(150) NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS OrleansSiloMetricsTable
 );
 
 
-CREATE OR REPLACE FUNCTION update_i_am_alive_time(
+CREATE FUNCTION update_i_am_alive_time(
     deployment_id OrleansMembershipTable.DeploymentId%TYPE, 
     address_arg OrleansMembershipTable.Address%TYPE, 
     port_arg OrleansMembershipTable.Port%TYPE, 
@@ -185,14 +185,13 @@ VALUES
         @Generation,
         @IAmAliveTime
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
 
 
-CREATE OR REPLACE FUNCTION insert_membership_version(
+CREATE FUNCTION insert_membership_version(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE
 )
   RETURNS TABLE(row_count integer) AS
@@ -236,8 +235,7 @@ VALUES
     SELECT * FROM insert_membership_version(
         @DeploymentId
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -245,7 +243,7 @@ ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
 
 
 
-CREATE OR REPLACE FUNCTION insert_membership(
+CREATE FUNCTION insert_membership(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE, 
     AddressArg      OrleansMembershipTable.Address%TYPE, 
     PortArg         OrleansMembershipTable.Port%TYPE, 
@@ -340,8 +338,7 @@ VALUES
         @IAmAliveTime,
         @Version
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -349,7 +346,7 @@ ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
 
 
 
-CREATE OR REPLACE FUNCTION update_membership(
+CREATE FUNCTION update_membership(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE, 
     AddressArg      OrleansMembershipTable.Address%TYPE, 
     PortArg         OrleansMembershipTable.Port%TYPE, 
@@ -421,8 +418,7 @@ VALUES
         @IAmAliveTime,
         @Version
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -430,7 +426,7 @@ ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
 
 
 
-CREATE OR REPLACE FUNCTION upsert_reminder_row(
+CREATE FUNCTION upsert_reminder_row(
     ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE, 
     GrainIdArg      OrleansRemindersTable.GrainId%TYPE, 
     ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,     
@@ -493,14 +489,13 @@ VALUES
         @Period,
         @GrainHash
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
 
 
-CREATE OR REPLACE FUNCTION upsert_report_client_metrics(
+CREATE FUNCTION upsert_report_client_metrics(
     DeploymentIdArg             OrleansClientMetricsTable.DeploymentId%TYPE, 
     ClientIdArg                 OrleansClientMetricsTable.ClientId%TYPE,     
     AddressArg                  OrleansClientMetricsTable.Address%TYPE,     
@@ -576,14 +571,13 @@ VALUES
         @ReceivedMessages,
         @ConnectedGatewayCount
     )
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
 
 
-CREATE OR REPLACE FUNCTION upsert_silo_metrics(
+CREATE FUNCTION upsert_silo_metrics(
     DeploymentIdArg                 OrleansSiloMetricsTable.DeploymentId%TYPE, 
     SiloIdArg                       OrleansSiloMetricsTable.SiloId%TYPE,     
     AddressArg                      OrleansSiloMetricsTable.Address%TYPE,    
@@ -701,8 +695,7 @@ VALUES
         @IsOverloaded,
         @ClientCount
     )
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -720,8 +713,7 @@ VALUES
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Status = @Status AND @Status IS NOT NULL
 		AND ProxyPort > 0;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -751,8 +743,7 @@ VALUES
 		AND Generation = @Generation AND @Generation IS NOT NULL
 	WHERE
 		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -777,8 +768,7 @@ VALUES
 		ON v.DeploymentId = m.DeploymentId
 	WHERE
 		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
@@ -791,8 +781,7 @@ VALUES
 	WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
 	DELETE FROM OrleansMembershipVersionTable
 	WHERE DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -808,8 +797,7 @@ VALUES
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -826,8 +814,7 @@ VALUES
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL
 		AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -844,8 +831,7 @@ VALUES
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
 		AND GrainHash <= @EndHash AND @EndHash IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -862,8 +848,7 @@ VALUES
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)
 		OR (GrainHash <= @EndHash AND @EndHash IS NOT NULL));
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -890,12 +875,11 @@ VALUES
 		@StatValue,
 		@Statistic;
 	COMMIT;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
-CREATE OR REPLACE FUNCTION delete_reminder_row(
+CREATE FUNCTION delete_reminder_row(
     ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE, 
     GrainIdArg      OrleansRemindersTable.GrainId%TYPE, 
     ReminderNameArg OrleansRemindersTable.ReminderName%TYPE, 
@@ -932,8 +916,7 @@ VALUES
         @ReminderName,
         @Version
     );
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -942,8 +925,7 @@ VALUES
 	DELETE FROM OrleansRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
-')
-ON CONFLICT (QueryKey) DO UPDATE SET QueryText=excluded.QueryText;
+');
 
 
 
