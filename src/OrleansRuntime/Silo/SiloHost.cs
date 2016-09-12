@@ -80,7 +80,7 @@ namespace Orleans.Runtime.Host
         /// Constructor
         /// </summary>
         /// <param name="siloName">Name of this silo.</param>
-        public SiloHost(string siloName)
+        internal SiloHost(string siloName)
         {
             Name = siloName;
             Type = Silo.SiloType.Secondary; // Default
@@ -90,15 +90,18 @@ namespace Orleans.Runtime.Host
         /// <summary> Constructor </summary>
         /// <param name="siloName">Name of this silo.</param>
         /// <param name="config">Silo config that will be used to initialize this silo.</param>
-        public SiloHost(string siloName, ClusterConfiguration config) : this(siloName)
+        internal SiloHost(string siloName, ClusterConfiguration config) : this(siloName)
         {
-            SetSiloConfig(config);
+            if (config != null)
+            {
+                SetSiloConfig(config);
+            }
         }
 
         /// <summary> Constructor </summary>
         /// <param name="siloName">Name of this silo.</param>
         /// <param name="configFile">Silo config file that will be used to initialize this silo.</param>
-        public SiloHost(string siloName, FileInfo configFile)
+        internal SiloHost(string siloName, FileInfo configFile)
             : this(siloName)
         {
             ConfigFileName = configFile.FullName;
@@ -110,7 +113,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Initialize this silo.
         /// </summary>
-        public void InitializeOrleansSilo()
+        internal void InitializeOrleansSilo(IServiceProvider serviceProvider)
         {
 #if DEBUG
             AssemblyLoaderUtils.EnableAssemblyLoadTracing();
@@ -119,7 +122,7 @@ namespace Orleans.Runtime.Host
             try
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
-                orleans = new Silo(Name, Type, Config);
+                orleans = new Silo(Name, Type, serviceProvider, Config);
                 logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", orleans.Name, orleans.Type);
             }
             catch (Exception exc)
@@ -419,7 +422,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Search for and load the config file for this silo.
         /// </summary>
-        public void LoadOrleansConfig()
+        internal void LoadOrleansConfig()
         {
             if (ConfigLoaded) return;
 

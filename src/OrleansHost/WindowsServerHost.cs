@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Threading;
+using Orleans.Runtime.Startup;
 
 
 namespace Orleans.Runtime.Host
@@ -21,13 +22,7 @@ namespace Orleans.Runtime.Host
 
         /// <summary> Reference to the SiloHost in this process. </summary>
         public SiloHost SiloHost { get; private set; }
-
-        /// <summary> Initialization function -- loads silo config information. </summary>
-        public void Init()
-        {
-            SiloHost.LoadOrleansConfig();
-        }
-
+        
         /// <summary>
         /// Run the Silo.
         /// </summary>
@@ -78,7 +73,6 @@ namespace Orleans.Runtime.Host
 
 			try
 			{
-				SiloHost.InitializeOrleansSilo();
 				ok = SiloHost.StartOrleansSilo();
 
 				if (ok)
@@ -114,7 +108,8 @@ namespace Orleans.Runtime.Host
         public bool ParseArguments(string[] args)
         {
             string siloName = Dns.GetHostName(); // Default to machine name
-            SiloHost = new SiloHost(siloName);
+            var builder = new SiloHostBuilder();
+            SiloHost = builder.Build(siloName);
 
             int argPos = 1;
             for (int i = 0; i < args.Length; i++)

@@ -75,7 +75,6 @@ namespace UnitTests.Management
             var expectedSiloType = Silo.SiloType.Primary;
             WindowsServerHost prog = new WindowsServerHost();
             Assert.True(prog.ParseArguments(new string[] { expectedSiloName }));
-            prog.Init();
             Assert.Equal(expectedSiloType, prog.SiloHost.Type);
             Assert.Equal(expectedSiloName, prog.SiloHost.Name);
         }

@@ -24,7 +24,6 @@ namespace Orleans.Runtime.Host
                     if (prog.Debug)
                         DumpCommandLineArgs(args);
                     
-                    prog.Init();
                     exitCode = prog.Run();
                 }
             }
