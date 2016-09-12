@@ -18,9 +18,11 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
 
+#if !NETSTANDARD
         // TODO: remove?
         /// <summary> Get or set the TestingSiloOptions used by the silo </summary>
         public TestingSiloOptions Options { get; set; }
+#endif
 
         /// <summary> Get or set configuration of the silo </summary>
         public NodeConfiguration NodeConfiguration { get; set; }

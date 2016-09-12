@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform>AnyCPU</Platform>
+    <ProjectGuid>{40EE3B00-D381-485F-9C69-FF706837DEED}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans.TestingHost</RootNamespace>
+    <AssemblyName>OrleansTestingHost</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansTestingHost.XML</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansTestingHost.XML</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Extensions\ConfigurationExtensions.cs">
+      <Link>Extensions\ConfigurationExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Extensions\TestConfigurationExtensions.cs">
+      <Link>Extensions\TestConfigurationExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\OrleansTestSecrets.cs">
+      <Link>OrleansTestSecrets.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\SiloHandle.cs">
+      <Link>SiloHandle.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\StorageTestConstants.cs">
+      <Link>StorageTestConstants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\TestCluster.cs">
+      <Link>TestCluster.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\TestClusterOptions.cs">
+      <Link>TestClusterOptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Utils\AsyncResultHandle.cs">
+      <Link>Utils\AsyncResultHandle.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Utils\NoOpTestLogger.cs">
+      <Link>Utils\NoOpTestLogger.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Utils\StorageEmulator.cs">
+      <Link>Utils\StorageEmulator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Utils\TestingUtils.cs">
+      <Link>Utils\TestingUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansTestingHost\Utils\ThreadSafeRandom.cs">
+      <Link>Utils\ThreadSafeRandom.cs</Link>
+    </Compile>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{aff2004c-cdf8-479c-bf27-c6bfe8ef93ea}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Orleans\Orleans.csproj">
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="project.json" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>
