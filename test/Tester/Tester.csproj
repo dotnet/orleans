@@ -48,6 +48,7 @@
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
+    <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="PSClientTests\PSClientTests.cs" />
