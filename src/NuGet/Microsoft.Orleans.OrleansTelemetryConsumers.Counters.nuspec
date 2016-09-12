@@ -19,20 +19,13 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net451" />    
+    <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net451" />
     <file src="OrleansTelemetryConsumers.Counters.XML" target="lib\net451" />
     <file src="OrleansTelemetryConsumers.Counters.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansTelemetryConsumers.Counters\**\*.cs" target="src" />
-    <file src="OrleansCounterControl.exe" target="tools" />
-    <file src="OrleansCounterControl.exe.config" target="tools" />
-    <file src="Orleans.dll" target="tools" />
-    <file src="Orleans.pdb" target="tools" />
-    <file src="OrleansRuntime.dll" target="tools" />
-    <file src="OrleansRuntime.pdb" target="tools" />
-    <file src="OrleansTelemetryConsumers.Counters.dll" target="tools" />
-    <file src="OrleansTelemetryConsumers.Counters.pdb" target="tools" />
   </files>
 </package>

@@ -14,13 +14,10 @@ namespace Orleans.Runtime.Counters
         private const int ERROR_THRESHOLD = 10; // A totally arbitrary value!
         private SafeTimer timer;
         private bool shouldWritePerfCounters = true;
-        
-        private const string CounterControlProgName = "OrleansCounterControl.exe";
-        private const string ExplainHowToCreateOrleansPerfCounters = "Run " + CounterControlProgName + " as Administrator to create perf counters for Orleans.";
-        
+
         public TimeSpan PerfCountersWriteInterval { get; private set; }
 
-        
+
         /// <summary>
         /// Initialize the counter publisher framework. Start the background stats writer thread.
         /// </summary>
@@ -32,14 +29,14 @@ namespace Orleans.Runtime.Counters
 
             PerfCountersWriteInterval = writeInterval;
         }
-        
+
         /// <summary>
         /// Start stats collection
         /// </summary>
         public void Start()
         {
             logger.Info(ErrorCode.PerfCounterStarting, "Starting Windows perf counter stats collection with frequency={0}", PerfCountersWriteInterval);
-            
+
             // Start the timer
             timer = new SafeTimer(TimerTick, null, PerfCountersWriteInterval, PerfCountersWriteInterval);
         }
