@@ -26,7 +26,7 @@ PS> Import-Module .\projectOutputDir\Orleans.psd1
 
 Althought you can do that, there is a much easier and interesting way for doing that by installing it from **PowerShell Galery**.
 
-### From PowerShell Galery
+### From PowerShell Gallery
 
 Powershell modules today are easily shared just as Nuget packages but instead of nuget.org, they are hosted on [PowerShell Gallery](https://www.powershellgallery.com/).
 
