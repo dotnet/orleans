@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 
 namespace OrleansTelemetryConsumers.Counters
 {
@@ -11,6 +12,8 @@ namespace OrleansTelemetryConsumers.Counters
     {
         internal const string CATEGORY_NAME = "OrleansRuntime";
         internal const string CATEGORY_DESCRIPTION = "Orleans Runtime Counters";
+        private const string CONTEXT_SWTICH_COUNTER_NAME = "Context Switches/sec";
+        private const string CONTEXT_SWITCH_METRIC_PREFIX = "OrleansTTS|";
         private const string ExplainHowToCreateOrleansPerfCounters = "Run 'InstallUtil.exe OrleansTelemetryConsumers.Counters.dll' as Administrator to create perf counters for Orleans.";
 
         private static readonly Logger logger = LogManager.GetLogger("OrleansPerfCounterManager", LoggerType.Runtime);
@@ -155,7 +158,17 @@ namespace OrleansTelemetryConsumers.Counters
 
         public void IncrementMetric(string name) => WriteMetric(name, UpdateMode.Increment);
 
-        public void IncrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Increment, value);
+        public void IncrementMetric(string name, double value)
+        {
+            if (!name.StartsWith(CONTEXT_SWITCH_METRIC_PREFIX))
+            {
+                WriteMetric(name, UpdateMode.Increment, value);
+            }
+            else
+            {
+                TrackContextSwitches(name.Replace(CONTEXT_SWITCH_METRIC_PREFIX, ""));
+            }
+        }
 
         public void TrackMetric(string name, double value, IDictionary<string, string> properties = null) => WriteMetric(name, UpdateMode.Set, value);
 
@@ -224,6 +237,39 @@ namespace OrleansTelemetryConsumers.Counters
             Increment = 0,
             Decrement,
             Set
+        }
+
+        private void TrackContextSwitches(string name)
+        {
+            PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
+            PerformanceCounter[] performanceCountersForThisThread = null;
+
+            // Iterate over all "Thread" category performance counters on system (includes numerous processes)
+            foreach (string threadName in allThreadsWithPerformanceCounters.GetInstanceNames())
+            {
+
+                // Obtain those performance counters for the OrleansHost
+                if (threadName.Contains("OrleansHost") && threadName.EndsWith("/" + Thread.CurrentThread.ManagedThreadId))
+                {
+                    performanceCountersForThisThread = allThreadsWithPerformanceCounters.GetCounters(threadName);
+                    break;
+                }
+            }
+
+            // In the case that the performance was not obtained correctly (this condition is null), we simply will not have stats for context switches
+            if (performanceCountersForThisThread == null) return;
+
+            // Look at all performance counters for this thread
+            foreach (PerformanceCounter performanceCounter in performanceCountersForThisThread)
+            {
+
+                // Find performance counter for context switches
+                if (performanceCounter.CounterName == CONTEXT_SWTICH_COUNTER_NAME)
+                {
+                    // Use raw value for logging, should show total context switches
+                    FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
+                }
+            }
         }
 
         #endregion

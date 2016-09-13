@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -14,11 +12,11 @@ namespace Orleans.Runtime
         public ulong NumRequests;
         public string Name;
 
-        private static readonly StageAnalysis globalStageAnalyzer = new StageAnalysis();
-        private const string CONTEXT_SWTICH_COUNTER_NAME = "Context Switches/sec";
+        private static readonly Logger logger = LogManager.GetLogger("Runtime", LoggerType.Runtime);
+        private static readonly StageAnalysis globalStageAnalyzer = new StageAnalysis();        
         public static bool ClientConnected = false;
         private bool firstStart;
-
+        private const string CONTEXT_SWITCH_METRIC_PREFIX = "OrleansTTS|";
         private static readonly List<FloatValueStatistic> allExecutingCpuCycleTime = new List<FloatValueStatistic>();
         private static readonly List<FloatValueStatistic> allExecutingWallClockTime = new List<FloatValueStatistic>();
         private static readonly List<FloatValueStatistic> allProcessingCpuCycleTime = new List<FloatValueStatistic>();
@@ -29,6 +27,7 @@ namespace Orleans.Runtime
         private static FloatValueStatistic totalProcessingCpuCycleTime;
         private static FloatValueStatistic totalProcessingWallClockTime;
         private static FloatValueStatistic totalNumProcessedRequests;
+        private readonly string metricName;
 
         /// <summary>
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
@@ -37,7 +36,7 @@ namespace Orleans.Runtime
         /// <param name="storage"></param>
         public ThreadTrackingStatistic(string threadName)
         {
-            
+            metricName = $"{CONTEXT_SWITCH_METRIC_PREFIX}{threadName}";
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
             ExecutingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
             ProcessingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
@@ -163,7 +162,7 @@ namespace Orleans.Runtime
                 firstStart = false;
                 if (StatisticsCollector.CollectContextSwitchesStats)
                 {
-                    TrackContextSwitches();
+                    logger.IncrementMetric(metricName);        
                 }
                 OnStartExecution();
             }
@@ -206,39 +205,6 @@ namespace Orleans.Runtime
                     NumRequests += (ulong)num;
                 }
             }
-        }
-
-        private void TrackContextSwitches()
-        {
-            PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
-            PerformanceCounter[] performanceCountersForThisThread = null;
-
-            // Iterate over all "Thread" category performance counters on system (includes numerous processes)
-            foreach (string threadName in allThreadsWithPerformanceCounters.GetInstanceNames())
-            {
-
-                // Obtain those performance counters for the OrleansHost
-                if (threadName.Contains("OrleansHost") && threadName.EndsWith("/" + Thread.CurrentThread.ManagedThreadId))
-                {
-                    performanceCountersForThisThread = allThreadsWithPerformanceCounters.GetCounters(threadName);
-                    break;
-                }
-            }
-
-            // In the case that the performance was not obtained correctly (this condition is null), we simply will not have stats for context switches
-            if (performanceCountersForThisThread == null) return;
-
-            // Look at all performance counters for this thread
-            foreach (PerformanceCounter performanceCounter in performanceCountersForThisThread)
-            {
-
-                // Find performance counter for context switches
-                if (performanceCounter.CounterName == CONTEXT_SWTICH_COUNTER_NAME)
-                {
-                    // Use raw value for logging, should show total context switches
-                    FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
-                }
-            }
-        }
+        }        
     }
 }
