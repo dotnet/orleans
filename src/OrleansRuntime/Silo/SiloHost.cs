@@ -112,7 +112,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void InitializeOrleansSilo()
         {
-#if DEBUG
+#if DEBUG && !NETSTANDARD
             AssemblyLoaderUtils.EnableAssemblyLoadTracing();
 #endif
 
