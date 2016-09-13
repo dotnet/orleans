@@ -631,9 +631,6 @@
     <Compile Include="..\..\..\src\Orleans\Statistics\QueueTrackingStatistic.cs">
       <Link>Statistics\QueueTrackingStatistic.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Statistics\RuntimeStatisticsGroup.cs">
-      <Link>Statistics\RuntimeStatisticsGroup.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\src\Orleans\Statistics\SchedulerStatisticsGroup.cs">
       <Link>Statistics\SchedulerStatisticsGroup.cs</Link>
     </Compile>
@@ -987,6 +984,7 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Shims\RuntimeStatisticsGroup.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
