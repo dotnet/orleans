@@ -41,6 +41,7 @@ namespace Orleans.Runtime
         public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
         public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
+        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
 
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;

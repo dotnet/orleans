@@ -10,6 +10,9 @@ using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading.Tasks;
+using Orleans.Runtime.TestHooks;
+using Orleans.Runtime;
 
 namespace UnitTests.Streaming
 {
@@ -70,12 +73,13 @@ namespace UnitTests.Streaming
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
-        public void ServiceId_ProviderRuntime()
+        public async Task ServiceId_ProviderRuntime()
         {
             Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.TestHook.ServiceId;
+            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, siloHandle.Silo.SiloAddress);
+            Guid serviceId = await testHook.GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config
@@ -84,7 +88,7 @@ namespace UnitTests.Streaming
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
-        public void ServiceId_SiloRestart()
+        public async Task ServiceId_SiloRestart()
         {
             Guid configServiceId = this.HostedCluster.Globals.ServiceId;
 
@@ -106,7 +110,8 @@ namespace UnitTests.Streaming
             Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.TestHook.ServiceId;
+            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, siloHandle.Silo.SiloAddress);
+            Guid serviceId = await testHook.GetServiceId();
             Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config

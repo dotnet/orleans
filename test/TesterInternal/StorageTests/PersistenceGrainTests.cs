@@ -62,12 +62,13 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
-        public void Persistence_Silo_StorageProviders()
+        public async Task Persistence_Silo_StorageProviders()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                List<string> providers = silo.TestHook.GetStorageProviderNames().ToList();
+                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
+                List<string> providers = (await testHook.GetStorageProviderNames()).ToList();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
                 const string providerName = "test1";

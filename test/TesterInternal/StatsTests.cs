@@ -11,6 +11,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Runtime.TestHooks;
 
 namespace UnitTests.Stats
 {
@@ -44,7 +45,7 @@ namespace UnitTests.Stats
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
-        public void Stats_Init_Mock()
+        public async Task Stats_Init_Mock()
         {
             ClientConfiguration config = this.HostedCluster.ClientConfig;
 
@@ -54,7 +55,8 @@ namespace UnitTests.Stats
             Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.SiloAddress);
+            Assert.True(await testHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 
             // Check we got some stats & metrics callbacks on both client and server.
             var siloStatsCollector = Assert.IsType<MockStatsSiloCollector>(silo.TestHook.StatisticsProvider);
@@ -78,7 +80,35 @@ namespace UnitTests.Stats
             Assert.True(numSiloStatsCalls > 0, $"Some silo stats calls = {numSiloStatsCalls}");
         }
     }
-    
+
+    public interface IStatsInitGrainTest : IGrain
+    {
+        Task<long> GetNumStatsCalls();
+        Task<long> GetNumMetricsCalls();
+    }
+
+    public class SiloStatsInitGrainTest : Grain, IStatsInitGrainTest
+    {
+        private IMockClientStatisticsPublisher clientStatsCollector;
+
+        public Task<long> GetNumMetricsCalls()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<long> GetNumStatsCalls()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override Task OnActivateAsync()
+        {
+            Runtime.
+            return base.OnActivateAsync();
+        }
+    }
+
+
     public class StatsTestsNoSilo
     {
         private readonly ITestOutputHelper output;
@@ -169,7 +199,7 @@ namespace UnitTests.Stats
         }
 
         [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
-        public void ClientInit_SqlServer_WithStats()
+        public async Task ClientInit_SqlServer_WithStats()
         {
             Assert.True(GrainClient.IsInitialized);
 
@@ -185,7 +215,9 @@ namespace UnitTests.Stats
             Assert.Equal("SQL",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+
+            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.SiloAddress);
+            Assert.True(await testHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
             Assert.Equal("SQL",  silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }

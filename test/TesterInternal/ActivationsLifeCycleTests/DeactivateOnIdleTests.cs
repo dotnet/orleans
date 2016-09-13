@@ -9,6 +9,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
+using Orleans.Runtime.TestHooks;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -273,23 +274,26 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var label = await g.GetLabel();
             }
 
+            var primarySiloTestHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, testCluster.Primary.Silo.SiloAddress);
+            var secondarySiloTestHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, testCluster.SecondarySilos[0].Silo.SiloAddress);
+
             // Disable retries in this case, to make test more predictable.
-            testCluster.Primary.TestHook.SetMaxForwardCount_ForTesting(0);
-            testCluster.SecondarySilos[0].TestHook.SetMaxForwardCount_ForTesting(0);
+            await primarySiloTestHook.SetMaxForwardCount(0);
+            await secondarySiloTestHook.SetMaxForwardCount(0);
 
             var lazyDeregistrationDelay = doLazyDeregistration ? TimeSpan.FromSeconds(2) : TimeSpan.FromMilliseconds(-1);
 
-            testCluster.Primary.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
-            testCluster.SecondarySilos[0].TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
+            await primarySiloTestHook.SetDirectoryLazyDeregistrationDelay(lazyDeregistrationDelay);
+            await secondarySiloTestHook.SetDirectoryLazyDeregistrationDelay(lazyDeregistrationDelay);
 
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
-            int primaryActivation = testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
-            int secondaryActivation = testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
+            int primaryActivation = await primarySiloTestHook.UnregisterGrainForTesting(grain);
+            int secondaryActivation = await secondarySiloTestHook.UnregisterGrainForTesting(grain);
             Assert.Equal(1, primaryActivation + secondaryActivation);
 
             // If we try again, we shouldn't find any
-            primaryActivation = testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
-            secondaryActivation = testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
+            primaryActivation = await primarySiloTestHook.UnregisterGrainForTesting(grain);
+            secondaryActivation = await secondarySiloTestHook.UnregisterGrainForTesting(grain);
             Assert.Equal(0, primaryActivation + secondaryActivation);
 
 

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.TestHooks;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -98,12 +99,24 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                // check for simulation of lost messages
-                if(Silo.CurrentSilo.TestHook.ShouldDrop(msg))
+                try
                 {
-                    logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
-                    messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
-                    return;
+                    var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, msg.SendingSilo);
+                    if (testHook != null)
+                    {
+                        // check for simulation of lost messages
+                        if (testHook.ShouldDrop(msg).Result)
+                        {
+                            logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
+                            messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
+                            return;
+                        }
+                    }
+                }
+                catch (Exception exc)
+                {
+
+                    throw;
                 }
 
                 // Prioritize system messages

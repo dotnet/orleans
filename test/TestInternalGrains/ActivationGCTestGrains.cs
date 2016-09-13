@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
+using Orleans.Runtime.TestHooks;
 
 namespace UnitTests.Grains
 {
@@ -23,7 +24,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
+    internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1, ITestHooksObserver
     {
         private int burstCount = 0;
 
@@ -50,11 +51,11 @@ namespace UnitTests.Grains
             }
 
             burstCount = count;
-            Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation = OnCollectActivation;
-            return TaskDone.Done;
+            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, GrainReference.SystemTargetSilo);
+            return testHook.RegisterTestHooksObserver(this);
         }
 
-        private void OnCollectActivation(GrainId grainId)
+        public void OnCollectActivation(GrainId grainId)
         {
             int other = grainId.GetTypeCode();
             int self = Data.Address.Grain.GetTypeCode();

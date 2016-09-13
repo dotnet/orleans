@@ -13,6 +13,7 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Runtime.TestHooks;
 
 namespace Tests.GeoClusterTests
 {
@@ -371,11 +372,15 @@ namespace Tests.GeoClusterTests
         public void BlockAllClusterCommunication(string from, string to)
         {
             foreach (var silo in Clusters[from].Silos)
+            {
+                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.SiloAddress);
                 foreach (var dest in Clusters[to].Silos)
                 {
                     WriteLog("Blocking {0}->{1}", silo, dest);
-                    silo.TestHook.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100);
+
+                    testHook.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100).Wait();
                 }
+            }
         }
 
         public void UnblockAllClusterCommunication(string from)
@@ -383,7 +388,8 @@ namespace Tests.GeoClusterTests
             foreach (var silo in Clusters[from].Silos)
             {
                 WriteLog("Unblocking {0}", silo);
-                silo.TestHook.UnblockSiloCommunication();
+                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
+                testHook.UnblockSiloCommunication().Wait();
             }
         }
   

@@ -11,6 +11,7 @@ using TestGrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Runtime.TestHooks;
 
 // ReSharper disable InconsistentNaming
 
@@ -137,16 +138,16 @@ namespace Tests.GeoClusterTests
 
         #region Test creation of independent grains
 
-        private Task IndependentCreation()
+        private async Task IndependentCreation()
         {
             int offset = random.Next();
 
-            int base_own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
-            int base_own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
-            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
-            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
+            int base_own0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned)).Count;
+            int base_own1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned)).Count;
+            int base_requested0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int base_requested1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int base_doubtful0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int base_doubtful1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful)).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2}", base_own0, base_requested0, base_doubtful0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2}", base_own1, base_requested1, base_doubtful1);
@@ -162,12 +163,12 @@ namespace Tests.GeoClusterTests
 
             // We expect all requests to resolve, and all created activations are in state OWNED
 
-            int own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
-            int own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
-            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
-            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
-            int requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
+            int own0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned)).Count;
+            int own1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned)).Count;
+            int doubtful0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int doubtful1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int requested0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int requested1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2}", own0, requested0, doubtful0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2}", own1, requested1, doubtful1);
@@ -179,8 +180,6 @@ namespace Tests.GeoClusterTests
             Assert.Equal(doubtful1, base_doubtful1);
             Assert.Equal(requested0, base_requested0);
             Assert.Equal(requested1, base_requested1);
-
-            return TaskDone.Done;
         }
 
         #endregion
@@ -195,14 +194,14 @@ namespace Tests.GeoClusterTests
         // The clients all invoke grain "g", in parallel, and then wait on a signal by the main thread (this function). The main thread, then 
         // wakes up the clients, after which they invoke "g+1", and so on.
 
-        private Task CreationRace()
+        private async Task CreationRace()
         {
             WriteLog("Starting ConcurrentCreation");
 
             var offset = random.Next();
 
             // take inventory now so we can exclude pre-existing entries from the validation
-            var baseline = GetGrainActivations();
+            var baseline = await GetGrainActivations();
 
             // We use two objects to coordinate client threads and the main thread. coordWakeup is an object that is used to signal the coordinator
             // thread. toWait is used to signal client threads.
@@ -271,11 +270,9 @@ namespace Tests.GeoClusterTests
                 thread.Join();
             }
 
-            var grains = GetGrainActivations(baseline);
+            var grains = await GetGrainActivations(baseline);
 
             ValidateClusterRaceResults(results, grains);
-
-            return TaskDone.Done;
         }
 
         private volatile int threadsDone;
@@ -353,20 +350,20 @@ namespace Tests.GeoClusterTests
         {
             int offset = random.Next();
 
-            int base_own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
-            int base_own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
-            int base_requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int base_requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int base_doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
-            int base_doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
-            int base_cached0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached).Count;
-            int base_cached1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached).Count;
+            int base_own0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned)).Count;
+            int base_own1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned)).Count;
+            int base_requested0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int base_requested1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int base_doubtful0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int base_doubtful1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int base_cached0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached)).Count;
+            int base_cached1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached)).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2} Cached={3}", base_own0, base_requested0, base_doubtful0, base_cached0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2} Cached={3}", base_own1, base_requested1, base_doubtful1, base_cached1);
 
             // take inventory now so we can exclude pre-existing entries from the validation
-            var baseline = GetGrainActivations();
+            var baseline = await GetGrainActivations();
 
             // Turn off intercluster messaging to simulate a partition.
             BlockAllClusterCommunication(cluster0, cluster1);
@@ -400,8 +397,8 @@ namespace Tests.GeoClusterTests
             });
 
             // Validate that all the created grains are in DOUBTFUL, one activation in each cluster.
-            Assert.True(GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count == numGrains);
-            Assert.True(GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count == numGrains);
+            Assert.True((await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful)).Count == numGrains);
+            Assert.True((await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful)).Count == numGrains);
 
             WriteLog("Restoring inter-cluster communication");
 
@@ -415,14 +412,14 @@ namespace Tests.GeoClusterTests
 
             WriteLog("Validation of conflict resolution");
 
-            int own0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned).Count;
-            int own1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned).Count;
-            int doubtful0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful).Count;
-            int doubtful1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful).Count;
-            int requested0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int requested1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership).Count;
-            int cached0 = GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached).Count;
-            int cached1 = GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached).Count;
+            int own0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Owned)).Count;
+            int own1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Owned)).Count;
+            int doubtful0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int doubtful1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Doubtful)).Count;
+            int requested0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int requested1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.RequestedOwnership)).Count;
+            int cached0 = (await GetGrainsInClusterWithStatus(cluster0, GrainDirectoryEntryStatus.Cached)).Count;
+            int cached1 = (await GetGrainsInClusterWithStatus(cluster1, GrainDirectoryEntryStatus.Cached)).Count;
 
             WriteLog("Counts: Cluster 0 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own0, requested0, doubtful0, cached0);
             WriteLog("Counts: Cluster 1 => Owned={0} Requested={1} Doubtful={2} Cached={3}", own1, requested1, doubtful1, cached1);
@@ -434,7 +431,7 @@ namespace Tests.GeoClusterTests
             Assert.Equal(requested1, base_requested1);
 
             // each grain should have one activation per cluster
-            var grains = GetGrainActivations(baseline);
+            var grains = await GetGrainActivations(baseline);
             foreach (var kvp in grains)
             {
                 GrainId key = kvp.Key;
@@ -500,14 +497,15 @@ namespace Tests.GeoClusterTests
 
         #region Helper methods 
 
-        private List<GrainId> GetGrainsInClusterWithStatus(string clusterId, GrainDirectoryEntryStatus? status = null)
+        private async Task<List<GrainId>> GetGrainsInClusterWithStatus(string clusterId, GrainDirectoryEntryStatus? status = null)
         {
             List<GrainId> grains = new List<GrainId>();
             var silos = Clusters[clusterId].Silos;
             int totalSoFar = 0;
             foreach (var silo in silos)
             {
-                var dir = silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
+                var dir = await testHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
                 foreach (var grainKeyValue in dir)
                 {
                     GrainId grainId = grainKeyValue.Key;
@@ -534,7 +532,7 @@ namespace Tests.GeoClusterTests
             return grains;
         }
 
-        private Dictionary<GrainId, List<IActivationInfo>> GetGrainActivations(Dictionary<GrainId, List<IActivationInfo>> exclude = null)
+        private async Task<Dictionary<GrainId, List<IActivationInfo>>> GetGrainActivations(Dictionary<GrainId, List<IActivationInfo>> exclude = null)
         {
             var grains = new Dictionary<GrainId, List<IActivationInfo>>();
 
@@ -543,7 +541,8 @@ namespace Tests.GeoClusterTests
             foreach (var kvp in Clusters)
                 foreach (var silo in kvp.Value.Silos)
                 {
-                    var dir = silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                    var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
+                    var dir = await testHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
 
                     foreach (var grainKeyValue in dir)
                     {

@@ -30,6 +30,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using Orleans.Runtime.TestHooks;
 
 namespace Orleans.Runtime
 {
@@ -116,6 +117,7 @@ namespace Orleans.Runtime
         {
             get { return allSiloProviders.AsReadOnly();  }
         }
+        internal ICatalog Catalog => catalog;
 
         internal IServiceProvider Services { get; }
 
@@ -137,7 +139,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Test hook connection for white-box testing of silo.
         /// </summary>
-        public TestHooks TestHook;
+        private TestHooksSystemTarget testHook;
         
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -335,8 +337,7 @@ namespace Orleans.Runtime
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
-
-            TestHook = new TestHooks(this);
+            
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -376,6 +377,12 @@ namespace Orleans.Runtime
             }
 
             logger.Verbose("Finished creating System Targets for this silo.");
+        }
+
+        internal void InitializeTestHooksSystemTarget()
+        {
+            testHook = new TestHooksSystemTarget(this);
+            RegisterSystemTarget(testHook);
         }
 
         private void InjectDependencies()
@@ -869,8 +876,8 @@ namespace Orleans.Runtime
                     
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
-
-                if (!TestHook.ExecuteFastKillInProcessExit) return;
+                
+                if (testHook != null && !testHook.ExecuteFastKillInProcessExit) return;
 
                 logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
                 FastKill();
@@ -878,190 +885,6 @@ namespace Orleans.Runtime
             finally
             {
                 LogManager.Close();
-            }
-        }
-
-        /// <summary>
-        /// Test hook functions for white box testing.
-        /// </summary>
-        public class TestHooks
-#if !NETSTANDARD_TODO
-            : MarshalByRefObject
-#endif
-        {
-            private readonly Silo silo;
-            internal bool ExecuteFastKillInProcessExit;
-            
-            internal IConsistentRingProvider ConsistentRingProvider
-            {
-                get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
-            }
-            
-            internal bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
-
-            internal object StatisticsProvider
-            {
-                get
-                {
-                    if (silo.statisticsProviderManager == null) return null;
-                    var provider = silo.statisticsProviderManager.GetProvider(silo.LocalConfig.StatisticsProviderName);
-                    return CheckReturnBoundaryReference("statistics provider", provider);
-                }
-            }
-
-            internal Action<GrainId> Debug_OnDecideToCollectActivation { get; set; }
-
-            internal TestHooks(Silo s)
-            {
-                silo = s;
-                ExecuteFastKillInProcessExit = true;
-            }
-
-            internal Guid ServiceId { get { return silo.GlobalConfig.ServiceId; } }
-
-            /// <summary>
-            /// Get list of providers loaded in this silo.
-            /// </summary>
-            /// <returns></returns>
-            internal IEnumerable<string> GetStorageProviderNames()
-            {
-                return silo.StorageProviderManager.GetProviderNames();
-            }
-
-            /// <summary>
-            /// Find the named storage provider loaded in this silo.
-            /// </summary>
-            /// <returns></returns>
-            internal IStorageProvider GetStorageProvider(string name)
-            {
-                IStorageProvider provider = silo.StorageProviderManager.GetProvider(name) as IStorageProvider;
-                return CheckReturnBoundaryReference("storage provider", provider);
-            }
-
-            internal string PrintSiloConfig()
-            {
-                return silo.OrleansConfig.ToString(silo.Name);
-            }
-
-            internal IBootstrapProvider GetBootstrapProvider(string name)
-            {
-                IBootstrapProvider provider = silo.BootstrapProviders.First(p => p.Name.Equals(name));
-                return CheckReturnBoundaryReference("bootstrap provider", provider);
-            }
-
-            internal IEnumerable<string> GetStreamProviderNames()
-            {
-                return silo.StreamProviderManager.GetStreamProviders().Select(p => ((IProvider)p).Name).ToList();
-            }
-
-            internal IEnumerable<string> GetAllSiloProviderNames()
-            {
-                var providers = silo.AllSiloProviders;
-                return providers.Select(p => ((IProvider)p).Name).ToList();
-            }
-
-            internal void SuppressFastKillInHandleProcessExit()
-            {
-                ExecuteFastKillInProcessExit = false;
-            }
-          
-            // used for testing only: returns directory entries whose type name contains the given string
-            internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
-            {
-                var x = new Dictionary<GrainId, IGrainInfo>();
-                foreach (var kvp in silo.localGrainDirectory.DirectoryPartition.GetItems())
-                {
-                    if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
-                        continue;// Skip system grains, system targets and clients
-                    if (silo.catalog.GetGrainTypeName(kvp.Key).Contains(expr))
-                        x.Add(kvp.Key, kvp.Value);
-                }
-                return x;
-            }
-
-            // store silos for which we simulate faulty communication
-            // number indicates how many percent of requests are lost
-            internal ConcurrentDictionary<IPEndPoint, double> SimulatedMessageLoss; 
-
-            internal void BlockSiloCommunication(IPEndPoint destination, double lost_percentage)
-            {
-                if (SimulatedMessageLoss == null)
-                    SimulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
-
-                SimulatedMessageLoss[destination] = lost_percentage;
-            }
-
-            internal void UnblockSiloCommunication()
-            {
-                SimulatedMessageLoss = null;
-            }
-
-            private readonly SafeRandom random = new SafeRandom();
-
-            internal bool ShouldDrop(Message msg)
-            {
-                if (SimulatedMessageLoss != null)
-                {
-                    double blockedpercentage;
-                    CurrentSilo.TestHook.SimulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
-                    return (random.NextDouble() * 100 < blockedpercentage);
-                }
-                else
-                    return false;
-            }
-
-            // this is only for white box testing - use RuntimeClient.Current.SendRequest instead
-
-            internal void SendMessageInternal(Message message)
-            {
-                silo.messageCenter.SendMessage(message);
-            }
-
-            // For white-box testing only
-
-            internal int UnregisterGrainForTesting(GrainId grain)
-            {
-                return silo.catalog.UnregisterGrainForTesting(grain);
-            }
-
-            // For white-box testing only
-
-            internal void SetDirectoryLazyDeregistrationDelay_ForTesting(TimeSpan timeSpan)
-            {
-                silo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay = timeSpan;
-            }
-
-            // For white-box testing only
-
-            internal void SetMaxForwardCount_ForTesting(int val)
-            {
-                silo.OrleansConfig.Globals.MaxForwardCount = val;
-            }
-
-            internal void LatchIsOverloaded(bool overloaded)
-            {
-                this.silo.Metrics.LatchIsOverload(overloaded);
-            }
-
-            internal void UnlatchIsOverloaded()
-            {
-                this.silo.Metrics.UnlatchIsOverloaded();
-            }
-
-            private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
-            {
-                if (obj == null) return null;
-                if (
-#if !NETSTANDARD_TODO
-                    obj is MarshalByRefObject ||
-#endif
-                    obj is ISerializable)
-                {
-                    // Referernce to the provider can safely be passed across app-domain boundary in unit test process
-                    return obj;
-                }
-                throw new InvalidOperationException(string.Format("Cannot return reference to {0} {1} if it is not MarshalByRefObject or Serializable",
-                    what, TypeUtils.GetFullName(obj.GetType())));
             }
         }
 

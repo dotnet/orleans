@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.TestHooks;
 
 namespace Orleans.Runtime
 {
@@ -332,9 +333,15 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            if (Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation != null)
+            try
             {
-                Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation(activation.Grain);
+                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, activation.Address.Silo);
+                testHook?.DecideToCollectActivation(activation.Grain);
+            }
+            catch (Exception exc)
+            {
+
+                throw;
             }
         }
 
