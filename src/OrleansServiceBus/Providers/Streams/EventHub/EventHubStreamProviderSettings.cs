@@ -7,9 +7,9 @@ using Orleans.Providers;
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// Configuration class for EventHubStreamProvider.
+    /// Settings class for EventHubStreamProvider.
     /// </summary>
-    public class EventHubStreamProviderConfig
+    public class EventHubStreamProviderSettings
     {
         /// <summary>
         /// Stream provider name.  This setting is required.
@@ -83,7 +83,7 @@ namespace Orleans.ServiceBus.Providers
         /// Constructor.  Requires provider name.
         /// </summary>
         /// <param name="streamProviderName"></param>
-        public EventHubStreamProviderConfig(string streamProviderName)
+        public EventHubStreamProviderSettings(string streamProviderName)
         {
             StreamProviderName = streamProviderName;
         }
@@ -122,7 +122,7 @@ namespace Orleans.ServiceBus.Providers
             CheckpointerSettingsType = providerConfiguration.GetTypeProperty(CheckpointerSettingsTypeName, null);
             if (string.IsNullOrWhiteSpace(StreamProviderName))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), "StreamProviderName not set.");
             }
             CacheSizeMb = providerConfiguration.GetIntProperty(CacheSizeMbName, DefaultCacheSizeMb);
             DataMinTimeInCache = providerConfiguration.GetTimeSpanProperty(DataMinTimeInCacheName, DefaultDataMinTimeInCache);

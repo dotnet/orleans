@@ -1,4 +1,5 @@
-﻿using Orleans.Streams;
+﻿
+using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -7,6 +8,11 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public interface IEventHubQueueMapper : IStreamQueueMapper
     {
+        /// <summary>
+        /// Gets the EventHub partition by QueueId
+        /// </summary>
+        /// <param name="queue"></param>
+        /// <returns></returns>
         string QueueToPartition(QueueId queue);
     }
 }
