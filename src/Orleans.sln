@@ -178,6 +178,9 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharpInterfaces", "..\test\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{2375D7D5-9B30-493F-9C2E-A6B2811A3C5A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "..\test\TesterInternal\TesterInternal.csproj", "{09610024-F5B9-4065-9557-BD9E36A32421}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3F6112A5-6488-4754-B6AB-478B792D4908} = {3F6112A5-6488-4754-B6AB-478B792D4908}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4CD3AA9E-D937-48CA-BB6C-158E12257D23}"
 EndProject
@@ -473,8 +476,12 @@ Global
 		{67738E6C-F292-46A2-994D-5B52E745205B}.Release|x64.ActiveCfg = Release|Any CPU
 		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Debug|x64.Build.0 = Debug|Any CPU
 		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Release|x64.ActiveCfg = Release|Any CPU
+		{69F40A37-4A2F-44D4-A994-CC165C12FB91}.Release|x64.Build.0 = Release|Any CPU
 		{936397DF-8D11-4244-A493-767D31F9D727}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{936397DF-8D11-4244-A493-767D31F9D727}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{936397DF-8D11-4244-A493-767D31F9D727}.Debug|x64.ActiveCfg = Debug|Any CPU
