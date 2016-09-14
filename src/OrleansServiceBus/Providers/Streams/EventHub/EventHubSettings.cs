@@ -6,6 +6,9 @@ using Orleans.Providers;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// EventHub settings for a specific hub
+    /// </summary>
     [Serializable]
     public class EventHubSettings : IEventHubSettings
     {
@@ -17,21 +20,32 @@ namespace Orleans.ServiceBus.Providers
         private const string StartFromNowName = "StartFromNow";
         private const bool StartFromNowDefault = true;
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
         public EventHubSettings(){}
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="connectionString">EventHub connection string.</param>
+        /// <param name="consumerGroup">EventHub consumer group.</param>
+        /// <param name="path">Hub path.</param>
+        /// <param name="startFromNow">In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the begining of a partition.</param>
+        /// <param name="prefetchCount">optional parameter that configures the receiver prefetch count.</param>
         public EventHubSettings(string connectionString, string consumerGroup, string path, bool startFromNow = StartFromNowDefault, int? prefetchCount = null)
         {
             if (string.IsNullOrWhiteSpace(connectionString))
             {
-                throw new ArgumentNullException("connectionString");
+                throw new ArgumentNullException(nameof(connectionString));
             }
             if (string.IsNullOrWhiteSpace(consumerGroup))
             {
-                throw new ArgumentNullException("consumerGroup");
+                throw new ArgumentNullException(nameof(consumerGroup));
             }
             if (string.IsNullOrWhiteSpace(path))
             {
-                throw new ArgumentNullException("path");
+                throw new ArgumentNullException(nameof(path));
             }
             ConnectionString = connectionString;
             ConsumerGroup = consumerGroup;
@@ -40,10 +54,25 @@ namespace Orleans.ServiceBus.Providers
             StartFromNow = startFromNow;
         }
 
+        /// <summary>
+        /// EventHub connection string.
+        /// </summary>
         public string ConnectionString { get; private set; }
+        /// <summary>
+        /// EventHub consumer group.
+        /// </summary>
         public string ConsumerGroup { get; private set; }
+        /// <summary>
+        /// Hub path.
+        /// </summary>
         public string Path { get; private set; }
+        /// <summary>
+        /// Optional parameter that configures the receiver prefetch count.
+        /// </summary>
         public int? PrefetchCount { get; private set; }
+        /// <summary>
+        /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the begining of a partition.
+        /// </summary>
         public bool StartFromNow { get; private set; }
 
         /// <summary>
@@ -71,17 +100,17 @@ namespace Orleans.ServiceBus.Providers
             ConnectionString = providerConfiguration.GetProperty(ConnectionStringName, null);
             if (string.IsNullOrWhiteSpace(ConnectionString))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", ConnectionStringName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), ConnectionStringName + " not set.");
             }
             ConsumerGroup = providerConfiguration.GetProperty(ConsumerGroupName, null);
             if (string.IsNullOrWhiteSpace(ConsumerGroup))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", ConsumerGroupName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), ConsumerGroupName + " not set.");
             }
             Path = providerConfiguration.GetProperty(PathName, null);
             if (string.IsNullOrWhiteSpace(Path))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", PathName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), PathName + " not set.");
             }
             PrefetchCount = providerConfiguration.GetIntProperty(PrefetchCountName, InvalidPrefetchCount);
             if (PrefetchCount == InvalidPrefetchCount)
