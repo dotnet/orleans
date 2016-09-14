@@ -208,7 +208,7 @@ namespace Orleans.ServiceBus.Providers
                 Hub = hubSettings,
                 Partition = streamQueueMapper.QueueToPartition(queueId),
             };
-            Logger recieverLogger = logger.GetSubLogger($".{config.Partition}");
+            Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
             return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger);
         }
 

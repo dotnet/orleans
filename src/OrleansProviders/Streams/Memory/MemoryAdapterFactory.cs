@@ -87,7 +87,7 @@ namespace Orleans.Providers.Streams.Memory
 
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new MemoryPooledCache(bufferPool, logger.GetSubLogger("-Cache"));
+            return new MemoryPooledCache(bufferPool, logger.GetSubLogger("messagecache", "-"));
         }
 
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)

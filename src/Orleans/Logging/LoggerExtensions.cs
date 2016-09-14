@@ -12,9 +12,9 @@ namespace Orleans.Runtime
         /// <param name="logger"></param>
         /// <param name="loggerName"></param>
         /// <returns></returns>
-        public static Logger GetSubLogger(this Logger logger, string appendedName)
+        public static Logger GetSubLogger(this Logger logger, string appendedName, string seperator = ".")
         {
-            return logger.GetLogger(logger.Name + appendedName);
+            return logger.GetLogger(logger.Name + seperator + appendedName);
         }
 
         /// <summary>
