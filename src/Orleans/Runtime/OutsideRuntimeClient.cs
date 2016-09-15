@@ -881,7 +881,11 @@ namespace Orleans
         }
         private string PrintAppDomainDetails()
         {
+#if NETSTANDARD_TODO
+            return "N/A";
+#else
             return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
+#endif
         }
 
 
