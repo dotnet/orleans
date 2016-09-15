@@ -724,7 +724,7 @@ namespace Orleans.Runtime.Configuration
                         if (child.HasAttribute("SystemStoreType"))
                         {
                             var sst = child.GetAttribute("SystemStoreType");
-                            if (!"None".Equals(sst, StringComparison.InvariantCultureIgnoreCase))
+                            if (!"None".Equals(sst, StringComparison.OrdinalIgnoreCase))
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
                                 ReminderServiceProviderType reminderServiceProviderType;
