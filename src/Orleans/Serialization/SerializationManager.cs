@@ -105,7 +105,7 @@ namespace Orleans.Serialization
         private static ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
         private static Dictionary<string, Type> batchTypes;
         private static Dictionary<Type, SerializerMethods> batchRegisteredTypes;
-        
+
         private static IExternalSerializer fallbackSerializer;
         private static LoggerImpl logger;
         private static bool IsBuiltInSerializersRegistered;
@@ -125,6 +125,7 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle charTypeHandle = typeof(char).TypeHandle;
         private static readonly RuntimeTypeHandle boolTypeHandle = typeof(bool).TypeHandle;
         private static readonly RuntimeTypeHandle objectTypeHandle = typeof(object).TypeHandle;
+        private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
 
         internal static CounterStatistic Copies;
         internal static CounterStatistic Serializations;
@@ -365,11 +366,11 @@ namespace Orleans.Serialization
                 {
                     return;
                 }
-                
+
                 addingComplete = true;
             }
         }
-        
+
         #endregion
 
         #region Serialization info registration
@@ -409,7 +410,7 @@ namespace Orleans.Serialization
             lock (typeWriteLock)
             {
                 bool wasInDictionary = TryUpdateOrAddRegisteredType(t, cop, ser, deser, forceOverride);
-                if(!wasInDictionary)
+                if (!wasInDictionary)
                 {
                     string name = t.OrleansTypeKeyString();
                     AddToNameToTypeMap(name, t);
@@ -489,15 +490,18 @@ namespace Orleans.Serialization
                 {
                     Register(
                         type,
-                        obj => {
+                        obj =>
+                        {
                             var concrete = RegisterConcreteSerializer(obj.GetType(), serializerType);
                             return concrete.DeepCopy(obj);
                         },
-                        (obj, stream, exp) => {
+                        (obj, stream, exp) =>
+                        {
                             var concrete = RegisterConcreteSerializer(obj.GetType(), serializerType);
                             concrete.Serialize(obj, stream, exp);
                         },
-                        (expected, stream) => {
+                        (expected, stream) =>
+                        {
                             var concrete = RegisterConcreteSerializer(expected, serializerType);
                             return concrete.Deserialize(expected, stream);
                         },
@@ -529,18 +533,18 @@ namespace Orleans.Serialization
 
         private static void AddToNameToTypeMap(string name, Type type)
         {
-            if(batchTypes != null)
+            if (batchTypes != null)
             {
-                if(batchTypes.ContainsKey(name))
+                if (batchTypes.ContainsKey(name))
                     return;
                 batchTypes.Add(name, type);
                 return;
             }
-            else if(types.ContainsKey(name))
+            else if (types.ContainsKey(name))
             {
                 return;
             }
-            
+
             if (addingComplete)
             {
                 var newDictionary = new Dictionary<string, Type>((Dictionary<string, Type>)types);
@@ -557,12 +561,12 @@ namespace Orleans.Serialization
         {
             SerializerMethods methods;
             bool wasInDictionary;
-            
-            if(batchRegisteredTypes != null) wasInDictionary = batchRegisteredTypes.TryGetValue(key, out methods);
+
+            if (batchRegisteredTypes != null) wasInDictionary = batchRegisteredTypes.TryGetValue(key, out methods);
             else wasInDictionary = registeredTypes.TryGetValue(key, out methods);
 
             bool needToUpdate = !wasInDictionary;
-            
+
             if (deepCopier != null && (methods.DeepCopy == null || forceOverride))
             {
                 methods = new SerializerMethods(deepCopier, methods.Serialize, methods.Deserialize);
@@ -576,7 +580,7 @@ namespace Orleans.Serialization
 
             if (needToUpdate)
             {
-                if(batchRegisteredTypes != null)
+                if (batchRegisteredTypes != null)
                 {
                     batchRegisteredTypes[key] = methods;
                 }
@@ -594,10 +598,10 @@ namespace Orleans.Serialization
 
             return wasInDictionary;
         }
-                        
+
         internal static void FindSerializationInfo(List<Type> typesToProcess)
         {
-            lock(typeWriteLock)
+            lock (typeWriteLock)
             {
                 bool firstRun = batchRegisteredTypes == null;
                 if (firstRun)
@@ -605,7 +609,7 @@ namespace Orleans.Serialization
                     batchRegisteredTypes = new Dictionary<Type, SerializerMethods>((Dictionary<Type, SerializerMethods>)registeredTypes);
                     batchTypes = new Dictionary<string, Type>((Dictionary<string, Type>)types);
                 }
-                foreach(var t in typesToProcess)
+                foreach (var t in typesToProcess)
                 {
                     FindSerializationInfo(t);
                 }
@@ -881,12 +885,7 @@ namespace Orleans.Serialization
                 typeInfo = type.GetTypeInfo();
             }
 
-            var constructor =
-                typeInfo.GetConstructor(
-                                BindingFlags.CreateInstance | BindingFlags.NonPublic | BindingFlags.Instance,
-                                null,
-                                new[] { typeof(GrainReference) },
-                                null);
+            var constructor = TypeUtils.GetConstructorThatMatches(type, new[] { typeof(GrainReference) });
 
             var ctorParam = Expression.Parameter(typeof(GrainReference), "grainRef");
             var lambda = Expression.Lambda(
@@ -908,7 +907,7 @@ namespace Orleans.Serialization
             var typeAlreadyRegistered = false;
 
             typeAlreadyRegistered = registeredTypes.ContainsKey(concreteSerializerType);
-            
+
             if (typeAlreadyRegistered)
             {
                 return new SerializerMethods(
@@ -1049,7 +1048,7 @@ namespace Orleans.Serialization
                     return originalArray;
                 }
                 // A common special case
-                if ((original is byte[]) && (originalArray.Rank == 1))
+                if (t.TypeHandle.Equals(byteArrayTypeHandle) && (originalArray.Rank == 1))
                 {
                     var source = (byte[])original;
                     if (source.Length > LARGE_OBJECT_LIMIT)
@@ -1142,7 +1141,7 @@ namespace Orleans.Serialization
         internal static bool HasSerializer(Type t)
         {
             SerializerMethods methods;
-            
+
             if (registeredTypes.TryGetValue(t, out methods) && methods.Serialize != null) return true;
 
             var typeInfo = t.GetTypeInfo();
@@ -1310,6 +1309,14 @@ namespace Orleans.Serialization
                     stream.Write(SerializationTokenType.ByteArray);
                     stream.Write(array.Length);
                     stream.Write((byte[])array);
+                    return;
+                }
+                if (et.TypeHandle.Equals(sbyteTypeHandle))
+                {
+                    stream.Write(SerializationTokenType.SpecifiedType);
+                    stream.Write(SerializationTokenType.SByteArray);
+                    stream.Write(array.Length);
+                    stream.Write((sbyte[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(boolTypeHandle))
@@ -1800,7 +1807,7 @@ namespace Orleans.Serialization
 
         #region Special case code for message headers
 
-        internal static void SerializeMessageHeaders(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
+        internal static void SerializeMessageHeaders(Message.HeadersContainer headers, BinaryTokenStreamWriter stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1808,80 +1815,19 @@ namespace Orleans.Serialization
                 timer = new Stopwatch();
                 timer.Start();
             }
-            SerializeMessageHeaderDictHelper(headers, stream);
+
+            var ser = GetSerializer(typeof(Message.HeadersContainer));
+            ser(headers, stream, typeof(Message.HeadersContainer));
 
             if (timer != null)
             {
                 timer.Stop();
                 HeaderSers.Increment();
-                HeaderSersNumHeaders.IncrementBy(headers.Count);
                 HeaderSerTime.IncrementBy(timer.ElapsedTicks);
             }
         }
 
-        private static void SerializeMessageHeaderDictHelper(Dictionary<Message.Header, object> headers, BinaryTokenStreamWriter stream)
-        {
-            stream.Write(SerializationTokenType.StringObjDict);
-            stream.Write(headers.Count);
-            foreach (var header in headers)
-            {
-                stream.Write((byte)header.Key);
-                SerializeMessageHeaderValueHelper(header.Value, stream);
-            }
-        }
-
-        private static void SerializeMessageHeaderListHelper(List<object> list, BinaryTokenStreamWriter stream)
-        {
-            stream.Write(SerializationTokenType.ObjList);
-            stream.Write(list.Count);
-            foreach (var item in list)
-                SerializeMessageHeaderValueHelper(item, stream);
-        }
-
-        private static void SerializeMessageHeaderValueHelper(object value, BinaryTokenStreamWriter stream)
-        {
-            if (value == null)
-            {
-                stream.WriteNull();
-                return;
-            }
-
-            if (value is Enum)
-            {
-                // Within message headers, enums get serialized as integers, and get re-cast in the code
-                stream.Write(SerializationTokenType.Int);
-                stream.Write(Convert.ToInt32(value));
-                return;
-            }
-
-            if (stream.TryWriteSimpleObject(value))
-                return;
-
-            if (value is Dictionary<Message.Header, object>)
-            {
-                SerializeMessageHeaderDictHelper((Dictionary<Message.Header, object>)value, stream);
-                return;
-            }
-
-            if (value is List<object>)
-            {
-                SerializeMessageHeaderListHelper((List<object>)value, stream);
-                return;
-            }
-
-            var t = value.GetType();
-            var ser = GetSerializer(t);
-            if (ser != null)
-            {
-                stream.WriteTypeHeader(t);
-                ser(value, stream, null);
-                return;
-            }
-
-            throw new ArgumentException("Invalid message header passed to SerializeMessageHeaders; type is " + value.GetType().Name, "value");
-        }
-
-        internal static Dictionary<Message.Header, object> DeserializeMessageHeaders(BinaryTokenStreamReader stream)
+        internal static Message.HeadersContainer DeserializeMessageHeaders(BinaryTokenStreamReader stream)
         {
             Stopwatch timer = null;
             if (StatisticsCollector.CollectSerializationStats)
@@ -1889,80 +1835,20 @@ namespace Orleans.Serialization
                 timer = new Stopwatch();
                 timer.Start();
             }
-            var token = stream.ReadToken();
-            if (token != SerializationTokenType.StringObjDict)
-            {
-                if (token == SerializationTokenType.SpecifiedType)
-                {
-                    Type t = null;
-                    try
-                    {
-                        t = stream.ReadSpecifiedTypeHeader();
-                    }
-                    catch (Exception) { }
 
-                    if (t != null)
-                        throw new SerializationException(String.Format("Introductory token for message headers is incorrect: token = {0}, SpecifiedTypeHeader = {1} ", token, t));
-                }
-                throw new SerializationException(String.Format("Introductory token for message headers is incorrect: {0}", token));
-            }
-            var result = DeserializeMessageHeaderDictHelper(stream);
+            var des = GetDeserializer(typeof(Message.HeadersContainer));
+            var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), stream);
 
             if (timer != null)
             {
                 timer.Stop();
                 HeaderDesers.Increment();
-                HeaderDesersNumHeaders.IncrementBy(result.Count);
                 HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
             }
-            return result;
+
+            return headers;
         }
 
-        private static Dictionary<Message.Header, object> DeserializeMessageHeaderDictHelper(BinaryTokenStreamReader stream)
-        {
-            var count = stream.ReadInt();
-            var result = new Dictionary<Message.Header, object>(count);
-            for (var i = 0; i < count; i++)
-            {
-                var key = stream.ReadByte();
-                result.Add((Message.Header)key, DeserializeMessageHeaderHelper(stream));
-            }
-            return result;
-        }
-
-        private static List<object> DeserializeMessageHeaderListHelper(BinaryTokenStreamReader stream)
-        {
-            var count = stream.ReadInt();
-            var result = new List<object>(count);
-            for (var i = 0; i < count; i++)
-                result.Add(DeserializeMessageHeaderHelper(stream));
-
-            return result;
-        }
-
-
-        private static object DeserializeMessageHeaderHelper(BinaryTokenStreamReader stream)
-        {
-            object result;
-            SerializationTokenType token;
-            if (stream.TryReadSimpleType(out result, out token))
-                return result;
-
-            if (token == SerializationTokenType.ObjList)
-                return DeserializeMessageHeaderListHelper(stream);
-
-            if (token == SerializationTokenType.StringObjDict)
-                return DeserializeMessageHeaderDictHelper(stream);
-
-            if (token == SerializationTokenType.SpecifiedType)
-            {
-                var t = stream.ReadSpecifiedTypeHeader();
-                var des = GetDeserializer(t);
-                if (des != null)
-                    return des(t, stream);
-            }
-            throw new SerializationException(String.Format("Unexpected token {0} parsing message headers", token));
-        }
 
         private static bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
@@ -2107,12 +1993,12 @@ namespace Orleans.Serialization
                 case TypeCode.Decimal:
                 case TypeCode.Char:
                 case TypeCode.DateTime:
-                return true;
+                    return true;
                 default:
-                if (t.IsArray)
-                    return HasOrleansSerialization(t.GetElementType());
-                SerializerMethods methods;
-                return t == typeof(string) || (registeredTypes.TryGetValue(t, out methods) && methods.Serialize != null) || typeToExternalSerializerDictionary.ContainsKey(t);
+                    if (t.IsArray)
+                        return HasOrleansSerialization(t.GetElementType());
+                    SerializerMethods methods;
+                    return t == typeof(string) || (registeredTypes.TryGetValue(t, out methods) && methods.Serialize != null) || typeToExternalSerializerDictionary.ContainsKey(t);
             }
         }
 
