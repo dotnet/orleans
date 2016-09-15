@@ -78,8 +78,11 @@ namespace Orleans.Runtime
         {
             foreach (var debuggableAttribute in assembly.GetCustomAttributes<DebuggableAttribute>())
             {
-                if (debuggableAttribute != null)
-                    return debuggableAttribute.IsJITTrackingEnabled;
+#if NETSTANDARD
+                return true;
+#else
+                return debuggableAttribute.IsJITTrackingEnabled;
+#endif
             }
             return false;
         }
