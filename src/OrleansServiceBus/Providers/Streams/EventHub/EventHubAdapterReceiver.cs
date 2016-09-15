@@ -17,7 +17,7 @@ namespace Orleans.ServiceBus.Providers
         public IEventHubSettings Hub { get; set; }
         public string Partition { get; set; }
     }
-    
+
     internal class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCache
     {
         public const int MaxMessagesPerRead = 1000;
@@ -28,16 +28,7 @@ namespace Orleans.ServiceBus.Providers
         private readonly Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory;
         private readonly Logger baseLogger;
         private readonly Logger logger;
-
-        // metric names
-        private readonly string hubReceiveTimeMetric;
-        private readonly string partitionReceiveTimeMetric;
-        private readonly string hubReadFailure;
-        private readonly string partitionReadFailure;
-        private readonly string hubMessagesRecieved;
-        private readonly string partitionMessagesReceived;
-        private readonly string hubAgeOfMessagesBeingProcessed;
-        private readonly string partitionAgeOfMessagesBeingProcessed;
+        private readonly IEventHubReceiverMonitor monitor;
 
         private IEventHubQueueCache cache;
         private EventHubReceiver receiver;
@@ -51,25 +42,22 @@ namespace Orleans.ServiceBus.Providers
 
         public int GetMaxAddCount() { return flowController.GetMaxAddCount(); }
 
-        public EventHubAdapterReceiver(EventHubPartitionSettings partitionSettings,
+        public EventHubAdapterReceiver(EventHubPartitionSettings settings,
             Func<string, IStreamQueueCheckpointer<string>, Logger,IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
-            Logger logger)
+            Logger baseLogger,
+            IEventHubReceiverMonitor monitor = null)
         {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
+            if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
+            if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
+            this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
-            baseLogger = logger;
-            this.logger = logger.GetSubLogger("-receiver");
-            settings = partitionSettings;
-
-            hubReceiveTimeMetric = $"Orleans.ServiceBus.EventHub.ReceiveTime_{settings.Hub.Path}";
-            partitionReceiveTimeMetric = $"Orleans.ServiceBus.EventHub.ReceiveTime_{settings.Hub.Path}-{settings.Partition}";
-            hubReadFailure = $"Orleans.ServiceBus.EventHub.ReadFailure_{settings.Hub.Path}";
-            partitionReadFailure = $"Orleans.ServiceBus.EventHub.ReadFailure_{settings.Hub.Path}-{settings.Partition}";
-            hubMessagesRecieved = $"Orleans.ServiceBus.EventHub.MessagesReceived_{settings.Hub.Path}";
-            partitionMessagesReceived = $"Orleans.ServiceBus.EventHub.MessagesReceived_{settings.Hub.Path}-{settings.Partition}";
-            hubAgeOfMessagesBeingProcessed = $"Orleans.ServiceBus.EventHub.AgeOfMessagesBeingProcessed_{settings.Hub.Path}";
-            partitionAgeOfMessagesBeingProcessed = $"Orleans.ServiceBus.EventHub.AgeOfMessagesBeingProcessed_{settings.Hub.Path}-{settings.Partition}";
+            this.baseLogger = baseLogger;
+            this.logger = baseLogger.GetSubLogger("receiver", "-");
+            this.monitor = monitor ?? new DefaultEventHubReceiverMonitor(settings.Hub.Path, settings.Partition, baseLogger.GetSubLogger("monitor", "-"));
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -119,15 +107,12 @@ namespace Orleans.ServiceBus.Providers
                 messages = (await receiver.ReceiveAsync(maxCount, ReceiveTimeout)).ToList();
                 watch.Stop();
 
-                logger.TrackMetric(hubReceiveTimeMetric, watch.Elapsed);
-                logger.TrackMetric(partitionReceiveTimeMetric, watch.Elapsed);
-                logger.TrackMetric(hubReadFailure, 0);
-                logger.TrackMetric(partitionReadFailure, 0);
+                monitor.TrackRead(true);
+                monitor.TrackMessagesRecieved(messages.Count, watch.Elapsed);
             }
             catch (Exception ex)
             {
-                logger.TrackMetric(hubReadFailure, 1);
-                logger.TrackMetric(partitionReadFailure, 1);
+                monitor.TrackRead(false);
                 logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead, "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", settings.Hub.Path,
                     settings.Partition, ex);
                 throw;
@@ -139,14 +124,11 @@ namespace Orleans.ServiceBus.Providers
                 return batches;
             }
 
-            logger.TrackMetric(hubMessagesRecieved, messages.Count);
-            logger.TrackMetric(partitionMessagesReceived, messages.Count);
-
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
-            TimeSpan difference = dequeueTimeUtc - messages[messages.Count-1].EnqueuedTimeUtc;
-            logger.TrackMetric(hubAgeOfMessagesBeingProcessed, difference);
-            logger.TrackMetric(partitionAgeOfMessagesBeingProcessed, difference);
+            TimeSpan oldest = dequeueTimeUtc - messages[0].EnqueuedTimeUtc;
+            TimeSpan newest = dequeueTimeUtc - messages[messages.Count - 1].EnqueuedTimeUtc;
+            monitor.TrackAgeOfMessagesRead(oldest, newest);
 
             foreach (EventData message in messages)
             {
