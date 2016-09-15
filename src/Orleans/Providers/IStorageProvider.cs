@@ -69,9 +69,11 @@ namespace Orleans.Storage
         public BadProviderConfigException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -94,9 +96,11 @@ namespace Orleans.Storage
         public InconsistentStateException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {}
+#endif
 
         public InconsistentStateException(
           string errorMsg,

@@ -22,11 +22,12 @@ namespace Orleans.Runtime
         public OrleansException(string message) : base(message) { }
 
         public OrleansException(string message, Exception innerException) : base(message, innerException) { }
-
+#if !NETSTANDARD
         protected OrleansException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
     }
 
     /// <summary>
@@ -47,10 +48,12 @@ namespace Orleans.Runtime
 
         public GatewayTooBusyException(string message, Exception innerException) : base(message, innerException) { }
 
+#if !NETSTANDARD
         protected GatewayTooBusyException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
     }
 
     /// <summary>
@@ -75,10 +78,12 @@ namespace Orleans.Runtime
         public LimitExceededException(string limitName, int current, int threshold, object extraInfo) 
             : base(string.Format("Limit exceeded {0} Current={1} Threshold={2} {3}", limitName, current, threshold, extraInfo)) { }
 
+#if !NETSTANDARD
         protected LimitExceededException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
     }
 
     /// <summary>
@@ -113,6 +118,7 @@ namespace Orleans.Runtime
             CallChain = callChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList();
         }
 
+#if !NETSTANDARD
         protected DeadlockException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -131,6 +137,7 @@ namespace Orleans.Runtime
 
             base.GetObjectData(info, context);
         }
+#endif
     }
 
     /// <summary>
@@ -143,9 +150,11 @@ namespace Orleans.Runtime
         public GrainExtensionNotInstalledException(string msg) : base(msg) { }
         public GrainExtensionNotInstalledException(string message, Exception innerException) : base(message, innerException) { }
 
+#if !NETSTANDARD
         protected GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -158,9 +167,11 @@ namespace Orleans.Runtime
         public SiloUnavailableException(string msg) : base(msg) { }
         public SiloUnavailableException(string message, Exception innerException) : base(message, innerException) { }
 
+#if !NETSTANDARD
         protected SiloUnavailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -173,9 +184,11 @@ namespace Orleans.Runtime
         public InvalidSchedulingContextException(string msg) : base(msg) { }
         public InvalidSchedulingContextException(string message, Exception innerException) : base(message, innerException) { }
 
+#if !NETSTANDARD
         protected InvalidSchedulingContextException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -188,9 +201,11 @@ namespace Orleans.Runtime
         internal ClientNotAvailableException(string msg) : base(msg) { }
         internal ClientNotAvailableException(string message, Exception innerException) : base(message, innerException) { }
 
+#if !NETSTANDARD
         protected ClientNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 }
 
