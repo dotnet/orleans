@@ -158,7 +158,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    callbackTimeouter.Dispose();
+                    callbackTimeouter = null;
                     timeouter.Dispose();
                 }
                 catch { }
