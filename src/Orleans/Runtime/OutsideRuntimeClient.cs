@@ -269,10 +269,7 @@ namespace Orleans
             transport.Start();
             LogManager.MyIPEndPoint = transport.MyAddress.Endpoint; // transport.MyAddress is only set after transport is Started.
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
-
             ClientStatistics = new ClientStatisticsManager(config);
-            ClientStatistics.Start(config, statisticsProviderManager, transport, clientId)
-                .WaitWithThrow(initTimeout);
 
             listeningCts = new CancellationTokenSource();
             var ct = listeningCts.Token;
@@ -292,6 +289,9 @@ namespace Orleans
                 }
             );
             grainInterfaceMap = transport.GetTypeCodeMap(grainFactory).Result;
+
+            ClientStatistics.Start(statisticsProviderManager, transport, clientId)
+                .WaitWithThrow(initTimeout);
 
             StreamingInitialize();
         }
