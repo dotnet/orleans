@@ -1637,12 +1637,12 @@ namespace Orleans.Serialization
 
         internal static void SerializeType(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            stream.Write(((Type)obj).OrleansTypeName());
+            stream.Write(((Type)obj).AssemblyQualifiedName);
         }
 
         internal static object DeserializeType(Type expected, BinaryTokenStreamReader stream)
         {
-            return SerializationManager.ResolveTypeName(stream.ReadString());
+            return Type.GetType(stream.ReadString(), throwOnError: true);
         }
 
         internal static object CopyType(object obj)
