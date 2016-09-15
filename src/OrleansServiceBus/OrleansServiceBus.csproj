@@ -47,6 +47,7 @@
     </Compile>
     <Compile Include="ErrorCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Providers\Streams\EventHub\DefaultEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\EventDataExtensions.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterFactory.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubAdapterReceiver.cs" />
@@ -59,9 +60,10 @@
     <Compile Include="Providers\Streams\EventHub\EventHubSequenceToken.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
-    <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderConfig.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\ICheckpointerSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueMapper.cs" />
+    <Compile Include="Providers\Streams\EventHub\IEventHubReceiverMonitor.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\IEventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\SegmentBuilder.cs" />

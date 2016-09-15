@@ -283,12 +283,6 @@ namespace Orleans.CodeGenerator
                                 SF.VariableDeclarator("result")
                                     .WithInitializer(SF.EqualsValueClause(GetObjectCreationExpressionSyntax(type))))));
 
-                // Copy all members from the input to the result.
-                foreach (var field in fields)
-                {
-                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
-                }
-
                 // Record this serialization.
                 Expression<Action> recordObject =
                     () => SerializationContext.Current.RecordObject(default(object), default(object));
@@ -303,6 +297,12 @@ namespace Orleans.CodeGenerator
                     SF.ExpressionStatement(
                         recordObject.Invoke(currentSerializationContext)
                             .AddArgumentListArguments(SF.Argument(originalVariable), SF.Argument(resultVariable))));
+
+                // Copy all members from the input to the result.
+                foreach (var field in fields)
+                {
+                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
+                }
 
                 body.Add(SF.ReturnStatement(resultVariable));
             }

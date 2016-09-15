@@ -42,11 +42,11 @@ namespace Orleans.ServiceBus.Providers
         {
             if (segment.Array == null)
             {
-                throw new ArgumentNullException("segment");
+                throw new ArgumentNullException(nameof(segment));
             }
             if (bytes == null)
             {
-                throw new ArgumentNullException("bytes");
+                throw new ArgumentNullException(nameof(bytes));
             }
 
             Array.Copy(BitConverter.GetBytes(bytes.Length), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
@@ -68,7 +68,7 @@ namespace Orleans.ServiceBus.Providers
         {
             if (segment.Array == null)
             {
-                throw new ArgumentNullException("segment");
+                throw new ArgumentNullException(nameof(segment));
             }
             if (str == null)
             {
@@ -96,7 +96,7 @@ namespace Orleans.ServiceBus.Providers
         {
             if (segment.Array == null)
             {
-                throw new ArgumentNullException("segment");
+                throw new ArgumentNullException(nameof(segment));
             }
             int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
             readerOffset += sizeof(int);
@@ -113,7 +113,7 @@ namespace Orleans.ServiceBus.Providers
         {
             if (segment.Array == null)
             {
-                throw new ArgumentNullException("segment");
+                throw new ArgumentNullException(nameof(segment));
             }
             int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
             readerOffset += sizeof(int);

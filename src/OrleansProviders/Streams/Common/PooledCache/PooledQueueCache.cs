@@ -92,7 +92,7 @@ namespace Orleans.Providers.Streams.Common
             }
             this.cacheDataAdapter = cacheDataAdapter;
             this.comparer = comparer;
-            this.logger = logger.GetSubLogger("-cache");
+            this.logger = logger.GetSubLogger("messagecache", "-");
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
             purgeQueue = new ConcurrentQueue<IDisposable>();
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();

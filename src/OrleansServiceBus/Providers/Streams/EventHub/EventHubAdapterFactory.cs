@@ -20,7 +20,7 @@ namespace Orleans.ServiceBus.Providers
         protected Logger logger;
         protected IServiceProvider serviceProvider;
         protected IProviderConfiguration providerConfig;
-        protected EventHubStreamProviderConfig adapterConfig;
+        protected EventHubStreamProviderSettings adapterSettings;
         protected IEventHubSettings hubSettings;
         protected ICheckpointerSettings checkpointerSettings;
         private IEventHubQueueMapper streamQueueMapper;
@@ -31,7 +31,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Name of the adapter. Primarily for logging purposes
         /// </summary>
-        public string Name => adapterConfig.StreamProviderName;
+        public string Name => adapterSettings.StreamProviderName;
 
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
@@ -73,29 +73,29 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="svcProvider"></param>
         public virtual void Init(IProviderConfiguration providerCfg, string providerName, Logger log, IServiceProvider svcProvider)
         {
-            if (providerCfg == null) throw new ArgumentNullException("providerCfg");
-            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException("providerName");
-            if (log == null) throw new ArgumentNullException("log");
+            if (providerCfg == null) throw new ArgumentNullException(nameof(providerCfg));
+            if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
+            if (log == null) throw new ArgumentNullException(nameof(log));
 
             providerConfig = providerCfg;
             serviceProvider = svcProvider;
             receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
 
-            adapterConfig = new EventHubStreamProviderConfig(providerName);
-            adapterConfig.PopulateFromProviderConfig(providerConfig);
-            hubSettings = adapterConfig.GetEventHubSettings(providerConfig, serviceProvider);
+            adapterSettings = new EventHubStreamProviderSettings(providerName);
+            adapterSettings.PopulateFromProviderConfig(providerConfig);
+            hubSettings = adapterSettings.GetEventHubSettings(providerConfig, serviceProvider);
             client = EventHubClient.CreateFromConnectionString(hubSettings.ConnectionString, hubSettings.Path);
 
             if (CheckpointerFactory == null)
             {
-                checkpointerSettings = adapterConfig.GetCheckpointerSettings(providerConfig, serviceProvider);
-                CheckpointerFactory = partition => EventHubCheckpointer.Create(checkpointerSettings, adapterConfig.StreamProviderName, partition);
+                checkpointerSettings = adapterSettings.GetCheckpointerSettings(providerConfig, serviceProvider);
+                CheckpointerFactory = partition => EventHubCheckpointer.Create(checkpointerSettings, adapterSettings.StreamProviderName, partition);
             }
 
             if (CacheFactory == null)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var timePurge = new TimePurgePredicate(adapterConfig.DataMinTimeInCache, adapterConfig.DataMaxAgeInCache);
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+                var timePurge = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
                 CacheFactory = (partition,checkpointer,cacheLogger) => new EventHubQueueCache(checkpointer, bufferPool, timePurge, cacheLogger);
             }
 
@@ -107,7 +107,7 @@ namespace Orleans.ServiceBus.Providers
 
             if (QueueMapperFactory == null)
             {
-                QueueMapperFactory = partitions => new EventHubQueueMapper(partitionIds, adapterConfig.StreamProviderName);
+                QueueMapperFactory = partitions => new EventHubQueueMapper(partitionIds, adapterSettings.StreamProviderName);
             }
 
             logger = log.GetLogger($"EventHub.{hubSettings.Path}");
@@ -203,12 +203,12 @@ namespace Orleans.ServiceBus.Providers
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
         {
-            var config = new EventHubPartitionConfig
+            var config = new EventHubPartitionSettings
             {
                 Hub = hubSettings,
                 Partition = streamQueueMapper.QueueToPartition(queueId),
             };
-            Logger recieverLogger = logger.GetSubLogger($".{config.Partition}");
+            Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
             return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger);
         }
 

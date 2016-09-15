@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
+using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
@@ -585,6 +586,7 @@ namespace Orleans.TestingHost
                 new object[] { });
 
             appDomain.UnhandledException += ReportUnobservedException;
+            appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
 
             return silo;
         }
@@ -596,6 +598,11 @@ namespace Orleans.TestingHost
                 appDomain.UnhandledException -= ReportUnobservedException;
                 AppDomain.Unload(appDomain);
             }
+        }
+
+        private static void RegisterPerfCountersTelemetryConsumer()
+        {
+            LogManager.TelemetryConsumers.Add(new OrleansPerfCounterTelemetryConsumer());
         }
 
         private static AppDomainSetup GetAppDomainSetupInfo()
