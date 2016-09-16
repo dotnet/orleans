@@ -52,7 +52,7 @@ This is because .NET property setters and getters aren't meant to do I/O.
 It is often possible to use traditional object-oriented design methodology with Orleans, but sometimes there are reasons for not doing so.
 In this case, we're choosing to not rely on inheritance when defining the `Manager` class, even though a `Manager` is clearly also an `Employee`.
 The reason for this will be explained when we discuss Orleans' support for [Declarative Persistence](Declarative-Persistence.md).
-With these two interfaces as our starting point, the implementation classes are straight-forward to implement, as the interfaces are simple.
+With these two interfaces as our starting point, the implementation classes are straightforward to implement, as the interfaces are simple.
 
 Here's what it looks like:
 
@@ -119,8 +119,8 @@ public class Manager : Grain, IManager
 }
 ```
 
-A manager is expressed as an employee through composition: the manager grain has a reference to an grain representing its "employeeness."
-The role of `OnActivateAsync()` will be explained later on; for now, you may consider it a constructor.
+A manager is expressed as an employee through composition: the manager grain has a reference to a grain representing its "employeeness."
+The role of `OnActivateAsync()` will be explained later on; for now, you may consider it to be a constructor.
 
 In the client _(Program.cs)_, we can add a few lines to create a couple of employees and their manager:
 
