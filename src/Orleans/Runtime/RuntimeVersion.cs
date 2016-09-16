@@ -16,7 +16,7 @@ namespace Orleans.Runtime
             {
                 Assembly thisProg = typeof(RuntimeVersion).GetTypeInfo().Assembly;
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
-                var isDebug = IsAssemblyDebugBuild(thisProg);
+                bool isDebug = IsAssemblyDebugBuild(thisProg);
                 string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
                 return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
             }
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
                 return progInfo.Name;
             }
         }
-        
+
         /// <summary>
         /// Writes the Orleans program ident info to the Console, eg: 'OrleansHost v2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
         /// </summary>
