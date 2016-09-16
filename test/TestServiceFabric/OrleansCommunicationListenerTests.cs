@@ -42,7 +42,7 @@ namespace TestServiceFabric
                 9823);
         }
 
-        [Fact]
+        [Fact, TestCategory("ServiceFabric")]
         public async Task SimpleUsageScenarioTest()
         {
             var endpoints = new EndpointsCollection
@@ -80,7 +80,7 @@ namespace TestServiceFabric
             siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
         }
 
-        [Fact]
+        [Fact, TestCategory("ServiceFabric")]
         public void MissingEndpointsCauseException()
         {
             var endpoints = new EndpointsCollection();
@@ -96,7 +96,7 @@ namespace TestServiceFabric
             Assert.Contains("OrleansProxyEndpoint", exception.Message);
         }
 
-        [Fact]
+        [Fact, TestCategory("ServiceFabric")]
         public void AbortStopAndDisposesSilo()
         {
             var endpoints = new EndpointsCollection
@@ -120,7 +120,7 @@ namespace TestServiceFabric
             siloHost.DidNotReceiveWithAnyArgs().Start(null, null);
         }
 
-        [Fact]
+        [Fact, TestCategory("ServiceFabric")]
         public async Task CloseStopsSilo()
         {
             var endpoints = new EndpointsCollection
