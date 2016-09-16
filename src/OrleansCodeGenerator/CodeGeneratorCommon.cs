@@ -46,13 +46,16 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblyName">
         /// The name for the generated assembly.
         /// </param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
@@ -90,7 +93,7 @@ namespace Orleans.CodeGenerator
                     .WithOptions(options);
 
             var outputStream = new MemoryStream();
-            var symbolStream = RuntimeVersion.IsDebugBuild ? new MemoryStream() : null;
+            var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
             try
             {
                 var compilationResult = compilation.Emit(outputStream, symbolStream);

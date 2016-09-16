@@ -16,7 +16,8 @@ namespace Orleans.Runtime
             {
                 Assembly thisProg = typeof(RuntimeVersion).GetTypeInfo().Assembly;
                 FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
-                string productVersion = progVersionInfo.ProductVersion + (IsDebugBuild ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
+                var isDebug = IsAssemblyDebugBuild(thisProg);
+                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
                 return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
             }
         }
@@ -60,12 +61,7 @@ namespace Orleans.Runtime
                 return progInfo.Name;
             }
         }
-
-        /// <summary>
-        /// Gets a value indicating whether or not this is a debug build.
-        /// </summary>
-        public static bool IsDebugBuild => IsAssemblyDebugBuild(typeof(RuntimeVersion).GetTypeInfo().Assembly);
-
+        
         /// <summary>
         /// Writes the Orleans program ident info to the Console, eg: 'OrleansHost v2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
         /// </summary>
@@ -78,7 +74,16 @@ namespace Orleans.Runtime
 #endif
         }
 
-        private static bool IsAssemblyDebugBuild(Assembly assembly)
+        /// <summary>
+        /// Returns a value indicating whether the provided <paramref name="assembly"/> was built in debug mode.
+        /// </summary>
+        /// <param name="assembly">
+        /// The assembly to check.
+        /// </param>
+        /// <returns>
+        /// A value indicating whether the provided assembly was built in debug mode.
+        /// </returns>
+        internal static bool IsAssemblyDebugBuild(Assembly assembly)
         {
             foreach (var debuggableAttribute in assembly.GetCustomAttributes<DebuggableAttribute>())
             {

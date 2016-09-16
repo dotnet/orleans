@@ -89,8 +89,14 @@ namespace Orleans.CodeGenerator
             }
 
             var timer = Stopwatch.StartNew();
+            var emitDebugSymbols = false;
             foreach (var input in inputs)
             {
+                if (!emitDebugSymbols)
+                {
+                    emitDebugSymbols |= RuntimeVersion.IsAssemblyDebugBuild(input);
+                }
+
                 RegisterGeneratedCodeTargets(input);
                 TryLoadGeneratedAssemblyFromCache(input);
             }
@@ -110,7 +116,7 @@ namespace Orleans.CodeGenerator
                 CachedAssembly generatedAssembly;
                 if (generatedSyntax.Syntax != null)
                 {
-                    generatedAssembly = CompileAndLoad(generatedSyntax);
+                    generatedAssembly = CompileAndLoad(generatedSyntax, emitDebugSymbols);
                 }
                 else
                 {
@@ -168,7 +174,8 @@ namespace Orleans.CodeGenerator
                 CachedAssembly generatedAssembly;
                 if (generated.Syntax != null)
                 {
-                    generatedAssembly = CompileAndLoad(generated);
+                    var emitDebugSymbols = RuntimeVersion.IsAssemblyDebugBuild(input);
+                    generatedAssembly = CompileAndLoad(generated, emitDebugSymbols);
                 }
                 else
                 {
@@ -259,10 +266,13 @@ namespace Orleans.CodeGenerator
         /// Compiles the provided syntax tree, and loads and returns the result.
         /// </summary>
         /// <param name="generatedSyntax">The syntax tree.</param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>The compilation output.</returns>
-        private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax)
+        private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax, bool emitDebugSymbols)
         {
-            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen");
+            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen", emitDebugSymbols: emitDebugSymbols);
             Assembly.Load(generated.RawBytes, generated.DebugSymbolRawBytes);
             return new CachedAssembly(generated)
             {
