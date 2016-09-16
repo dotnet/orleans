@@ -18,10 +18,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public static void InitializeGrainDirectoryManager(LocalGrainDirectory router)
+        public static void InitializeGrainDirectoryManager(LocalGrainDirectory router, int numRetriesForGSI)
         {
             Instance = new RegistrarManager();
             Instance.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(router.DirectoryPartition));
+            Instance.Register<GlobalSingleInstanceRegistration>(new GlobalSingleInstanceRegistrar(router.DirectoryPartition, router.Logger, router.GsiActivationMaintainer, numRetriesForGSI));
         }
 
         private void Register<TStrategy>(IGrainRegistrar directory)

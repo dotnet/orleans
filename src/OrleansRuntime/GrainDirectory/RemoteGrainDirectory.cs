@@ -41,14 +41,14 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, singleActivation, 1)));
         }
 
-        public Task UnregisterAsync(ActivationAddress address, bool force, int hopCount)
+        public Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount)
         {
-            return router.UnregisterAsync(address, force, hopCount);
+            return router.UnregisterAsync(address, cause, hopCount);
         }
 
-        public Task UnregisterManyAsync(List<ActivationAddress> addresses, int hopCount)
+        public Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount)
         {
-            return router.UnregisterManyAsync(addresses, hopCount);
+            return router.UnregisterManyAsync(addresses, cause, hopCount);
         }
 
         public  Task DeleteGrainAsync(GrainId grainId, int hopCount)
@@ -79,7 +79,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // the grain entry has been updated -- fetch and return its current version
-                    var lookupResult = partition.LookUpGrain(tuple.Item1);
+                    var lookupResult = partition.LookUpActivations(tuple.Item1);
                     // validate that the entry is still in the directory (i.e., it was not removed concurrently)
                     if (lookupResult.Addresses != null)
                     {

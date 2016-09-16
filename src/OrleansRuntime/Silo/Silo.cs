@@ -180,7 +180,7 @@ namespace Orleans.Runtime
                 LogManager.Initialize(nodeConfig);
 
             config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(nodeConfig, true), false);
-            MultiClusterRegistrationStrategy.Initialize();
+            MultiClusterRegistrationStrategy.Initialize(config.Globals);
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
             
@@ -272,7 +272,7 @@ namespace Orleans.Runtime
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = new LocalGrainDirectory(this); 
 
-            RegistrarManager.InitializeGrainDirectoryManager(localGrainDirectory);
+            RegistrarManager.InitializeGrainDirectoryManager(localGrainDirectory, globalConfig.GlobalSingleInstanceNumberRetries);
 
             // Now the activation directory.
             // This needs to know which router to use so that it can keep the global directory in synch with the local one.
@@ -344,9 +344,12 @@ namespace Orleans.Runtime
             logger.Verbose("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(DeploymentLoadPublisher.Instance);
 
-            logger.Verbose("Creating {0} System Target", "RemGrainDirectory + CacheValidator");
-            RegisterSystemTarget(LocalGrainDirectory.RemGrainDirectory);
+            logger.Verbose("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
+            RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
+
+            logger.Verbose("Creating {0} System Target", "RemoteClusterGrainDirectory");
+            RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
             clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalGrainDirectory, LocalScheduler, OrleansConfig);
@@ -959,10 +962,19 @@ namespace Orleans.Runtime
             {
                 ExecuteFastKillInProcessExit = false;
             }
- 
-            internal void InjectMultiClusterConfiguration(MultiClusterConfiguration config)
+          
+            // used for testing only: returns directory entries whose type name contains the given string
+            internal IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
             {
-                silo.LocalMultiClusterOracle.InjectMultiClusterConfiguration(config).Wait();
+                var x = new Dictionary<GrainId, IGrainInfo>();
+                foreach (var kvp in silo.localGrainDirectory.DirectoryPartition.GetItems())
+                {
+                    if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
+                        continue;// Skip system grains, system targets and clients
+                    if (silo.catalog.GetGrainTypeName(kvp.Key).Contains(expr))
+                        x.Add(kvp.Key, kvp.Value);
+                }
+                return x;
             }
 
             // store silos for which we simulate faulty communication

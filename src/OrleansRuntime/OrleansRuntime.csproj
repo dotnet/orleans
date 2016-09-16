@@ -67,6 +67,11 @@
     <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
     <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
     <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceActivationMaintainer.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceResponseTracker.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceRegistrar.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\MultiClusterUtils.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />

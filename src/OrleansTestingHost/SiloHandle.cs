@@ -19,9 +19,10 @@ namespace Orleans.TestingHost
         public string MachineName { get; set; }
         public IPEndPoint Endpoint { get; set; }
 
+        public int? GatewayPort { get; set; }
         public override string ToString()
         {
-            return String.Format("SiloHandle:{0}", Endpoint);
+            return String.Format("(SiloHandle endpoint={0} gatewayport={1})", Endpoint, GatewayPort);
         }
     }
 }

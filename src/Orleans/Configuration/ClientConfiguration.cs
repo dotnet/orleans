@@ -269,6 +269,7 @@ namespace Orleans.Runtime.Configuration
                                 }
                             }
                             break;
+
                         case "Tracing":
                             ConfigUtilities.ParseTracing(this, child, ClientName);
                             break;

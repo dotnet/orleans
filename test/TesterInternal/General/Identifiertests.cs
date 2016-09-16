@@ -466,6 +466,10 @@ namespace UnitTests.General
             GrainId observerGrainId = GrainId.NewClientId();
             grainRef = GrainReference.NewObserverGrainReference(observerGrainId, GuidId.GetNewGuidId());
             TestGrainReference(grainRef);
+
+            GrainId geoObserverGrainId = GrainId.NewClientId("clusterid");
+            grainRef = GrainReference.NewObserverGrainReference(geoObserverGrainId, GuidId.GetNewGuidId());
+            TestGrainReference(grainRef);
         }
 
         private void TestGrainReference(GrainReference grainRef)

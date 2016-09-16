@@ -12,9 +12,9 @@ namespace Orleans.Runtime.GrainDirectory
     {
         public SiloAddress SiloAddress { get; private set; }
         public DateTime TimeCreated { get; private set; }
-        public MultiClusterStatus RegistrationStatus { get; set; }
+        public GrainDirectoryEntryStatus RegistrationStatus { get; set; }
 
-        public ActivationInfo(SiloAddress siloAddress, MultiClusterStatus registrationStatus)
+        public ActivationInfo(SiloAddress siloAddress, GrainDirectoryEntryStatus registrationStatus)
         {
             SiloAddress = siloAddress;
             TimeCreated = DateTime.UtcNow;
@@ -26,6 +26,34 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress = iActivationInfo.SiloAddress;
             TimeCreated = iActivationInfo.TimeCreated;
             RegistrationStatus = iActivationInfo.RegistrationStatus;
+        }
+
+
+        public bool OkToRemove(UnregistrationCause cause)
+        {
+            switch (cause)
+            {
+                case UnregistrationCause.Force:
+                    return true;
+
+                case UnregistrationCause.CacheInvalidation:
+                    return RegistrationStatus == GrainDirectoryEntryStatus.Cached;
+
+                case UnregistrationCause.NonexistentActivation:
+                    {
+                        if (RegistrationStatus == GrainDirectoryEntryStatus.Cached)
+                            return true; // cache entries are always removed
+
+                        var delayparameter = Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay;
+                        if (delayparameter <= TimeSpan.Zero)
+                            return false; // no lazy deregistration
+                        else
+                            return (TimeCreated <= DateTime.UtcNow - delayparameter);
+                    }
+
+                default:
+                    throw new OrleansException("unhandled case");
+            }
         }
 
         public override string ToString()
@@ -72,12 +100,12 @@ namespace Orleans.Runtime.GrainDirectory
                     return false;
                 }
             }
-            Instances[act] = new ActivationInfo(silo, MultiClusterStatus.Owned);
+            Instances[act] = new ActivationInfo(silo, GrainDirectoryEntryStatus.ClusterLocal);
             VersionTag = rand.Next();
             return true;
         }
 
-        public ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned)
+        public ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus)
         {
             SingleInstance = true;
             if (Instances.Count > 0)
@@ -89,36 +117,19 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Instances.Add(act, new ActivationInfo(silo, registrationStatus));
                 VersionTag = rand.Next();
-                return ActivationAddress.GetAddress(silo, grain, act, registrationStatus);
+                return ActivationAddress.GetAddress(silo, grain, act);
             }
         }
 
-        public bool RemoveActivation(ActivationAddress addr)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo info, out bool wasRemoved)
         {
-            return RemoveActivation(addr.Activation, true);
-        }
-
-        public bool RemoveActivation(ActivationId act, bool force)
-        {
-            if (force)
+            info = null;
+            wasRemoved = false;
+            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause))
             {
                 Instances.Remove(act);
-                VersionTag = rand.Next();                
-            }
-            else
-            {
-                if (Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay > TimeSpan.Zero)
-                {
-                    IActivationInfo info;
-                    if (Instances.TryGetValue(act, out info))
-                    {
-                        if (info.TimeCreated <= DateTime.UtcNow - Silo.CurrentSilo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay)
-                        {
-                            Instances.Remove(act);
-                            VersionTag = rand.Next();
-                        }
-                    }
-                }
+                wasRemoved = true;
+                VersionTag = rand.Next();
             }
             return Instances.Count == 0;
         }
@@ -170,10 +181,10 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Instances.Remove(oldActivation);
             }
-            Instances.Add(activation, new ActivationInfo(silo, MultiClusterStatus.Cached));
+            Instances.Add(activation, new ActivationInfo(silo, GrainDirectoryEntryStatus.Cached));
         }
 
-        public bool UpdateClusterRegistrationStatus(ActivationId activationId, MultiClusterStatus status, MultiClusterStatus? compareWith = null)
+        public bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus status, GrainDirectoryEntryStatus? compareWith = null)
         {
             IActivationInfo activationInfo;
             if (!Instances.TryGetValue(activationId, out activationInfo))
@@ -270,7 +281,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo"></param>
         /// <param name="registrationStatus"></param>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned)
+        internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus)
         {
             if (log.IsVerbose3) log.Verbose3("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
 
@@ -292,24 +303,45 @@ namespace Orleans.Runtime.GrainDirectory
             return result;
         }
 
+
         /// <summary>
         /// Removes an activation of the given grain from the partition
         /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="activation"></param>
-        /// <param name="force"></param>
-        internal void RemoveActivation(GrainId grain, ActivationId activation, bool force)
+        /// <param name="grain">the identity of the grain</param>
+        /// <param name="activation">the id of the activation</param>
+        /// <param name="cause">reason for removing the activation</param>
+        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause = UnregistrationCause.Force)
         {
-            lock (lockable)
-            {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, force))
-                {
-                    partitionData.Remove(grain);
-                }
-            }
-            if (log.IsVerbose3) log.Verbose3("Removing activation for grain {0}", grain.ToString());
+            IActivationInfo ignore1;
+            bool ignore2;
+            RemoveActivation(grain, activation, cause, out ignore1, out ignore2);
         }
 
+
+        /// <summary>
+        /// Removes an activation of the given grain from the partition
+        /// </summary>
+        /// <param name="grain">the identity of the grain</param>
+        /// <param name="activation">the id of the activation</param>
+        /// <param name="cause">reason for removing the activation</param>
+        /// <param name="entry">returns the entry, if found </param>
+        /// <param name="wasRemoved">returns whether the entry was actually removed</param>
+        internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause, out IActivationInfo entry, out bool wasRemoved)
+        {
+            wasRemoved = false;
+            entry = null;
+            lock (lockable)
+            {
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, out entry, out wasRemoved))
+                    // if the last activation for the grain was removed, we remove the entire grain info 
+                    partitionData.Remove(grain);
+
+            }
+            if (log.IsVerbose3)
+                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
+        }
+
+   
         /// <summary>
         /// Removes the grain (and, effectively, all its activations) from the diretcory
         /// </summary>
@@ -329,24 +361,54 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grain"></param>
         /// <returns></returns>
-        internal AddressesAndTag LookUpGrain(GrainId grain)
+        internal AddressesAndTag LookUpActivations(GrainId grain)
         {
             var result = new AddressesAndTag();
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
                 {
                     result.Addresses = new List<ActivationAddress>();
                     result.VersionTag = partitionData[grain].VersionTag;
 
-                    foreach (var route in partitionData[grain].Instances.Where(route => IsValidSilo(route.Value.SiloAddress)))
+                    foreach (var route in partitionData[grain].Instances)
                     {
-                        result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key, route.Value.RegistrationStatus));
+                        if (IsValidSilo(route.Value.SiloAddress))
+                            result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
                     }
                 }
             }
             return result;
         }
+
+
+        /// <summary>
+        /// Returns the activation of a single-activation grain, if present.
+        /// </summary>
+        internal GrainDirectoryEntryStatus TryGetActivation(GrainId grain, out ActivationAddress address, out int version)
+        {
+            lock (lockable)
+            {
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
+                {
+                    var first = graininfo.Instances.FirstOrDefault();
+
+                    if (first.Value != null)
+                    {
+                        address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
+                        version = graininfo.VersionTag;
+                        return first.Value.RegistrationStatus;
+                    }
+                }
+            }
+            address = null;
+            version = 0;
+            return GrainDirectoryEntryStatus.Invalid;
+        }
+
+
 
         /// <summary>
         /// Returns the version number of the list of activations for the grain.
@@ -523,18 +585,19 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     AddSingleActivation(grain, otherClusterAddress.Activation, otherClusterAddress.Silo,
-                        MultiClusterStatus.Cached);
+                        GrainDirectoryEntryStatus.Cached);
                 }
             }
         }
 
-        public bool UpdateClusterRegistrationStatus(GrainId grain, ActivationId activationId, MultiClusterStatus registrationStatus, MultiClusterStatus? compareWith = null)
+        public bool UpdateClusterRegistrationStatus(GrainId grain, ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null)
         {
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                IGrainInfo graininfo;
+                if (partitionData.TryGetValue(grain, out graininfo))
                 {
-                    return partitionData[grain].UpdateClusterRegistrationStatus(activationId, registrationStatus, compareWith);
+                    return graininfo.UpdateClusterRegistrationStatus(activationId, registrationStatus, compareWith);
                 }
                 return false;
             }

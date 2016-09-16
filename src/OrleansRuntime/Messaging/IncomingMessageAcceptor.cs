@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Messaging
 
             if (Cts.IsCancellationRequested) return false;
 
-            if (!ReadConnectionPreemble(sock, out client))
+            if (!ReadConnectionPreamble(sock, out client))
             {
                 return false;
             }
@@ -132,7 +132,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private bool ReadConnectionPreemble(Socket socket, out GrainId grainId)
+        private bool ReadConnectionPreamble(Socket socket, out GrainId grainId)
         {
             grainId = null;
             byte[] buffer = null;
@@ -171,7 +171,7 @@ namespace Orleans.Runtime.Messaging
                     if (bytesRead == 0)
                     {
                         Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed,
-                            "Remote socket closed while receiving connection preemble data from endpoint {0}.", sock.RemoteEndPoint);
+                            "Remote socket closed while receiving connection preamble data from endpoint {0}.", sock.RemoteEndPoint);
                         return null;
                     }
                     offset += bytesRead;
@@ -179,7 +179,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception ex)
                 {
                     Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving,
-                        "Exception receiving connection preemble data from endpoint " + sock.RemoteEndPoint, ex);
+                        "Exception receiving connection preamble data from endpoint " + sock.RemoteEndPoint, ex);
                     return null;
                 }
             }

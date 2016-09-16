@@ -1,3 +1,4 @@
+using Orleans.GrainDirectory;
 using System;
 using System.Threading.Tasks;
 
@@ -11,6 +12,37 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
+        internal override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementContext context)
+        {
+
+  
+            // first, check if we can find an activation for this client in the cache or local directory partition
+            AddressesAndTag addresses;
+            if (context.FastLookup(target, out addresses))
+                return ChooseRandomActivation(addresses.Addresses, context);
+
+            // we need to look up the directory entry for this grain on a remote silo
+            switch (target.Category)
+            {
+                case UniqueKey.Category.Client:
+                    {
+                        addresses = await context.FullLookup(target);
+                        return ChooseRandomActivation(addresses.Addresses, context);
+                    }
+
+                case UniqueKey.Category.GeoClient:
+                    {
+                        // we need to look up the activations in the remote cluster
+                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
+                        return ChooseRandomActivation(addresses.Addresses, context);
+                    }
+
+                default:
+                    throw new InvalidOperationException("Unsupported client type. Grain " + target);
+            }
+        }
+
+
         internal override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {

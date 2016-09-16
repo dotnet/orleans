@@ -8,30 +8,22 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tests.GeoClusterTests
 {
-    public class MultiClusterNetworkTests : TestingClusterHost, IDisposable
+    public class MultiClusterNetworkTests : TestingClusterHost
     {
+        public MultiClusterNetworkTests(ITestOutputHelper output) : base(output)
+        { }
 
-        // Kill all clients and silos.
-        public void Dispose()
-        {
-            try
-            {
-                StopAllClientsAndClusters();
-            }
-            catch (Exception e)
-            {
-                WriteLog("Exception caught in test cleanup function: {0}", e);
-            }
-        }
+       
 
         // We need use ClientWrapper to load a client object in a new app domain. 
         // This allows us to create multiple clients that are connected to different silos.
         public class ClientWrapper : ClientWrapperBase
         {
-            public ClientWrapper(string name, int gatewayport) : base(name, gatewayport)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer) : base(name, gatewayport, clusterId, customizer)
             {
                 systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
             }

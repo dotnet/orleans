@@ -51,6 +51,7 @@
     <Compile Include="IActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ICatalogTestGrain.cs" />
     <Compile Include="IClientAddressableTestConsumer.cs" />
+    <Compile Include="IClusterTestGrains.cs" />
     <Compile Include="ICollectionTestGrain.cs" />
     <Compile Include="IConcurrentGrain.cs" />
     <Compile Include="IConsumerEventCountingGrain.cs" />

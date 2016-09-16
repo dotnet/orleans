@@ -12,27 +12,20 @@ namespace Orleans.GrainDirectory
     {
         private static MultiClusterRegistrationStrategy defaultStrategy;
 
-        internal static void Initialize(GlobalConfiguration config = null)
+        internal static void Initialize(GlobalConfiguration config)
         {
             InitializeStrategies();
-            var strategy = config == null
-                ? GlobalConfiguration.DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY
-                : config.DefaultMultiClusterRegistrationStrategy;
-            defaultStrategy = GetStrategy(strategy);
-        }
-        
-        private static MultiClusterRegistrationStrategy GetStrategy(string strategy)
-        {
-            if (strategy.Equals(typeof (ClusterLocalRegistration).Name))
-            {
-                return ClusterLocalRegistration.Singleton;
-            }
-            return null;
-        }
 
+            if (config.HasMultiClusterNetwork && config.UseGlobalSingleInstanceByDefault)
+                defaultStrategy = GlobalSingleInstanceRegistration.Singleton;
+            else
+                defaultStrategy = ClusterLocalRegistration.Singleton;    
+        }
+      
         private static void InitializeStrategies()
         {
             ClusterLocalRegistration.Initialize();
+            GlobalSingleInstanceRegistration.Initialize();
         }
 
         internal static MultiClusterRegistrationStrategy GetDefault()

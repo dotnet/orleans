@@ -112,6 +112,7 @@
     <Compile Include="Core\IStorage.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistrationStrategy.cs" />
+    <Compile Include="GrainDirectory\GlobalSingleInstanceRegistration.cs" />
     <Compile Include="GrainDirectory\IGrainDirectory.cs" />
     <Compile Include="GrainDirectory\IGrainRegistrar.cs" />
     <Compile Include="GrainDirectory\ClusterLocalRegistration.cs" />
@@ -143,6 +144,7 @@
     <Compile Include="Streams\PersistentStreams\StreamEventDeliveryFailureException.cs" />
     <Compile Include="Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
+    <Compile Include="SystemTargetInterfaces\IClusterGrainDirectory.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Streams\QueueAdapters\IQueueFlowController.cs" />

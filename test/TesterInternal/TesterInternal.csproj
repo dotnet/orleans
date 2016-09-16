@@ -55,6 +55,7 @@
     <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
+    <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
@@ -129,6 +130,7 @@
     <Compile Include="GeoClusterTests\AzureGossipTableTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
+    <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
     <Compile Include="GeoClusterTests\MultiClusterNetworkTests.cs" />
     <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
@@ -349,6 +351,7 @@
     <Content Include="..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
       <Link>ClientConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml">
       <Link>OrleansConfigurationForTesting.xml</Link>
