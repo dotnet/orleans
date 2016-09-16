@@ -64,14 +64,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether or not this is a debug build.
         /// </summary>
-        public static bool IsDebugBuild
-        {
-            get
-            {
-                var thisProg = Assembly.GetEntryAssembly() ?? typeof(RuntimeVersion).GetTypeInfo().Assembly;
-                return IsAssemblyDebugBuild(thisProg);
-            }
-        }
+        public static bool IsDebugBuild => IsAssemblyDebugBuild(typeof(RuntimeVersion).GetTypeInfo().Assembly);
 
         /// <summary>
         /// Writes the Orleans program ident info to the Console, eg: 'OrleansHost v2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
