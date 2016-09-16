@@ -9,6 +9,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
@@ -237,7 +238,16 @@ namespace Orleans.Runtime
             AppDomain.CurrentDomain.UnhandledException +=
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
-            grainFactory = new GrainFactory();
+            try
+            {
+                grainFactory = Services.GetRequiredService<GrainFactory>();
+            }
+            catch (InvalidOperationException exc)
+            {
+                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container", exc);
+                throw;
+            }
+
             typeManager = new GrainTypeManager(
                 here.Address.Equals(IPAddress.Loopback),
                 grainFactory, 

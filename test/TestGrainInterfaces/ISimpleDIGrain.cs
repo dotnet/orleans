@@ -8,4 +8,9 @@ namespace UnitTests.GrainInterfaces
         Task<long> GetTicksFromService();
         Task<string> GetStringValue();
     }
+
+    public interface IDIGrainWithInjectedServices : ISimpleDIGrain
+    {
+        Task<long> GetGrainFactoryId();
+    }
 }
