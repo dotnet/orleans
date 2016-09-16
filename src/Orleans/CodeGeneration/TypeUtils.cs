@@ -397,11 +397,13 @@ namespace Orleans.Runtime
         {
             var grainType = typeof(Grain);
             var grainChevronType = typeof(Grain<>);
+#if !NETSTANDARD
             if (type.Assembly.ReflectionOnly)
             {
                 grainType = ToReflectionOnlyType(grainType);
                 grainChevronType = ToReflectionOnlyType(grainChevronType);
             }
+#endif
 
             if (grainType == type || grainChevronType == type) return false;
 
@@ -418,13 +420,14 @@ namespace Orleans.Runtime
 
             var systemTargetInterfaceType = typeof(ISystemTarget);
             var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
+#if !NETSTANDARD
             if (type.Assembly.ReflectionOnly)
             {
                 systemTargetType = ToReflectionOnlyType(systemTargetType);
                 systemTargetInterfaceType = ToReflectionOnlyType(systemTargetInterfaceType);
                 systemTargetBaseInterfaceType = ToReflectionOnlyType(systemTargetBaseInterfaceType);
             }
-
+#endif
             if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
                 !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
                 !systemTargetType.IsAssignableFrom(type)) return false;
@@ -521,13 +524,27 @@ namespace Orleans.Runtime
         public static bool IsGrainMethodInvokerType(Type type)
         {
             var generalType = typeof(IGrainMethodInvoker);
+#if !NETSTANDARD
             if (type.Assembly.ReflectionOnly)
             {
                 generalType = ToReflectionOnlyType(generalType);
             }
+#endif
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
 
+#if NETSTANDARD_TODO
+        public static Type ResolveType(string fullName)
+        {
+            return Type.GetType(fullName, true);
+        }
+
+        public static bool TryResolveType(string fullName, out Type type)
+        {
+            type = Type.GetType(fullName, false);
+            return type != null;
+        }
+#else
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);
@@ -547,6 +564,7 @@ namespace Orleans.Runtime
         {
             return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
         }
+#endif
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
         {
@@ -621,6 +639,7 @@ namespace Orleans.Runtime
 
         public static bool TypeHasAttribute(Type type, Type attribType)
         {
+#if !NETSTANDARD
             if (type.Assembly.ReflectionOnly || attribType.Assembly.ReflectionOnly)
             {
                 type = ToReflectionOnlyType(type);
@@ -630,6 +649,7 @@ namespace Orleans.Runtime
                 return CustomAttributeData.GetCustomAttributes(type).Any(
                         attrib => attribType.IsAssignableFrom(attrib.AttributeType));
             }
+#endif
 
             return TypeHasAttribute(type.GetTypeInfo(), attribType);
         }
