@@ -20,6 +20,8 @@
   href: Activation-Garbage-Collection.md
 - name: Application Bootstrap within a Silo
   href: Application-Bootstrap-within-a-Silo.md
+- name: Dependency Injection
+  href: Dependency-Injection.md
 - name: Client Error Code Monitoring
   href: Client-Error-Code-Monitoring.md
 - name: Configuring .NET Garbage Collection
