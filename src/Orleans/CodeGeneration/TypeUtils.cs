@@ -561,7 +561,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                if (logger.IsWarning)
+                if (logger!= null && logger.IsWarning)
                 {
                     var message =
                         string.Format(
@@ -569,6 +569,13 @@ namespace Orleans.Runtime
                             assembly.FullName,
                             exception);
                     logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+                
+                var typeLoadException = exception as ReflectionTypeLoadException;
+                if (typeLoadException != null)
+                {
+                    return typeLoadException.Types?.Where(type => type != null).Select(type => type.GetTypeInfo()) ??
+                           Enumerable.Empty<TypeInfo>();
                 }
 
                 return Enumerable.Empty<TypeInfo>();
