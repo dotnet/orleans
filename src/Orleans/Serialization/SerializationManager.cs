@@ -448,6 +448,15 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Registers the specified types, generating serializers for the types which do not have serializers present.
+        /// </summary>
+        /// <param name="types">The types.</param>
+        public static void RegisterAll(params string[] types)
+        {
+            IlBasedSerializerRegistry.RegisterAll(types);
+        }
+
+        /// <summary>
         /// This method registers a type that has no specific serializer or deserializer.
         /// For instance, abstract base types and interfaces need to be registered this way.
         /// </summary>

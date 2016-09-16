@@ -268,6 +268,65 @@ namespace Orleans.Serialization
             return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || type.IsPointer;
         }
 
+        public static bool IsGrainInterfaceInaccessibleForCodeGeneration(Type type, Module fromModule, Assembly fromAssembly)
+        {
+            var typeInfo = type.GetTypeInfo();
+
+            if (typeInfo.IsGenericTypeDefinition)
+            {
+                // Guard against invalid type constraints, which appear when generating code for some languages.
+                foreach (var parameter in typeInfo.GenericTypeParameters)
+                {
+                    if (parameter.GetTypeInfo().GetGenericParameterConstraints().Any(IsSpecialClass))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (!typeInfo.IsVisible && type.IsConstructedGenericType)
+            {
+                foreach (var inner in typeInfo.GetGenericArguments())
+                {
+                    if (IsGrainInterfaceInaccessibleForCodeGeneration(inner, fromModule, fromAssembly))
+                    {
+                        return true;
+                    }
+                }
+
+                if (IsGrainInterfaceInaccessibleForCodeGeneration(typeInfo.GetGenericTypeDefinition(), fromModule, fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            if ((typeInfo.IsNotPublic || !typeInfo.IsVisible) && !AreInternalsVisibleTo(typeInfo.Assembly, fromAssembly))
+            {
+                // subtype is defined in a different assembly from the outer type
+                if (!typeInfo.Module.Equals(fromModule))
+                {
+                    return true;
+                }
+
+                // subtype defined in a different assembly from the one we are generating serializers for.
+                if (!typeInfo.Assembly.Equals(fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            // For nested types, check that the declaring type is accessible.
+            if (typeInfo.IsNested)
+            {
+                if (IsGrainInterfaceInaccessibleForCodeGeneration(typeInfo.DeclaringType, fromModule, fromAssembly))
+                {
+                    return true;
+                }
+            }
+
+            return typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily;
+        }
+
         /// <summary>
         /// Returns true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise.
         /// </summary>
@@ -293,7 +352,7 @@ namespace Orleans.Serialization
         private static bool IsSpecialClass(Type type)
         {
             return type == typeof(object) || type == typeof(Array) || type == typeof(Delegate) ||
-                   type == typeof(Enum) || type == typeof(ValueType);
+                   type == typeof(Enum);
         }
     }
 }

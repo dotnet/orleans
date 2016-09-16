@@ -30,7 +30,8 @@
         /// </summary>
         /// <param name="t">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
-        public bool IsSupportedType(Type t) => IlBasedSerializerTypeChecker.IsSupportedType(t.GetTypeInfo());
+        public bool IsSupportedType(Type itemType)
+            => IlBasedSerializerTypeChecker.IsSupportedType(itemType.GetTypeInfo());
 
         /// <summary>
         /// Tries to create a copy of source.

@@ -136,6 +136,7 @@
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
     <Compile Include="Serialization\IlBasedFallbackSerializer.cs" />
+    <Compile Include="Serialization\IlBasedSerializerRegistry.cs" />
     <Compile Include="Serialization\IlCodeGenerationException.cs" />
     <Compile Include="Serialization\IlBasedSerializers.cs" />
     <Compile Include="Serialization\IlBasedSerializerGenerator.cs" />

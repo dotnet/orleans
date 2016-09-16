@@ -78,7 +78,7 @@
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The serializer for the provided type.</returns>
-        private GeneratedSerializer GetAndRegister(Type type)
+        internal GeneratedSerializer GetAndRegister(Type type)
         {
             var methods = this.Get(type);
             SerializationManager.Register(type, methods.DeepCopy, methods.Serialize, methods.Deserialize, forceOverride: true);
