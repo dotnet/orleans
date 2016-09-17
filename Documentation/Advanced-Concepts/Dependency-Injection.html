@@ -112,6 +112,62 @@
 
 <p>Now when <i>MyGrain</i> is activated the <i>ISuperCoolServiceClient</i> is injected into the grain</p>
 
+<h1>>Using the Startup class</h1>
+<h2>Production</h2>
+<p> In production this is relatvely straight forward.   Make hte Startup class be use by the Silo startup</p>
+
+<code>
+              siloHost.NodeConfig.StartupTypeName = typeof(Startup).AssemblyQualifiedName;
+</code>
+
+<h2>Unit Test</h2>
+<p>Unit test get more fun</p>
+<p>Using the <i>TestCluster</i></p>
+<p>Build a startup class for the class, or fixture or whatever is running your <i>Testcluster</i></p>
+
+<code>
+    public class TestStartup
+    {
+        public TestStartup()
+        { }
+
+        public IServiceProvider ConfigureServices(IServiceCollection services)
+        {
+            services.AddTransient<ISuperCoolServiceClient, ISuperCoolServiceClient>(f =>
+            {
+                var mock = new Mock<ISuperCoolServiceClient>();
+                mock.Setup(m => m.MyMockedFunc(It.IsAny<string>())).ReturnsAsync("My cats name");
+
+                return mock.Object;
+            });
+
+            services.AddTransient<MyGrain>(
+                sp => new MyGrain(sp.GetRequiredService<ISuperCoolServiceClient>()));
+
+            return services.BuildServiceProvider();
+
+        }
+    }
+  
+</code>
+
+
+
+<code>
+        public override TestCluster CreateTestCluster()
+        {
+			var options = new TestClusterOptions();
+			options.ClusterConfiguration.AddMemoryStorageProvider("SuperCool");
+			options.ClusterConfiguration.AddSimpleMessageStreamProvider("SuperCoolStream");
+            //dependency injection
+            options.ClusterConfiguration.UseStartupType<TestStartup>();
+
+            return new TestCluster(options);
+        }
+  
+</code>
+
+
 
             </article>
           </div>
