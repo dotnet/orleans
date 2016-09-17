@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Timers and Reminders | Microsoft Orleans Website </title>
+    <title>Dependency-Injection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Dependency Injection | Microsoft Orleans Website ">
     <meta name="generator" content="docfx 2.4.0.0">
@@ -72,8 +72,6 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               <h1 id="Dependency-Injection">Dependency Injection</h1>
-              
-
 
 <p>Welcome to Dependency injection for Orleans.  Dependency Injection for Orleans is based off the Microsoft.Dependency.Injection from ASP.NET CORE</p>
 <h1 id="Constructors">Constructors</h1>
@@ -84,10 +82,10 @@
   <code class="lang-csharp">public MyGrain(ISuperCoolServiceClient client)
 </code>
 </pre>
-<p>Where <pre>ISuperCoolServiceClient</pre> is a interface to the dependency you are injecting.   but it could be anything, a <pre>int</pre> constant, or the name of your current pet</p>
+<p>Where <i>ISuperCoolServiceClient</i> is a interface to the dependency you are injecting.   but it could be anything, an <i>int</i> constant, or <i>string</i> with the name of your current pet</p>
 
 <h1 id="Startup Class">Startup Class</h1>
-<p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <pre>SEAM</pre> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
+<p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <i>SEAM</i> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
 <p>Lets create a startup class.  In this case we are using the <i>Microsoft.Dependency.Injection</i> classes, but you can use whatever DI container you like</pre></p>
 <pre>
   <code class="lang-csharp">public class Startup
