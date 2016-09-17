@@ -95,7 +95,7 @@
   
   public IServiceProvider ConfigureServices(IServiceCollection services)
   {
-            services.AddSingleton<ISuperCoolServiceClient, SuperCoolServiceClient>(f =>
+            services.AddSingleton&lt;ISuperCoolServiceClient, SuperCoolServiceClient&gt;(f =>
             {
                 var configSection = (SuperCoolServiceConfiguration) ConfigurationManager.GetSection(SuperCoolServiceConfiguration.SectionName);
                 var baseUrl = new Uri(configSection.BaseUrl);
@@ -103,7 +103,7 @@
                 return new SuperCoolService(baseUrl);
             });
             
-           services.AddTransient<MyGrain>(
+           services.AddTransient&lt;MyGrain&gt;(
                 sp => new MyGrain(sp.GetRequiredService<ISuperCoolServiceClient>()));
     return services.BuildServiceProvider(); 
   }
@@ -135,7 +135,7 @@
 
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddTransient<ISuperCoolServiceClient, ISuperCoolServiceClient>(f =>
+            services.AddTransient&lt;ISuperCoolServiceClient, ISuperCoolServiceClient&gt;(f =>
             {
                 var mock = new Mock<ISuperCoolServiceClient>();
                 mock.Setup(m => m.MyMockedFunc(It.IsAny<string>())).ReturnsAsync("My cats name");
@@ -143,8 +143,8 @@
                 return mock.Object;
             });
 
-            services.AddTransient<MyGrain>(
-                sp => new MyGrain(sp.GetRequiredService<ISuperCoolServiceClient>()));
+            services.AddTransient&lt;MyGrain&gt;(
+                sp => new MyGrain(sp.GetRequiredService&lt;ISuperCoolServiceClient&gt;()));
 
             return services.BuildServiceProvider();
 
@@ -162,7 +162,7 @@
 			options.ClusterConfiguration.AddMemoryStorageProvider("SuperCool");
 			options.ClusterConfiguration.AddSimpleMessageStreamProvider("SuperCoolStream");
             //dependency injection
-            options.ClusterConfiguration.UseStartupType<TestStartup>();
+            options.ClusterConfiguration.UseStartupType&lt;TestStartup&gt;();
 
             return new TestCluster(options);
         }
