@@ -62,10 +62,8 @@ DROP DATABASE ""{0}"";";
             {
                 setupScript,
                 CreateStreamTestTable
-            }; // setupScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries).ToList();
-
-            //This removes the use of recovery log in case of database crashes, which
-            //improves performance to some degree, depending on usage. For non-performance testing only.
+            }; 
+            
 
             return batches;
         }
