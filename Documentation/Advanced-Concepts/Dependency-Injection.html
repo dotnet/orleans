@@ -73,10 +73,8 @@
             <article class="content wrap" id="_content" data-uid="">
               <h1 id="Dependency-Injection">Dependency Injection</h1>
               
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> gh-pages
+
+
 <p>Welcome to Dependency injection for Orleans.  Dependency Injection for Orleans is based off the Microsoft.Dependency.Injection from ASP.NET CORE</p>
 <h1 id="Constructors">Constructors</h1>
 <p>Orleans still uses the notion of a class as the fundmental block for the grain.  It has a constructor which executed, but normally this constructor needs to be a empty default contructor with no arguments</p>
@@ -87,45 +85,9 @@
 </code>
 </pre>
 <p>Where <pre>ISuperCoolServiceClient</pre> is a interface to the dependency you are injecting.   but it could be anything, a <pre>int</pre> constant, or the name of your current pet</p>
-<<<<<<< HEAD
-=======
-
 
 <h1 id="Startup Class">Startup Class</h1>
 <p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <pre>SEAM</pre> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
-<p>Lets create a startup class.  In this case we are using the <i>Microsoft.Dependency.Injection</i> classes, but you can use whatever DI container you like</pre></p>
-<pre>
-  <code class="lang-csharp">public class Startup
-  {
-  public Startup(){}
-  
-  public IServiceProvider ConfigureServices(IServiceCollection services)
-  {
-            services.AddSingleton<ISuperCoolServiceClient, SuperCoolServiceClient>(f =>
-            {
-                var configSection = (SuperCoolServiceConfiguration) ConfigurationManager.GetSection(SuperCoolServiceConfiguration.SectionName);
-                var baseUrl = new Uri(configSection.BaseUrl);
-                //return the concrete implementation
-                return new SuperCoolService(baseUrl);
-            });
-            
-           services.AddTransient<MyGrain>(
-                sp => new MyGrain(sp.GetRequiredService<ISuperCoolServiceClient>()));
-    return services.BuildServiceProvider(); 
-  }
-</code>
-</pre>
-=======
-<p>Welcome to Dependency injection for Orleans.  Dependency Injection for Orleans is based off the Microsoft.Dependency.Injection from asp.net core</p>
-<h1 id="timers">Constructors</h1>
-<h1 id="timers">Startup Class</h1>
->>>>>>> gh-pages
-<h1 id="timers">Unit tests</h1>
->>>>>>> gh-pages
-
-
-<h1 id="Startup Class">Startup Class</h1>
-<p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <i>SEAM</i> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
 <p>Lets create a startup class.  In this case we are using the <i>Microsoft.Dependency.Injection</i> classes, but you can use whatever DI container you like</pre></p>
 <pre>
   <code class="lang-csharp">public class Startup
