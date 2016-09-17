@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.CodeGeneration;
@@ -27,6 +28,7 @@ namespace Orleans.Serialization
         private int currentSegmentOffset;
         private int currentSegmentCount;
         private int totalProcessedBytes;
+        private int currentSegmentOffsetPlusCount;
         private readonly int totalLength;
 
         private static readonly ArraySegment<byte> emptySegment = new ArraySegment<byte>(new byte[0]);
@@ -50,14 +52,20 @@ namespace Orleans.Serialization
             buffers = buffs;
             totalProcessedBytes = 0;
             currentSegmentIndex = 0;
-            currentSegment = buffs[0];
+            InitializeCurrentSegment(0);
+            totalLength = buffs.Sum(b => b.Count);
+            buffersCount = buffs.Count;
+            Trace("Starting new stream reader");
+        }
+
+        private void InitializeCurrentSegment(int segmentIndex)
+        {
+            currentSegment = buffers[segmentIndex];
             currentBuffer = currentSegment.Array;
             currentOffset = currentSegment.Offset;
             currentSegmentOffset = currentOffset;
             currentSegmentCount = currentSegment.Count;
-            totalLength = buffs.Sum(b => b.Count);
-            buffersCount = buffs.Count;
-            Trace("Starting new stream reader");
+            currentSegmentOffsetPlusCount = currentSegmentOffset + currentSegmentCount;
         }
 
         /// <summary>
@@ -87,11 +95,7 @@ namespace Orleans.Serialization
             currentSegmentIndex++;
             if (currentSegmentIndex < buffersCount)
             {
-                currentSegment = buffers[currentSegmentIndex];
-                currentBuffer = currentSegment.Array;
-                currentOffset = currentSegment.Offset;
-                currentSegmentOffset = currentOffset;
-                currentSegmentCount = currentSegment.Count;
+                InitializeCurrentSegment(currentSegmentIndex);
             }
             else
             {
@@ -99,24 +103,53 @@ namespace Orleans.Serialization
                 currentBuffer = null;
                 currentOffset = 0;
                 currentSegmentOffset = 0;
+                currentSegmentOffsetPlusCount = currentSegmentOffset + currentSegmentCount;
             }
         }
 
         private byte[] CheckLength(int n, out int offset)
         {
             bool ignore;
+            byte[] res;
+            if (TryCheckLengthFast(n, out res, out offset, out ignore))
+            {
+                return res;
+            }
+
             return CheckLength(n, out offset, out ignore);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryCheckLengthFast(int n, out byte[] res, out int offset, out bool safeToUse)
+        {
+            safeToUse = false;
+            res = null;
+            offset = 0;
+            var nextOffset = currentOffset + n;
+            if (nextOffset <= currentSegmentOffsetPlusCount)
+            {
+                offset = currentOffset;
+                currentOffset = nextOffset;
+                res = currentBuffer;
+                return true;
+            }
+
+            return false;
         }
 
         private byte[] CheckLength(int n, out int offset, out bool safeToUse)
         {
             safeToUse = false;
             offset = 0;
-
-            if (n == 0)
+            if (currentOffset == currentSegmentOffsetPlusCount)
             {
-                safeToUse = true;
-                return emptyByteArray;
+                StartNextSegment();
+            }
+
+            byte[] res;
+            if (TryCheckLengthFast(n, out res, out offset, out safeToUse))
+            {
+                return res;
             }
 
             if ((CurrentPosition + n > totalLength))
@@ -126,37 +159,24 @@ namespace Orleans.Serialization
                     CurrentPosition, n, totalLength));
             }
 
-            if (currentSegmentIndex >= buffersCount)
-            {
-                throw new SerializationException(
-                    String.Format("Attempt to read past buffers.Count: currentSegmentIndex={0}, buffers.Count={1}.", currentSegmentIndex, buffers.Count));
-            }
-
-            if (currentOffset == currentSegmentOffset + currentSegmentCount)
-            {
-                StartNextSegment();
-            }
-
-            var nextOffset = currentOffset + n;
-            if (nextOffset <= currentSegmentOffset + currentSegmentCount)
-            {
-                offset = currentOffset;
-                currentOffset = nextOffset;
-                return currentBuffer;
-            }
-
             var temp = new byte[n];
             var i = 0;
+
             while (i < n)
             {
-                var segmentOffsetPlusCount = currentSegmentOffset + currentSegmentCount;
-                var bytesFromThisBuffer = Math.Min(segmentOffsetPlusCount - currentOffset,
-                                                   n - i);
+                var segmentOffsetPlusCount = currentSegmentOffsetPlusCount;
+                var bytesFromThisBuffer = Math.Min(segmentOffsetPlusCount - currentOffset, n - i);
                 Buffer.BlockCopy(currentBuffer, currentOffset, temp, i, bytesFromThisBuffer);
                 i += bytesFromThisBuffer;
                 currentOffset += bytesFromThisBuffer;
                 if (currentOffset >= segmentOffsetPlusCount)
                 {
+                    if (currentSegmentIndex >= buffersCount)
+                    {
+                        throw new SerializationException(
+                            String.Format("Attempt to read past buffers.Count: currentSegmentIndex={0}, buffers.Count={1}.", currentSegmentIndex, buffers.Count));
+                    }
+
                     StartNextSegment();
                 }
             }
@@ -307,12 +327,17 @@ namespace Orleans.Serialization
         {
             if (count == 0)
             {
-                return new byte[0];
+                return emptyByteArray;
             }
             bool safeToUse;
 
             int offset;
-            var buff = CheckLength(count, out offset, out safeToUse);
+            byte[] buff;
+            if (!TryCheckLengthFast(count, out buff, out offset, out safeToUse))
+            {
+                buff = CheckLength(count, out offset, out safeToUse);
+            }
+
             Trace("--Read byte array of length {0}", count);
             if (!safeToUse)
             {
@@ -338,7 +363,7 @@ namespace Orleans.Serialization
             }
 
             var buffOffset = 0;
-            var buff = CheckLength(count, out buffOffset);
+            var buff = count == 0 ? emptyByteArray : CheckLength(count, out buffOffset);
             Buffer.BlockCopy(buff, buffOffset, destination, offset, count);
         }
 
@@ -455,10 +480,10 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
-        internal MultiClusterStatus ReadMultiClusterStatus()
+        internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
         {
             byte val = ReadByte();
-            return (MultiClusterStatus)val;
+            return (GrainDirectoryEntryStatus)val;
         }
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
@@ -468,7 +493,6 @@ namespace Orleans.Serialization
             var silo = ReadSiloAddress();
             var grain = ReadGrainId();
             var act = ReadActivationId();
-            var mcstatus = ReadMultiClusterStatus();
 
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
@@ -476,7 +500,7 @@ namespace Orleans.Serialization
             if (act.Equals(ActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act, mcstatus);
+            return ActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>

@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq.Expressions;
@@ -124,7 +123,7 @@ namespace Orleans.Runtime
             ActivationData sendingActivation = null;
             if (schedulingContext == null)
             {
-                throw new InvalidExpressionException(
+                throw new InvalidOperationException(
                     String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext) "
                         + "RuntimeContext.Current={1} TaskScheduler.Current={2}",
                         message,
@@ -282,9 +281,10 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address);
+                        directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
+   
 #if false
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.

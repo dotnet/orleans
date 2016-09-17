@@ -17,13 +17,13 @@ namespace Orleans.Runtime.GrainDirectory
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
         void Stop(bool doOnStopHandoff);
 
-        RemoteGrainDirectory RemGrainDirectory { get; }
+        RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
+        ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
         Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
-        /// Removes the record for an existing activation from the directory service,
-        /// if it was created before the passed-in timestamp.
+        /// Removes the record for an non-existing activation from the directory service.
         /// This is used when a request is received for an activation that cannot be found, 
         /// to lazily clean up the remote directory.
         /// The timestamp is used to prevent removing a valid entry in a possible (but unlikely)
@@ -34,7 +34,8 @@ namespace Orleans.Runtime.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the activation to remove.</param>
-        Task UnregisterConditionallyAsync(ActivationAddress address);
+        /// <param name="origin"> the silo from which the message to the non-existing activation was sent</param>
+        Task UnregisterAfterNonexistingActivation(ActivationAddress address, SiloAddress origin);
 
         /// <summary>
         /// Fetches locally known directory information for a grain.
@@ -47,13 +48,23 @@ namespace Orleans.Runtime.GrainDirectory
         bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
 
         /// <summary>
+        /// Fetches complete directory information for a grain in an explicitly named cluster.
+        /// <para>This method must be called from a scheduler thread.</para>
+        /// </summary>
+        /// <param name="grain">The ID of the grain to look up.</param>
+        /// <param name="clusterId">The cluster in which to look up the grain</param>
+        /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
+
+        /// <summary>
         /// Invalidates cache entry for the given activation address.
         /// This method is intended to be called whenever a directory client tries to access 
         /// an activation returned from the previous directory lookup and gets a reject from the target silo 
         /// notifiying him that the activation does not exist.
         /// </summary>
         /// <param name="activation">The address of the activation that needs to be invalidated in the directory cache for the given grain.</param>
-        void InvalidateCacheEntry(ActivationAddress activation);
+        /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activatiosn in remote clusters as well</param>
+        void InvalidateCacheEntry(ActivationAddress activation, bool invalidateDirectoryAlso = false);
 
         /// <summary>
         /// For testing purposes only.
@@ -99,5 +110,17 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="grain"></param>
         /// <returns></returns>
         List<ActivationAddress> GetLocalCacheData(GrainId grain);
+
+        /// <summary>
+        /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not
+        /// </summary>
+        /// <param name="silo">the address of the silo</param>
+        /// <returns>true if the silo is known to be part of this cluster</returns>
+        bool IsSiloInCluster(SiloAddress silo);
+
+        /// <summary>
+        /// The id of this cluster
+        /// </summary>
+        string ClusterId { get; }
     }
 }

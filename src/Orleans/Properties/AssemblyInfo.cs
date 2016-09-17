@@ -20,6 +20,7 @@ using System.Runtime.InteropServices;
 
 [assembly: InternalsVisibleTo("ClientGenerator")]
 [assembly: InternalsVisibleTo("OrleansCounterControl")]
+[assembly: InternalsVisibleTo("OrleansTelemetryConsumers.Counters")]
 [assembly: InternalsVisibleTo("OrleansCodeGenerator")]
 [assembly: InternalsVisibleTo("OrleansRuntime")]
 [assembly: InternalsVisibleTo("OrleansHost")]

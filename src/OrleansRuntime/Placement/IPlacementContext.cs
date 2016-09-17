@@ -18,6 +18,8 @@ namespace Orleans.Runtime.Placement
 
         Task<AddressesAndTag> FullLookup(GrainId grain);
 
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
+
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 
         List<SiloAddress> AllActiveSilos { get; }

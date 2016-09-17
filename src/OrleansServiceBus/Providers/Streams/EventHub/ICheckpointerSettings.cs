@@ -5,6 +5,9 @@ using Orleans.Providers;
 
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Setting interface for checkpointer
+    /// </summary>
     public interface ICheckpointerSettings
     {
         /// <summary>
@@ -28,6 +31,9 @@ namespace Orleans.ServiceBus.Providers
         string CheckpointNamespace { get; }
     }
 
+    /// <summary>
+    /// EventHub checkpointer.
+    /// </summary>
     public class EventHubCheckpointerSettings : ICheckpointerSettings
     {
         private const string DataConnectionStringName = "CheckpointerDataConnectionString";
@@ -36,31 +42,53 @@ namespace Orleans.ServiceBus.Providers
         private const string CheckpointNamespaceName = "CheckpointNamespace";
         private static readonly TimeSpan DefaultPersistInterval = TimeSpan.FromMinutes(1);
 
+        /// <summary>
+        /// Default constructor/
+        /// </summary>
         public EventHubCheckpointerSettings(){}
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="dataConnectionString">Azure table storage connections string.</param>
+        /// <param name="table">table name.</param>
+        /// <param name="checkpointNamespace">checkpointer namespace.</param>
+        /// <param name="persistInterval">checkpoint interval.</param>
         public EventHubCheckpointerSettings(string dataConnectionString, string table, string checkpointNamespace, TimeSpan? persistInterval = null)
         {
             if (string.IsNullOrWhiteSpace(dataConnectionString))
             {
-                throw new ArgumentNullException("dataConnectionString");
+                throw new ArgumentNullException(nameof(dataConnectionString));
             }
             if (string.IsNullOrWhiteSpace(table))
             {
-                throw new ArgumentNullException("table");
+                throw new ArgumentNullException(nameof(table));
             }
             if (string.IsNullOrWhiteSpace(checkpointNamespace))
             {
-                throw new ArgumentNullException("checkpointNamespace");
+                throw new ArgumentNullException(nameof(checkpointNamespace));
             }
             DataConnectionString = dataConnectionString;
             TableName = table;
             CheckpointNamespace = checkpointNamespace;
-            PersistInterval = persistInterval.HasValue ? persistInterval.Value : DefaultPersistInterval;
+            PersistInterval = persistInterval ?? DefaultPersistInterval;
         }
 
+        /// <summary>
+        /// Azure table storage connections string.
+        /// </summary>
         public string DataConnectionString { get; private set; }
+        /// <summary>
+        /// Azure table name.
+        /// </summary>
         public string TableName { get; private set; }
+        /// <summary>
+        /// Intervale to write checkpoints.  Prevents spamming storage.
+        /// </summary>
         public TimeSpan PersistInterval { get; private set; }
+        /// <summary>
+        /// Unique namespace for checkpoint data.  Is similar to consumer group.
+        /// </summary>
         public string CheckpointNamespace { get; private set; }
 
         /// <summary>
@@ -84,18 +112,18 @@ namespace Orleans.ServiceBus.Providers
             DataConnectionString = providerConfiguration.GetProperty(DataConnectionStringName, null);
             if (string.IsNullOrWhiteSpace(DataConnectionString))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", DataConnectionStringName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), DataConnectionStringName + " not set.");
             }
             TableName = providerConfiguration.GetProperty(TableNameName, null);
             if (string.IsNullOrWhiteSpace(TableName))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", TableNameName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), TableNameName + " not set.");
             }
             PersistInterval = providerConfiguration.GetTimeSpanProperty(PersistIntervalName, DefaultPersistInterval);
             CheckpointNamespace = providerConfiguration.GetProperty(CheckpointNamespaceName, null);
             if (string.IsNullOrWhiteSpace(CheckpointNamespace))
             {
-                throw new ArgumentOutOfRangeException("providerConfiguration", CheckpointNamespaceName + " not set.");
+                throw new ArgumentOutOfRangeException(nameof(providerConfiguration), CheckpointNamespaceName + " not set.");
             }
         }
     }

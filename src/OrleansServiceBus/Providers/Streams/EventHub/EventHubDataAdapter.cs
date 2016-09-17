@@ -256,7 +256,7 @@ namespace Orleans.ServiceBus.Providers
                 {
                     string errmsg = String.Format(CultureInfo.InvariantCulture,
                         "Message size is to big. MessageSize: {0}", size);
-                    throw new ArgumentOutOfRangeException("size", errmsg);
+                    throw new ArgumentOutOfRangeException(nameof(size), errmsg);
                 }
             }
             return segment;

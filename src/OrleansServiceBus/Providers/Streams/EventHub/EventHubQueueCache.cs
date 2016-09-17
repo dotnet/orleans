@@ -155,7 +155,7 @@ namespace Orleans.ServiceBus.Providers
 
         public AveragingCachePressureMonitor(Logger logger)
         {
-            this.logger = logger.GetSubLogger("-flowcontrol");
+            this.logger = logger.GetSubLogger("flowcontrol", "-");
             nextCheckedTime = DateTime.MinValue;
             isUnderPressure = false;
         }
@@ -232,7 +232,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, Logger logger)
             : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, EventHubDataComparer.Instance, logger)
         {
-            log = logger.GetSubLogger("-ehcache");
+            log = logger.GetSubLogger("messagecache", "-");
         }
 
         /// <summary>

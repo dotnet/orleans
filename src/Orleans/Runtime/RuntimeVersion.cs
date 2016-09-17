@@ -74,12 +74,24 @@ namespace Orleans.Runtime
 #endif
         }
 
-        private static bool IsAssemblyDebugBuild(Assembly assembly)
+        /// <summary>
+        /// Returns a value indicating whether the provided <paramref name="assembly"/> was built in debug mode.
+        /// </summary>
+        /// <param name="assembly">
+        /// The assembly to check.
+        /// </param>
+        /// <returns>
+        /// A value indicating whether the provided assembly was built in debug mode.
+        /// </returns>
+        internal static bool IsAssemblyDebugBuild(Assembly assembly)
         {
             foreach (var debuggableAttribute in assembly.GetCustomAttributes<DebuggableAttribute>())
             {
-                if (debuggableAttribute != null)
-                    return debuggableAttribute.IsJITTrackingEnabled;
+#if NETSTANDARD
+                return true;
+#else
+                return debuggableAttribute.IsJITTrackingEnabled;
+#endif
             }
             return false;
         }

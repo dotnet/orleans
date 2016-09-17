@@ -58,7 +58,7 @@
     <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
-    <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="Counters\CounterConfigData.cs" />
     <Compile Include="Startup\ConfigureServicesBuilder.cs" />
     <Compile Include="Startup\StartupBuilder.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
@@ -67,6 +67,11 @@
     <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
     <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
     <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceActivationMaintainer.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceResponseTracker.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceRegistrar.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\MultiClusterUtils.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />
@@ -102,9 +107,6 @@
     <Compile Include="Messaging\IncomingMessageAcceptor.cs" />
     <Compile Include="Messaging\MessageCenter.cs" />
     <Compile Include="Messaging\OutboundMessageQueue.cs" />
-    <Compile Include="Counters\OrleansPerformanceCounterInstaller.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="ReminderService\MockReminderTable.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
     <Compile Include="Silo\IStartupBuilder.cs" />
@@ -127,8 +129,8 @@
     <Compile Include="Scheduler\IWorkItem.cs" />
     <Compile Include="Scheduler\SchedulingContext.cs" />
     <Compile Include="Placement\IPlacementContext.cs" />
-    <Compile Include="Counters\PerfCountersStatistics.cs" />
-    <Compile Include="Counters\OrleansPerfCounterManager.cs" />
+    <Compile Include="Counters\CountersStatistics.cs" />
+    <Compile Include="Counters\OrleansCounterManager.cs" />
     <Compile Include="GrainDirectory\AdaptiveGrainDirectoryCache.cs" />
     <Compile Include="GrainDirectory\AdaptiveDirectoryCacheMaintainer.cs" />
     <Compile Include="GrainDirectory\GrainDirectoryCacheFactory.cs" />

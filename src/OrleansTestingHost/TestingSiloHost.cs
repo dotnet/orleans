@@ -13,9 +13,12 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
+using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
+    using Orleans.CodeGeneration;
+
     /// <summary>
     /// Important note: <see cref="TestingSiloHost"/> will be eventually deprectated. It is recommended that you use <see cref="TestCluster"/> instead.
     /// A host class for local testing with Orleans using in-process silos.
@@ -40,7 +43,7 @@ namespace Orleans.TestingHost
         public SiloHandle Primary { get; private set; }
         public SiloHandle Secondary { get; private set; }
         protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
+        protected readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
 
         protected TestingSiloOptions siloInitOptions { get; private set; }
         protected TestingClientOptions clientInitOptions { get; private set; }
@@ -459,7 +462,7 @@ namespace Orleans.TestingHost
                 {
                     // If we have never seen generated code for this assembly before, or generated code might be
                     // newer, store it for later silo creation.
-                    byte[] existing;
+                    GeneratedAssembly existing;
                     if (!this.additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
                     {
                         this.additionalAssemblies[assembly.Key] = assembly.Value;
@@ -468,7 +471,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static Dictionary<string, byte[]> TryGetGeneratedAssemblies(SiloHandle siloHandle)
+        private static Dictionary<string, GeneratedAssembly> TryGetGeneratedAssemblies(SiloHandle siloHandle)
         {
             var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
             {
@@ -755,10 +758,11 @@ namespace Orleans.TestingHost
             nodeConfig.PropagateActivityId = config.Defaults.PropagateActivityId;
             nodeConfig.BulkMessageLimit = config.Defaults.BulkMessageLimit;
 
+            int? gatewayport = null;
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                int proxyBasePort = options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort;
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, proxyBasePort + instanceCount);
+                gatewayport = (options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort) + instanceCount;
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, gatewayport.Value);
             }
 
             config.Globals.ExpectedClusterSize = 2;
@@ -779,6 +783,7 @@ namespace Orleans.TestingHost
                 Silo = silo,
                 Options = options,
                 Endpoint = silo.SiloAddress.Endpoint,
+                GatewayPort = gatewayport,
                 AppDomain = appDomain,
             };
             host.ImportGeneratedAssemblies(retValue);
@@ -861,8 +866,14 @@ namespace Orleans.TestingHost
                 new object[] { });
 
             appDomain.UnhandledException += ReportUnobservedException;
+            appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
 
             return silo;
+        }
+
+        private static void RegisterPerfCountersTelemetryConsumer()
+        {
+            LogManager.TelemetryConsumers.Add(new OrleansPerfCounterTelemetryConsumer());
         }
 
         private static void UnloadSiloInAppDomain(AppDomain appDomain)
