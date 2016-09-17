@@ -17,6 +17,8 @@ using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
+    using Orleans.CodeGeneration;
+
     /// <summary>
     /// Important note: <see cref="TestingSiloHost"/> will be eventually deprectated. It is recommended that you use <see cref="TestCluster"/> instead.
     /// A host class for local testing with Orleans using in-process silos.
@@ -41,7 +43,7 @@ namespace Orleans.TestingHost
         public SiloHandle Primary { get; private set; }
         public SiloHandle Secondary { get; private set; }
         protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
+        protected readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
 
         protected TestingSiloOptions siloInitOptions { get; private set; }
         protected TestingClientOptions clientInitOptions { get; private set; }
@@ -460,7 +462,7 @@ namespace Orleans.TestingHost
                 {
                     // If we have never seen generated code for this assembly before, or generated code might be
                     // newer, store it for later silo creation.
-                    byte[] existing;
+                    GeneratedAssembly existing;
                     if (!this.additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
                     {
                         this.additionalAssemblies[assembly.Key] = assembly.Value;
@@ -469,7 +471,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static Dictionary<string, byte[]> TryGetGeneratedAssemblies(SiloHandle siloHandle)
+        private static Dictionary<string, GeneratedAssembly> TryGetGeneratedAssemblies(SiloHandle siloHandle)
         {
             var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
             {

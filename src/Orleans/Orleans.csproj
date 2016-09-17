@@ -76,6 +76,7 @@
     <Compile Include="Async\TaskUtility.cs" />
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
+    <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />
     <Compile Include="Logging\LogFormatter.cs" />

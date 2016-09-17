@@ -15,6 +15,8 @@ using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
+    using Orleans.CodeGeneration;
+
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
     /// Runs a Primary and optionally secondary silos in seperate app domains, and client in the main app domain.
@@ -30,7 +32,7 @@ namespace Orleans.TestingHost
         public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
 
         protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
+        protected readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
 
         public ClientConfiguration ClientConfiguration { get; private set; }
 
@@ -384,7 +386,7 @@ namespace Orleans.TestingHost
                 {
                     // If we have never seen generated code for this assembly before, or generated code might be
                     // newer, store it for later silo creation.
-                    byte[] existing;
+                    GeneratedAssembly existing;
                     if (!this.additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
                     {
                         this.additionalAssemblies[assembly.Key] = assembly.Value;
@@ -393,7 +395,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private Dictionary<string, byte[]> TryGetGeneratedAssemblies(SiloHandle siloHandle)
+        private Dictionary<string, GeneratedAssembly> TryGetGeneratedAssemblies(SiloHandle siloHandle)
         {
             var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
             {

@@ -1058,13 +1058,13 @@ namespace Orleans.Runtime
                 /// </summary>
                 public GeneratedAssemblies()
                 {
-                    Assemblies = new Dictionary<string, byte[]>();
+                    Assemblies = new Dictionary<string, GeneratedAssembly>();
                 }
 
                 /// <summary>
                 /// Gets the assemblies which were produced by code generation.
                 /// </summary>
-                public Dictionary<string, byte[]> Assemblies { get; private set; }
+                public Dictionary<string, GeneratedAssembly> Assemblies { get; }
 
                 /// <summary>
                 /// Adds a new assembly to this collection.
@@ -1075,7 +1075,7 @@ namespace Orleans.Runtime
                 /// <param name="value">
                 /// The raw generated assembly.
                 /// </param>
-                public void Add(string key, byte[] value)
+                public void Add(string key, GeneratedAssembly value)
                 {
                     if (!string.IsNullOrWhiteSpace(key))
                     {
@@ -1094,7 +1094,7 @@ namespace Orleans.Runtime
                 /// </summary>
                 /// <param name="targetAssemblyName">The assembly which the cached assembly was generated for.</param>
                 /// <param name="cachedAssembly">The generated assembly.</param>
-                public void AddCachedAssembly(string targetAssemblyName, byte[] cachedAssembly)
+                public void AddCachedAssembly(string targetAssemblyName, GeneratedAssembly cachedAssembly)
                 {
                     CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
                 }
