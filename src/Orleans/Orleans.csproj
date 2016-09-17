@@ -248,7 +248,7 @@
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
     <Compile Include="Timers\ReminderRegistry.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
-    <Compile Include="Utils\FastLock.cs" />
+    <Compile Include="Utils\InterlockedExchangeLock.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />
     <Compile Include="Placement\StatelessWorkerPlacement.cs" />
@@ -372,6 +372,7 @@
     <Compile Include="Runtime\GrainReference.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\orleans.codegen.cs" Condition="'$(Bootstrap)' != 'true'" />
+    <Compile Include="Utils\TimerWheel.cs" />
     <Compile Include="Utils\Utils.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

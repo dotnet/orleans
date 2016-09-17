@@ -9,27 +9,32 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime
 {
     // About 2x faster than ordinary lock on mostly single threaded locking
-    internal class FastLock
+    internal class InterlockedExchangeLock
     {
-        private int lockTaken = 0;
+        private const int Locked = 1;
+        private const int Unlocked = 0;
+        private int lockState = Unlocked;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Take()
+        public bool TryGet()
         {
-            if (Interlocked.CompareExchange(ref lockTaken, 1, 0) == 0)
+            return Interlocked.Exchange(ref lockState, Locked) != Locked;
+        }
+        
+        public void Get()
+        {
+            if (TryGet())
                 return;
 
             SpinWait spinWait = new SpinWait();
-            while (Interlocked.CompareExchange(ref lockTaken, 1, 0) != 0)
+            while (!TryGet())
             {
                 spinWait.SpinOnce();
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        
         public void Release()
         {
-            Interlocked.Exchange(ref lockTaken, 0);
+            Interlocked.Exchange(ref lockState, Unlocked);
         }
     }
 }

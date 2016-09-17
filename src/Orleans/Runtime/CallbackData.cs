@@ -15,10 +15,11 @@ namespace Orleans.Runtime
         /// This method is called by the timer when the time out is reached.
         /// </summary>
         void OnTimeout();
-        TimeSpan RequestedTimeout();
+
+        DateTime DueTime { get; }
     }
 
-    internal class CallbackData : ITimebound, IDisposable
+    internal class CallbackData : ITimebound
     {
         private readonly Action<Message, TaskCompletionSource<object>> callback;
         private readonly Func<Message, bool> resendFunc;
@@ -28,12 +29,27 @@ namespace Orleans.Runtime
         private TimeSpan? resendPeriod;
         private bool alreadyFired;
         private TimeSpan timeout;
-        private DateTime dueTime;
         private ITimeInterval timeSinceIssued;
         private IMessagingConfiguration config;
 
+        private readonly TimeSpan _callbacksWheelCheckPeriod = TimeSpan.FromMilliseconds(77);
+
         [ThreadStatic]
-        private static CallbackTimeouter callbackTimeouter;
+        private static TimerWheel<CallbackData> resendableCallbacksWheel;
+        [ThreadStatic]
+        private static TimerWheel<CallbackData> callbacksWheel;
+
+        private static readonly Func<CallbackData, bool> timerWheelShouldDequeue = callback => callback.alreadyFired;
+        private static readonly Func<CallbackData, bool> timerWheelShouldReEnqueue = callback =>
+        {
+            if (callback.resendPeriod.HasValue)
+            {
+                callback.DueTime = DateTime.UtcNow + callback.resendPeriod.Value;
+                return true;
+            }
+
+            return false;
+        };
 
         private static readonly Logger logger = LogManager.GetLogger("CallbackData");
 
@@ -76,18 +92,19 @@ namespace Orleans.Runtime
                 timeSinceIssued.Start();
             }
 
-            if (callbackTimeouter == null) callbackTimeouter = new CallbackTimeouter(config.ResendOnTimeout);
             TimeSpan firstPeriod = timeout;
             if (config.ResendOnTimeout && config.MaxResendCount > 0)
             {
                 resendPeriod = firstPeriod = timeout.Divide(config.MaxResendCount + 1);
-                dueTime = DateTime.UtcNow.Add(firstPeriod);
-                callbackTimeouter.RegisterResendable(this);
+                DueTime = DateTime.UtcNow.Add(firstPeriod);
+                if(resendableCallbacksWheel == null) resendableCallbacksWheel = new TimerWheel<CallbackData>(_callbacksWheelCheckPeriod, timerWheelShouldReEnqueue, timerWheelShouldDequeue);
+                resendableCallbacksWheel.Register(this);
                 return;
             }
 
-            dueTime = DateTime.UtcNow.Add(firstPeriod);
-            callbackTimeouter.Register(this);
+            DueTime = DateTime.UtcNow.Add(firstPeriod);
+            if (callbacksWheel == null) callbacksWheel = new TimerWheel<CallbackData>(_callbacksWheelCheckPeriod, shouldDequeue: timerWheelShouldDequeue);
+            callbacksWheel.Register(this);
         }
 
         public void OnTimeout()
@@ -103,6 +120,8 @@ namespace Orleans.Runtime
             var error = msg.CreatePromptExceptionResponse(new TimeoutException(errorMsg));
             OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
         }
+
+        public DateTime DueTime { get; private set; }
 
         public void OnTargetSiloFail()
         {
@@ -151,22 +170,6 @@ namespace Orleans.Runtime
             callback(response, context);
         }
 
-        public void Dispose()
-        {
-            var timeouter = callbackTimeouter;
-            if (timeouter != null)
-            {
-                try
-                {
-                    callbackTimeouter = null;
-                    timeouter.Dispose();
-                }
-                catch { }
-            }
-
-            GC.SuppressFinalize(this);
-        }
-
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
         {
             lock (this)
@@ -204,125 +207,6 @@ namespace Orleans.Runtime
         public TimeSpan RequestedTimeout()
         {
             return timeout;
-        }
-
-        private class CallbackTimeouter : IDisposable
-        {
-            private readonly QueueChecker queueChecker;
-            private readonly QueueChecker resendableQueueChecker;
-
-            public CallbackTimeouter(bool resendOnTimeout)
-            {
-                TimeSpan timerPeriod = TimeSpan.FromMilliseconds(70);
-                queueChecker = new QueueChecker(timerPeriod, (queue, callback) => { });
-
-                if (!resendOnTimeout)
-                {
-                    return;
-                }
-
-                // different queues is needed because due time of resendable callback differs from due time of ordinary one
-                resendableQueueChecker = new QueueChecker(timerPeriod, (queue, callback) =>
-                {
-                    if (callback.resendPeriod.HasValue)
-                    {
-                        callback.dueTime = DateTime.UtcNow + callback.resendPeriod.Value;
-                    }
-
-                    queue.Enqueue(callback);
-                });
-            }
-
-
-            public void Register(CallbackData data)
-            {
-                queueChecker.Register(data);
-            }
-
-            public void RegisterResendable(CallbackData data)
-            {
-                if (resendableQueueChecker == null)
-                {
-                    throw new InvalidOperationException("Can't enqueue resendable callback when initialized with resendOnCallback = false");
-                }
-
-                resendableQueueChecker.Register(data);
-            }
-
-            public void Dispose()
-            {
-                queueChecker.Dispose();
-                resendableQueueChecker?.Dispose();
-            }
-
-            private class QueueChecker : IDisposable
-            {
-                private readonly Queue<CallbackData> callbacks = new Queue<CallbackData>();
-                private readonly FastLock queueLock = new FastLock();
-                private readonly SafeTimer queueChecker;
-                private readonly Action<Queue<CallbackData>, CallbackData> _onTimeout;
-
-                public QueueChecker(TimeSpan timerPeriod, Action<Queue<CallbackData>, CallbackData> onTimeout)
-                {
-                    _onTimeout = @onTimeout;
-                    queueChecker = new SafeTimer(state =>
-                    {
-                        CheckQueue();
-                    }, null, timerPeriod, timerPeriod);
-                }
-
-                public void Register(CallbackData data)
-                {
-                    queueLock.Take();
-                    callbacks.Enqueue(data);
-                    queueLock.Release();
-                }
-
-                // Crawls through the callbacks and timeouts expired ones
-                private void CheckQueue()
-                {
-                    var now = DateTime.UtcNow;
-                    while (true)
-                    {
-                        queueLock.Take();
-                        int maxItemsPerLock = 7;
-                        for (int i = 0; i < maxItemsPerLock; i++)
-                        {
-                            if (callbacks.Count == 0)
-                            {
-                                queueLock.Release();
-                                return;
-                            }
-
-                            var callback = callbacks.Peek();
-                            if (callback.alreadyFired)
-                            {
-                                callbacks.Dequeue();
-                                continue;
-                            }
-
-                            if (callback.dueTime < now)
-                            {
-                                callbacks.Dequeue();
-                                callback.OnTimeout();
-                                _onTimeout(callbacks, callback);
-                            }
-                            else
-                            {
-                                queueLock.Release();
-                                return;
-                            }
-                        }
-
-                        queueLock.Release();
-                    }
-                }
-
-                public void Dispose()
-                {
-                    queueChecker.Dispose();
-                }
-            }
         }
     }
 }

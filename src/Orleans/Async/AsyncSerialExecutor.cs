@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -13,23 +14,7 @@ namespace Orleans
     {
         private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions;
         private readonly InterlockedExchangeLock locker;
-
-        private class InterlockedExchangeLock
-        {
-            private const int Locked = 1;
-            private const int Unlocked = 0;
-            private int lockState = Unlocked;
-
-            public bool TryGetLock()
-            {
-                return Interlocked.Exchange(ref lockState, Locked) != Locked;
-            }
-
-            public void ReleaseLock()
-            {
-                Interlocked.Exchange(ref lockState, Unlocked);
-            }
-        }
+        
 
         public AsyncSerialExecutor()
         {
@@ -60,7 +45,7 @@ namespace Orleans
                 bool gotLock = false;
                 try
                 {
-                    if (!(gotLock = locker.TryGetLock()))
+                    if (!(gotLock = locker.TryGet()))
                     {
                         return;
                     }
@@ -85,7 +70,7 @@ namespace Orleans
                 finally
                 {
                     if (gotLock)
-                        locker.ReleaseLock();
+                        locker.Release();
                 }
             }
         }

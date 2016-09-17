@@ -38,6 +38,8 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="InternalUtils\InternalUtilsBenchmarkConfig.cs" />
+    <Compile Include="InternalUtils\TimerWheelBenchmark.cs" />
     <Compile Include="Serialization\PocoState.cs" />
     <Compile Include="Serialization\SerializationBenchmarkConfig.cs" />
     <Compile Include="MapReduce\MapReduceBenchmarkConfig.cs" />
