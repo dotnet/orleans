@@ -261,16 +261,19 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 return GrainInfo.NO_ETAG;
             }
+
+            IGrainInfo grainInfo;
             lock (lockable)
             {
-                if (!partitionData.ContainsKey(grain))
+                if (!partitionData.TryGetValue(grain, out grainInfo))
                 {
-                    partitionData[grain] = new GrainInfo();
+                    partitionData[grain] = grainInfo = new GrainInfo();
                 }
-                partitionData[grain].AddActivation(activation, silo);
             }
+
+            grainInfo.AddActivation(activation, silo);
             if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
-            return partitionData[grain].VersionTag;
+            return grainInfo.VersionTag;
         }
 
         /// <summary>
@@ -289,17 +292,19 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (!IsValidSilo(silo))
                 return result;
-            
+
+            IGrainInfo grainInfo;
             lock (lockable)
             {
-                if (!partitionData.ContainsKey(grain))
+                if (!partitionData.TryGetValue(grain, out grainInfo))
                 {
-                    partitionData[grain] = new GrainInfo();
+                    partitionData[grain] = grainInfo = new GrainInfo();
                 }
-                var grainInfo = partitionData[grain];
-                result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
-                result.VersionTag = grainInfo.VersionTag;
             }
+
+            result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
+            result.VersionTag = grainInfo.VersionTag;
+
             return result;
         }
 
@@ -364,21 +369,23 @@ namespace Orleans.Runtime.GrainDirectory
         internal AddressesAndTag LookUpActivations(GrainId grain)
         {
             var result = new AddressesAndTag();
+            IGrainInfo graininfo;
             lock (lockable)
             {
-                IGrainInfo graininfo;
-                if (partitionData.TryGetValue(grain, out graininfo))
+                if (!partitionData.TryGetValue(grain, out graininfo))
                 {
-                    result.Addresses = new List<ActivationAddress>();
-                    result.VersionTag = partitionData[grain].VersionTag;
-
-                    foreach (var route in partitionData[grain].Instances)
-                    {
-                        if (IsValidSilo(route.Value.SiloAddress))
-                            result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
-                    }
+                    return result;
                 }
             }
+
+            result.Addresses = new List<ActivationAddress>();
+            result.VersionTag = graininfo.VersionTag;
+            foreach (var route in graininfo.Instances)
+            {
+                if (IsValidSilo(route.Value.SiloAddress))
+                    result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
+            }
+
             return result;
         }
 
@@ -388,23 +395,25 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         internal GrainDirectoryEntryStatus TryGetActivation(GrainId grain, out ActivationAddress address, out int version)
         {
-            lock (lockable)
-            {
-                IGrainInfo graininfo;
-                if (partitionData.TryGetValue(grain, out graininfo))
-                {
-                    var first = graininfo.Instances.FirstOrDefault();
-
-                    if (first.Value != null)
-                    {
-                        address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
-                        version = graininfo.VersionTag;
-                        return first.Value.RegistrationStatus;
-                    }
-                }
-            }
+            IGrainInfo grainInfo;
             address = null;
             version = 0;
+            lock (lockable)
+            {
+                if (!partitionData.TryGetValue(grain, out grainInfo))
+                {
+                    return GrainDirectoryEntryStatus.Invalid;
+                }
+            }
+
+            var first = grainInfo.Instances.FirstOrDefault();
+            if (first.Value != null)
+            {
+                address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
+                version = grainInfo.VersionTag;
+                return first.Value.RegistrationStatus;
+            }
+
             return GrainDirectoryEntryStatus.Invalid;
         }
 
@@ -418,11 +427,16 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns></returns>
         internal int GetGrainETag(GrainId grain)
         {
+            IGrainInfo grainInfo;
             lock (lockable)
             {
-                return partitionData.ContainsKey(grain) ? 
-                    partitionData[grain].VersionTag : GrainInfo.NO_ETAG;
+                if (!partitionData.TryGetValue(grain, out grainInfo))
+                {
+                    return GrainInfo.NO_ETAG;
+                }
             }
+
+            return grainInfo.VersionTag;
         }
 
         /// <summary>
