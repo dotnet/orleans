@@ -74,6 +74,9 @@
               <h1 id="Dependency-Injection">Dependency Injection</h1>
               
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> gh-pages
 <p>Welcome to Dependency injection for Orleans.  Dependency Injection for Orleans is based off the Microsoft.Dependency.Injection from ASP.NET CORE</p>
 <h1 id="Constructors">Constructors</h1>
 <p>Orleans still uses the notion of a class as the fundmental block for the grain.  It has a constructor which executed, but normally this constructor needs to be a empty default contructor with no arguments</p>
@@ -84,6 +87,8 @@
 </code>
 </pre>
 <p>Where <pre>ISuperCoolServiceClient</pre> is a interface to the dependency you are injecting.   but it could be anything, a <pre>int</pre> constant, or the name of your current pet</p>
+<<<<<<< HEAD
+=======
 
 
 <h1 id="Startup Class">Startup Class</h1>
@@ -116,79 +121,33 @@
 <h1 id="timers">Startup Class</h1>
 >>>>>>> gh-pages
 <h1 id="timers">Unit tests</h1>
+>>>>>>> gh-pages
 
-<h1 id="timers">Timers</h1>
-<h2 id="description">Description</h2>
-<p><strong>Timers</strong> are used to create periodic grain behavior that isn&#39;t required to span multiple activations (instantiations of the grain). It is essentially identical to the standard .<strong>NET System.Threading.Timer</strong> class. In addition, it is subject to single threaded execution guarantees within the grain activation that it operates.</p>
-<p> Each activation may have zero or more timers associated with it. The runtime executes each timer routine within the runtime context of the activation that it is associated with.</p>
-<h2 id="usage">Usage</h2>
-<p>To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
-<pre><code class="lang-csharp">protected IDisposable RegisterTimer(Func&lt;object, Task&gt; asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-</code></pre><ul>
-<li>asyncCallback is the function to be invoked when the timer ticks.</li>
-<li>state is an object that will be passed to asyncCallback when the timer ticks.</li>
-<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
-<li><p>period specifies the period of the timer.</p>
-<p>Cancel the timer by disposing it.</p>
-<p>A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.</p>
-<p>Important Considerations</p>
-</li>
-<li><p>When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</p>
-</li>
-<li>The period passed to <strong>Grain.RegisterTimer</strong> is the amount of time that passes from the moment the Task returned by <strong>asyncCallback</strong> is resolved to the moment that the next invocation of <strong>asyncCallback</strong> should occur. This not only makes it impossible for successive calls to <strong>asyncCallback</strong> to overlap but also makes it so that the length of time <strong>asyncCallback</strong> takes to complete affects the frequency at which <strong>asyncCallback</strong> is invoked. This is an important deviation from the semantics of <strong>System.Threading.Timer</strong>.</li>
-<li>Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered to behave as if running on a reentrant grain with respect to other messages to that grain.</li>
-</ul>
-<h1 id="reminders">Reminders</h1>
-<h2 id="description-1">Description</h2>
-<p>Reminders are similar to timers with a few important differences:</p>
-<ul>
-<li>Reminders are persistent and will continue to trigger in all situations (including partial or full cluster restarts) unless explicitly cancelled.</li>
-<li>Reminders are associated with a grain, not any specific activation.</li>
-<li>If a grain has no activation associated with it and a reminder ticks, one will be created. e.g.: If an activation becomes idle and is deactivated, a reminder associated with the same grain will reactivate the grain when it ticks next.</li>
-<li>Reminders are delivered by message and are subject to the same interleaving semantics as all other grain methods.</li>
-<li>Reminders should not be used for high-frequency timers-- their period should be measured in minutes, hours, or days.</li>
-</ul>
-<h2 id="configuration">Configuration</h2>
-<p>Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.</p>
-<pre><code class="lang-xml">&lt;SystemStore SystemStoreType=&quot;AzureTable&quot; /&gt; OR
-&lt;SystemStore SystemStoreType=&quot;SqlServer&quot; /&gt;
-</code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
-<pre><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
-</code></pre><h2 id="usage-1">Usage</h2>
-<p>A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
-<pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
-{
-    Console.WriteLine(&quot;Thanks for reminding me-- I almost forgot!&quot;);
-    return TaskDone.Done;
-}
-</code></pre><p> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IOrleansReminder</strong> object:</p>
-<pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-</code></pre><ul>
-<li>reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.</li>
-<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
-<li>period specifies the period of the timer.</li>
-</ul>
-<p>Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling <strong>Grain.UnregisterReminder</strong>:</p>
-<pre><code class="lang-csharp">protected Task UnregisterReminder(IOrleansReminder reminder)
-</code></pre><p>reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
-<p> Instances of <strong>IOrleansReminder</strong> aren&#39;t guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder&#39;s name.</p>
-<p> If you only have the reminder&#39;s name and need the corresponding instance of  <strong>IOrleansReminder</strong>, call the <strong>Grain.GetReminder</strong> method:</p>
-<pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; GetReminder(string reminderName)
-</code></pre><h2 id="which-should-i-use">Which Should I Use?</h2>
-<p>We recommend that you use timers in the following circumstances:</p>
-<ul>
-<li>It doesn&#39;t matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.</li>
-<li>If the resolution of the timer is small (e.g. reasonably expressible in seconds or minutes).</li>
-<li>The timer callback can be started from <code>Grain.OnActivateAsync</code> or when a grain method is invoked.</li>
-</ul>
-<p>We recommend that you use reminders in the following circumstances:</p>
-<ul>
-<li>When the periodic behavior needs to survive the activation and any failures.</li>
-<li>To perform infrequent tasks (e.g. reasonably expressible in minutes, hours, or days).</li>
-</ul>
-<h2 id="combining-timers-and-reminders">Combining Timers and Reminders</h2>
-<p>You might consider using a combination of reminders and timers to accomplish your goal. For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.</p>
 
+<h1 id="Startup Class">Startup Class</h1>
+<p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <i>SEAM</i> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
+<p>Lets create a startup class.  In this case we are using the <i>Microsoft.Dependency.Injection</i> classes, but you can use whatever DI container you like</pre></p>
+<pre>
+  <code class="lang-csharp">public class Startup
+  {
+  public Startup(){}
+  
+  public IServiceProvider ConfigureServices(IServiceCollection services)
+  {
+            services.AddSingleton<ISuperCoolServiceClient, SuperCoolServiceClient>(f =>
+            {
+                var configSection = (SuperCoolServiceConfiguration) ConfigurationManager.GetSection(SuperCoolServiceConfiguration.SectionName);
+                var baseUrl = new Uri(configSection.BaseUrl);
+                //return the concrete implementation
+                return new SuperCoolService(baseUrl);
+            });
+            
+           services.AddTransient<MyGrain>(
+                sp => new MyGrain(sp.GetRequiredService<ISuperCoolServiceClient>()));
+    return services.BuildServiceProvider(); 
+  }
+</code>
+</pre>
             </article>
           </div>
           
@@ -197,7 +156,7 @@
               <div class="contribution">
                 <ul class="nav">
                   <li>
-                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Timers-and-Reminders.md/#L1" class="contribution-link">Improve this Doc</a>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Dependency-Injection.html/#L1" class="contribution-link">Improve this Doc</a>
                   </li>
                 </ul>
               </div>
