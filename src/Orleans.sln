@@ -74,6 +74,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Nuget", "Nuget", "{014CD19F
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
 		NuGet\Microsoft.Orleans.OrleansRuntime.nuspec = NuGet\Microsoft.Orleans.OrleansRuntime.nuspec
 		NuGet\Microsoft.Orleans.OrleansServiceBus.nuspec = NuGet\Microsoft.Orleans.OrleansServiceBus.nuspec
+		NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec = NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.AI.nuspec = NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.AI.nuspec
 		NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.Counters.nuspec = NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.Counters.nuspec
 		NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic.nuspec = NuGet\Microsoft.Orleans.OrleansTelemetryConsumers.NewRelic.nuspec
