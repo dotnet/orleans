@@ -75,17 +75,18 @@
 
 <p>Welcome to Dependency injection for Orleans.  Dependency Injection for Orleans is based off the Microsoft.Dependency.Injection from ASP.NET CORE</p>
 <h1 id="Constructors">Constructors</h1>
-<p>Orleans still uses the notion of a class as the fundmental block for the grain.  It has a constructor which executed, but normally this constructor needs to be a empty default contructor with no arguments</p>
-<p>Orleans uses the contrcutor to perform constructor injection (see Mark Seeman), where a given dependyc is injected into the grain at(really before) activation time.</p>
-<p>So to injection a necessary dendpency into your grain, give the grain a contrcutor taking an argument</p>
+<p>Orleans uses a class as the fundmental block for the grain.  It has a constructor, but typically this constructor is empty with no arguments</p>
+<p>Orleans uses the contrcutor to perform constructor injection (see Mark Seeman), where a given dependency is injected into the grain at(really before) activation time.</p>
+<p>So to inject a necessary dedenpency into your grain, give the grain a contructor taking an argument</p>
 <pre>
   <code class="lang-csharp">public MyGrain(ISuperCoolServiceClient client)
 </code>
 </pre>
 <p>Where <i>ISuperCoolServiceClient</i> is a interface to the dependency you are injecting.   but it could be anything, an <i>int</i> constant, or <i>string</i> with the name of your current pet</p>
+<p>Now if you try running this grain in a silo, your going to get errors e.g. the silo can start that grain.  We need a startup class</p>
 
 <h1 id="Startup Class">Startup Class</h1>
-<p>Now that your grain is fully dependent on something, its time to fulfill that dependency. A Startup class is the <i>SEAM</i> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
+<p>Now that your grain is dependent on something, it's time to fulfill that dependency. A Startup class is the <i>SEAM</i> that performs that action. The Startup class is invoked by the silo when it starts up.</p>
 <p>Lets create a startup class.  In this case we are using the <i>Microsoft.Dependency.Injection</i> classes, but you can use whatever DI container you like</pre></p>
 <pre>
   <code class="lang-csharp">public class Startup
@@ -108,6 +109,10 @@
   }
 </code>
 </pre>
+
+<p>Now when <i>MyGrain</i> is activated the <i>ISuperCoolServiceClient</i> is injected into the grain</p>
+
+
             </article>
           </div>
           
