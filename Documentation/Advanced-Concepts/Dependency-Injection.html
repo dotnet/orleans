@@ -112,19 +112,21 @@
 
 <p>Now when <i>MyGrain</i> is activated the <i>ISuperCoolServiceClient</i> is injected into the grain</p>
 
-<h1>>Using the Startup class</h1>
+<h1>Using the Startup class</h1>
 <h2>Production</h2>
-<p> In production this is relatvely straight forward.   Make hte Startup class be use by the Silo startup</p>
-
+<p> In production this is relatvely straight forward.   Make the Startup class be used by the Silo startup</p>
+<pre>
 <code>
               siloHost.NodeConfig.StartupTypeName = typeof(Startup).AssemblyQualifiedName;
 </code>
+</pre>
 
 <h2>Unit Test</h2>
 <p>Unit test get more fun</p>
 <p>Using the <i>TestCluster</i></p>
 <p>Build a startup class for the class, or fixture or whatever is running your <i>Testcluster</i></p>
 
+<pre>
 <code>
     public class TestStartup
     {
@@ -150,7 +152,7 @@
     }
   
 </code>
-
+</pre>
 
 
 <code>
