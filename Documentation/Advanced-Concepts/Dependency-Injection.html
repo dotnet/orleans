@@ -137,8 +137,8 @@
         {
             services.AddTransient&lt;ISuperCoolServiceClient, ISuperCoolServiceClient&gt;(f =>
             {
-                var mock = new Mock<ISuperCoolServiceClient>();
-                mock.Setup(m => m.MyMockedFunc(It.IsAny<string>())).ReturnsAsync("My cats name");
+                var mock = new Mock&lt;ISuperCoolServiceClient&gt;();
+                mock.Setup(m => m.MyMockedFunc(It.IsAny&lt;string&gt;())).ReturnsAsync("My cats name");
 
                 return mock.Object;
             });
