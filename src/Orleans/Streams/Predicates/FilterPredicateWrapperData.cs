@@ -65,7 +65,7 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            Type funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
+            Type funcClassType = TypeUtils.ResolveType(funcClassName);
             MethodInfo method = funcClassType.GetMethod(funcMethodName);
             StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
 #if DEBUG
