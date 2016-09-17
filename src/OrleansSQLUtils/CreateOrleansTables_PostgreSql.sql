@@ -40,7 +40,6 @@ CREATE TABLE OrleansQuery
 	CONSTRAINT OrleansQuery_Key PRIMARY KEY(QueryKey)
 );
 
-
 -- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
 CREATE TABLE OrleansMembershipVersionTable 
 (
@@ -50,8 +49,6 @@ CREATE TABLE OrleansMembershipVersionTable
 
 	CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId)
 );
-
-
 
 -- Every silo instance has a row in the membership table.
 CREATE TABLE OrleansMembershipTable 
@@ -146,7 +143,6 @@ CREATE TABLE OrleansSiloMetricsTable
 	CONSTRAINT FK_SiloMetricsTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
 );
 
-
 CREATE FUNCTION update_i_am_alive_time(
     deployment_id OrleansMembershipTable.DeploymentId%TYPE, 
     address_arg OrleansMembershipTable.Address%TYPE, 
@@ -169,9 +165,6 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-
-
-
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -187,10 +180,6 @@ VALUES
     );
 ');
 
-
-
-
-
 CREATE FUNCTION insert_membership_version(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE
 )
@@ -198,8 +187,7 @@ CREATE FUNCTION insert_membership_version(
 $func$
 DECLARE
     RowCountVar int := 0;
-BEGIN
-  
+BEGIN  
   
     BEGIN
       
@@ -210,11 +198,9 @@ BEGIN
         SELECT DeploymentIdArg
         ON CONFLICT (DeploymentId) DO NOTHING;
 
-
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
         ASSERT RowCountVar <> 0, 'no rows affected, rollback';
-
         
         RETURN QUERY SELECT RowCountVar;
     EXCEPTION
@@ -225,9 +211,6 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-
-
-
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -236,12 +219,6 @@ VALUES
         @DeploymentId
     );
 ');
-
-
-
-
-
-
 
 CREATE FUNCTION insert_membership(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE, 
@@ -260,8 +237,7 @@ $func$
 DECLARE
     RowCountVar int := 0;
 BEGIN
-  
-  
+
     BEGIN
         INSERT INTO OrleansMembershipTable
         (
@@ -316,11 +292,6 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-
-
-
-
-
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -340,12 +311,6 @@ VALUES
     );
 ');
 
-
-
-
-
-
-
 CREATE FUNCTION update_membership(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE, 
     AddressArg      OrleansMembershipTable.Address%TYPE, 
@@ -361,7 +326,6 @@ $func$
 DECLARE
     RowCountVar int := 0;
 BEGIN
-  
   
     BEGIN
       
@@ -403,7 +367,6 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -420,12 +383,6 @@ VALUES
     );
 ');
 
-
-
-
-
-
-
 CREATE FUNCTION upsert_reminder_row(
     ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE, 
     GrainIdArg      OrleansRemindersTable.GrainId%TYPE, 
@@ -439,9 +396,6 @@ $func$
 DECLARE
     VersionVar int := 0;  
 BEGIN
-  
-    
-  
     
 	INSERT INTO OrleansRemindersTable
 	(
@@ -469,8 +423,6 @@ BEGIN
             Version = OrleansRemindersTable.Version + 1
     RETURNING 
         OrleansRemindersTable.Version INTO STRICT VersionVar;
-    
-    
         
 	RETURN QUERY SELECT VersionVar AS versionr;
     
@@ -490,10 +442,6 @@ VALUES
         @GrainHash
     );
 ');
-
-
-
-
 
 CREATE FUNCTION upsert_report_client_metrics(
     DeploymentIdArg             OrleansClientMetricsTable.DeploymentId%TYPE, 
@@ -573,10 +521,6 @@ VALUES
     )
 ');
 
-
-
-
-
 CREATE FUNCTION upsert_silo_metrics(
     DeploymentIdArg                 OrleansSiloMetricsTable.DeploymentId%TYPE, 
     SiloIdArg                       OrleansSiloMetricsTable.SiloId%TYPE,     
@@ -601,8 +545,6 @@ CREATE FUNCTION upsert_silo_metrics(
   RETURNS void AS
 $func$
 BEGIN
-  
-  
 
 	INSERT INTO OrleansSiloMetricsTable
 	(
@@ -697,8 +639,6 @@ VALUES
     )
 ');
 
-
-
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
@@ -714,8 +654,6 @@ VALUES
 		AND Status = @Status AND @Status IS NOT NULL
 		AND ProxyPort > 0;
 ');
-
-
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -769,9 +707,6 @@ VALUES
 	WHERE
 		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
 ');
-
-
-
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
@@ -877,8 +812,6 @@ VALUES
 	COMMIT;
 ');
 
-
-
 CREATE FUNCTION delete_reminder_row(
     ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE, 
     GrainIdArg      OrleansRemindersTable.GrainId%TYPE, 
@@ -926,12 +859,3 @@ VALUES
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
 ');
-
-
-
-
-
-
-
-
-
