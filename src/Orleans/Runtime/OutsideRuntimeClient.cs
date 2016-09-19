@@ -218,6 +218,7 @@ namespace Orleans
 
         private static void LoadAdditionalAssemblies()
         {
+#if !NETSTANDARD_TODO
             var logger = LogManager.GetLogger("AssemblyLoader.Client", LoggerType.Runtime);
 
             var directories =
@@ -241,6 +242,7 @@ namespace Orleans
                     };
 
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
+#endif
         }
         
         private void UnhandledException(ISchedulingContext context, Exception exception)
