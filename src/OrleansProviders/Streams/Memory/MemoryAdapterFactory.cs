@@ -25,12 +25,35 @@ namespace Orleans.Providers.Streams.Memory
         private String providerName;
         private IGrainFactory grainFactory;
 
+        /// <summary>
+        /// Name of the adapter. Primarily for logging purposes
+        /// </summary>
         public string Name { get { return adapterConfig.StreamProviderName; } }
+
+        /// <summary>
+        /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
+        /// </summary>
+        /// <returns>True if this is a rewindable stream adapter, false otherwise.</returns>
         public bool IsRewindable { get { return false; } }
+
+        /// <summary>
+        /// Direction of this queue adapter: Read, Write or ReadWrite.
+        /// </summary>
+        /// <returns>The direction in which this adapter provides data.</returns>
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
 
+        /// <summary>
+        /// Creates a failure handler for a partition.
+        /// </summary>
         protected Func<string, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { get; set; }
 
+        /// <summary>
+        /// Factory initialization.
+        /// </summary>
+        /// <param name="providerConfig"></param>
+        /// <param name="providerName"></param>
+        /// <param name="log"></param>
+        /// <param name="svcProvider"></param>
         public void Init(IProviderConfiguration providerConfig, string providerName, Logger log, IServiceProvider svcProvider)
         {
             this.logger = log;
@@ -46,27 +69,54 @@ namespace Orleans.Providers.Streams.Memory
             this.bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
         }
 
+        /// <summary>
+        /// Create queue adapter.
+        /// </summary>
+        /// <returns></returns>
         public Task<IQueueAdapter> CreateAdapter()
         {
             return Task.FromResult<IQueueAdapter>(this);
         }
 
+        /// <summary>
+        /// Create queue message cache adapter
+        /// </summary>
+        /// <returns></returns>
         public IQueueAdapterCache GetQueueAdapterCache()
         {
             return this;
-        } 
+        }
 
+        /// <summary>
+        /// Create queue mapper
+        /// </summary>
+        /// <returns></returns>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             return streamQueueMapper;
         }
 
+        /// <summary>
+        /// Creates a quere receiver for the specificed queueId
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             IQueueAdapterReceiver receiver = (IQueueAdapterReceiver)new MemoryAdapterReceiver(GetQueueGrain(queueId), logger);
             return receiver;
         }
 
+        /// <summary>
+        /// Writes a set of events to the queue as a single batch associated with the provided streamId.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
+        /// <param name="events"></param>
+        /// <param name="token"></param>
+        /// <param name="requestContext"></param>
+        /// <returns></returns>
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             QueueId queueId;
@@ -85,16 +135,30 @@ namespace Orleans.Providers.Streams.Memory
             }
         }
 
+        /// <summary>
+        /// Create a cache for a given queue id
+        /// </summary>
+        /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
             return new MemoryPooledCache(bufferPool, logger.GetSubLogger("messagecache", "-"));
         }
 
+        /// <summary>
+        /// Aquire delivery failure handler for a queue
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
             return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
 
+        /// <summary>
+        /// Generate a deterministic Guid from a queue Id. 
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             // provider name hash code
@@ -119,6 +183,11 @@ namespace Orleans.Providers.Streams.Memory
             return new Guid(providerNameGuidHash, s1, s2, tail.ToArray());
         }
 
+        /// <summary>
+        /// Get a MemoryStreamQueueGrain instance by queue Id. 
+        /// </summary>
+        /// <param name="queueId"></param>
+        /// <returns></returns>
         private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
         {
             return queueGrains.GetOrAdd(queueId, grainFactory.GetGrain<IMemoryStreamQueueGrain>(GenerateDeterministicGuid(queueId)));

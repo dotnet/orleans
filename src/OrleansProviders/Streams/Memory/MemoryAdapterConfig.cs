@@ -10,17 +10,37 @@ namespace Orleans.Providers.Streams.Memory
     /// </summary>
     public class MemoryAdapterConfig
     {
+        /// <summary>
+        /// Stream provider name.
+        /// </summary>
         public String StreamProviderName { get; private set; }
 
+        /// <summary>
+        /// Total queue count name. Indicates the name of the property in provider config.
+        /// </summary>
         private const string TotalQueueCountName = "TotalQueueCount";
+
+        /// <summary>
+        /// Total queue count default value.
+        /// </summary>
         private const int TotalQueueCountDefault = 4;
         private static int cacheSizeMbDefault = 10;
+
+        /// <summary>
+        /// Actual total queue count.
+        /// </summary>
         public int TotalQueueCount { get; set; }
+
         /// <summary>
         /// Cache size of FixedSizeObjectPool measured in Mb
         /// </summary>
         public int CacheSizeMb { get; set; } = cacheSizeMbDefault;
 
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="streamProviderName"></param>
+        /// <param name="totalQueueCount"></param>
         public MemoryAdapterConfig(string streamProviderName, int totalQueueCount = TotalQueueCountDefault)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
