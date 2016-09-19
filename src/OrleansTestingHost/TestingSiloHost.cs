@@ -78,7 +78,8 @@ namespace Orleans.TestingHost
         /// <summary> GrainFactory to use in the tests </summary>
         public IGrainFactory GrainFactory { get; private set; }
 
-        private Logger logger
+        /// <summary> Get the logger to use in tests </summary>
+        protected Logger logger
         {
             get { return GrainClient.Logger; }
         }
