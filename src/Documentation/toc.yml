@@ -60,6 +60,8 @@
     href: Advanced-Concepts/Activation-Garbage-Collection.md
   - name: Application Bootstrap within a Silo
     href: Advanced-Concepts/Application-Bootstrap-within-a-Silo.md
+  - name: Dependency Injection
+    href: Advanced-Concepts/Dependency-Injection.md
   - name: Client Error Code Monitoring
     href: Advanced-Concepts/Client-Error-Code-Monitoring.md
   - name: Configuring .NET Garbage Collection
