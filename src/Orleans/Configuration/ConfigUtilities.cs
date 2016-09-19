@@ -619,7 +619,8 @@ namespace Orleans.Runtime.Configuration
         public static string RuntimeVersionInfo()
         {
             var sb = new StringBuilder();
-#if !NETSTANDARD
+            sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
+#if !NETSTANDARD_TODO
 			// TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   Is .NET 4.5=").AppendLine(IsNet45OrNewer().ToString());
