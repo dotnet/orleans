@@ -197,15 +197,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        private string workingStoreDir;
-        /// <summary>
-        /// </summary>
-        internal string WorkingStorageDirectory
-        {
-            get { return workingStoreDir ?? (workingStoreDir = GetDefaultWorkingStoreDirectory()); }
-            set { workingStoreDir = value; }
-        }
-
         /// <summary>
         /// </summary>
         public int MinDotNetThreadPoolSize { get; set; }
@@ -498,13 +489,6 @@ namespace Orleans.Runtime.Configuration
 
                 }
             }
-        }
-
-        private string GetDefaultWorkingStoreDirectory()
-        {
-            string workingStoreLocation = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
-            string cacheDirBase = Path.Combine(workingStoreLocation, "OrleansData");
-            return cacheDirBase;
         }
     }
 }
