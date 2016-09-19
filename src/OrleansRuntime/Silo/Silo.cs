@@ -211,8 +211,8 @@ namespace Orleans.Runtime
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
                 siloType, nodeConfig.DNSHostName, Environment.MachineName, here, generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' .NET version='{2}' Is .NET 4.5={3} OS version='{4}' Config= " + Environment.NewLine + "{5}",
-                name, RuntimeVersion.Current, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion, config.ToString(name));
+            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
+                name, config.ToString(name));
 
             if (keyStore != null)
             {
