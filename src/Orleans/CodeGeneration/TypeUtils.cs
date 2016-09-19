@@ -561,13 +561,9 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                if (logger!= null && logger.IsWarning)
+                if (logger != null && logger.IsWarning)
                 {
-                    var message =
-                        string.Format(
-                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
-                            assembly.FullName,
-                            exception);
+                    var message = $"AssemblyLoader encountered an exception loading types from assembly '{assembly.FullName}': {exception}";
                     logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
                 }
                 
