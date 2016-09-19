@@ -173,7 +173,8 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Build the client configuration based on the cluster configuration.
+        /// Build the client configuration based on the cluster configuration. If a debugger is attached, 
+        /// the response timeout will be overridden to 1000000ms
         /// </summary>
         /// <param name="clusterConfig">The reference cluster configuration.</param>
         /// <returns>THe builded client configuration</returns>
@@ -218,7 +219,7 @@ namespace Orleans.TestingHost
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
 
-            // Test is running inside debugger - Make timeout ~= infinite
+            // If a debugger is attached, override the timeout setting
             config.ResponseTimeout = Debugger.IsAttached
                 ? TimeSpan.FromMilliseconds(1000000)
                 : clusterConfig.Globals.ResponseTimeout;

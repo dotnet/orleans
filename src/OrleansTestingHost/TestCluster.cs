@@ -43,7 +43,7 @@ namespace Orleans.TestingHost
         private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
 
         /// <summary>
-        /// Client condfiguration to use when initializing the client
+        /// Client configuration to use when initializing the client
         /// </summary>
         public ClientConfiguration ClientConfiguration { get; private set; }
 
