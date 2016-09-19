@@ -65,6 +65,11 @@ namespace UnitTests.StorageTests.Relational
                 {
                     StorageInvariant = AdoNetInvariants.InvariantNameMySql,
                     ConnectionString = "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;"
+                },
+                new StorageConnection
+                {
+                    StorageInvariant = AdoNetInvariants.InvariantNamePostgreSql,
+                    ConnectionString = "Server=127.0.0.1;Port=5432;Database=postgres;Integrated Security=true;Pooling=false;"
                 }
             })),
             EnvironmentId = "Default"

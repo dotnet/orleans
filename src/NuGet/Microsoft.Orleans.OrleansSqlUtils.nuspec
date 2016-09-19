@@ -28,5 +28,6 @@
     <file src="OrleansSqlUtils.xml" target="lib\net451" />
     <file src="CreateOrleansTables_SqlServer.sql" target="lib\net451\SQLServer" />
     <file src="CreateOrleansTables_MySql.sql" target="lib\net451\MySql" />
+    <file src="CreateOrleansTables_PostgreSql.sql" target="lib\net451\PostgreSql" />
   </files>
 </package>
