@@ -607,6 +607,7 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
+#if !NETSTANDARD_TODO
             if (nodeConfig.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
@@ -642,6 +643,7 @@ namespace Orleans.Runtime
             ServicePointManager.Expect100Continue = nodeConfig.Expect100Continue;
             ServicePointManager.DefaultConnectionLimit = nodeConfig.DefaultConnectionLimit;
             ServicePointManager.UseNagleAlgorithm = nodeConfig.UseNagleAlgorithm;
+#endif
         }
 
         /// <summary>
