@@ -126,8 +126,7 @@ namespace Orleans
         /// Find cached copy of object with specified key, otherwise create new one using the supplied creator-function.
         /// </summary>
         /// <param name="key">key to find</param>
-        /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
-        /// <returns>Object with specified key - either previous cached copy or newly created</returns>
+        /// <param name="obj">The existing value if the key is found</param>
         public bool TryFind(K key, out T obj)
         {
             obj = null;

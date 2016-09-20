@@ -31,6 +31,7 @@ namespace Orleans.Streams
         /// Binds an extension to an addressable object, if not already done.
         /// </summary>
         /// <typeparam name="TExtension">The type of the extension (e.g. StreamConsumerExtension).</typeparam>
+        /// <typeparam name="TExtensionInterface">The public interface type of the implementation.</typeparam>
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
         Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
@@ -50,11 +51,7 @@ namespace Orleans.Streams
         /// <returns></returns>
         IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
 
-        /// <summary>
-        /// Return true if this runtime executes inside silo, false otherwise (on the client).
-        /// </summary>
-        /// <param name="pubSubType"></param>
-        /// <returns></returns>
+        /// <summary>Return true if this runtime executes inside silo, false otherwise (on the client).</summary>
         bool InSilo { get; }
 
         object GetCurrentSchedulingContext();

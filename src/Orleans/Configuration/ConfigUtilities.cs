@@ -533,6 +533,8 @@ namespace Orleans.Runtime.Configuration
                 PrintDataConnectionInfo(dataConnectionString));
         }
 
+        /// <summary>Removes private credential information about an azure connection string by truncating the account key from it.</summary>
+        /// <param name="azureConnectionString">The original connection string</param>
         public static string PrintDataConnectionInfo(string azureConnectionString)
         {
             if (String.IsNullOrEmpty(azureConnectionString)) return "null";
@@ -547,6 +549,8 @@ namespace Orleans.Runtime.Configuration
             return azureConnectionInfo;
         }
 
+        /// <summary>Removes private credential information about a SQL connection string by truncating the account password from it.</summary>
+        /// <param name="sqlConnectionString">The original connection string</param>
         public static string PrintSqlConnectionString(string sqlConnectionString)
         {
             if (String.IsNullOrEmpty(sqlConnectionString))

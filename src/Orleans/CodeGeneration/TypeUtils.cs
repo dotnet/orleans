@@ -710,18 +710,10 @@ namespace Orleans.Runtime
             return index > 0 ? method.Name.Substring(0, index) : method.Name;
         }
 
-        /// <summary>
-        /// Returns a string representation of <paramref name="type"/>.
-        /// </summary>
-        /// <param name="type">
-        /// The type.
-        /// </param>
-        /// <param name="includeNamespace">
-        /// A value indicating whether or not to include the namespace name.
-        /// </param>
-        /// <returns>
-        /// A string representation of the <paramref name="type"/>.
-        /// </returns>
+        /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="options">The type formatting options.</param>
+        /// <returns>A string representation of the <paramref name="type"/>.</returns>
         public static string GetParseableName(this Type type, TypeFormattingOptions options = null)
         {
             options = options ?? new TypeFormattingOptions();
@@ -743,21 +735,11 @@ namespace Orleans.Runtime
                 });
         }
 
-        /// <summary>
-        /// Returns a string representation of <paramref name="type"/>.
-        /// </summary>
-        /// <param name="type">
-        /// The type.
-        /// </param>
-        /// <param name="builder">
-        /// The <see cref="StringBuilder"/> to append results to.
-        /// </param>
-        /// <param name="typeArguments">
-        /// The type arguments of <paramref name="type"/>.
-        /// </param>
-        /// <param name="options">
-        /// The type formatting options.
-        /// </param>
+        /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="builder">The <see cref="StringBuilder"/> to append results to.</param>
+        /// <param name="typeArguments">The type arguments of <paramref name="type"/>.</param>
+        /// <param name="options">The type formatting options.</param>
         private static void GetParseableName(
             Type type,
             StringBuilder builder,
@@ -919,21 +901,10 @@ namespace Orleans.Runtime
             throw new ArgumentException("Expression type unsupported.");
         }
 
-        /// <summary>
-        /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.
-        /// </summary>
-        /// <typeparam name="T">
-        /// The containing type of the method.
-        /// </typeparam>
-        /// <typeparam name="TResult">
-        /// The return type of the method.
-        /// </typeparam>
-        /// <param name="expression">
-        /// The expression.
-        /// </param>
-        /// <returns>
-        /// The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
-        /// </returns>
+        /// <summary>Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.</summary>
+        /// <typeparam name="TResult">The return type of the method.</typeparam>
+        /// <param name="expression">The expression.</param>
+        /// <returns>The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.</returns>
         public static MemberInfo Member<TResult>(Expression<Func<TResult>> expression)
         {
             var methodCall = expression.Body as MethodCallExpression;
@@ -951,18 +922,10 @@ namespace Orleans.Runtime
             throw new ArgumentException("Expression type unsupported.");
         }
 
-        /// <summary>
-        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
-        /// </summary>
-        /// <typeparam name="T">
-        /// The containing type of the method.
-        /// </typeparam>
-        /// <param name="expression">
-        /// The expression.
-        /// </param>
-        /// <returns>
-        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
-        /// </returns>
+        /// <summary>Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.</summary>
+        /// <typeparam name="T">The containing type of the method.</typeparam>
+        /// <param name="expression">The expression.</param>
+        /// <returns>The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.</returns>
         public static MethodInfo Method<T>(Expression<Func<T>> expression)
         {
             var methodCall = expression.Body as MethodCallExpression;
@@ -974,18 +937,11 @@ namespace Orleans.Runtime
             throw new ArgumentException("Expression type unsupported.");
         }
 
-        /// <summary>
-        /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
+        /// <summary>Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
         /// </summary>
-        /// <typeparam name="T">
-        /// The containing type of the method.
-        /// </typeparam>
-        /// <param name="expression">
-        /// The expression.
-        /// </param>
-        /// <returns>
-        /// The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
-        /// </returns>
+        /// <typeparam name="T">The containing type of the method.</typeparam>
+        /// <param name="expression">The expression.</param>
+        /// <returns>The <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.</returns>
         public static MethodInfo Method<T>(Expression<Action<T>> expression)
         {
             var methodCall = expression.Body as MethodCallExpression;
@@ -997,13 +953,9 @@ namespace Orleans.Runtime
             throw new ArgumentException("Expression type unsupported.");
         }
 
-        /// <summary>
-        /// Returns the namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.
-        /// </summary>
+        /// <summary>Returns the namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.</summary>
         /// <param name="type">The type.</param>
-        /// <returns>
-        /// The namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.
-        /// </returns>
+        /// <returns>The namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.</returns>
         public static string GetNamespaceOrEmpty(this Type type)
         {
             if (type == null || string.IsNullOrEmpty(type.Namespace))
@@ -1014,18 +966,10 @@ namespace Orleans.Runtime
             return type.Namespace;
         }
 
-        /// <summary>
-        /// Returns the types referenced by the provided <paramref name="type"/>.
-        /// </summary>
-        /// <param name="type">
-        /// The type.
-        /// </param>
-        /// <param name="includeMethods">
-        /// Whether or not to include the types referenced in the methods of this type.
-        /// </param>
-        /// <returns>
-        /// The types referenced by the provided <paramref name="type"/>.
-        /// </returns>
+        /// <summary>Returns the types referenced by the provided <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="includeMethods">Whether or not to include the types referenced in the methods of this type.</param>
+        /// <returns>The types referenced by the provided <paramref name="type"/>.</returns>
         public static IList<Type> GetTypes(this Type type, bool includeMethods = false)
         {
             List<Type> results;
@@ -1117,18 +1061,11 @@ namespace Orleans.Runtime
             return references.Any(asm => string.Equals(asm.Name, assemblyName.Name, StringComparison.Ordinal));
         }
 
-        /// <summary>
-        /// Returns the types referenced by the provided <paramref name="type"/>.
-        /// </summary>
-        /// <param name="type">
-        /// The type.
-        /// </param>
-        /// <param name="includeMethods">
-        /// Whether or not to include the types referenced in the methods of this type.
-        /// </param>
-        /// <returns>
-        /// The types referenced by the provided <paramref name="type"/>.
-        /// </returns>
+        /// <summary>Returns the types referenced by the provided <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="includeMethods">Whether or not to include the types referenced in the methods of this type.</param>
+        /// <param name="exclude">Types to exclude</param>
+        /// <returns>The types referenced by the provided <paramref name="type"/>.</returns>
         private static IEnumerable<Type> GetTypes(
             this Type type,
             bool includeMethods,

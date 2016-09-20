@@ -10,11 +10,7 @@ namespace Orleans
         /// Shortcut to create HashSet from IEnumerable that supports type inference
         /// (which the standard constructor does not)
         /// </summary>
-        /// <typeparam name="TK"></typeparam>
-        /// <typeparam name="TV"></typeparam>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The element type</typeparam>
         public static HashSet<T> ToSet<T>(this IEnumerable<T> values)
         {
             if (values == null)

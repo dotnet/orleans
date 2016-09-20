@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// </summary>
     public class TypeFormattingOptions : IEquatable<TypeFormattingOptions>
     {
+        /// <summary>Initializes a new instance of <see cref="TypeFormattingOptions"/>.</summary>
         public TypeFormattingOptions(
             string nameSuffix = null,
             bool includeNamespace = true,
@@ -122,11 +123,13 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>Determines whether the specified objects are equal.</summary>
         public static bool operator ==(TypeFormattingOptions left, TypeFormattingOptions right)
         {
             return Equals(left, right);
         }
 
+        /// <summary>Determines whether the specified objects are not equal.</summary>
         public static bool operator !=(TypeFormattingOptions left, TypeFormattingOptions right)
         {
             return !Equals(left, right);

@@ -14,7 +14,7 @@ namespace Orleans.Streams
         /// handler methods instead of requiring an instance of IAsyncObserver.
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
-        /// <param name="obs">The Observable object.</param>
+        /// <param name="handle">The subscription handle.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
         /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
@@ -39,7 +39,7 @@ namespace Orleans.Streams
         /// handler methods instead of requiring an instance of IAsyncObserver.
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
-        /// <param name="obs">The Observable object.</param>
+        /// <param name="handle">The subscription handle.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="onErrorAsync">Delegte that is called for IAsyncObserver.OnErrorAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
@@ -61,7 +61,7 @@ namespace Orleans.Streams
         /// handler methods instead of requiring an instance of IAsyncObserver.
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
-        /// <param name="obs">The Observable object.</param>
+        /// <param name="handle">The subscription handle.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="onCompletedAsync">Delegte that is called for IAsyncObserver.OnCompletedAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
@@ -82,7 +82,7 @@ namespace Orleans.Streams
         /// Usually this is because it is not a static method. </exception>
         /// </summary>
         /// <typeparam name="T">The type of object produced by the observable.</typeparam>
-        /// <param name="obs">The Observable object.</param>
+        /// <param name="handle">The subscription handle.</param>
         /// <param name="onNextAsync">Delegte that is called for IAsyncObserver.OnNextAsync.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.

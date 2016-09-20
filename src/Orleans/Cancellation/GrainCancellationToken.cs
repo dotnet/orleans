@@ -83,6 +83,7 @@ namespace Orleans
             _targetGrainReferences.TryAdd(grainReference.GrainId, grainReference);
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             _cancellationTokenSource.Dispose();

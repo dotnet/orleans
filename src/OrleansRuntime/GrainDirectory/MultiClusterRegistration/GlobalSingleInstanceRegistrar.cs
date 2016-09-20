@@ -284,7 +284,8 @@ namespace Orleans.Runtime.GrainDirectory
         /// <summary>
         /// Send GSI protocol request to the given remote cluster
         /// </summary>
-        /// <param name="remotecluster"></param>
+        /// <param name="grain">The grainId of the grain being activated</param>
+        /// <param name="remotecluster">The remote cluster name to send the request to.</param>
         public async Task<RemoteClusterActivationResponse> SendRequest(GrainId grain, string remotecluster)
         {
             try

@@ -17,6 +17,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="T">The type of the list elements.</typeparam>
         /// <param name="collection">The IEnumerable to describe.</param>
+        /// <param name="toString">Converts the element to a string. If none specified, <see cref="object.ToString"/> will be used.</param>
+        /// <param name="separator">The separator to use.</param>
+        /// <param name="putInBrackets">Puts elements within brackets</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// elements with square brackets and separating them with commas.</returns>
         public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null, 
@@ -60,8 +63,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="T1">The type of the dictionary keys.</typeparam>
         /// <typeparam name="T2">The type of the dictionary elements.</typeparam>
-        /// <param name="separateWithNewLine">Whether the elements should appear separated by a new line.</param>
         /// <param name="dict">The dictionary to describe.</param>
+        /// <param name="toString">Converts the element to a string. If none specified, <see cref="object.ToString"/> will be used.</param>
+        /// <param name="separator">The separator to use. If none specified, the elements should appear separated by a new line.</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// pairs with square brackets and separating them with commas.
         /// Each key-value pair is represented as the string description of the key followed by
