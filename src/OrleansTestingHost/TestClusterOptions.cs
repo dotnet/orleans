@@ -80,7 +80,7 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// The client configuration. If no value set, build a new one with <see cref="BuildClientConfiguration()"/>
+        /// The client configuration. If no value set, build a new one with <see cref="BuildClientConfiguration(Runtime.Configuration.ClusterConfiguration)"/>
         /// </summary>
         public ClientConfiguration ClientConfiguration
         {
