@@ -39,10 +39,10 @@ namespace Orleans.Runtime
             return NewCriterion(
                     (Assembly assembly, out IEnumerable<string> assemblyComplaints) =>
                     {
-                        Type[] types;
+                        TypeInfo[] types;
                         try
                         {
-                            types = assembly.DefinedTypes.ToArray();
+                            types = TypeUtils.GetDefinedTypes(assembly, null).ToArray();
                         }
                         catch (ReflectionTypeLoadException e)
                         {
