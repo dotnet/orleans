@@ -195,6 +195,8 @@ namespace Orleans.Runtime.Configuration
             if (Globals.SeedNodes.Contains(n.Endpoint)) n.IsSeedNode = true;
         }
 
+        /// <summary>Loads the configuration from a file</summary>
+        /// <param name="fileName">The file path.</param>
         public void LoadFromFile(string fileName)
         {
             using (TextReader input = File.OpenText(fileName))

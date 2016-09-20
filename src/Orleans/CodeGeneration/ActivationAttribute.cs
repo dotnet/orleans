@@ -33,34 +33,17 @@ namespace Orleans.CodeGeneration
         /// </summary>
         protected GeneratedAttribute() { }
     }
-    
-    [AttributeUsage(System.AttributeTargets.Class)]
-    public sealed class GrainStateAttribute : GeneratedAttribute
-    {
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainStateAttribute(string forGrainType)
-        {
-            ForGrainType = forGrainType;
-        }
 
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public GrainStateAttribute(Type forGrainType)
-        {
-            GrainType = forGrainType;
-            ForGrainType = forGrainType.GetParseableName();
-        }
-    }
-
+    /// <summary>
+    /// Identifies a class that knows how to map the messages targeting a specifies interface ID to a grain (CLR) interface.
+    /// </summary>
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class MethodInvokerAttribute : GeneratedAttribute
     {
-        /// <summary>
-        /// </summary>
-        /// <param name="forGrainType">type argument</param>
+        /// <summary>Initializes a new instance of <see cref="MethodInvokerAttribute"/>.</summary>
+        /// <param name="forGrainType">The type which this implementation applies to.</param>
+        /// <param name="interfaceId">The ID assigned to the interface by Orleans</param>
+        /// <param name="grainType">The grain implementation type</param>
         public MethodInvokerAttribute(string forGrainType, int interfaceId, Type grainType = null)
         {
             ForGrainType = forGrainType;
@@ -68,9 +51,11 @@ namespace Orleans.CodeGeneration
             GrainType = grainType;
         }
 
+        /// <summary>The ID assigned to the interface by Orleans</summary>
         public int InterfaceId { get; private set; }
     }
 
+    /// <summary>Identifies a concrete grain reference to an interface ID</summary>
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class GrainReferenceAttribute : GeneratedAttribute
     {
@@ -92,16 +77,19 @@ namespace Orleans.CodeGeneration
         }
     }
 
+    /// <summary>
+    /// Identifies a class that contains all the serializer methods for a type.
+    /// </summary>
     [AttributeUsage(System.AttributeTargets.Class)]
     public sealed class SerializerAttribute : GeneratedAttribute
     {
         /// <summary>
         /// </summary>
-        /// <param name="forGrainType">type argument</param>
-        public SerializerAttribute(Type forGrainType)
+        /// <param name="serializableType">The target type that these serializer methods are for.</param>
+        public SerializerAttribute(Type serializableType)
         {
-            GrainType = forGrainType;
-            ForGrainType = forGrainType.GetParseableName();
+            GrainType = serializableType;
+            ForGrainType = serializableType.GetParseableName();
         }
     }
 }

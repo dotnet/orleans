@@ -30,8 +30,8 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
-    <DocumentationFile>obj\Debug\Orleans.XML</DocumentationFile>
+    <NoWarn>1572,1573,1591</NoWarn>
+    <DocumentationFile>bin\Debug\Orleans.XML</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
     <CodeAnalysisIgnoreGeneratedCode>true</CodeAnalysisIgnoreGeneratedCode>
@@ -47,8 +47,8 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
-    <DocumentationFile>obj\Release\Orleans.XML</DocumentationFile>
+    <NoWarn>1572,1573,1591</NoWarn>
+    <DocumentationFile>bin\Release\Orleans.XML</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>

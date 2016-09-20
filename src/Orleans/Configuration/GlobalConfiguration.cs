@@ -98,8 +98,10 @@ namespace Orleans.Runtime.Configuration
         [Serializable]
         public class GossipChannelConfiguration
         {
+            /// <summary>Gets or sets the gossip channel type.</summary>
             public GossipChannelType ChannelType { get; set; }
 
+            /// <summary>Gets or sets the credential information used by the channel implementation.</summary>
             public string ConnectionString { get; set; }
         }
   

@@ -324,7 +324,10 @@ namespace Orleans.Runtime
             {
                 if (USE_DEBUG_CONTEXT_PARAMS)
                 {
+#pragma warning disable 162
+                    // This is normally unreachable code, but kept for debugging purposes
                     debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+#pragma warning restore 162
                 }
                 else
                 {

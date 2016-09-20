@@ -21,12 +21,23 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public enum GatewayProviderType
         {
-            None,               // 
-            AzureTable,         // use Azure, requires SystemStore element
-            SqlServer,          // use SQL, requires SystemStore element
-            ZooKeeper,          // use ZooKeeper, requires SystemStore element
-            Config,             // use Config based static list, requires Config element(s)
-            Custom              // use provider from third-party assembly
+            /// <summary>No provider specified</summary>
+            None,
+
+            /// <summary>use Azure, requires SystemStore element</summary>
+            AzureTable,
+
+            /// <summary>use SQL, requires SystemStore element</summary>
+            SqlServer,
+
+            /// <summary>use ZooKeeper, requires SystemStore element</summary>
+            ZooKeeper,
+
+            /// <summary>use Config based static list, requires Config element(s)</summary>
+            Config,
+
+            /// <summary>use provider from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -37,6 +48,7 @@ namespace Orleans.Runtime.Configuration
         private string traceFilePattern;
         private readonly DateTime creationTimestamp;
 
+        /// <summary>Gets the configuration source file path</summary>
         public string SourceFile { get; private set; }
 
         /// <summary>
@@ -82,11 +94,22 @@ namespace Orleans.Runtime.Configuration
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
+        /// <inheritdoc />
         public Severity DefaultTraceLevel { get; set; }
+
+        /// <inheritdoc />
         public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
+
+        /// <inheritdoc />
         public bool TraceToConsole { get; set; }
+
+        /// <inheritdoc />
         public int LargeMessageWarningThreshold { get; set; }
+
+        /// <inheritdoc />
         public bool PropagateActivityId { get; set; }
+
+        /// <inheritdoc />
         public int BulkMessageLimit { get; set; }
 
         /// <summary>
@@ -101,9 +124,8 @@ namespace Orleans.Runtime.Configuration
         /// If value is zero, then a random machine-assigned port number will be used.
         /// </summary>
         public int Port { get; private set; }
-        /// <summary>
-        /// </summary>
-        public string DNSHostName { get; private set; } // This is a true host name, no IP address. It is NOT settable, equals Dns.GetHostName().
+        /// <summary>Gets the true host name, no IP address. It equals Dns.GetHostName()</summary>
+        public string DNSHostName { get; private set; }
         /// <summary>
         /// </summary>
         public TimeSpan GatewayListRefreshPeriod { get; set; }
@@ -150,6 +172,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IDictionary<string, ProviderCategoryConfiguration> ProviderConfigurations { get; set; }
 
+        /// <inheritdoc />
         public string TraceFilePattern
         {
             get { return traceFilePattern; }
@@ -159,10 +182,11 @@ namespace Orleans.Runtime.Configuration
                 ConfigUtilities.SetTraceFileName(this, ClientName, this.creationTimestamp);
             }
         }
+
+        /// <inheritdoc />
         public string TraceFileName { get; set; }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Initializes a new instance of <see cref="ClientConfiguration"/>.</summary>
         public ClientConfiguration()
             : base(false)
         {
@@ -405,6 +429,7 @@ namespace Orleans.Runtime.Configuration
             return LoadFromFile(fileName);
         }
 
+        /// <summary>Returns a detailed human readable string that represents the current configuration. It does not contain every single configuration knob.</summary>
         public override string ToString()
         {
             var sb = new StringBuilder();

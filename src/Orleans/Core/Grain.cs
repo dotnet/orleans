@@ -298,16 +298,20 @@ namespace Orleans
             get { return grainState; }
         }
 
+        /// <summary>Clear the current grain state data from backing store.</summary>
         protected virtual Task ClearStateAsync()
         {
             return storage.ClearStateAsync();
         }
 
+        /// <summary>Write of the current grain state data into backing store.</summary>
         protected virtual Task WriteStateAsync()
         {
             return storage.WriteStateAsync();
         }
 
+        /// <summary>Read the current grain state data from backing store.</summary>
+        /// <remarks>Any previous contents of the grain state data will be overwritten.</remarks>
         protected virtual Task ReadStateAsync()
         {
             return storage.ReadStateAsync();

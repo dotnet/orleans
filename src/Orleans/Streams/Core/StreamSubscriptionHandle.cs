@@ -21,7 +21,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Unsubscribe a stream consumer from this observable.
         /// </summary>
-        /// <param name="handle">The stream handle to unsubscribe.</param>
         /// <returns>A promise to unsubscription action.
         /// </returns>
         public abstract Task UnsubscribeAsync();
@@ -29,7 +28,8 @@ namespace Orleans.Streams
         /// <summary>
         /// Resumed consumption from a subscription to a stream.
         /// </summary>
-        /// <param name="handle">The stream handle to consume from.</param>
+        /// <param name="observer">The Observer object.</param>
+        /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <returns>A promise with an updates subscription handle.
         /// </returns>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);

@@ -64,7 +64,7 @@ namespace Orleans.GrainDirectory
         /// If there is no local information, then this method will query the appropriate remote directory node.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
+        /// <param name="grainId">The ID of the grain to look up.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
         Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
