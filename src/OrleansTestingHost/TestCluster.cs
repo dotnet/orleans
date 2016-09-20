@@ -448,7 +448,7 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync()"/>
+        /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
         /// </summary>
         public void InitializeClient()
         {

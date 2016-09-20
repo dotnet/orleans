@@ -11,9 +11,7 @@ namespace Orleans.TestingHost.Utils
         bool done = false;
         bool continueFlag = false;
 
-        /// <summary>
-        /// Reset current AsyncResultHandle object
-        /// </summary>
+        /// <summary> Reset the current result handle </summary>
         public virtual void Reset()
         {
             Exception = null;
@@ -22,32 +20,24 @@ namespace Orleans.TestingHost.Utils
             continueFlag = false;
         }
 
-        /// <summary>
-        /// Boolean determines whether current handled async task is finished
-        /// </summary>
+        /// <summary> Get or set the Done flag </summary>
         public bool Done
         {
             get { return done; }
             set { done = value; }
         }
 
-        /// <summary>
-        /// Continue flag 
-        /// </summary>
+        /// <summary> Get or set the Continue flag </summary>
         public bool Continue
         {
             get { return continueFlag; }
             set { continueFlag = value; }
         }
 
-        /// <summary>
-        /// Exception happened during processing current handled async task
-        /// </summary>
+        /// <summary> Get or set the exception of the result handle </summary>
         public Exception Exception { get; set; }
 
-        /// <summary>
-        /// Result for current handled async task
-        /// </summary>
+        /// <summary> Get or set the value of the result handle </summary>
         public object Result { get; set; }
 
         /// <summary>
