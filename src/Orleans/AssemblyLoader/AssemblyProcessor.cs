@@ -124,6 +124,7 @@ namespace Orleans.Runtime
             var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, Logger).ToArray();
 
             // Process each type in the assembly.
+            List<Type> typesToFind = new List<Type>(assemblyTypes.Length);
             foreach (TypeInfo typeInfo in assemblyTypes)
             {
                 try
@@ -136,7 +137,7 @@ namespace Orleans.Runtime
                     }
                     if (shouldProcessSerialization)
                     {
-                        SerializationManager.FindSerializationInfo(type);
+                        typesToFind.Add(type);
                     }
     
                     GrainFactory.FindSupportClasses(type);
@@ -146,6 +147,7 @@ namespace Orleans.Runtime
                     Logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failed to load type " + typeInfo.FullName + " in assembly " + assembly.FullName + ".", exception);
                 }
             }
+            SerializationManager.FindSerializationInfo(typesToFind);
         }
     }
 }
