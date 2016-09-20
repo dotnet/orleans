@@ -97,14 +97,14 @@
 <li><em>Status</em> - status of this silo, as set by cluster management protocol. Any of the type <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs"><code>Orleans.Runtime.SiloStatus</code></a></li>
 <li><em>ProxyPort</em> - silo to clients TCP port</li>
 <li><em>Primary</em> - whether this silo is primary or not. Deprecated.</li>
-<li><em>RoleName</em> - If running is Azure - the name of this role. If running on premises, the name of the executing assembly.</li>
-<li><em>InstanceName</em> - If running is Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.</li>
-<li><em>UpdateZone</em> - Azure update zone, if running is Azure.</li>
-<li><em>FaultZone</em> - Azure fault zone, if running is Azure.</li>
+<li><em>RoleName</em> - If running in Azure - the name of this role. If running on premises, the name of the executing assembly.</li>
+<li><em>InstanceName</em> - If running in Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.</li>
+<li><em>UpdateZone</em> - Azure update zone, if running in Azure.</li>
+<li><em>FaultZone</em> - Azure fault zone, if running in Azure.</li>
 <li><em>SuspectingSilos</em> - the list of silos that suspect this silo. Managed by cluster management protocol.</li>
 <li><em>SuspectingTimes</em> - the list of times when this silo was suspected. Managed by cluster management protocol.</li>
 <li><em>StartTime</em> - the time when this silo was started.</li>
-<li><em>IAmAliveTime</em> - the last time this silo reoprted that it is alive. Used for diagnostics and troubleshooting only.</li>
+<li><em>IAmAliveTime</em> - the last time this silo reported that it is alive. Used for diagnostics and troubleshooting only.</li>
 </ol>
 <p>There is also a special row in this table, called membership version row, with the following columns:</p>
 <ol>
@@ -135,7 +135,7 @@ On premises (<code>SiloHost</code>) the role name is the executing  assembly nam
 <li><em>GrainRefConsistentHash</em> - the consistent hash of the GrainReference</li>
 </ol>
 <h2 id="silo-metrics-table">Silo Metrics table</h2>
-<p>Silo metrics table containes a small set of per-silo important key performance metrics (usually known as KPI - <a href="http://en.wikipedia.org/wiki/Performance_indicator">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36"><code>SiloMetricsData</code></a>).</p>
+<p>Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - <a href="http://en.wikipedia.org/wiki/Performance_indicator">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36"><code>SiloMetricsData</code></a>).</p>
 <ol>
 <li><em>PartitionKey</em> - DeploymentId</li>
 <li><em>RowKey</em> -  silo name</li>
