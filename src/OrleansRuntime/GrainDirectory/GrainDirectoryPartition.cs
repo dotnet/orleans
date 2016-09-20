@@ -268,18 +268,19 @@ namespace Orleans.Runtime.GrainDirectory
                 return GrainInfo.NO_ETAG;
             }
 
+            IGrainInfo grainInfo;
             lock (lockable)
             {
-                IGrainInfo grainInfo;
                 if (!partitionData.TryGetValue(grain, out grainInfo))
                 {
                     partitionData[grain] = grainInfo = new GrainInfo();
                 }
 
                 grainInfo.AddActivation(activation, silo);
-                if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
-                return grainInfo.VersionTag;
             }
+
+            if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
+            return grainInfo.VersionTag;
         }
 
         /// <summary>
