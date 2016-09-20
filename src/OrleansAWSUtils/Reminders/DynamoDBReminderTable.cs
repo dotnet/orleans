@@ -10,6 +10,9 @@ using Amazon.DynamoDBv2;
 
 namespace OrleansAWSUtils.Reminders
 {
+    /// <summary>
+    /// DynamoDB implementation of the reminder table.
+    /// </summary>
     public class DynamoDBReminderTable : IReminderTable
     {
         private const string DEPLOYMENT_ID_PROPERTY_NAME = "DeploymentId";
@@ -67,6 +70,12 @@ namespace OrleansAWSUtils.Reminders
                 new List<GlobalSecondaryIndex> { secondaryIndex });
         }
 
+        /// <summary>
+        /// Reads a reminder for a grain reference by reminder name.
+        /// </summary>
+        /// <param name="grainRef"></param>
+        /// <param name="reminderName"></param>
+        /// <returns></returns>
         public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
             var reminderId = ConstructReminderId(serviceId, grainRef, reminderName);
@@ -112,6 +121,12 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Reads reminder table data for a given hash range.
+        /// </summary>
+        /// <param name="beginHash"></param>
+        /// <param name="endHash"></param>
+        /// <returns></returns>
         public async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
@@ -181,6 +196,10 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Test hook to clear reminder table data.
+        /// </summary>
+        /// <returns></returns>
         public async Task TestOnlyClearTable()
         {
             var expressionValues = new Dictionary<string, AttributeValue>

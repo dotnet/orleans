@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace OrleansAWSUtils.Streams
 {
+    /// <summary>
+    /// SQS utility functions
+    /// </summary>
     public class SQSStreamProviderUtils
     {
         /// <summary>
