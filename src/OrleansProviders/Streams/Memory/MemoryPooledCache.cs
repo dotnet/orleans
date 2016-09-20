@@ -8,10 +8,18 @@ using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Memory
 {
+    /// <summary>
+    /// Pooled cache for memory stream provider
+    /// </summary>
     public class MemoryPooledCache : IQueueCache
     {
         private readonly PooledQueueCache<MemoryBatchContainer, CachedMessage> cache;
 
+        /// <summary>
+        /// Pooled cache for memory stream provider
+        /// </summary>
+        /// <param name="bufferPool"></param>
+        /// <param name="logger"></param>
         public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool);
@@ -19,10 +27,15 @@ namespace Orleans.Providers.Streams.Memory
             dataAdapter.PurgeAction = cache.Purge;
         }
 
-        // For fast GC this struct should contain only value types. 
+        /// <summary>
+        /// Cache structure that stores the message. For fast GC this struct should contain only value types. 
+        /// </summary>
         private struct CachedMessage
         {
             public Guid StreamGuid;
+            /// <summary>
+            /// Hash code of namespace. Stores hash for fast and efficient storage.
+            /// </summary>
             public uint StreamNamespaceHash;
             public long SequenceNumber;
             public ArraySegment<byte> Payload;
@@ -178,11 +191,18 @@ namespace Orleans.Providers.Streams.Memory
             }
         }
 
+        /// <summary>
+        /// The limit of the maximum number of items that can be added
+        /// </summary>
         public int GetMaxAddCount()
         {
             return 100;
         }
 
+        /// <summary>
+        /// Add messages to the cache
+        /// </summary>
+        /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
             DateTime dequeueTimeUtc = DateTime.UtcNow;
@@ -192,17 +212,32 @@ namespace Orleans.Providers.Streams.Memory
             }
         }
 
+        /// <summary>
+        /// Ask the cache if it has items that can be purged from the cache 
+        /// (so that they can be subsequently released them the underlying queue).
+        /// </summary>
+        /// <param name="purgedItems"></param>
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
             return false;
         }
 
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retrieve messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
         public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             return new Cursor(cache, streamIdentity, token);
         }
 
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
         public bool IsUnderPressure()
         {
             return false;

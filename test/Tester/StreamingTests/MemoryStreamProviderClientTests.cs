@@ -61,7 +61,7 @@ namespace Tester.StreamingTests
         }
 
         private static readonly MemoryAdapterConfig ProviderConfig = new MemoryAdapterConfig(Fixture.StreamProviderName);
-        private readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper output = null;
         private readonly ClientStreamTestRunner runner;
 
         public MemoryStreamProviderClientTests(Fixture fixture)
