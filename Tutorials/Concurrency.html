@@ -73,7 +73,7 @@
             <article class="content wrap" id="_content" data-uid="">
               <h1 id="concurrency">Concurrency</h1>
               
-<p>Please read about <a href="/orleans/Getting-Started-With-Orleans/Grains.md">Grains</a> before following this tutorial.</p>
+<p>Please read about <a href="../Documentation/Getting-Started-With-Orleans/Grains.html">Grains</a> before following this tutorial.</p>
 <p>Let&#39;s go back to the code that was established in the tutorial on collections of actors and modify it to demonstrate how things can go bad by creating a trivial cycle in the messaging graph: when an employee receives a greeting, he sends another greeting back to the sender and waits for the acknowledgment.
 This will send a back-and-forth series of messages, until we get to 3.</p>
 <p>First create a class in the interface project which we&#39;ll use to send the greetings around:</p>
@@ -148,7 +148,7 @@ public class Employee : Grain, IEmployee
 <p>Messages are simply data passed from one actor to another, we just created the <code>GreetingData</code> class to do just this.</p>
 <p>In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn&#39;t work well with concurrency, and definitely not with distribution.</p>
 <p>When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain.
-This prohibits the mutation of state from one grain to another, one of the main tenants in the actor model is that state shouldn&#39;t be shared, and message passing is the only mechanism for exchanging data.</p>
+This prohibits the mutation of state from one grain to another, one of the main tenets in the actor model is that state shouldn&#39;t be shared, and message passing is the only mechanism for exchanging data.</p>
 <p>When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.</p>
 <p>However, this deep copy process is expensive, and if you promise not to modify the message, then for communication with grains within a silo, it&#39;s unnecessary.</p>
 <p>If you indicate to Orleans that you are not going to modify the object (i.e. it&#39;s immutable) then it can skip the deep copy step, and it will pass the object by reference.

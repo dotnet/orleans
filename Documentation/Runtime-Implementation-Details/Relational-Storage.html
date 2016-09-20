@@ -73,7 +73,7 @@
             <article class="content wrap" id="_content" data-uid="">
               <h1 id="relational-storage">Relational Storage</h1>
               
-<p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
+<p>Relational storage backend code in Orleans is built on generic ADO.NET functionality and is consequently database vendor agnostic. The Orleans data storage layout has been explained already in <a href="Runtime-Tables.html">Runtime Tables</a>. Setting up the connection strings are done as explained in <a href="http://dotnet.github.io/orleans/Documentation/Orleans-Configuration-Guide/">Orleans Configuration Guide </a> and <a href="http://dotnet.github.io/orleans/Documentation/Advanced-Concepts/Configuring-SQL-Tables">SQL Tables</a>.</p>
 <p>To make Orleans code function with a given relational database backend, the following is required:</p>
 <ol>
 <li>Appropriate ADO.NET library must be loaded to the process (multiple can exist in GAC or otherwise). This should be defined as usual, e.g. via <a href="https://msdn.microsoft.com/en-us/library/dd0w4a2z(v=vs.110).aspx">DbProviderFactories</a> element in application configuration.</li>
@@ -150,7 +150,7 @@ TExpected queryResult = SpecificQuery12InOrleans&lt;TExpected&gt;(query, Param1,
 </code></pre><p>These principles are also <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/">included in the database scripts</a>.</p>
 <h2 id="some-ideas-on-applying-customized-scripts">Some ideas on applying customized scripts</h2>
 <ol>
-<li>Alter scripts in <code>OrleansQuery</code> for <a href="http://dotnet.github.io/orleans/Getting-Started-With-Orleans/Grain-Persistence">grain persistence</a> with <code>IF ELSE</code>
+<li>Alter scripts in <code>OrleansQuery</code> for <a href="http://dotnet.github.io/orleans/Documentation/Getting-Started-With-Orleans/Grain-Persistence">grain persistence</a> with <code>IF ELSE</code>
 so that some state is saved using the default <code>INSERT</code> while some grain state uses, for instance, <a href="https://msdn.microsoft.com/en-us/library/dn133165.aspx">memory optimized tables</a>.
 The <code>SELECT</code> queries need to be altered accordingly.</li>
 <li>The idea in <code>1.</code> can be used to take advantage of other deployment or vendor specific aspects. Such as splitting data between <code>SSD</code> or <code>HDD</code>, putting some data on encrypted tables,

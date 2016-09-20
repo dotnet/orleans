@@ -104,7 +104,7 @@ This is because .NET property setters and getters aren&#39;t meant to do I/O.</p
 <p>It is often possible to use traditional object-oriented design methodology with Orleans, but sometimes there are reasons for not doing so.
 In this case, we&#39;re choosing to not rely on inheritance when defining the <code>Manager</code> class, even though a <code>Manager</code> is clearly also an <code>Employee</code>.
 The reason for this will be explained when we discuss Orleans&#39; support for <a href="Declarative-Persistence.html">Declarative Persistence</a>.
-With these two interfaces as our starting point, the implementation classes are straight-forward to implement, as the interfaces are simple.</p>
+With these two interfaces as our starting point, the implementation classes are straightforward to implement, as the interfaces are simple.</p>
 <p>Here&#39;s what it looks like:</p>
 <pre><code class="lang-csharp">public class Employee : Grain, IEmployee
 {
@@ -162,8 +162,8 @@ With these two interfaces as our starting point, the implementation classes are 
     private IEmployee _me;
     private List&lt;IEmployee&gt; _reports = new List&lt;IEmployee&gt;();
 }
-</code></pre><p>A manager is expressed as an employee through composition: the manager grain has a reference to an grain representing its &quot;employeeness.&quot;
-The role of <code>OnActivateAsync()</code> will be explained later on; for now, you may consider it a constructor.</p>
+</code></pre><p>A manager is expressed as an employee through composition: the manager grain has a reference to a grain representing its &quot;employeeness.&quot;
+The role of <code>OnActivateAsync()</code> will be explained later on; for now, you may consider it to be a constructor.</p>
 <p>In the client <em>(Program.cs)</em>, we can add a few lines to create a couple of employees and their manager:</p>
 <pre><code class="lang-csharp">// Orleans comes with a rich XML and programmatic configuration. Here we&#39;re just going to set up with basic programmatic config
 var config = Orleans.Runtime.Configuration.ClientConfiguration.LocalhostSilo(30000);
