@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
-using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
@@ -635,7 +634,9 @@ namespace Orleans.TestingHost
 
         private static void RegisterPerfCountersTelemetryConsumer()
         {
-            LogManager.TelemetryConsumers.Add(new OrleansPerfCounterTelemetryConsumer());
+#if !NETSTANDARD_TODO
+            LogManager.TelemetryConsumers.Add(new OrleansTelemetryConsumers.Counters.OrleansPerfCounterTelemetryConsumer());
+#endif
         }
 
         private static AppDomainSetup GetAppDomainSetupInfo()

@@ -1,0 +1,23 @@
+﻿{
+  "supports": {
+    "net462.app": {}
+  },
+  "dependencies": {
+    "Microsoft.NETCore.Portable.Compatibility": "1.0.1",
+    "NETStandard.Library": "1.6.0",
+    "Microsoft.Extensions.DependencyInjection": "1.0.0",
+    "System.Reflection.TypeExtensions": "4.1.0",
+    "System.Runtime": "4.1.0",
+    "System.Runtime.Serialization.Formatters": "4.0.0-rc3-24212-01",
+    "System.Threading.Thread": "4.0.0",
+    "System.Xml.XmlDocument": "4.0.1"
+  },
+  "frameworks": {
+    "netstandard1.5": {
+      "imports": [
+        "net462",
+        "portable-dnxcore50+net45+win8+wp8+wpa81"
+      ]
+    }
+  }
+}

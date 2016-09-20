@@ -1,3 +1,4 @@
+#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -77,3 +78,4 @@ namespace Orleans.Runtime
         }
     }
 }
+#endif

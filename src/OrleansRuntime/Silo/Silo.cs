@@ -36,7 +36,10 @@ namespace Orleans.Runtime
     /// <summary>
     /// Orleans silo.
     /// </summary>
-    public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
+    public class Silo
+#if !NETSTANDARD_TODO
+        : MarshalByRefObject  // for hosting multiple silos in app domains of the same process
+#endif
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
@@ -607,6 +610,7 @@ namespace Orleans.Runtime
 
         private void ConfigureThreadPoolAndServicePointSettings()
         {
+#if !NETSTANDARD_TODO
             if (nodeConfig.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
@@ -642,6 +646,7 @@ namespace Orleans.Runtime
             ServicePointManager.Expect100Continue = nodeConfig.Expect100Continue;
             ServicePointManager.DefaultConnectionLimit = nodeConfig.DefaultConnectionLimit;
             ServicePointManager.UseNagleAlgorithm = nodeConfig.UseNagleAlgorithm;
+#endif
         }
 
         /// <summary>
@@ -872,7 +877,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Test hook functions for white box testing.
         /// </summary>
-        public class TestHooks : MarshalByRefObject
+        public class TestHooks
+#if !NETSTANDARD_TODO
+            : MarshalByRefObject
+#endif
         {
             private readonly Silo silo;
             internal bool ExecuteFastKillInProcessExit;
@@ -1039,7 +1047,11 @@ namespace Orleans.Runtime
             private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
             {
                 if (obj == null) return null;
-                if (obj is MarshalByRefObject || obj is ISerializable)
+                if (
+#if !NETSTANDARD_TODO
+                    obj is MarshalByRefObject ||
+#endif
+                    obj is ISerializable)
                 {
                     // Referernce to the provider can safely be passed across app-domain boundary in unit test process
                     return obj;
@@ -1051,7 +1063,10 @@ namespace Orleans.Runtime
             /// <summary>
             /// Represents a collection of generated assemblies accross an application domain.
             /// </summary>
-            public class GeneratedAssemblies : MarshalByRefObject
+            public class GeneratedAssemblies
+#if !NETSTANDARD_TODO
+            : MarshalByRefObject
+#endif
             {
                 /// <summary>
                 /// Initializes a new instance of the <see cref="GeneratedAssemblies"/> class.
@@ -1087,7 +1102,10 @@ namespace Orleans.Runtime
             /// <summary>
             /// Methods for optimizing the code generator.
             /// </summary>
-            public class CodeGeneratorOptimizer : MarshalByRefObject
+            public class CodeGeneratorOptimizer
+#if !NETSTANDARD_TODO
+            : MarshalByRefObject
+#endif
             {
                 /// <summary>
                 /// Adds a cached assembly to the code generator.

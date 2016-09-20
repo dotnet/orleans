@@ -97,11 +97,14 @@ namespace Orleans.Runtime
             {
                 Logger.Verbose3("Processing assembly {0}", assemblyName);
             }
+
+#if !NETSTANDARD
             // If the assembly is loaded for reflection only avoid processing it.
             if (assembly.ReflectionOnly)
             {
                 return;
             }
+#endif
 
             // Don't bother re-processing an assembly we've already scanned
             lock (ProcessedAssemblies)

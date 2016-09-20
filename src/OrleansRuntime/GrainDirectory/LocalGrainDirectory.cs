@@ -9,7 +9,11 @@ using Orleans.SystemTargetInterfaces;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class LocalGrainDirectory : MarshalByRefObject, ILocalGrainDirectory, ISiloStatusListener
+    internal class LocalGrainDirectory :
+#if !NETSTANDARD
+        MarshalByRefObject,
+#endif
+        ILocalGrainDirectory, ISiloStatusListener
     {
         /// <summary>
         /// list of silo members sorted by the hash value of their address

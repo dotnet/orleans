@@ -1,0 +1,1047 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans</RootNamespace>
+    <AssemblyName>Orleans</AssemblyName>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <TargetFrameworkVersion>v5.0</TargetFrameworkVersion>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Debug\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+    <CodeAnalysisIgnoreGeneratedCode>true</CodeAnalysisIgnoreGeneratedCode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <NoWarn>1591,1711,1712,1572,1573</NoWarn>
+    <DocumentationFile>obj\Release\Orleans.XML</DocumentationFile>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Bootstrap)' == 'true'">
+    <OutputPath>$(BootstrapOutputPath)</OutputPath>
+    <OutDir>$(BootstrapOutputPath)</OutDir>
+    <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoader.cs">
+      <Link>AssemblyLoader\AssemblyLoader.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoaderCriteria.cs">
+      <Link>AssemblyLoader\AssemblyLoaderCriteria.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoaderCriterion.cs">
+      <Link>AssemblyLoader\AssemblyLoaderCriterion.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoaderPathNameCriterion.cs">
+      <Link>AssemblyLoader\AssemblyLoaderPathNameCriterion.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoaderReflectionCriterion.cs">
+      <Link>AssemblyLoader\AssemblyLoaderReflectionCriterion.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyProcessor.cs">
+      <Link>AssemblyLoader\AssemblyProcessor.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\CachedReflectionOnlyTypeResolver.cs">
+      <Link>AssemblyLoader\CachedReflectionOnlyTypeResolver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\CachedTypeResolver.cs">
+      <Link>AssemblyLoader\CachedTypeResolver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\AsyncBatchedContinuationQueue.cs">
+      <Link>Async\AsyncBatchedContinuationQueue.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\AsyncExecutorWithRetries.cs">
+      <Link>Async\AsyncExecutorWithRetries.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\AsyncLock.cs">
+      <Link>Async\AsyncLock.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\AsyncPipeline.cs">
+      <Link>Async\AsyncPipeline.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\AsyncSerialExecutor.cs">
+      <Link>Async\AsyncSerialExecutor.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\BatchWorker.cs">
+      <Link>Async\BatchWorker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\MultiTaskCompletionSource.cs">
+      <Link>Async\MultiTaskCompletionSource.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\ObserverSubscriptionManager.cs">
+      <Link>Async\ObserverSubscriptionManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\TaskExtensions.cs">
+      <Link>Async\TaskExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\TaskUtility.cs">
+      <Link>Async\TaskUtility.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Async\UnobservedExceptionsHandlerClass.cs">
+      <Link>Async\UnobservedExceptionsHandlerClass.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Cancellation\GrainCancellationToken.cs">
+      <Link>Cancellation\GrainCancellationToken.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Cancellation\GrainCancellationTokenSource.cs">
+      <Link>Cancellation\GrainCancellationTokenSource.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Cancellation\ICancellationSourcesExtension.cs">
+      <Link>Cancellation\ICancellationSourcesExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\ActivationAttribute.cs">
+      <Link>CodeGeneration\ActivationAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\CodeGeneratorManager.cs">
+      <Link>CodeGeneration\CodeGeneratorManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\ConsiderForCodeGenerationAttribute.cs">
+      <Link>CodeGeneration\ConsiderForCodeGenerationAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\GeneratedAssembly.cs">
+      <Link>CodeGeneration\GeneratedAssembly.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\GrainFactoryBase.cs">
+      <Link>CodeGeneration\GrainFactoryBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\GrainInterfaceUtils.cs">
+      <Link>CodeGeneration\GrainInterfaceUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\GrainState.cs">
+      <Link>CodeGeneration\GrainState.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\ICodeGeneratorCache.cs">
+      <Link>CodeGeneration\ICodeGeneratorCache.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\IGrainMethodInvoker.cs">
+      <Link>CodeGeneration\IGrainMethodInvoker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\IGrainState.cs">
+      <Link>CodeGeneration\IGrainState.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\InvokeMethodRequest.cs">
+      <Link>CodeGeneration\InvokeMethodRequest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\IRuntimeCodeGenerator.cs">
+      <Link>CodeGeneration\IRuntimeCodeGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\ISourceCodeGenerator.cs">
+      <Link>CodeGeneration\ISourceCodeGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\KnownAssemblyAttribute.cs">
+      <Link>CodeGeneration\KnownAssemblyAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\Language.cs">
+      <Link>CodeGeneration\Language.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\OrleansCodeGenerationTargetAttribute.cs">
+      <Link>CodeGeneration\OrleansCodeGenerationTargetAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\SkipCodeGenerationAttribute.cs">
+      <Link>CodeGeneration\SkipCodeGenerationAttribute.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\TypeFormattingOptions.cs">
+      <Link>CodeGeneration\TypeFormattingOptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\CodeGeneration\TypeUtils.cs">
+      <Link>CodeGeneration\TypeUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ApplicationConfiguration.cs">
+      <Link>Configuration\ApplicationConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ClientConfiguration.cs">
+      <Link>Configuration\ClientConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ClusterConfiguration.cs">
+      <Link>Configuration\ClusterConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ConfigurationExtensions.cs">
+      <Link>Configuration\ConfigurationExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ConfigUtilities.cs">
+      <Link>Configuration\ConfigUtilities.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\GlobalConfiguration.cs">
+      <Link>Configuration\GlobalConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\IStatisticsConfiguration.cs">
+      <Link>Configuration\IStatisticsConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ITraceConfiguration.cs">
+      <Link>Configuration\ITraceConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\LimitManager.cs">
+      <Link>Configuration\LimitManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\LimitNames.cs">
+      <Link>Configuration\LimitNames.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\LimitValue.cs">
+      <Link>Configuration\LimitValue.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\MessagingConfiguration.cs">
+      <Link>Configuration\MessagingConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\NodeConfiguration.cs">
+      <Link>Configuration\NodeConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Configuration\ProviderConfiguration.cs">
+      <Link>Configuration\ProviderConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\Exceptions.cs">
+      <Link>Core\Exceptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\Grain.cs">
+      <Link>Core\Grain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainAttributes.cs">
+      <Link>Core\GrainAttributes.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainClient.cs">
+      <Link>Core\GrainClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainExtensions.cs">
+      <Link>Core\GrainExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainFactory.cs">
+      <Link>Core\GrainFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainStateStorageBridge.cs">
+      <Link>Core\GrainStateStorageBridge.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IGrain.cs">
+      <Link>Core\IGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IGrainFactory.cs">
+      <Link>Core\IGrainFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IGrainIdentity.cs">
+      <Link>Core\IGrainIdentity.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IGrainInvokeInterceptor.cs">
+      <Link>Core\IGrainInvokeInterceptor.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IGrainObserver.cs">
+      <Link>Core\IGrainObserver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\Immutable.cs">
+      <Link>Core\Immutable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\InterceptedMethodInvoker.cs">
+      <Link>Core\InterceptedMethodInvoker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\InterceptedMethodInvokerCache.cs">
+      <Link>Core\InterceptedMethodInvokerCache.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IStatefulGrain.cs">
+      <Link>Core\IStatefulGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IStorage.cs">
+      <Link>Core\IStorage.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\ClusterLocalRegistration.cs">
+      <Link>GrainDirectory\ClusterLocalRegistration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\GlobalSingleInstanceRegistration.cs">
+      <Link>GrainDirectory\GlobalSingleInstanceRegistration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\IGrainDirectory.cs">
+      <Link>GrainDirectory\IGrainDirectory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\IGrainRegistrar.cs">
+      <Link>GrainDirectory\IGrainRegistrar.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\MultiClusterRegistrationStrategy.cs">
+      <Link>GrainDirectory\MultiClusterRegistrationStrategy.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\GrainDirectory\MultiClusterStatus.cs">
+      <Link>GrainDirectory\MultiClusterStatus.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\ActivationAddress.cs">
+      <Link>IDs\ActivationAddress.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\ActivationId.cs">
+      <Link>IDs\ActivationId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\GrainId.cs">
+      <Link>IDs\GrainId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\GuidId.cs">
+      <Link>IDs\GuidId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\Interner.cs">
+      <Link>IDs\Interner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\JenkinsHash.cs">
+      <Link>IDs\JenkinsHash.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\QueueId.cs">
+      <Link>IDs\QueueId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\SiloAddress.cs">
+      <Link>IDs\SiloAddress.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\StreamId.cs">
+      <Link>IDs\StreamId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\TypeCodeMapper.cs">
+      <Link>IDs\TypeCodeMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\UniqueIdentifier.cs">
+      <Link>IDs\UniqueIdentifier.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\IDs\UniqueKey.cs">
+      <Link>IDs\UniqueKey.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\ConsoleText.cs">
+      <Link>Logging\ConsoleText.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\ErrorCodes.cs">
+      <Link>Logging\ErrorCodes.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\ILogConsumer.cs">
+      <Link>Logging\ILogConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\LogFormatter.cs">
+      <Link>Logging\LogFormatter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\Logger.cs">
+      <Link>Logging\Logger.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\LoggerExtensions.cs">
+      <Link>Logging\LoggerExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\LoggerImpl.cs">
+      <Link>Logging\LoggerImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\LogManager.cs">
+      <Link>Logging\LogManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Logging\TraceLogger.cs">
+      <Link>Logging\TraceLogger.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\BufferPool.cs">
+      <Link>Messaging\BufferPool.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\ByteArrayBuilder.cs">
+      <Link>Messaging\ByteArrayBuilder.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\CorrelationId.cs">
+      <Link>Messaging\CorrelationId.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\GatewayClientReceiver.cs">
+      <Link>Messaging\GatewayClientReceiver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\GatewayConnection.cs">
+      <Link>Messaging\GatewayConnection.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\GatewayManager.cs">
+      <Link>Messaging\GatewayManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\GatewayProviderFactory.cs">
+      <Link>Messaging\GatewayProviderFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\IGatewayListProvider.cs">
+      <Link>Messaging\IGatewayListProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\IMessageCenter.cs">
+      <Link>Messaging\IMessageCenter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\IncomingMessageBuffer.cs">
+      <Link>Messaging\IncomingMessageBuffer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\IOutgoingMessage.cs">
+      <Link>Messaging\IOutgoingMessage.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\Message.cs">
+      <Link>Messaging\Message.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\OutgoingMessageSender.cs">
+      <Link>Messaging\OutgoingMessageSender.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\ProxiedMessageCenter.cs">
+      <Link>Messaging\ProxiedMessageCenter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\RequestInvocationHistory.cs">
+      <Link>Messaging\RequestInvocationHistory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\Response.cs">
+      <Link>Messaging\Response.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Messaging\SocketManager.cs">
+      <Link>Messaging\SocketManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\MultiCluster\IMultiClusterGatewayInfo.cs">
+      <Link>MultiCluster\IMultiClusterGatewayInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\MultiCluster\MultiClusterConfiguration.cs">
+      <Link>MultiCluster\MultiClusterConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\ActivationCountBasedPlacement.cs">
+      <Link>Placement\ActivationCountBasedPlacement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\GrainStrategy.cs">
+      <Link>Placement\GrainStrategy.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\PlacementResult.cs">
+      <Link>Placement\PlacementResult.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\PlacementStrategy.cs">
+      <Link>Placement\PlacementStrategy.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\PreferLocalPlacement.cs">
+      <Link>Placement\PreferLocalPlacement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\RandomPlacement.cs">
+      <Link>Placement\RandomPlacement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\StatelessWorkerPlacement.cs">
+      <Link>Placement\StatelessWorkerPlacement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Placement\SystemPlacement.cs">
+      <Link>Placement\SystemPlacement.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\ClientProviderRuntime.cs">
+      <Link>Providers\ClientProviderRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IBootstrapProvider.cs">
+      <Link>Providers\IBootstrapProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IControllable.cs">
+      <Link>Providers\IControllable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\ILocalDataStore.cs">
+      <Link>Providers\ILocalDataStore.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IMemoryStorageGrain.cs">
+      <Link>Providers\IMemoryStorageGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IOrleansProvider.cs">
+      <Link>Providers\IOrleansProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IProviderRuntime.cs">
+      <Link>Providers\IProviderRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\IStorageProvider.cs">
+      <Link>Providers\IStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\ProviderLoader.cs">
+      <Link>Providers\ProviderLoader.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\ProviderStateManager.cs">
+      <Link>Providers\ProviderStateManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\ProviderTypeLoader.cs">
+      <Link>Providers\ProviderTypeLoader.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\StatisticsProviderManager.cs">
+      <Link>Providers\StatisticsProviderManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Providers\StorageProviderUtils.cs">
+      <Link>Providers\StorageProviderUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\AsynchAgent.cs">
+      <Link>Runtime\AsynchAgent.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\AsynchQueueAgent.cs">
+      <Link>Runtime\AsynchQueueAgent.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\CallbackData.cs">
+      <Link>Runtime\CallbackData.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\Constants.cs">
+      <Link>Runtime\Constants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\GrainInterfaceMap.cs">
+      <Link>Runtime\GrainInterfaceMap.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\GrainReference.cs">
+      <Link>Runtime\GrainReference.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\GrainReferenceCache.cs">
+      <Link>Runtime\GrainReferenceCache.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\GrainRuntime.cs">
+      <Link>Runtime\GrainRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\HashRing.cs">
+      <Link>Runtime\HashRing.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IActivationData.cs">
+      <Link>Runtime\IActivationData.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IAddressable.cs">
+      <Link>Runtime\IAddressable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IClientObserverRegistrar.cs">
+      <Link>Runtime\IClientObserverRegistrar.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IConsistentRingProviderForGrains.cs">
+      <Link>Runtime\IConsistentRingProviderForGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IGrainExtension.cs">
+      <Link>Runtime\IGrainExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IGrainRuntime.cs">
+      <Link>Runtime\IGrainRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\IRuntimeClient.cs">
+      <Link>Runtime\IRuntimeClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\ISchedulingContext.cs">
+      <Link>Runtime\ISchedulingContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\ITypeManager.cs">
+      <Link>Runtime\ITypeManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\OutsideRuntimeClient.cs">
+      <Link>Runtime\OutsideRuntimeClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\RequestContext.cs">
+      <Link>Runtime\RequestContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\RingRange.cs">
+      <Link>Runtime\RingRange.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\RuntimeClient.cs">
+      <Link>Runtime\RuntimeClient.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\RuntimeContext.cs">
+      <Link>Runtime\RuntimeContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\RuntimeVersion.cs">
+      <Link>Runtime\RuntimeVersion.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\SiloStatus.cs">
+      <Link>Runtime\SiloStatus.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\SystemStatus.cs">
+      <Link>Runtime\SystemStatus.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\BinaryFormatterSerializer.cs">
+      <Link>Serialization\BinaryFormatterSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\BinaryTokenStreamReader.cs">
+      <Link>Serialization\BinaryTokenStreamReader.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\BinaryTokenStreamWriter.cs">
+      <Link>Serialization\BinaryTokenStreamWriter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\BuiltInTypes.cs">
+      <Link>Serialization\BuiltInTypes.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\DeserializationContext.cs">
+      <Link>Serialization\DeserializationContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\IExternalSerializer.cs">
+      <Link>Serialization\IExternalSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\OrleansJsonSerializer.cs">
+      <Link>Serialization\OrleansJsonSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\SerializationContext.cs">
+      <Link>Serialization\SerializationContext.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\SerializationManager.cs">
+      <Link>Serialization\SerializationManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\SerializationTokenType.cs">
+      <Link>Serialization\SerializationTokenType.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\TypeUtilities.cs">
+      <Link>Serialization\TypeUtilities.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\ApplicationRequestsStatisticsGroup.cs">
+      <Link>Statistics\ApplicationRequestsStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\AverageTimeSpanStatistic.cs">
+      <Link>Statistics\AverageTimeSpanStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\AverageValueStatistic.cs">
+      <Link>Statistics\AverageValueStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\ClientStatisticsManager.cs">
+      <Link>Statistics\ClientStatisticsManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\ClientTableStatistics.cs">
+      <Link>Statistics\ClientTableStatistics.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\CounterStatistic.cs">
+      <Link>Statistics\CounterStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\FloatValueStatistic.cs">
+      <Link>Statistics\FloatValueStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\HistogramValueStatistic.cs">
+      <Link>Statistics\HistogramValueStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\IntValueStatistic.cs">
+      <Link>Statistics\IntValueStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\IPerformanceMetrics.cs">
+      <Link>Statistics\IPerformanceMetrics.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\LogStatistics.cs">
+      <Link>Statistics\LogStatistics.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\MessagingProcessingStatisticsGroup.cs">
+      <Link>Statistics\MessagingProcessingStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\MessagingStatisticsGroup.cs">
+      <Link>Statistics\MessagingStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\NetworkingStatisticsGroup.cs">
+      <Link>Statistics\NetworkingStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\QueueTrackingStatistic.cs">
+      <Link>Statistics\QueueTrackingStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\SchedulerStatisticsGroup.cs">
+      <Link>Statistics\SchedulerStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\StageAnalysis.cs">
+      <Link>Statistics\StageAnalysis.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\StatisticNames.cs">
+      <Link>Statistics\StatisticNames.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\StatisticsCollector.cs">
+      <Link>Statistics\StatisticsCollector.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\StorageStatisticsGroup.cs">
+      <Link>Statistics\StorageStatisticsGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\StringValueStatistic.cs">
+      <Link>Statistics\StringValueStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\ThreadCycleStopWatch.cs">
+      <Link>Statistics\ThreadCycleStopWatch.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\ThreadTrackingStatistic.cs">
+      <Link>Statistics\ThreadTrackingStatistic.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Statistics\TimeInterval.cs">
+      <Link>Statistics\TimeInterval.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\AsyncObservableExtensions.cs">
+      <Link>Streams\Core\AsyncObservableExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\IAsyncObservable.cs">
+      <Link>Streams\Core\IAsyncObservable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\IAsyncObserver.cs">
+      <Link>Streams\Core\IAsyncObserver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\IAsyncStream.cs">
+      <Link>Streams\Core\IAsyncStream.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\IStreamIdentity.cs">
+      <Link>Streams\Core\IStreamIdentity.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\StreamIdentity.cs">
+      <Link>Streams\Core\StreamIdentity.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\StreamSequenceToken.cs">
+      <Link>Streams\Core\StreamSequenceToken.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\StreamSubscriptionHandle.cs">
+      <Link>Streams\Core\StreamSubscriptionHandle.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Core\StreamSubscriptionHandleExtensions.cs">
+      <Link>Streams\Core\StreamSubscriptionHandleExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\GenericAsyncObserver.cs">
+      <Link>Streams\Internal\GenericAsyncObserver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\IInternalAsyncObservable.cs">
+      <Link>Streams\Internal\IInternalAsyncObservable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\IInternalStreamProvider.cs">
+      <Link>Streams\Internal\IInternalStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\IStreamControl.cs">
+      <Link>Streams\Internal\IStreamControl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\IStreamGrainExtensions.cs">
+      <Link>Streams\Internal\IStreamGrainExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamConsumer.cs">
+      <Link>Streams\Internal\StreamConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamConsumerExtension.cs">
+      <Link>Streams\Internal\StreamConsumerExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamDirectory.cs">
+      <Link>Streams\Internal\StreamDirectory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamHandshakeToken.cs">
+      <Link>Streams\Internal\StreamHandshakeToken.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamImpl.cs">
+      <Link>Streams\Internal\StreamImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Internal\StreamSubscriptionHandleImpl.cs">
+      <Link>Streams\Internal\StreamSubscriptionHandleImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\IDeploymentConfiguration.cs">
+      <Link>Streams\PersistentStreams\IDeploymentConfiguration.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\IPersistentStreamPullingAgent.cs">
+      <Link>Streams\PersistentStreams\IPersistentStreamPullingAgent.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\IStreamFailureHandler.cs">
+      <Link>Streams\PersistentStreams\IStreamFailureHandler.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\IStreamQueueBalancer.cs">
+      <Link>Streams\PersistentStreams\IStreamQueueBalancer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\IStreamQueueCheckpointer.cs">
+      <Link>Streams\PersistentStreams\IStreamQueueCheckpointer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\NoOpStreamFailureHandler.cs">
+      <Link>Streams\PersistentStreams\NoOpStreamFailureHandler.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\PersistentStreamProducer.cs">
+      <Link>Streams\PersistentStreams\PersistentStreamProducer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\PersistentStreamProvider.cs">
+      <Link>Streams\PersistentStreams\PersistentStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\QueueStreamDataStructures.cs">
+      <Link>Streams\PersistentStreams\QueueStreamDataStructures.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\StreamConsumerCollection.cs">
+      <Link>Streams\PersistentStreams\StreamConsumerCollection.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\StreamEventDeliveryFailureException.cs">
+      <Link>Streams\PersistentStreams\StreamEventDeliveryFailureException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PersistentStreams\StreamQueueBalancerType.cs">
+      <Link>Streams\PersistentStreams\StreamQueueBalancerType.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs">
+      <Link>Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Predicates\FilterPredicateWrapperData.cs">
+      <Link>Streams\Predicates\FilterPredicateWrapperData.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Predicates\IStreamFilterPredicateWrapper.cs">
+      <Link>Streams\Predicates\IStreamFilterPredicateWrapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Predicates\OrFilter.cs">
+      <Link>Streams\Predicates\OrFilter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\IStreamProvider.cs">
+      <Link>Streams\Providers\IStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\IStreamProviderImpl.cs">
+      <Link>Streams\Providers\IStreamProviderImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\IStreamProviderManager.cs">
+      <Link>Streams\Providers\IStreamProviderManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\IStreamProviderRuntime.cs">
+      <Link>Streams\Providers\IStreamProviderRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\StreamProviderDirection.cs">
+      <Link>Streams\Providers\StreamProviderDirection.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\Providers\StreamProviderManager.cs">
+      <Link>Streams\Providers\StreamProviderManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\FaultedSubscriptionException.cs">
+      <Link>Streams\PubSub\FaultedSubscriptionException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\GrainBasedPubSubRuntime.cs">
+      <Link>Streams\PubSub\GrainBasedPubSubRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\ImplicitStreamPubSub.cs">
+      <Link>Streams\PubSub\ImplicitStreamPubSub.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\ImplicitStreamSubscriberTable.cs">
+      <Link>Streams\PubSub\ImplicitStreamSubscriberTable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\IPubSubRendezvousGrain.cs">
+      <Link>Streams\PubSub\IPubSubRendezvousGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\PubSubPublisherState.cs">
+      <Link>Streams\PubSub\PubSubPublisherState.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\PubSubSubscriptionState.cs">
+      <Link>Streams\PubSub\PubSubSubscriptionState.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\StreamPubSubImpl.cs">
+      <Link>Streams\PubSub\StreamPubSubImpl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\PubSub\SubscriptionMarker.cs">
+      <Link>Streams\PubSub\SubscriptionMarker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\AggregatedQueueFlowController.cs">
+      <Link>Streams\QueueAdapters\AggregatedQueueFlowController.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\DataNotAvailableException.cs">
+      <Link>Streams\QueueAdapters\DataNotAvailableException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\HashRingBasedStreamQueueMapper.cs">
+      <Link>Streams\QueueAdapters\HashRingBasedStreamQueueMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IBatchContainer.cs">
+      <Link>Streams\QueueAdapters\IBatchContainer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IConsistentRingStreamQueueMapper.cs">
+      <Link>Streams\QueueAdapters\IConsistentRingStreamQueueMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueAdapter.cs">
+      <Link>Streams\QueueAdapters\IQueueAdapter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueAdapterCache.cs">
+      <Link>Streams\QueueAdapters\IQueueAdapterCache.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueAdapterFactory.cs">
+      <Link>Streams\QueueAdapters\IQueueAdapterFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueAdapterReceiver.cs">
+      <Link>Streams\QueueAdapters\IQueueAdapterReceiver.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueCache.cs">
+      <Link>Streams\QueueAdapters\IQueueCache.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueCacheCursor.cs">
+      <Link>Streams\QueueAdapters\IQueueCacheCursor.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IQueueFlowController.cs">
+      <Link>Streams\QueueAdapters\IQueueFlowController.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\IStreamQueueMapper.cs">
+      <Link>Streams\QueueAdapters\IStreamQueueMapper.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\QueueAdapterConstants.cs">
+      <Link>Streams\QueueAdapters\QueueAdapterConstants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\QueueAdapters\QueueCacheMissException.cs">
+      <Link>Streams\QueueAdapters\QueueCacheMissException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\SimpleMessageStream\SimpleMessageStreamProducer.cs">
+      <Link>Streams\SimpleMessageStream\SimpleMessageStreamProducer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\SimpleMessageStream\SimpleMessageStreamProducerExtension.cs">
+      <Link>Streams\SimpleMessageStream\SimpleMessageStreamProducerExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Streams\SimpleMessageStream\SimpleMessageStreamProvider.cs">
+      <Link>Streams\SimpleMessageStream\SimpleMessageStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\ICatalog.cs">
+      <Link>SystemTargetInterfaces\ICatalog.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IClusterGrainDirectory.cs">
+      <Link>SystemTargetInterfaces\IClusterGrainDirectory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IDeploymentLoadPublisher.cs">
+      <Link>SystemTargetInterfaces\IDeploymentLoadPublisher.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IManagementGrain.cs">
+      <Link>SystemTargetInterfaces\IManagementGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IMembershipService.cs">
+      <Link>SystemTargetInterfaces\IMembershipService.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IMembershipTable.cs">
+      <Link>SystemTargetInterfaces\IMembershipTable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IMultiClusterGossipService.cs">
+      <Link>SystemTargetInterfaces\IMultiClusterGossipService.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IReminderService.cs">
+      <Link>SystemTargetInterfaces\IReminderService.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IReminderTable.cs">
+      <Link>SystemTargetInterfaces\IReminderTable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IRemoteGrainDirectory.cs">
+      <Link>SystemTargetInterfaces\IRemoteGrainDirectory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\ISiloControl.cs">
+      <Link>SystemTargetInterfaces\ISiloControl.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\IStreamProviderManagerAgent.cs">
+      <Link>SystemTargetInterfaces\IStreamProviderManagerAgent.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\SystemTargetInterfaces\ISystemTarget.cs">
+      <Link>SystemTargetInterfaces\ISystemTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\Consumers\ConsoleTelemetryConsumer.cs">
+      <Link>Telemetry\Consumers\ConsoleTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\Consumers\FileTelemetryConsumer.cs">
+      <Link>Telemetry\Consumers\FileTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\Consumers\TraceTelemetryConsumer.cs">
+      <Link>Telemetry\Consumers\TraceTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\IDependencyTelemetryConsumer.cs">
+      <Link>Telemetry\IDependencyTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\IEventTelemetryConsumer.cs">
+      <Link>Telemetry\IEventTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\IExceptionTelemetryConsumer.cs">
+      <Link>Telemetry\IExceptionTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\IMetricTelemetryConsumer.cs">
+      <Link>Telemetry\IMetricTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\IRequestTelemetryConsumer.cs">
+      <Link>Telemetry\IRequestTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\ITelemetryConsumer.cs">
+      <Link>Telemetry\ITelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\ITraceTelemetryConsumer.cs">
+      <Link>Telemetry\ITraceTelemetryConsumer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\Severity.cs">
+      <Link>Telemetry\Severity.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Telemetry\TraceParserUtils.cs">
+      <Link>Telemetry\TraceParserUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\AsyncTaskSafeTimer.cs">
+      <Link>Timers\AsyncTaskSafeTimer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\IRemindable.cs">
+      <Link>Timers\IRemindable.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\IReminderRegistry.cs">
+      <Link>Timers\IReminderRegistry.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\ITimerRegistry.cs">
+      <Link>Timers\ITimerRegistry.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\ReminderRegistry.cs">
+      <Link>Timers\ReminderRegistry.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\SafeTimer.cs">
+      <Link>Timers\SafeTimer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\SafeTimerBase.cs">
+      <Link>Timers\SafeTimerBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Timers\TimerRegistry.cs">
+      <Link>Timers\TimerRegistry.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\LRU.cs">
+      <Link>Utils\LRU.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\SafeRandom.cs">
+      <Link>Utils\SafeRandom.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\SetExtensions.cs">
+      <Link>Utils\SetExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\StandardExtensions.cs">
+      <Link>Utils\StandardExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\Utils.cs">
+      <Link>Utils\Utils.cs</Link>
+    </Compile>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+    <Compile Include="Shims\AppDomain.cs" />
+    <Compile Include="Shims\RuntimeStatisticsGroup.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
+      <Link>Configuration\OrleansConfiguration.xsd</Link>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="project.json" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
+  <PropertyGroup>
+    <NuGetTargetMoniker>.NETStandard,Version=v1.5</NuGetTargetMoniker>
+  </PropertyGroup>
+  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>1</BuildNumber>
+    </PropertyGroup>
+  </Target>
+  <Target Name="VersionInit" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="$(SolutionDir)NuGet\EmptyFile.cs" DestinationFolder="$(TargetDir)" ContinueOnError="true" />
+  </Target>
+  <Target Name="LogBuildProperties" BeforeTargets="CoreCompile" AfterTargets="VersionInit">
+    <!-- Show values of some useful properties -->
+    <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
+  </Target>
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" Condition="'$(Bootstrap)' != 'true'">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <!-- Clean Generated directory -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
+    <PropertyGroup>
+      <BootstrapOutputPath>$(OutDir)Bootstrap\</BootstrapOutputPath>
+      <BootstrapOutputPath Condition="'$(BuildingInsideVisualStudio)' == 'true'">$(ProjectDir)$(OutDir)Bootstrap\</BootstrapOutputPath>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
+    </PropertyGroup>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
+    <!-- Compile code generator -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for bootstrap" Importance="high" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
+    <MSBuild Projects="$(ProjectDir)\..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <MSBuild Projects="$(ProjectDir)\..\ClientGenerator\ClientGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <!-- Finally invoke code generator on the recently built Orleans.dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <PropertyGroup>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <CodeGenArgs Include="/bootstrap" />
+      <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')" />
+    </ItemGroup>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
+    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" />
+  </Target>
+</Project>

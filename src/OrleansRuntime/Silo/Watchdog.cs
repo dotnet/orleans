@@ -45,10 +45,12 @@ namespace Orleans.Runtime
                     WatchdogHeartbeatTick(null);
                     Thread.Sleep(heartbeatPeriod);
                 }
+#if !NETSTANDARD
                 catch (ThreadAbortException)
                 {
                     // Silo is probably shutting-down, so just ignore and exit
                 }
+#endif
                 catch (Exception exc)
                 {
                     logger.Error(ErrorCode.Watchdog_InternalError, "Watchdog Internal Error.", exc);

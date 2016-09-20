@@ -50,7 +50,9 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
+#if !NETSTANDARD_TODO
                 AcceptingSocket.BeginAccept(AcceptCallback, this);
+#endif
             }
             catch (Exception ex)
             {
@@ -205,6 +207,7 @@ namespace Orleans.Runtime.Messaging
             OpenReceiveSockets.Clear();
         }
 
+#if !NETSTANDARD_TODO
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "BeginAccept")]
         private static void AcceptCallback(IAsyncResult result)
         {
@@ -378,6 +381,7 @@ namespace Orleans.Runtime.Messaging
                 rcc.IMA.SafeCloseSocket(rcc.Sock);
             }
         }
+#endif
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
@@ -468,6 +472,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+#if !NETSTANDARD_TODO
         private void RestartAcceptingSocket()
         {
             try
@@ -483,6 +488,7 @@ namespace Orleans.Runtime.Messaging
                 throw;
             }
         }
+#endif
 
         private void SafeCloseSocket(Socket sock)
         {
@@ -490,7 +496,7 @@ namespace Orleans.Runtime.Messaging
             SocketManager.CloseSocket(sock);
         }
 
-
+#if !NETSTANDARD_TODO
         private class ReceiveCallbackContext
         {
             private readonly IncomingMessageBuffer _buffer;
@@ -585,5 +591,6 @@ namespace Orleans.Runtime.Messaging
 #endif
             }
         }
+#endif
     }
 }
