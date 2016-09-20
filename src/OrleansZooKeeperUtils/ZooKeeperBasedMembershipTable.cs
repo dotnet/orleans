@@ -58,7 +58,7 @@ namespace Orleans.Runtime.Host
         /// <summary>
         /// Initializes the ZooKeeper based gateway provider
         /// </summary>
-        /// <param name="config">The configuration for this instance.</param>
+        /// <param name="config">The given client configuration.</param>
         /// <param name="logger">The logger to be used by this instance</param>
         public Task InitializeGatewayListProvider(ClientConfiguration config, Logger logger)
         {
@@ -234,7 +234,7 @@ namespace Orleans.Runtime.Host
         /// this operation should not change the TableVersion of the table. It should leave it untouched.
         /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
         /// </summary>
-        /// <param name="entry"></param>
+        /// <param name="entry">The target MembershipEntry tp update</param>
         /// <returns>Task representing the successful execution of this operation. </returns>
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
