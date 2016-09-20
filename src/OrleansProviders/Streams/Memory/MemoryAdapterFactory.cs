@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.Memory
         }
 
         /// <summary>
-        /// Aquire delivery failure handler for a queue
+        /// Acquire delivery failure handler for a queue
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>

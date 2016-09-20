@@ -19,7 +19,7 @@ namespace Orleans.Providers.Streams.Memory
         Task Enqueue(MemoryEventData eventData);
 
         /// <summary>
-        /// Dequeue an event.
+        /// Dequeue up to maxCount events.
         /// </summary>
         Task<List<MemoryEventData>> Dequeue(int maxCount);
     }
