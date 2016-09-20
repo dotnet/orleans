@@ -209,6 +209,12 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Logger log;
         private ISiloStatusOracle membership;
 
+        [ThreadStatic]
+        private static ActivationId[] activationIdsHolder;
+
+        [ThreadStatic]
+        private static IActivationInfo[] activationInfosHolder;
+
         internal int Count { get { return partitionData.Count; } }
 
         internal GrainDirectoryPartition()
@@ -262,18 +268,18 @@ namespace Orleans.Runtime.GrainDirectory
                 return GrainInfo.NO_ETAG;
             }
 
-            IGrainInfo grainInfo;
             lock (lockable)
             {
+                IGrainInfo grainInfo;
                 if (!partitionData.TryGetValue(grain, out grainInfo))
                 {
                     partitionData[grain] = grainInfo = new GrainInfo();
                 }
-            }
 
-            grainInfo.AddActivation(activation, silo);
-            if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
-            return grainInfo.VersionTag;
+                grainInfo.AddActivation(activation, silo);
+                if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
+                return grainInfo.VersionTag;
+            }
         }
 
         /// <summary>
@@ -300,10 +306,10 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     partitionData[grain] = grainInfo = new GrainInfo();
                 }
-            }
 
-            result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
-            result.VersionTag = grainInfo.VersionTag;
+                result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
+                result.VersionTag = grainInfo.VersionTag;
+            }
 
             return result;
         }
@@ -369,21 +375,56 @@ namespace Orleans.Runtime.GrainDirectory
         internal AddressesAndTag LookUpActivations(GrainId grain)
         {
             var result = new AddressesAndTag();
-            IGrainInfo graininfo;
+            ActivationId[] activationIds;
+            IActivationInfo[] activationInfos;
+            const int arrayReusingThreshold = 15;
+            int grainInfoInstancesCount;
+
             lock (lockable)
             {
+                IGrainInfo graininfo;
                 if (!partitionData.TryGetValue(grain, out graininfo))
                 {
                     return result;
                 }
+
+                result.VersionTag = graininfo.VersionTag;
+
+                grainInfoInstancesCount = graininfo.Instances.Count;
+                if (grainInfoInstancesCount < arrayReusingThreshold)
+                {
+                    if ((activationIds = activationIdsHolder) == null)
+                    {
+                        activationIdsHolder = activationIds = new ActivationId[arrayReusingThreshold];
+                    }
+
+                    if ((activationInfos = activationInfosHolder) == null)
+                    {
+                        activationInfosHolder = activationInfos = new IActivationInfo[arrayReusingThreshold];
+                    }
+                }
+                else
+                {
+                    activationIds = new ActivationId[grainInfoInstancesCount];
+                    activationInfos = new IActivationInfo[grainInfoInstancesCount];
+                }
+
+
+                graininfo.Instances.Keys.CopyTo(activationIds, 0);
+                graininfo.Instances.Values.CopyTo(activationInfos, 0);
             }
 
-            result.Addresses = new List<ActivationAddress>();
-            result.VersionTag = graininfo.VersionTag;
-            foreach (var route in graininfo.Instances)
+            result.Addresses = new List<ActivationAddress>(grainInfoInstancesCount);
+            for (var i = 0; i < grainInfoInstancesCount; i++)
             {
-                if (IsValidSilo(route.Value.SiloAddress))
-                    result.Addresses.Add(ActivationAddress.GetAddress(route.Value.SiloAddress, grain, route.Key));
+                var activationInfo = activationInfos[i];
+                if (IsValidSilo(activationInfo.SiloAddress))
+                {
+                    result.Addresses.Add(ActivationAddress.GetAddress(activationInfo.SiloAddress, grain, activationIds[i]));
+                }
+
+                activationInfos[i] = null;
+                activationIds[i] = null;
             }
 
             return result;
@@ -404,14 +445,14 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     return GrainDirectoryEntryStatus.Invalid;
                 }
-            }
 
-            var first = grainInfo.Instances.FirstOrDefault();
-            if (first.Value != null)
-            {
-                address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
-                version = grainInfo.VersionTag;
-                return first.Value.RegistrationStatus;
+                var first = grainInfo.Instances.FirstOrDefault();
+                if (first.Value != null)
+                {
+                    address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
+                    version = grainInfo.VersionTag;
+                    return first.Value.RegistrationStatus;
+                }
             }
 
             return GrainDirectoryEntryStatus.Invalid;
@@ -434,9 +475,9 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     return GrainInfo.NO_ETAG;
                 }
-            }
 
-            return grainInfo.VersionTag;
+                return grainInfo.VersionTag;
+            }
         }
 
         /// <summary>
@@ -616,7 +657,5 @@ namespace Orleans.Runtime.GrainDirectory
                 return false;
             }
         }
-
-     
     }
 }
