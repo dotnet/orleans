@@ -11,6 +11,7 @@ namespace Orleans.TestingHost.Utils
         bool done = false;
         bool continueFlag = false;
 
+        /// <summary> Reset the current result handle </summary>
         public virtual void Reset()
         {
             Exception = null;
@@ -19,20 +20,24 @@ namespace Orleans.TestingHost.Utils
             continueFlag = false;
         }
 
+        /// <summary> Get or set the Done flag </summary>
         public bool Done
         {
             get { return done; }
             set { done = value; }
         }
 
+        /// <summary> Get or set the Continue flag </summary>
         public bool Continue
         {
             get { return continueFlag; }
             set { continueFlag = value; }
         }
 
+        /// <summary> Get or set the exception of the result handle </summary>
         public Exception Exception { get; set; }
 
+        /// <summary> Get or set the value of the result handle </summary>
         public object Result { get; set; }
 
         /// <summary>
