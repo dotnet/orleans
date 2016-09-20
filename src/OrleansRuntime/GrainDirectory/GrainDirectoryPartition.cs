@@ -378,7 +378,7 @@ namespace Orleans.Runtime.GrainDirectory
             var result = new AddressesAndTag();
             ActivationId[] activationIds;
             IActivationInfo[] activationInfos;
-            const int arrayReusingThreshold = 15;
+            const int arrayReusingThreshold = 100;
             int grainInfoInstancesCount;
 
             lock (lockable)
