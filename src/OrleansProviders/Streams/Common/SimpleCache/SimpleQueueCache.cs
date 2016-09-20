@@ -154,6 +154,13 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
         public virtual IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             if (token != null && !(token is EventSequenceToken))
