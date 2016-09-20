@@ -17,11 +17,29 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
+        /// <summary>
+        /// Orleans logging
+        /// </summary>
         protected Logger logger;
+        /// <summary>
+        /// Framework service provider
+        /// </summary>
         protected IServiceProvider serviceProvider;
+        /// <summary>
+        /// Provider configuration
+        /// </summary>
         protected IProviderConfiguration providerConfig;
+        /// <summary>
+        /// Stream provider settings
+        /// </summary>
         protected EventHubStreamProviderSettings adapterSettings;
+        /// <summary>
+        /// Event Hub settings
+        /// </summary>
         protected IEventHubSettings hubSettings;
+        /// <summary>
+        /// Checkpointer settings
+        /// </summary>
         protected ICheckpointerSettings checkpointerSettings;
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
