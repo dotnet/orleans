@@ -138,6 +138,10 @@ namespace Orleans.Providers.Streams.Common
             return itemsToRelease;
         }
 
+        /// <summary>
+        /// Add a list of message to the cache
+        /// </summary>
+        /// <param name="msgs"></param>
         public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException("msgs");
