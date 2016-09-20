@@ -8,7 +8,7 @@
     <title>Application Bootstrapping within a Silo | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Application Bootstrapping within a Silo | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,16 +71,16 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="application-bootstrapping-within-a-silo">Application Bootstrapping within a Silo</h1>
+              <h1 id="application-bootstrapping-within-a-silo" sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="6" sourceendlinenumber="6">Application Bootstrapping within a Silo</h1>
               
-<p>There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online.</p>
-<p>Some examples include, but are not limited to:</p>
-<ul>
-<li>Starting background timers to perform periodic housekeeping tasks</li>
-<li>Pre-loading some cache grains with data downloaded from external backing storage.</li>
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="8" sourceendlinenumber="8">There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="10" sourceendlinenumber="10">Some examples include, but are not limited to:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="11" sourceendlinenumber="12">
+<li sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="11" sourceendlinenumber="11">Starting background timers to perform periodic housekeeping tasks</li>
+<li sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="12" sourceendlinenumber="12">Pre-loading some cache grains with data downloaded from external backing storage.</li>
 </ul>
-<p>We have now added support for this auto-run functionality through configuring &quot;bootstrap providers&quot; for Orleans silos. For example:</p>
-<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="14" sourceendlinenumber="14">We have now added support for this auto-run functionality through configuring &quot;bootstrap providers&quot; for Orleans silos. For example:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="16" sourceendlinenumber="25"><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
     &lt;BootstrapProviders&gt;
       &lt;Provider Type=&quot;My.App.BootstrapClass1&quot; Name=&quot;bootstrap1&quot; /&gt;
@@ -88,19 +88,19 @@
     &lt;/BootstrapProviders&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre><p>It is also possible to register Bootstrap provider programaticaly, via calling one of the:</p>
-<pre><code class="lang-csharp">public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary&lt;string, string&gt; properties = null)
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="27" sourceendlinenumber="27">It is also possible to register Bootstrap provider programaticaly, via calling one of the:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="29" sourceendlinenumber="33"><code class="lang-csharp">public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary&lt;string, string&gt; properties = null)
 
 public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&lt;string, string&gt; properties = null) where T : IBootstrapProvider
-</code></pre><p>on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> class.</p>
-<p>These bootstrap providers are C# classes that implement the <code>Orleans.Providers.IBootstrapProvider</code> interface.</p>
-<p>When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.</p>
-<pre><code class="lang-csharp">Task Init(
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="34" sourceendlinenumber="34">on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs" sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="34" sourceendlinenumber="34"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> class.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="36" sourceendlinenumber="36">These bootstrap providers are C# classes that implement the <code>Orleans.Providers.IBootstrapProvider</code> interface.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="38" sourceendlinenumber="38">When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="40" sourceendlinenumber="45"><code class="lang-csharp">Task Init(
     string name,
     IProviderRuntime providerRuntime,
     IProviderConfiguration config)
-</code></pre><p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
-<p>This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.</p>
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="47" sourceendlinenumber="47">Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md" sourcestartlinenumber="49" sourceendlinenumber="49">This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.</p>
 
             </article>
           </div>
@@ -137,8 +137,8 @@ public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Storage Providers | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Storage Providers | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,16 +71,16 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="storage-providers">Storage Providers</h1>
+              <h1 id="storage-providers" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="6" sourceendlinenumber="6">Storage Providers</h1>
               
-<p><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/">download</a> and install MongoDB.</p>
-<p>Custom storage providers allow you to extend the capabilities of Orleans to store application data in new storage services. In this sample, we have code to store data in a file system (presumably networked) and in MongoDB.</p>
-<p>While binary formatting is almost always better to use for persistent storage, this sample chooses to use JSON as the external format for one reason: it&#39;s easier to read and verify, which is a good thing in a sample. As you adopt the sample code for more realistic use, you will probably want to switch to something else than JSON as the external format.</p>
-<h3 id="running-the-sample">Running the sample</h3>
-<p>The sample solution consists of four projects -- the storage provider library, and three test libraries, with the same client+server structure that the <a href="Hello-World.html">Hello World</a> sample has.</p>
-<p><img src="ProvidersSample.png" alt=""></p>
-<p>Edit the <code>DevTestServerConfiguration.xml</code> file in the Test.Client project, uncommenting the element of the file-storage provider.</p>
-<pre><code class="lang-xml">&lt;!-- To test the sample storage providers, uncomment one of the following two lines:
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="8" sourceendlinenumber="8"><strong>Note</strong>: This sample requires the &quot;Official MongoDB C# Driver&quot; NuGet package from 10gen, Inc. If you want to run the sample and store data using MongoDB, you will also need to <a href="https://www.mongodb.org/" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="8" sourceendlinenumber="8">download</a> and install MongoDB.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="10" sourceendlinenumber="10">Custom storage providers allow you to extend the capabilities of Orleans to store application data in new storage services. In this sample, we have code to store data in a file system (presumably networked) and in MongoDB.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="12" sourceendlinenumber="12">While binary formatting is almost always better to use for persistent storage, this sample chooses to use JSON as the external format for one reason: it&#39;s easier to read and verify, which is a good thing in a sample. As you adopt the sample code for more realistic use, you will probably want to switch to something else than JSON as the external format.</p>
+<h3 id="running-the-sample" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="14" sourceendlinenumber="14">Running the sample</h3>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="15" sourceendlinenumber="15">The sample solution consists of four projects -- the storage provider library, and three test libraries, with the same client+server structure that the <a href="Hello-World.html" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="15" sourceendlinenumber="15">Hello World</a> sample has.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="17" sourceendlinenumber="17"><img src="ProvidersSample.png" alt="" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="17" sourceendlinenumber="17"></p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="19" sourceendlinenumber="19">Edit the <code>DevTestServerConfiguration.xml</code> file in the Test.Client project, uncommenting the element of the file-storage provider.</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="21" sourceendlinenumber="31"><code class="lang-xml">&lt;!-- To test the sample storage providers, uncomment one of the following two lines:
 &lt;Provider Type=&quot;Samples.StorageProviders.MongoDBStorage&quot;
          Name=&quot;TestStore&quot;
          Database=&quot;orleanssamples&quot;
@@ -89,47 +89,47 @@
 &lt;Provider Type=&quot;Samples.StorageProviders.OrleansFileStorage&quot;
          Name=&quot;TestStore&quot;
          RootDirectory=&quot;.\Samples.FileStorage&quot;/&gt;
-</code></pre><p>Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
-<p>Set the &#39;Test.Client&#39; project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:</p>
-<pre><code>Successfully started Orleans silo &#39;host-001&#39; as a Primary node.
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="33" sourceendlinenumber="33">Build the solution. This will move everything where it needs to go, including the MongoDB client libraries that NuGet brought in.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="35" sourceendlinenumber="35">Set the &#39;Test.Client&#39; project as the startup project and hit F5. Right before it stops spitting out text, it will have this to say:</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="37" sourceendlinenumber="42"><code>Successfully started Orleans silo &#39;host-001&#39; as a Primary node.
 
 We just wrote something to the persistent store. Please verify!
 
 Orleans Silo is running.
 Press Enter to terminate...
-</code></pre><p>Stop the program and open a command line windows, move to the <code>bin\Debug</code> folder of the Test.Client project. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:</p>
-<pre><code>&gt;&gt;dir
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="45" sourceendlinenumber="45">Stop the program and open a command line windows, move to the <code>bin\Debug</code> folder of the Test.Client project. There should be a folder called Samples.FileStorage there. In that folder, you should find a single file:</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="47" sourceendlinenumber="52"><code>&gt;&gt;dir
      Directory: c:\Orleans\Samples\StorageProviders\Test.Client\bin\Debug\Samples.FileStorage
 
 Mode                LastWriteTime     Length Name
 ----                -------------     ------ ----
 -a---         3/26/2014     19:50         48 0000...003ffffffc0950639.PersonState
-</code></pre><p>If you look at the contents of that file, you should see some JSON text:</p>
-<pre><code>&gt;&gt;
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="55" sourceendlinenumber="55">If you look at the contents of that file, you should see some JSON text:</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="57" sourceendlinenumber="59"><code>&gt;&gt;
 more .\Samples.FileStorage\0000000000000000000000000000000003ffffffc0950639.PersonState
 {&quot;FirstName&quot;:&quot;John&quot;,&quot;LastName&quot;:&quot;Doe&quot;,&quot;Gender&quot;:0}
-</code></pre><p>Now, run the program again. It&#39;s written to detect that state already exists, so this time, it will have something else to say:</p>
-<pre><code>Successfully started Orleans silo host-001&#39; as a Primary node.
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="61" sourceendlinenumber="61">Now, run the program again. It&#39;s written to detect that state already exists, so this time, it will have something else to say:</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="63" sourceendlinenumber="68"><code>Successfully started Orleans silo host-001&#39; as a Primary node.
 
 This was found in the persistent store: John, Doe, Male
 
 Orleans Silo is running.
 Press Enter to terminate...
-</code></pre><p>If you have <a href="http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/">MongoDB installed</a>, you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:</p>
-<pre><code>MongoDB shell version: 2.4.6
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="71" sourceendlinenumber="71">If you have <a href="http://docs.mongodb.org/manual/tutorial/install-mongodb-on-windows/" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="71" sourceendlinenumber="71">MongoDB installed</a>, you can repeat this procedure to test the other storage provider. Just change which XML element in the configuration file that is uncommented and ensure that the mongod.exe process is running. When you inspect the data with the MongoDB shell (mongo.exe), it should look something like this:</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="73" sourceendlinenumber="81"><code>MongoDB shell version: 2.4.6
 connecting to: test
 &gt; use orleanssamples
 switched to db orleanssamples
 &gt; db.PersonState.find()
 { &quot;_id&quot; : ObjectId(&quot;533391afcf20b011307a82bf&quot;), &quot;FirstName&quot; : &quot;John&quot;, &quot;LastName&quot; : &quot;Doe&quot;, &quot;Gender&quot; : 0, &quot;key&quot; : &quot;0000000000000000000000000000000003ffffffc0950639&quot; }
 &gt;
-</code></pre><h3 id="design">Design</h3>
-<p>Since both concrete storage providers use JSON, we place the serialization and deserialization code in a base class, <code>BaseJSONStorageProvider</code>. It contains the logic for <code>Init()</code>, <code>ReadStateAsync()</code>, <code>WriteStateAsync()</code> and <code>ClearStateAsync()</code>, the main interface methods of IStorageProvider.</p>
-<p>The logic to deal with the underlying store is delegated to a <code>DataManager</code> class hiearchy: <code>IJSONStateDataManager</code>,  <code>GrainFileStateManager</code>, and <code>GrainStateMongoDataManager</code>. Their methods <code>Delete()</code>, <code>Read()</code> and <code>Write()</code> correspond directly to the methods defined in the storage provider classes.</p>
-<p>In this description, we won&#39;t go into the details of interacting with the file system or MongoDB via .NET, that is described in detail elsewhere. A couple of things in the code requires explanation, though.</p>
-<p>In both cases, the name of the grain type is used as name for the collection of instances; in the file storage provider case, the collection name is mapped to the folder that data is stored in, while the primary key is used to identify the actual instance; in the MongoDB case, the type name denotes a database collection, while the primary key is used as the document name.</p>
-<p>In the MongoDB case, the JSON structure is augmented during a write operation with another element, key, which contains the Orleans grain key and allows us to query for that document when reading. Care is also taken to maintain the Mongo-internal _id document identity.</p>
-<pre><code class="lang-csharp">public Task Write(string collectionName, string key, string entityData)
+</code></pre><h3 id="design" sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="83" sourceendlinenumber="83">Design</h3>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="85" sourceendlinenumber="85">Since both concrete storage providers use JSON, we place the serialization and deserialization code in a base class, <code>BaseJSONStorageProvider</code>. It contains the logic for <code>Init()</code>, <code>ReadStateAsync()</code>, <code>WriteStateAsync()</code> and <code>ClearStateAsync()</code>, the main interface methods of IStorageProvider.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="87" sourceendlinenumber="87">The logic to deal with the underlying store is delegated to a <code>DataManager</code> class hiearchy: <code>IJSONStateDataManager</code>,  <code>GrainFileStateManager</code>, and <code>GrainStateMongoDataManager</code>. Their methods <code>Delete()</code>, <code>Read()</code> and <code>Write()</code> correspond directly to the methods defined in the storage provider classes.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="89" sourceendlinenumber="89">In this description, we won&#39;t go into the details of interacting with the file system or MongoDB via .NET, that is described in detail elsewhere. A couple of things in the code requires explanation, though.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="91" sourceendlinenumber="91">In both cases, the name of the grain type is used as name for the collection of instances; in the file storage provider case, the collection name is mapped to the folder that data is stored in, while the primary key is used to identify the actual instance; in the MongoDB case, the type name denotes a database collection, while the primary key is used as the document name.</p>
+<p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="93" sourceendlinenumber="93">In the MongoDB case, the JSON structure is augmented during a write operation with another element, key, which contains the Orleans grain key and allows us to query for that document when reading. Care is also taken to maintain the Mongo-internal _id document identity.</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="95" sourceendlinenumber="117"><code class="lang-csharp">public Task Write(string collectionName, string key, string entityData)
 {
     var collection = GetOrCreateCollection(collectionName);
 
@@ -150,8 +150,8 @@ switched to db orleanssamples
     }
     return TaskDone.Done;
 }
-</code></pre><p>On read, the _id field is removed from the JSON document that is passed back to the caller, since that is not part of the Orleans data model.</p>
-<pre><code class="lang-csharp">public Task&lt;string&gt; Read(string collectionName, string key)
+</code></pre><p sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="119" sourceendlinenumber="119">On read, the _id field is removed from the JSON document that is passed back to the caller, since that is not part of the Orleans data model.</p>
+<pre sourcefile="Documentation/Samples-Overview/Storage-Providers.md" sourcestartlinenumber="121" sourceendlinenumber="142"><code class="lang-csharp">public Task&lt;string&gt; Read(string collectionName, string key)
 {
     var collection = GetCollection(collectionName);
     if (collection == null)
@@ -207,8 +207,8 @@ switched to db orleanssamples
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

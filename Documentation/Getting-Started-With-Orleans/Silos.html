@@ -8,7 +8,7 @@
     <title>Silos | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Silos | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -72,16 +72,16 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               
-              <p>An Orleans silo is a server that hosts and executes Orleans grains. It has one listening port for silo-to-silo messaging and another for client-to-silo messaging. Typically, one silo is run per machine.</p>
-<h2 id="cluster">Cluster</h2>
-<p>A number of silos can work together by forming an Orleans cluster. Orleans runtime fully automates cluster management.
+              <p sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="7" sourceendlinenumber="7">An Orleans silo is a server that hosts and executes Orleans grains. It has one listening port for silo-to-silo messaging and another for client-to-silo messaging. Typically, one silo is run per machine.</p>
+<h2 id="cluster" sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="9" sourceendlinenumber="9">Cluster</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="10" sourceendlinenumber="13">A number of silos can work together by forming an Orleans cluster. Orleans runtime fully automates cluster management.
 All silos use a shared membership store that is updated dynamically and helps coordinate cluster management.
 Silos learn about each others&#39; status by reading the shared store. At any time, a silo can join a cluster by registering in a the shared store. This way the cluster can can scale-out dynamically at runtime.
 Orleans provides resilience and availability by removing unresponsive silos from the cluster.</p>
-<p>For an in-depth detailed documentation of how Orleans manages a cluster, read about <a href="/orleans/Runtime-Implementation-Details/Cluster-Management">Cluster Management</a>.</p>
-<h2 id="next">Next</h2>
-<p>Next we look at what a client is and how it interacts in the Orleans architecture.</p>
-<p><a href="Clients.html">Clients</a></p>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="15" sourceendlinenumber="15">For an in-depth detailed documentation of how Orleans manages a cluster, read about <a href="/orleans/Runtime-Implementation-Details/Cluster-Management" sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="15" sourceendlinenumber="15">Cluster Management</a>.</p>
+<h2 id="next" sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="17" sourceendlinenumber="17">Next</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="18" sourceendlinenumber="18">Next we look at what a client is and how it interacts in the Orleans architecture.</p>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="20" sourceendlinenumber="20"><a href="Clients.html" sourcefile="Documentation/Getting-Started-With-Orleans/Silos.md" sourcestartlinenumber="20" sourceendlinenumber="20">Clients</a></p>
 
             </article>
           </div>
@@ -118,8 +118,8 @@ Orleans provides resilience and availability by removing unresponsive silos from
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

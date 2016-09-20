@@ -8,7 +8,7 @@
     <title>Troubleshooting Deployments | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Troubleshooting Deployments | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,56 +71,56 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="troubleshooting-deployments">Troubleshooting Deployments</h1>
+              <h1 id="troubleshooting-deployments" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="6" sourceendlinenumber="6">Troubleshooting Deployments</h1>
               
-<p>This page gives some general guidelines for troubleshooting any issues that occur while deploying to Azure Cloud Services.
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="8" sourceendlinenumber="9">This page gives some general guidelines for troubleshooting any issues that occur while deploying to Azure Cloud Services.
 These are very common issues to watch out for. Be sure to check the logs for more information.</p>
-<h2 id="getting-a-silounavailableexception">Getting a SiloUnavailableException</h2>
-<p>First check to make sure that you are actually starting the silos before attempting to initialize the client. Sometimes the
+<h2 id="getting-a-silounavailableexception" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="11" sourceendlinenumber="11">Getting a SiloUnavailableException</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="13" sourceendlinenumber="15">First check to make sure that you are actually starting the silos before attempting to initialize the client. Sometimes the
 silos take a long time to start so it can be beneficial to try to initialize the client multiple times. If it still throws an
 exception, then there might be another issue with the silos.</p>
-<p>Check the silo configuration and make sure that the silos are starting up properly.</p>
-<h2 id="common-connection-string-issues">Common Connection String Issues</h2>
-<ul>
-<li>Using the local connection string when deploying to Azure – the website will fail to connect</li>
-<li>Using different connection strings for the silos and the front end (web and worker roles) – the website will fail to
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="17" sourceendlinenumber="17">Check the silo configuration and make sure that the silos are starting up properly.</p>
+<h2 id="common-connection-string-issues" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="19" sourceendlinenumber="19">Common Connection String Issues</h2>
+<ul sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="20" sourceendlinenumber="22">
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="20" sourceendlinenumber="20">Using the local connection string when deploying to Azure – the website will fail to connect</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="21" sourceendlinenumber="22">Using different connection strings for the silos and the front end (web and worker roles) – the website will fail to
 initialize the client because it cannot connect to the silos</li>
 </ul>
-<p>The connection string configuration can be checked in the Azure Portal. The logs may not display properly if the connection
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="24" sourceendlinenumber="25">The connection string configuration can be checked in the Azure Portal. The logs may not display properly if the connection
 strings are not set up correctly.</p>
-<h2 id="modifying-the-configuration-files-improperly">Modifying the Configuration Files Improperly</h2>
-<p>Make sure that the proper endpoints are configured in the ServiceDefinition.csdef file or else the deployment will not work.
+<h2 id="modifying-the-configuration-files-improperly" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="27" sourceendlinenumber="27">Modifying the Configuration Files Improperly</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="29" sourceendlinenumber="30">Make sure that the proper endpoints are configured in the ServiceDefinition.csdef file or else the deployment will not work.
 It will give errors saying that it cannot get the endpoint information.</p>
-<h2 id="missing-logs">Missing Logs</h2>
-<p>Make sure that the connection strings are set up properly.</p>
-<p>It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly.
+<h2 id="missing-logs" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="32" sourceendlinenumber="32">Missing Logs</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="33" sourceendlinenumber="33">Make sure that the connection strings are set up properly.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="35" sourceendlinenumber="36">It is likely that the Web.config file in the web role or the app.config file in the worker role were modified improperly.
 Incorrect versions in these files can cause issues with the deployment. Be careful when dealing with updates.</p>
-<h2 id="version-issues">Version Issues</h2>
-<p>Make sure that the same version of Orleans is used in every project in the solution. Not doing this can lead to the worker
+<h2 id="version-issues" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="38" sourceendlinenumber="38">Version Issues</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="39" sourceendlinenumber="40">Make sure that the same version of Orleans is used in every project in the solution. Not doing this can lead to the worker
 role recycling. Check the logs for more information. Visual Studio provides some silo startup error messages in the deployment history.</p>
-<h2 id="role-keeps-recycling">Role Keeps Recycling</h2>
-<ul>
-<li>Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.</li>
-<li>Check the logs to see if there is an unhandled exception while initializing.</li>
-<li>Make sure that the connection strings are correct.</li>
-<li>Check the Azure Cloud Services troubleshooting pages for more information.</li>
+<h2 id="role-keeps-recycling" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="42" sourceendlinenumber="42">Role Keeps Recycling</h2>
+<ul sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="43" sourceendlinenumber="46">
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="43" sourceendlinenumber="43">Check that all the appropriate Orleans assemblies are in the solution and have Copy Local set to True.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="44" sourceendlinenumber="44">Check the logs to see if there is an unhandled exception while initializing.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="45" sourceendlinenumber="45">Make sure that the connection strings are correct.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="46" sourceendlinenumber="46">Check the Azure Cloud Services troubleshooting pages for more information.</li>
 </ul>
-<h2 id="how-to-check-logs">How to Check Logs</h2>
-<ul>
-<li>Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.</li>
-<li>You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level.</li>
+<h2 id="how-to-check-logs" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="48" sourceendlinenumber="48">How to Check Logs</h2>
+<ul sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="49" sourceendlinenumber="50">
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="49" sourceendlinenumber="49">Use the cloud explorer in Visual Studio to navigate to the appropriate storage table or blob in the storage account. The WADLogsTable is a good starting point for looking at the logs.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="50" sourceendlinenumber="50">You might only be logging errors. If you want informational logs as well, you will need to modify the configuration to set the logging severity level.</li>
 </ul>
-<p>Programmatic configuration:</p>
-<ul>
-<li>When creating a <code>ClusterConfiguration</code> object, set <code>config.Defaults.DefaultTraceLevel = Severity.Info</code>.</li>
-<li>When creating a <code>ClientConfiguration</code> object, set <code>config.DefaultTraceLevel = Severity.Info</code>.</li>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="52" sourceendlinenumber="52">Programmatic configuration:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="53" sourceendlinenumber="54">
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="53" sourceendlinenumber="53">When creating a <code>ClusterConfiguration</code> object, set <code>config.Defaults.DefaultTraceLevel = Severity.Info</code>.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="54" sourceendlinenumber="54">When creating a <code>ClientConfiguration</code> object, set <code>config.DefaultTraceLevel = Severity.Info</code>.</li>
 </ul>
-<p>Declarative configuration:</p>
-<ul>
-<li>Add <code>&lt;Tracing DefaultTraceLevel=&quot;Info&quot; /&gt;</code> to the <code>OrleansConfiguration.xml</code> and/or the <code>ClientConfiguration.xml</code> files.</li>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="56" sourceendlinenumber="56">Declarative configuration:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="57" sourceendlinenumber="57">
+<li sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="57" sourceendlinenumber="57">Add <code>&lt;Tracing DefaultTraceLevel=&quot;Info&quot; /&gt;</code> to the <code>OrleansConfiguration.xml</code> and/or the <code>ClientConfiguration.xml</code> files.</li>
 </ul>
-<p>In the <code>diagnostics.wadcfgx</code> file for the web and worker roles, make sure to set the <code>scheduledTransferLogLevelFilter</code> attribute in the <code>Logs</code> element to <code>Information</code>, as this is an additional layer of trace filtering that defines which traces are sent to the <code>WADLogsTable</code> in Azure Storage.</p>
-<p>You can find more information about this in the <a href="../Orleans-Configuration-Guide/index.html">Orleans Configuration Guide</a>.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="59" sourceendlinenumber="59">In the <code>diagnostics.wadcfgx</code> file for the web and worker roles, make sure to set the <code>scheduledTransferLogLevelFilter</code> attribute in the <code>Logs</code> element to <code>Information</code>, as this is an additional layer of trace filtering that defines which traces are sent to the <code>WADLogsTable</code> in Azure Storage.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="61" sourceendlinenumber="61">You can find more information about this in the <a href="../Orleans-Configuration-Guide/index.html" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="61" sourceendlinenumber="61">Orleans Configuration Guide</a>.</p>
 
             </article>
           </div>
@@ -157,8 +157,8 @@ role recycling. Check the logs for more information. Visual Studio provides some
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

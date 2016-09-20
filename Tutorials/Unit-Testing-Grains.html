@@ -8,7 +8,7 @@
     <title>Unit Testing Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Unit Testing Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,27 +71,27 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="unit-testing-grains">Unit Testing Grains</h1>
+              <h1 id="unit-testing-grains" sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="6" sourceendlinenumber="6">Unit Testing Grains</h1>
               
-<p>This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="8" sourceendlinenumber="9">This tutorial shows you how to write unit tests for your grains to make sure they are behaving correctly.
 For a distributed application written in Orleans, you&#39;ll need load tests and integration tests as well but here we&#39;ll only focus on unit tests.</p>
-<p>Orleans makes it possible to mock many of its parts (<a href="https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal">example</a>) but here we only focus on simply running grains in test silos.</p>
-<p>The steps are</p>
-<ul>
-<li>You should create a test project in your favorite unit testing framework.</li>
-<li>Add references to Microsoft.Orleans.TestingHost and Microsoft.Orleans.OrleansProviders packages from NuGet to the project.</li>
-<li>Reference your interfaces and collection projects in the test project.</li>
-<li>Inherit your test classes from <code>Orleans.TestingHost.TestingSiloHost</code>.</li>
-<li>Shutdown the silo properly in each test class.</li>
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="11" sourceendlinenumber="11">Orleans makes it possible to mock many of its parts (<a href="https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal" sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="11" sourceendlinenumber="11">example</a>) but here we only focus on simply running grains in test silos.</p>
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="13" sourceendlinenumber="13">The steps are</p>
+<ul sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="15" sourceendlinenumber="19">
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="15" sourceendlinenumber="15">You should create a test project in your favorite unit testing framework.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="16" sourceendlinenumber="16">Add references to Microsoft.Orleans.TestingHost and Microsoft.Orleans.OrleansProviders packages from NuGet to the project.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="17" sourceendlinenumber="17">Reference your interfaces and collection projects in the test project.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="18" sourceendlinenumber="18">Inherit your test classes from <code>Orleans.TestingHost.TestingSiloHost</code>.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="19" sourceendlinenumber="19">Shutdown the silo properly in each test class.</li>
 </ul>
-<h2 id="the-process">The process</h2>
-<p>The TestingSiloHost creates a mini cluster of 2 silos in 2 different AppDomains and initializes a client in the main AppDomain which test cases will run on, in its constructor.
+<h2 id="the-process" sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="21" sourceendlinenumber="21">The process</h2>
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="22" sourceendlinenumber="24">The TestingSiloHost creates a mini cluster of 2 silos in 2 different AppDomains and initializes a client in the main AppDomain which test cases will run on, in its constructor.
  Then it will run all of the test cases in the class and at cleanup time shuts the silos down.
 The test cases like ordinary grain code should call grains and then wait for the results using await and should not block the execution.</p>
-<h2 id="writing-the-code">Writing the code</h2>
-<p>The <code>TestingSiloHost</code> which we inherit from starts the silos up for us but we need to shutdown them ourselves.
+<h2 id="writing-the-code" sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="26" sourceendlinenumber="26">Writing the code</h2>
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="27" sourceendlinenumber="28">The <code>TestingSiloHost</code> which we inherit from starts the silos up for us but we need to shutdown them ourselves.
 The samples here are using MS Test but you can use NUnit, XUnit or any other testing framework that you want. Let&#39;s use the hello world sample&#39;s code here as an example.</p>
-<pre><code class="lang-csharp">using System;
+<pre sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="30" sourceendlinenumber="72"><code class="lang-csharp">using System;
 using System.Threading.Tasks;
 using HelloWorldInterfaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -131,18 +131,18 @@ namespace Tests
         }
     }
 }
-</code></pre><p>Since this test method is asynchronous and leverages the <code>await</code> keyword, be sure the method is defined as <code>async</code> and returns a <code>Task</code>.
+</code></pre><p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="74" sourceendlinenumber="76">Since this test method is asynchronous and leverages the <code>await</code> keyword, be sure the method is defined as <code>async</code> and returns a <code>Task</code>.
 As you can see having <code>ClassCleanup()</code> is optional but it&#39;s good to have it around.
 Our test method simply creates a grain, sends the message to it and then first checks if the result is null or not and then checks if it is in the expected format or not.</p>
-<p>So writing tests for Orleans is not much different from a normal test project.
+<p sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="78" sourceendlinenumber="79">So writing tests for Orleans is not much different from a normal test project.
 You just need to reference the two NuGet packages and derive your class from <code>TestingSiloHost</code>.</p>
-<h2 id="remarks">Remarks</h2>
-<ul>
-<li>Keep in mind that the silo will not be restarted after each test method so if your methods need a fully clean grain then make sure that they&#39;ll use different grain IDs.</li>
-<li>The <code>TestingSiloHost</code> class has multiple utility methods for starting and stopping silos which can be used for programmatic simulation of some failure situations.</li>
-<li>Starting and stopping the silo for each test case takes time and is not a good idea unless you really need it for a test.</li>
-<li>The two created silos will be named &quot;Primary&quot; and &quot;Secondary&quot;. It is important to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special <code>MembershipTableGrain</code> system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.</li>
-<li>Configurations of the environment are based on <code>TestSiloOptions</code> and <code>TestClientOptions</code> objects which can be passed to the constructor of the base class.</li>
+<h2 id="remarks" sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="81" sourceendlinenumber="81">Remarks</h2>
+<ul sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="83" sourceendlinenumber="87">
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="83" sourceendlinenumber="83">Keep in mind that the silo will not be restarted after each test method so if your methods need a fully clean grain then make sure that they&#39;ll use different grain IDs.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="84" sourceendlinenumber="84">The <code>TestingSiloHost</code> class has multiple utility methods for starting and stopping silos which can be used for programmatic simulation of some failure situations.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="85" sourceendlinenumber="85">Starting and stopping the silo for each test case takes time and is not a good idea unless you really need it for a test.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="86" sourceendlinenumber="86">The two created silos will be named &quot;Primary&quot; and &quot;Secondary&quot;. It is important to note that the notion of a Primary silo is only used in Testing. We use the Primary silo to host the system store in a special <code>MembershipTableGrain</code> system grain, to allow bootstrap. In production there is no primary and secondary silos: all silos are equal and behave in a peer-to-peer fashion.</li>
+<li sourcefile="Tutorials/Unit-Testing-Grains.md" sourcestartlinenumber="87" sourceendlinenumber="87">Configurations of the environment are based on <code>TestSiloOptions</code> and <code>TestClientOptions</code> objects which can be passed to the constructor of the base class.</li>
 </ul>
 
             </article>
@@ -180,8 +180,8 @@ You just need to reference the two NuGet packages and derive your class from <co
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

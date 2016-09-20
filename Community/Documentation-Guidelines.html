@@ -8,7 +8,7 @@
     <title>Documentation Guidelines | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Documentation Guidelines | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,69 +71,69 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="documentation-guidelines">Documentation Guidelines</h1>
+              <h1 id="documentation-guidelines" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="6" sourceendlinenumber="6">Documentation Guidelines</h1>
               
-<p>The Orleans documentation is built in <a href="https://help.github.com/articles/markdown-basics/">Markdown</a>.
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="8" sourceendlinenumber="9">The Orleans documentation is built in <a href="https://help.github.com/articles/markdown-basics/" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="8" sourceendlinenumber="8">Markdown</a>.
 We use a few simple conventions to ensure a homogeneous style throughout the full set of documents.</p>
-<p>These standards are being introduced.
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="11" sourceendlinenumber="13">These standards are being introduced.
 If you have issues with these guidelines then raise an issue or a Pull Request.
-If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request. Also if you are using windows 10 you can go to the store and find free MarkDown editors like <a href="https://www.microsoft.com/store/apps/9wzdncrdd2p3">this</a></p>
-<h1 id="structure">Structure</h1>
-<h2 id="language">Language</h2>
-<p>The documentation will follow US-English spelling.
-Desktop tools like <a href="http://markdownpad.com">http://markdownpad.com</a> have spell checking features.</p>
-<h2 id="paragraph-structure">Paragraph structure</h2>
-<p>Each sentence should be written on a single line, and only one sentence per line.
+If you find documentation that fails to meet the guidelines, then make a fix and submit a pull request. Also if you are using windows 10 you can go to the store and find free MarkDown editors like <a href="https://www.microsoft.com/store/apps/9wzdncrdd2p3" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="13" sourceendlinenumber="13">this</a></p>
+<h1 id="structure" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="15" sourceendlinenumber="15">Structure</h1>
+<h2 id="language" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="17" sourceendlinenumber="17">Language</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="18" sourceendlinenumber="19">The documentation will follow US-English spelling.
+Desktop tools like <a href="http://markdownpad.com" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="19" sourceendlinenumber="19">http://markdownpad.com</a> have spell checking features.</p>
+<h2 id="paragraph-structure" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="21" sourceendlinenumber="21">Paragraph structure</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="22" sourceendlinenumber="23">Each sentence should be written on a single line, and only one sentence per line.
 This makes merging changes easier and also helps identify verbose language.</p>
-<p>Paragraphs in Markdown are just one or more lines of consecutive text followed by one or more blank lines.</p>
-<h2 id="headings">Headings</h2>
-<p>Heading should be used to structure a document.
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="25" sourceendlinenumber="25">Paragraphs in Markdown are just one or more lines of consecutive text followed by one or more blank lines.</p>
+<h2 id="headings" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="27" sourceendlinenumber="27">Headings</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="28" sourceendlinenumber="30">Heading should be used to structure a document.
 Avoid using other emphasis features like ALLCAPS, <em>Italics</em> or <strong>bold</strong> to identify a new topic.
 Using a header is not only more consistent, but also allows linking to the header.</p>
-<h2 id="footers">Footers</h2>
-<p>At the end of a page, it is helpful to link to the next logical page in the documentation.
+<h2 id="footers" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="32" sourceendlinenumber="32">Footers</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="33" sourceendlinenumber="34">At the end of a page, it is helpful to link to the next logical page in the documentation.
 If the page is the last in a sub-section then linking back to the index page is useful.</p>
-<h1 id="styles">Styles</h1>
-<h2 id="code-formatting">Code formatting</h2>
-<p>Blocks of example code should be formatted with the triple back tick format followed by the language</p>
-<pre><code>``` csharp
+<h1 id="styles" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="36" sourceendlinenumber="36">Styles</h1>
+<h2 id="code-formatting" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="38" sourceendlinenumber="38">Code formatting</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="39" sourceendlinenumber="39">Blocks of example code should be formatted with the triple back tick format followed by the language</p>
+<pre sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="41" sourceendlinenumber="47"><code>``` csharp
 [StorageProvider(ProviderName=&quot;store1&quot;)]
 public class MyGrain&lt;IMyGrainState&gt; ...
 {
   ...
 }
 ```
-</code></pre><p>Which will render as</p>
-<pre><code class="lang-csharp">[StorageProvider(ProviderName=&quot;store1&quot;)]
+</code></pre><p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="49" sourceendlinenumber="49">Which will render as</p>
+<pre sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="51" sourceendlinenumber="57"><code class="lang-csharp">[StorageProvider(ProviderName=&quot;store1&quot;)]
 public class MyGrain&lt;IMyGrainState&gt; ...
 {
   ...
 }
-</code></pre><p>Inline code should be marked with a single backtick (`).</p>
-<p>This include references to:</p>
-<ul>
-<li>type names e.g. <code>Task&lt;T&gt;</code></li>
-<li>variable names e.g. <code>game</code></li>
-<li>namespaces e.g. <code>Orleans.Storage.AzureTableStorage</code></li>
+</code></pre><p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="59" sourceendlinenumber="59">Inline code should be marked with a single backtick (`).</p>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="61" sourceendlinenumber="61">This include references to:</p>
+<ul sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="63" sourceendlinenumber="65">
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="63" sourceendlinenumber="63">type names e.g. <code>Task&lt;T&gt;</code></li>
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="64" sourceendlinenumber="64">variable names e.g. <code>game</code></li>
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="65" sourceendlinenumber="65">namespaces e.g. <code>Orleans.Storage.AzureTableStorage</code></li>
 </ul>
-<p>If showing text that is an output (e.g. text file content or console output) you can either use the triple back tick without specifying a language or you can indent the content. For example:</p>
-<pre><code>1 said: Welcome to my team!
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="67" sourceendlinenumber="67">If showing text that is an output (e.g. text file content or console output) you can either use the triple back tick without specifying a language or you can indent the content. For example:</p>
+<pre sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="70" sourceendlinenumber="73"><code>1 said: Welcome to my team!
 0 said: Thanks!
 1 said: Thanks!
 0 said: Thanks!
-</code></pre><h2 id="file-names-and-paths">File names and paths</h2>
-<p>When referencing a filename, directory/folder or URI then use standard italics to format.
+</code></pre><h2 id="file-names-and-paths" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="77" sourceendlinenumber="77">File names and paths</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="78" sourceendlinenumber="79">When referencing a filename, directory/folder or URI then use standard italics to format.
 This can be done by surrounding the string with either with a single asterisk (<code>*</code>) or a single underscore (<code>_</code>)</p>
-<p>Examples:</p>
-<ul>
-<li><em>OrleansRuntimeInterfaces.dll</em></li>
-<li><em>C:\Binaries</em></li>
-<li><em>../src/Grain.cs</em></li>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="81" sourceendlinenumber="81">Examples:</p>
+<ul sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="83" sourceendlinenumber="85">
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="83" sourceendlinenumber="83"><em>OrleansRuntimeInterfaces.dll</em></li>
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="84" sourceendlinenumber="84"><em>C:\Binaries</em></li>
+<li sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="85" sourceendlinenumber="85"><em>../src/Grain.cs</em></li>
 </ul>
-<h2 id="tables">Tables</h2>
-<p>Markdown supports <a href="https://help.github.com/articles/github-flavored-markdown/#tables">tabular data</a>.
+<h2 id="tables" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="88" sourceendlinenumber="88">Tables</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="90" sourceendlinenumber="91">Markdown supports <a href="https://help.github.com/articles/github-flavored-markdown/#tables" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="90" sourceendlinenumber="90">tabular data</a>.
 Tables could be used to structure data so that is is easily consumable for the reader.</p>
-<table>
+<table sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="93" sourceendlinenumber="97">
 <thead>
 <tr>
 <th>Suffix</th>
@@ -155,14 +155,14 @@ Tables could be used to structure data so that is is easily consumable for the r
 </tr>
 </tbody>
 </table>
-<h2 id="links">Links</h2>
-<p>When referencing another concept, the concept should be linked to.
-Forward and backward references with in a page can be linked to via the header. e.g. link back to <a href="#structure">Structure</a>
+<h2 id="links" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="100" sourceendlinenumber="100">Links</h2>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="101" sourceendlinenumber="104">When referencing another concept, the concept should be linked to.
+Forward and backward references with in a page can be linked to via the header. e.g. link back to <a href="#structure" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="102" sourceendlinenumber="102">Structure</a>
 Links to other documents can either link to the page, or a sub-section/header within the page.
-External links should be exposed as a the full link e.g. <a href="https://github.com/dotnet/roslyn">https://github.com/dotnet/roslyn</a></p>
-<h1 id="contribution">Contribution</h1>
-<p>The Orleans documentation is managed as Markdown files in a Git repository hosted on <a href="https://github.com/dotnet/orleans/tree/gh-pages">GitHub in the gh-pages branch</a>.
-See the <a href="https://pages.github.com/">GitHub Pages</a> documentation on how to use the <code>gh-pages</code> branch convention for &quot;Project site&quot; documents.</p>
+External links should be exposed as a the full link e.g. <a href="https://github.com/dotnet/roslyn" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="104" sourceendlinenumber="104">https://github.com/dotnet/roslyn</a></p>
+<h1 id="contribution" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="108" sourceendlinenumber="108">Contribution</h1>
+<p sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="109" sourceendlinenumber="110">The Orleans documentation is managed as Markdown files in a Git repository hosted on <a href="https://github.com/dotnet/orleans/tree/gh-pages" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="109" sourceendlinenumber="109">GitHub in the gh-pages branch</a>.
+See the <a href="https://pages.github.com/" sourcefile="Community/Documentation-Guidelines.md" sourcestartlinenumber="110" sourceendlinenumber="110">GitHub Pages</a> documentation on how to use the <code>gh-pages</code> branch convention for &quot;Project site&quot; documents.</p>
 
             </article>
           </div>
@@ -199,8 +199,8 @@ See the <a href="https://pages.github.com/">GitHub Pages</a> documentation on ho
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

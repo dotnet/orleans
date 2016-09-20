@@ -8,7 +8,7 @@
     <title>What's new in Orleans | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="What's new in Orleans | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,295 +71,295 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="whats-new-in-orleans">What&#39;s new in Orleans?</h1>
+              <h1 id="whats-new-in-orleans" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="6" sourceendlinenumber="6">What&#39;s new in Orleans?</h1>
               
-<h2 id="v123httpsgithubcomdotnetorleansreleasestagv123-july-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.3">v1.2.3</a> July 11th 2016</h2>
-<h3 id="release-notes">Release notes</h3>
-<ul>
-<li>Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable <a href="https://github.com/dotnet/orleans/pull/1888">#1888</a> <a href="https://github.com/dotnet/orleans/pull/1864">#1864</a> <a href="https://github.com/dotnet/orleans/pull/1855">#1855</a></li>
-<li>Troubleshooting improvements:<ul>
-<li>Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) <a href="https://github.com/dotnet/orleans/pull/1879">#1879</a> <a href="https://github.com/dotnet/orleans/pull/1808">#1808</a></li>
-<li>Better messaging when silo fails to join due to initial connectivity problems <a href="https://github.com/dotnet/orleans/pull/1866">#1866</a> <a href="https://github.com/dotnet/orleans/pull/1933">#1933</a></li>
-<li>Throw meaningful exception if grain timer is created outside grain context <a href="https://github.com/dotnet/orleans/pull/1858">#1858</a></li>
+<h2 id="v123httpsgithubcomdotnetorleansreleasestagv123-july-11th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="8" sourceendlinenumber="8"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.3" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="8" sourceendlinenumber="8">v1.2.3</a> July 11th 2016</h2>
+<h3 id="release-notes" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="10" sourceendlinenumber="10">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="12" sourceendlinenumber="21">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="12" sourceendlinenumber="12">Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable <a href="https://github.com/dotnet/orleans/pull/1888" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="12" sourceendlinenumber="12">#1888</a> <a href="https://github.com/dotnet/orleans/pull/1864" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="12" sourceendlinenumber="12">#1864</a> <a href="https://github.com/dotnet/orleans/pull/1855" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="12" sourceendlinenumber="12">#1855</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="13" sourceendlinenumber="16">Troubleshooting improvements:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="14" sourceendlinenumber="16">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="14" sourceendlinenumber="14">Fixed stacktrace preservation in exceptions from grain calls (bug introduced in 1.2.0) <a href="https://github.com/dotnet/orleans/pull/1879" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="14" sourceendlinenumber="14">#1879</a> <a href="https://github.com/dotnet/orleans/pull/1808" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="14" sourceendlinenumber="14">#1808</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="15" sourceendlinenumber="15">Better messaging when silo fails to join due to initial connectivity problems <a href="https://github.com/dotnet/orleans/pull/1866" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="15" sourceendlinenumber="15">#1866</a> <a href="https://github.com/dotnet/orleans/pull/1933" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="15" sourceendlinenumber="15">#1933</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="16" sourceendlinenumber="16">Throw meaningful exception if grain timer is created outside grain context <a href="https://github.com/dotnet/orleans/pull/1858" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="16" sourceendlinenumber="16">#1858</a></li>
 </ul>
 </li>
-<li>Bug fixes:<ul>
-<li>Do not deactivate Stateless Workers upon grain directory partition shutdown <a href="https://github.com/dotnet/orleans/pull/1838">#1838</a></li>
-<li>interception works with Streams and grain extensions <a href="https://github.com/dotnet/orleans/pull/1874">#1874</a></li>
-<li>Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. <a href="https://github.com/dotnet/orleans/pull/1885">#1885</a></li>
-<li>Other minor bug fixes <a href="https://github.com/dotnet/orleans/pull/1884">#1884</a> <a href="https://github.com/dotnet/orleans/pull/1823">#1823</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="17" sourceendlinenumber="21">Bug fixes:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="18" sourceendlinenumber="21">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="18" sourceendlinenumber="18">Do not deactivate Stateless Workers upon grain directory partition shutdown <a href="https://github.com/dotnet/orleans/pull/1838" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="18" sourceendlinenumber="18">#1838</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="19" sourceendlinenumber="19">interception works with Streams and grain extensions <a href="https://github.com/dotnet/orleans/pull/1874" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="19" sourceendlinenumber="19">#1874</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="20" sourceendlinenumber="20">Memory Storage provider properly enforces etags for any state that has been added or removed, but does not enforce etags for newly added state. <a href="https://github.com/dotnet/orleans/pull/1885" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="20" sourceendlinenumber="20">#1885</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="21" sourceendlinenumber="21">Other minor bug fixes <a href="https://github.com/dotnet/orleans/pull/1884" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="21" sourceendlinenumber="21">#1884</a> <a href="https://github.com/dotnet/orleans/pull/1823" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="21" sourceendlinenumber="21">#1823</a></li>
 </ul>
 </li>
 </ul>
-<h2 id="v122httpsgithubcomdotnetorleansreleasestagv122-june-15th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.2">v1.2.2</a> June 15th 2016</h2>
-<h3 id="release-notes-1">Release notes</h3>
-<ul>
-<li>Bugfix: Remote stacktrace is once again being included in the exception that bubbles up to the caller (bug introduced in 1.2.0). <a href="https://github.com/dotnet/orleans/pull/1808">#1808</a></li>
-<li>Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. <a href="https://github.com/dotnet/orleans/pull/1804">#1804</a></li>
-<li>Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). <a href="https://github.com/dotnet/orleans/pull/1720">#1720</a></li>
-<li>Added GrainCreator abstraction to enable some unit testing scenarios. <a href="https://github.com/dotnet/orleans/pull/1802/">#1802</a> &amp; <a href="https://github.com/dotnet/orleans/pull/1792/">#1792</a></li>
-<li>ServiceBus package dependency upgraded to 3.2.2 <a href="https://github.com/dotnet/orleans/pull/1758/">#1758</a></li>
+<h2 id="v122httpsgithubcomdotnetorleansreleasestagv122-june-15th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="23" sourceendlinenumber="23"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.2" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="23" sourceendlinenumber="23">v1.2.2</a> June 15th 2016</h2>
+<h3 id="release-notes-1" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="25" sourceendlinenumber="25">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="27" sourceendlinenumber="31">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="27" sourceendlinenumber="27">Bugfix: Remote stacktrace is once again being included in the exception that bubbles up to the caller (bug introduced in 1.2.0). <a href="https://github.com/dotnet/orleans/pull/1808" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="27" sourceendlinenumber="27">#1808</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="28" sourceendlinenumber="28">Bugfix: Memory Storage provider no longer throws NullReferenceException after the grain state is cleared. <a href="https://github.com/dotnet/orleans/pull/1804" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="28" sourceendlinenumber="28">#1804</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="29" sourceendlinenumber="29">Microsoft.Orleans.OrleansCodeGenerator.Build package updated to not add the empty orleans.codegen.cs content file at install time, and instead create it at build time (should be more compatible with NuGet Transitive Restore). <a href="https://github.com/dotnet/orleans/pull/1720" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="29" sourceendlinenumber="29">#1720</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="30" sourceendlinenumber="30">Added GrainCreator abstraction to enable some unit testing scenarios. <a href="https://github.com/dotnet/orleans/pull/1802/" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="30" sourceendlinenumber="30">#1802</a> &amp; <a href="https://github.com/dotnet/orleans/pull/1792/" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="30" sourceendlinenumber="30">#1792</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="31" sourceendlinenumber="31">ServiceBus package dependency upgraded to 3.2.2 <a href="https://github.com/dotnet/orleans/pull/1758/" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="31" sourceendlinenumber="31">#1758</a></li>
 </ul>
-<h2 id="v121httpsgithubcomdotnetorleansreleasestagv121-may-19th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.1">v1.2.1</a> May 19th 2016</h2>
-<h3 id="release-notes-2">Release notes</h3>
-<ul>
-<li>SupressDuplicateDeads: Use SiloAddress.Endpoint instead of InstanceName. <a href="https://github.com/dotnet/orleans/pull/1728">1728</a></li>
-<li>Added support for complex generic grain parameters. <a href="https://github.com/dotnet/orleans/pull/1732">#1732</a></li>
-<li>Fix race condition bugs in LocalReminderService. <a href="https://github.com/dotnet/orleans/pull/1757">#1757</a></li>
+<h2 id="v121httpsgithubcomdotnetorleansreleasestagv121-may-19th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="33" sourceendlinenumber="33"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.1" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="33" sourceendlinenumber="33">v1.2.1</a> May 19th 2016</h2>
+<h3 id="release-notes-2" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="35" sourceendlinenumber="35">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="37" sourceendlinenumber="39">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="37" sourceendlinenumber="37">SupressDuplicateDeads: Use SiloAddress.Endpoint instead of InstanceName. <a href="https://github.com/dotnet/orleans/pull/1728" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="37" sourceendlinenumber="37">1728</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="38" sourceendlinenumber="38">Added support for complex generic grain parameters. <a href="https://github.com/dotnet/orleans/pull/1732" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="38" sourceendlinenumber="38">#1732</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="39" sourceendlinenumber="39">Fix race condition bugs in LocalReminderService. <a href="https://github.com/dotnet/orleans/pull/1757" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="39" sourceendlinenumber="39">#1757</a></li>
 </ul>
-<h2 id="v120httpsgithubcomdotnetorleansreleasestagv120-may-4th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0">v1.2.0</a> May 4th 2016</h2>
-<h3 id="release-notes-3">Release notes</h3>
-<p>In addition to all the changes in 1.2.0-beta.</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1704">Azure storage 7.0 compatibility</a>.</li>
-<li>Updated to latest version of Consul and ZooKeeper NuGets.</li>
-<li><a href="https://github.com/dotnet/orleans/pull/1711">Added ability to throw exceptions that occur when starting silo</a>.</li>
+<h2 id="v120httpsgithubcomdotnetorleansreleasestagv120-may-4th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="41" sourceendlinenumber="41"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="41" sourceendlinenumber="41">v1.2.0</a> May 4th 2016</h2>
+<h3 id="release-notes-3" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="43" sourceendlinenumber="43">Release notes</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="45" sourceendlinenumber="45">In addition to all the changes in 1.2.0-beta.</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="47" sourceendlinenumber="49">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="47" sourceendlinenumber="47"><a href="https://github.com/dotnet/orleans/pull/1704" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="47" sourceendlinenumber="47">Azure storage 7.0 compatibility</a>.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="48" sourceendlinenumber="48">Updated to latest version of Consul and ZooKeeper NuGets.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="49" sourceendlinenumber="49"><a href="https://github.com/dotnet/orleans/pull/1711" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="49" sourceendlinenumber="49">Added ability to throw exceptions that occur when starting silo</a>.</li>
 </ul>
-<h2 id="v120-betahttpsgithubcomdotnetorleansreleasestagv120-beta-april-18th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0-beta">v1.2.0-beta</a> April 18th 2016</h2>
-<h3 id="release-notes-4">Release notes</h3>
-<ul>
-<li><p>Major improvements</p>
-<ul>
-<li>Added an EventHub stream provider based on the same code that is used in Halo 5.</li>
-<li><a href="https://github.com/dotnet/orleans/pull/1586">Increased throughput by between 5% and 26% depending on the scenario.</a></li>
-<li>Migrated all but 30 functional tests to GitHub.</li>
-<li>Grain state doesn&#39;t have to extend <code>GrainState</code> anymore (marked as <code>[Obsolete]</code>) and can be a simple POCO class.</li>
-<li><a href="https://github.com/dotnet/orleans/pull/963">Added support for per-grain-class</a> and <a href="https://github.com/dotnet/orleans/pull/965">global server-side interceptors.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1267">Added support for using Consul 0.6.0 as a Membership Provider.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1479">Support C# 6.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1455">Switched to xUnit for testing as a step towards CoreCLR compatibility.</a></li>
-</ul>
-</li>
-<li><p>Codegen &amp; serialization</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1137">Added support for generic type constraints in codegen.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1047">Added support for Newtonsoft.Json as a fallback serializer.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1319">Added generation of serializers for type arguments of <code>IAsyncObserver&lt;T&gt;</code>.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1369">Improved support for F# interfaces.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1501">Consolidated two compile time codegen NuGet packages into one <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>. <code>Microsoft.Orleans.Templates.Interfaces</code> and <code>Microsoft.Orleans.Templates.Grains</code> are now meta-packages for backward compatibility only.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1302">Moved to Newtonsoft.Json 7.0.1.</a></li>
+<h2 id="v120-betahttpsgithubcomdotnetorleansreleasestagv120-beta-april-18th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="51" sourceendlinenumber="51"><a href="https://github.com/dotnet/orleans/releases/tag/v1.2.0-beta" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="51" sourceendlinenumber="51">v1.2.0-beta</a> April 18th 2016</h2>
+<h3 id="release-notes-4" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="53" sourceendlinenumber="53">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="55" sourceendlinenumber="88">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="55" sourceendlinenumber="63"><p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="55" sourceendlinenumber="55">Major improvements</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="56" sourceendlinenumber="63">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="56" sourceendlinenumber="56">Added an EventHub stream provider based on the same code that is used in Halo 5.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="57" sourceendlinenumber="57"><a href="https://github.com/dotnet/orleans/pull/1586" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="57" sourceendlinenumber="57">Increased throughput by between 5% and 26% depending on the scenario.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="58" sourceendlinenumber="58">Migrated all but 30 functional tests to GitHub.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="59" sourceendlinenumber="59">Grain state doesn&#39;t have to extend <code>GrainState</code> anymore (marked as <code>[Obsolete]</code>) and can be a simple POCO class.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="60" sourceendlinenumber="60"><a href="https://github.com/dotnet/orleans/pull/963" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="60" sourceendlinenumber="60">Added support for per-grain-class</a> and <a href="https://github.com/dotnet/orleans/pull/965" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="60" sourceendlinenumber="60">global server-side interceptors.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="61" sourceendlinenumber="61"><a href="https://github.com/dotnet/orleans/pull/1267" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="61" sourceendlinenumber="61">Added support for using Consul 0.6.0 as a Membership Provider.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="62" sourceendlinenumber="62"><a href="https://github.com/dotnet/orleans/pull/1479" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="62" sourceendlinenumber="62">Support C# 6.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="63" sourceendlinenumber="63"><a href="https://github.com/dotnet/orleans/pull/1455" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="63" sourceendlinenumber="63">Switched to xUnit for testing as a step towards CoreCLR compatibility.</a></li>
 </ul>
 </li>
-<li><p>Programmatic config</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1411">Added helper methods for programmatic test configuration.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1622">Added helper methods to <code>AzureClient</code> and <code>AzureSilo</code> for easier programmatic config.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1623">Added extension methods for using programmatic config.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1629">Remove config filed from Server and Client NuGet packages.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="65" sourceendlinenumber="71"><p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="65" sourceendlinenumber="65">Codegen &amp; serialization</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="66" sourceendlinenumber="71">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="66" sourceendlinenumber="66"><a href="https://github.com/dotnet/orleans/pull/1137" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="66" sourceendlinenumber="66">Added support for generic type constraints in codegen.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="67" sourceendlinenumber="67"><a href="https://github.com/dotnet/orleans/pull/1047" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="67" sourceendlinenumber="67">Added support for Newtonsoft.Json as a fallback serializer.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="68" sourceendlinenumber="68"><a href="https://github.com/dotnet/orleans/pull/1319" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="68" sourceendlinenumber="68">Added generation of serializers for type arguments of <code>IAsyncObserver&lt;T&gt;</code>.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="69" sourceendlinenumber="69"><a href="https://github.com/dotnet/orleans/pull/1369" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="69" sourceendlinenumber="69">Improved support for F# interfaces.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="70" sourceendlinenumber="70"><a href="https://github.com/dotnet/orleans/pull/1501" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="70" sourceendlinenumber="70">Consolidated two compile time codegen NuGet packages into one <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code>. <code>Microsoft.Orleans.Templates.Interfaces</code> and <code>Microsoft.Orleans.Templates.Grains</code> are now meta-packages for backward compatibility only.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="71" sourceendlinenumber="71"><a href="https://github.com/dotnet/orleans/pull/1302" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="71" sourceendlinenumber="71">Moved to Newtonsoft.Json 7.0.1.</a></li>
 </ul>
 </li>
-<li><p>Other</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1060">Improved support for SQL membership, reminders, and grain storage.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1356">Improved propagation of exception, so that the caller gets the originally thrown exception instead of an <code>AggregateException</code> wrapping it.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1376">Added a storage provider for Azure Blob (graduated from <code>OrleansContrib</code>).</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1520">Start Reminder Service initial load in the background.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1429">Added automatic cleanup of dead client stream producers and consumers</a> and <a href="https://github.com/dotnet/orleans/pull/1669">this.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1675">Added GetPrimaryKeyString extension method for <code>IAddressable</code>.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1674">Added support for additional application directories.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="73" sourceendlinenumber="77"><p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="73" sourceendlinenumber="73">Programmatic config</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="74" sourceendlinenumber="77">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="74" sourceendlinenumber="74"><a href="https://github.com/dotnet/orleans/pull/1411" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="74" sourceendlinenumber="74">Added helper methods for programmatic test configuration.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="75" sourceendlinenumber="75"><a href="https://github.com/dotnet/orleans/pull/1622" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="75" sourceendlinenumber="75">Added helper methods to <code>AzureClient</code> and <code>AzureSilo</code> for easier programmatic config.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="76" sourceendlinenumber="76"><a href="https://github.com/dotnet/orleans/pull/1623" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="76" sourceendlinenumber="76">Added extension methods for using programmatic config.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="77" sourceendlinenumber="77"><a href="https://github.com/dotnet/orleans/pull/1629" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="77" sourceendlinenumber="77">Remove config filed from Server and Client NuGet packages.</a></li>
 </ul>
 </li>
-<li><p>Many other fixes and improvements.</p>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="79" sourceendlinenumber="86"><p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="79" sourceendlinenumber="79">Other</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="80" sourceendlinenumber="86">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="80" sourceendlinenumber="80"><a href="https://github.com/dotnet/orleans/pull/1060" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="80" sourceendlinenumber="80">Improved support for SQL membership, reminders, and grain storage.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="81" sourceendlinenumber="81"><a href="https://github.com/dotnet/orleans/pull/1356" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="81" sourceendlinenumber="81">Improved propagation of exception, so that the caller gets the originally thrown exception instead of an <code>AggregateException</code> wrapping it.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="82" sourceendlinenumber="82"><a href="https://github.com/dotnet/orleans/pull/1376" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="82" sourceendlinenumber="82">Added a storage provider for Azure Blob (graduated from <code>OrleansContrib</code>).</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="83" sourceendlinenumber="83"><a href="https://github.com/dotnet/orleans/pull/1520" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="83" sourceendlinenumber="83">Start Reminder Service initial load in the background.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="84" sourceendlinenumber="84"><a href="https://github.com/dotnet/orleans/pull/1429" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="84" sourceendlinenumber="84">Added automatic cleanup of dead client stream producers and consumers</a> and <a href="https://github.com/dotnet/orleans/pull/1669" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="84" sourceendlinenumber="84">this.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="85" sourceendlinenumber="85"><a href="https://github.com/dotnet/orleans/pull/1675" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="85" sourceendlinenumber="85">Added GetPrimaryKeyString extension method for <code>IAddressable</code>.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="86" sourceendlinenumber="86"><a href="https://github.com/dotnet/orleans/pull/1674" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="86" sourceendlinenumber="86">Added support for additional application directories.</a></li>
+</ul>
+</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="88" sourceendlinenumber="88"><p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="88" sourceendlinenumber="88">Many other fixes and improvements.</p>
 </li>
 </ul>
-<h2 id="v113httpsgithubcomdotnetorleansreleasestagv113-march-9th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.3">v1.1.3</a> March 9th 2016</h2>
-<h3 id="release-notes-5">Release notes</h3>
-<p>A patch release with a set of bug fixes.</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1345">Initialize SerializationManager before CodeGeneratorManager</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1348">Avoid unnecessary table scan when finding reminder entries to delete</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1351">Stop a stuck BlockingCollection.Take operation that caused thread leak on the client.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1381">Fixed Azure table property being not sanitized.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1384">Fixed String.Format arguments in DetailedGrainReport.ToString()</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1405">Increment and DecrementMetric methods in Orleans.TraceLogger had same body</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1414">Update the custom serializer warning message to adequately reflect the OSS status of Orleans</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1503">Fix retry timeout when running under debugger</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1478">Networking bug fix: Reset receive buffer on error.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1518">Fixed performance regression in networking</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1520">Start ReminderService initial load in the background</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1534">Safe load of types from failing assemblies in TypeUtils.GetTypes</a></li>
+<h2 id="v113httpsgithubcomdotnetorleansreleasestagv113-march-9th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="90" sourceendlinenumber="90"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.3" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="90" sourceendlinenumber="90">v1.1.3</a> March 9th 2016</h2>
+<h3 id="release-notes-5" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="92" sourceendlinenumber="92">Release notes</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="94" sourceendlinenumber="94">A patch release with a set of bug fixes.</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="96" sourceendlinenumber="107">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="96" sourceendlinenumber="96"><a href="https://github.com/dotnet/orleans/pull/1345" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="96" sourceendlinenumber="96">Initialize SerializationManager before CodeGeneratorManager</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="97" sourceendlinenumber="97"><a href="https://github.com/dotnet/orleans/pull/1348" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="97" sourceendlinenumber="97">Avoid unnecessary table scan when finding reminder entries to delete</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="98" sourceendlinenumber="98"><a href="https://github.com/dotnet/orleans/pull/1351" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="98" sourceendlinenumber="98">Stop a stuck BlockingCollection.Take operation that caused thread leak on the client.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="99" sourceendlinenumber="99"><a href="https://github.com/dotnet/orleans/pull/1381" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="99" sourceendlinenumber="99">Fixed Azure table property being not sanitized.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="100" sourceendlinenumber="100"><a href="https://github.com/dotnet/orleans/pull/1384" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="100" sourceendlinenumber="100">Fixed String.Format arguments in DetailedGrainReport.ToString()</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="101" sourceendlinenumber="101"><a href="https://github.com/dotnet/orleans/pull/1405" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="101" sourceendlinenumber="101">Increment and DecrementMetric methods in Orleans.TraceLogger had same body</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="102" sourceendlinenumber="102"><a href="https://github.com/dotnet/orleans/pull/1414" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="102" sourceendlinenumber="102">Update the custom serializer warning message to adequately reflect the OSS status of Orleans</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="103" sourceendlinenumber="103"><a href="https://github.com/dotnet/orleans/pull/1503" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="103" sourceendlinenumber="103">Fix retry timeout when running under debugger</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="104" sourceendlinenumber="104"><a href="https://github.com/dotnet/orleans/pull/1478" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="104" sourceendlinenumber="104">Networking bug fix: Reset receive buffer on error.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="105" sourceendlinenumber="105"><a href="https://github.com/dotnet/orleans/pull/1518" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="105" sourceendlinenumber="105">Fixed performance regression in networking</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="106" sourceendlinenumber="106"><a href="https://github.com/dotnet/orleans/pull/1520" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="106" sourceendlinenumber="106">Start ReminderService initial load in the background</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="107" sourceendlinenumber="107"><a href="https://github.com/dotnet/orleans/pull/1534" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="107" sourceendlinenumber="107">Safe load of types from failing assemblies in TypeUtils.GetTypes</a></li>
 </ul>
-<h2 id="community-virtual-meetup-9">Community Virtual Meetup #9</h2>
-<p><a href="https://github.com/nehmebilal">Nehme Bilal</a> and <a href="https://github.com/ReubenBond">Reuben Bond</a> <a href="https://youtu.be/w__D7gnqeZ0">talk about deploying Orleans</a> with <a href="https://github.com/Microsoft/Yams">YAMS</a> and <a href="https://azure.microsoft.com/en-gb/documentation/articles/service-fabric-overview/">Service Fabric</a>
+<h2 id="community-virtual-meetup-9" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="110" sourceendlinenumber="110">Community Virtual Meetup #9</h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="112"><a href="https://github.com/nehmebilal" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="111">Nehme Bilal</a> and <a href="https://github.com/ReubenBond" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="111">Reuben Bond</a> <a href="https://youtu.be/w__D7gnqeZ0" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="111">talk about deploying Orleans</a> with <a href="https://github.com/Microsoft/Yams" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="111">YAMS</a> and <a href="https://azure.microsoft.com/en-gb/documentation/articles/service-fabric-overview/" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="111" sourceendlinenumber="111">Service Fabric</a>
 Fabruary 26st 2016</p>
-<h2 id="community-virtual-meetup-85">Community Virtual Meetup #8.5</h2>
-<p><a href="https://youtu.be/F1Yoe88HEvg">Networking discussion</a> hosted by <a href="https://github.com/jason-bragg">Jason Bragg</a>
+<h2 id="community-virtual-meetup-85" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="114" sourceendlinenumber="114">Community Virtual Meetup #8.5</h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="115" sourceendlinenumber="116"><a href="https://youtu.be/F1Yoe88HEvg" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="115" sourceendlinenumber="115">Networking discussion</a> hosted by <a href="https://github.com/jason-bragg" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="115" sourceendlinenumber="115">Jason Bragg</a>
 February 11th 2016</p>
-<h2 id="community-virtual-meetup-8">Community Virtual Meetup #8</h2>
-<p><a href="https://www.youtube.com/watch?v=4BiCyhvSOs4">Orleans core team present the roadmap</a>
+<h2 id="community-virtual-meetup-8" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="118" sourceendlinenumber="118">Community Virtual Meetup #8</h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="119" sourceendlinenumber="120"><a href="https://www.youtube.com/watch?v=4BiCyhvSOs4" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="119" sourceendlinenumber="119">Orleans core team present the roadmap</a>
 January 21st 2016</p>
-<h2 id="v112httpsgithubcomdotnetorleansreleasestagv112-january-20th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.2">v1.1.2</a> January 20th 2016</h2>
-<h3 id="release-notes-6">Release notes</h3>
-<p>A patch release with bug fixes, primarily for codegen and serializer corner cases.</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1137">Add support for generic type constraints in codegen</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1178">Correctly specify struct type constraint in generated code</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1182">fix issue:GetReminder throws exception when reminder don&#39;t exists #1167</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1240">Cleanup/fix usage of IsNested vs. IsNestedXXX &amp; serialize nested types.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1241">Correctly serialize [Obsolete] fields and properties.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1249">Nested serialization of Guid with Json serializer.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1261">Fix a race in StreamConsumer.SubscribeAsync.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1280">fix deepcopy issue #1278</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1284">Check declaring types when performing accessibility checks for code gen.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1285">Allow to configure PubSub for SMS.</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1270">Make Namespace access modifier public in ImplicitStreamSubscriptionAttribute. Add Provider property.</a></li>
+<h2 id="v112httpsgithubcomdotnetorleansreleasestagv112-january-20th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="123" sourceendlinenumber="123"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.2" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="123" sourceendlinenumber="123">v1.1.2</a> January 20th 2016</h2>
+<h3 id="release-notes-6" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="125" sourceendlinenumber="125">Release notes</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="127" sourceendlinenumber="127">A patch release with bug fixes, primarily for codegen and serializer corner cases.</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="129" sourceendlinenumber="139">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="129" sourceendlinenumber="129"><a href="https://github.com/dotnet/orleans/pull/1137" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="129" sourceendlinenumber="129">Add support for generic type constraints in codegen</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="130" sourceendlinenumber="130"><a href="https://github.com/dotnet/orleans/pull/1178" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="130" sourceendlinenumber="130">Correctly specify struct type constraint in generated code</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="131" sourceendlinenumber="131"><a href="https://github.com/dotnet/orleans/pull/1182" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="131" sourceendlinenumber="131">fix issue:GetReminder throws exception when reminder don&#39;t exists #1167</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="132" sourceendlinenumber="132"><a href="https://github.com/dotnet/orleans/pull/1240" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="132" sourceendlinenumber="132">Cleanup/fix usage of IsNested vs. IsNestedXXX &amp; serialize nested types.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="133" sourceendlinenumber="133"><a href="https://github.com/dotnet/orleans/pull/1241" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="133" sourceendlinenumber="133">Correctly serialize [Obsolete] fields and properties.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="134" sourceendlinenumber="134"><a href="https://github.com/dotnet/orleans/pull/1249" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="134" sourceendlinenumber="134">Nested serialization of Guid with Json serializer.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="135" sourceendlinenumber="135"><a href="https://github.com/dotnet/orleans/pull/1261" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="135" sourceendlinenumber="135">Fix a race in StreamConsumer.SubscribeAsync.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="136" sourceendlinenumber="136"><a href="https://github.com/dotnet/orleans/pull/1280" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="136" sourceendlinenumber="136">fix deepcopy issue #1278</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="137" sourceendlinenumber="137"><a href="https://github.com/dotnet/orleans/pull/1284" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="137" sourceendlinenumber="137">Check declaring types when performing accessibility checks for code gen.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="138" sourceendlinenumber="138"><a href="https://github.com/dotnet/orleans/pull/1285" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="138" sourceendlinenumber="138">Allow to configure PubSub for SMS.</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="139" sourceendlinenumber="139"><a href="https://github.com/dotnet/orleans/pull/1270" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="139" sourceendlinenumber="139">Make Namespace access modifier public in ImplicitStreamSubscriptionAttribute. Add Provider property.</a></li>
 </ul>
-<h2 id="v111httpsgithubcomdotnetorleansreleasestagv111-january-11th-2016"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.1">v1.1.1</a> January 11th 2016</h2>
-<h3 id="release-notes-7">Release notes</h3>
-<p>A patch release for two bug fixes</p>
-<ul>
-<li><a href="https://github.com/dotnet/orleans/pull/1134">Missing argument to trace format in TraceLogger.Initialize</a></li>
-<li><a href="https://github.com/dotnet/orleans/pull/1195">Make ConsoleText resilient to ObjectDisposedExceptions</a></li>
+<h2 id="v111httpsgithubcomdotnetorleansreleasestagv111-january-11th-2016" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="142" sourceendlinenumber="142"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.1" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="142" sourceendlinenumber="142">v1.1.1</a> January 11th 2016</h2>
+<h3 id="release-notes-7" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="144" sourceendlinenumber="144">Release notes</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="146" sourceendlinenumber="146">A patch release for two bug fixes</p>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="148" sourceendlinenumber="149">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="148" sourceendlinenumber="148"><a href="https://github.com/dotnet/orleans/pull/1134" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="148" sourceendlinenumber="148">Missing argument to trace format in TraceLogger.Initialize</a></li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="149" sourceendlinenumber="149"><a href="https://github.com/dotnet/orleans/pull/1195" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="149" sourceendlinenumber="149">Make ConsoleText resilient to ObjectDisposedExceptions</a></li>
 </ul>
-<h2 id="community-virtual-meetup-7httpswwwyoutubecomwatchvfkl-ps8q9ac"><a href="https://www.youtube.com/watch?v=FKL-PS8Q9ac">Community Virtual Meetup #7</a></h2>
-<p>Christmas Special - <a href="https://github.com/yevhen">Yevhen Bobrov</a> on <a href="https://github.com/yevhen/Orleankka">Orleankka</a>
+<h2 id="community-virtual-meetup-7httpswwwyoutubecomwatchvfkl-ps8q9ac" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="151" sourceendlinenumber="151"><a href="https://www.youtube.com/watch?v=FKL-PS8Q9ac" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="151" sourceendlinenumber="151">Community Virtual Meetup #7</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="152" sourceendlinenumber="153">Christmas Special - <a href="https://github.com/yevhen" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="152" sourceendlinenumber="152">Yevhen Bobrov</a> on <a href="https://github.com/yevhen/Orleankka" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="152" sourceendlinenumber="152">Orleankka</a>
 December 17th 2015</p>
-<h2 id="v110httpsgithubcomdotnetorleansreleasestagv110-december-14nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.0">v1.1.0</a> December 14nd 2015</h2>
-<h3 id="release-notes-8">Release notes</h3>
-<ul>
-<li>New Roslyn-based codegen, compile time and run time</li>
-<li>Public APIs:<ul>
-<li>Core API for Event Sourcing</li>
-<li>Most methods of <code>Grain</code> class are now virtual</li>
-<li>ASP.NET vNext style Dependency Injection for grains</li>
-<li>New telemetry API</li>
+<h2 id="v110httpsgithubcomdotnetorleansreleasestagv110-december-14nd-2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="155" sourceendlinenumber="155"><a href="https://github.com/dotnet/orleans/releases/tag/v1.1.0" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="155" sourceendlinenumber="155">v1.1.0</a> December 14nd 2015</h2>
+<h3 id="release-notes-8" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="157" sourceendlinenumber="157">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="159" sourceendlinenumber="181">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="159" sourceendlinenumber="159">New Roslyn-based codegen, compile time and run time</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="160" sourceendlinenumber="164">Public APIs:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="161" sourceendlinenumber="164">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="161" sourceendlinenumber="161">Core API for Event Sourcing</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="162" sourceendlinenumber="162">Most methods of <code>Grain</code> class are now virtual</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="163" sourceendlinenumber="163">ASP.NET vNext style Dependency Injection for grains</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="164" sourceendlinenumber="164">New telemetry API</li>
 </ul>
 </li>
-<li>Portability:<ul>
-<li>Support for C# 6.0</li>
-<li>Improved support for F# and VB</li>
-<li>Code adjustments towards CoreCLR compliance</li>
-<li>Orleans assemblies are not strong-named anymore</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="165" sourceendlinenumber="169">Portability:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="166" sourceendlinenumber="169">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="166" sourceendlinenumber="166">Support for C# 6.0</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="167" sourceendlinenumber="167">Improved support for F# and VB</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="168" sourceendlinenumber="168">Code adjustments towards CoreCLR compliance</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="169" sourceendlinenumber="169">Orleans assemblies are not strong-named anymore</li>
 </ul>
 </li>
-<li>SQL:<ul>
-<li><code>OrleansSQLUtils.dll</code> for SQL-related functionality</li>
-<li>MySQL is now supported as a cluster membership store</li>
-<li>Storage provider for SQL Server</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="170" sourceendlinenumber="173">SQL:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="171" sourceendlinenumber="173">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="171" sourceendlinenumber="171"><code>OrleansSQLUtils.dll</code> for SQL-related functionality</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="172" sourceendlinenumber="172">MySQL is now supported as a cluster membership store</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="173" sourceendlinenumber="173">Storage provider for SQL Server</li>
 </ul>
 </li>
-<li>Serialization:<ul>
-<li>Support for pluggable external serializers</li>
-<li>Bond serializer plugin</li>
-<li>Support for Json.Net as a fallback serializer</li>
-<li>Added <code>[KnownType]</code> attribute for generating serializers for arbitrary types</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="174" sourceendlinenumber="178">Serialization:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="175" sourceendlinenumber="178">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="175" sourceendlinenumber="175">Support for pluggable external serializers</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="176" sourceendlinenumber="176">Bond serializer plugin</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="177" sourceendlinenumber="177">Support for Json.Net as a fallback serializer</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="178" sourceendlinenumber="178">Added <code>[KnownType]</code> attribute for generating serializers for arbitrary types</li>
 </ul>
 </li>
-<li>Upgraded to Azure Storage 5.0</li>
-<li>Upgraded to .NET 4.5.1</li>
-<li>Other fixes and improvements</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="179" sourceendlinenumber="179">Upgraded to Azure Storage 5.0</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="180" sourceendlinenumber="180">Upgraded to .NET 4.5.1</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="181" sourceendlinenumber="181">Other fixes and improvements</li>
 </ul>
-<h2 id="community-virtual-meetup-6">Community Virtual Meetup #6</h2>
-<p><a href="https://www.youtube.com/watch?v=fOl8ophHtug">MSR PhDs on Geo Distributed Orleansp</a>
+<h2 id="community-virtual-meetup-6" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="183" sourceendlinenumber="183">Community Virtual Meetup #6</h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="184" sourceendlinenumber="185"><a href="https://www.youtube.com/watch?v=fOl8ophHtug" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="184" sourceendlinenumber="184">MSR PhDs on Geo Distributed Orleansp</a>
 October 23rd 2015</p>
-<h2 id="v1010httpsgithubcomdotnetorleansreleasestagv1010-september-22nd-2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.10">v1.0.10</a> September 22nd 2015</h2>
-<h3 id="release-notes-9">Release notes</h3>
-<h4 id="general">General:</h4>
-<ul>
-<li>No SDK msi anymore, only NuGets from now on</li>
-<li>Removed support for grain state interfaces and code generation of state classes</li>
-<li>Removed code generated  MyGrainFactory.GetGrain()  factory methods</li>
-<li>StorageProvider  attribute is now optional</li>
-<li>Membership and reminder table implementations were made pluggable</li>
-<li>Improvements to  ObserverSubscriptionManager  </li>
-<li>Strong guarantee for specified max number of  StatelessWorker  activations per silo</li>
-<li>General purpose interface for sending run time control commands to providers</li>
-<li>Named event to trigger silo shutdown</li>
+<h2 id="v1010httpsgithubcomdotnetorleansreleasestagv1010-september-22nd-2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="187" sourceendlinenumber="187"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.10" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="187" sourceendlinenumber="187">v1.0.10</a> September 22nd 2015</h2>
+<h3 id="release-notes-9" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="189" sourceendlinenumber="189">Release notes</h3>
+<h4 id="general" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="191" sourceendlinenumber="191">General:</h4>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="192" sourceendlinenumber="200">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="192" sourceendlinenumber="192">No SDK msi anymore, only NuGets from now on</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="193" sourceendlinenumber="193">Removed support for grain state interfaces and code generation of state classes</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="194" sourceendlinenumber="194">Removed code generated  MyGrainFactory.GetGrain()  factory methods</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="195" sourceendlinenumber="195">StorageProvider  attribute is now optional</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="196" sourceendlinenumber="196">Membership and reminder table implementations were made pluggable</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="197" sourceendlinenumber="197">Improvements to  ObserverSubscriptionManager  </li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="198" sourceendlinenumber="198">Strong guarantee for specified max number of  StatelessWorker  activations per silo</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="199" sourceendlinenumber="199">General purpose interface for sending run time control commands to providers</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="200" sourceendlinenumber="200">Named event to trigger silo shutdown</li>
 </ul>
-<h4 id="streaming">Streaming:</h4>
-<ul>
-<li>Support for multiple  ImplicitSubscription  attributes for streams</li>
-<li>Support for rewinding of implicit stream subscriptions</li>
-<li>Propagate request context via persistent streams</li>
-<li>More options for stream Queue Balancers</li>
-<li>Delayed repartitioning of stream queues</li>
-<li>Improved cleanup of client stream producers/consumers when client shuts down</li>
-<li>Config option and management grain API for controlling start/stop state of stream pulling agents</li>
-<li>Azure Queue stream provider fixed to guarantees at least once delivery</li>
-<li>Numerous bug fixes and improvements, mostly to streaming</li>
+<h4 id="streaming" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="202" sourceendlinenumber="202">Streaming:</h4>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="203" sourceendlinenumber="211">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="203" sourceendlinenumber="203">Support for multiple  ImplicitSubscription  attributes for streams</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="204" sourceendlinenumber="204">Support for rewinding of implicit stream subscriptions</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="205" sourceendlinenumber="205">Propagate request context via persistent streams</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="206" sourceendlinenumber="206">More options for stream Queue Balancers</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="207" sourceendlinenumber="207">Delayed repartitioning of stream queues</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="208" sourceendlinenumber="208">Improved cleanup of client stream producers/consumers when client shuts down</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="209" sourceendlinenumber="209">Config option and management grain API for controlling start/stop state of stream pulling agents</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="210" sourceendlinenumber="210">Azure Queue stream provider fixed to guarantees at least once delivery</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="211" sourceendlinenumber="211">Numerous bug fixes and improvements, mostly to streaming</li>
 </ul>
-<h2 id="v109httpsgithubcomdotnetorleansreleasestagv109-july-15th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.9">v1.0.9</a> July 15th  2015</h2>
-<h3 id="this-release-includes-several-significant-api-changes-that-require-adjustments-in-existing-code-created-with-v108-or-earlier-versions-of-orleans">This release includes several significant API changes that require adjustments in existing code created with v1.0.8 or earlier versions of Orleans</h3>
-<p><strong>1. <code>GrainFactory</code> is not a static class anymore, so that the default implementation can be substituted for testing and other reasons.</strong></p>
-<p>Within grain code one can still use code like <code>GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code> because <code>Grain</code> class now has a <code>GrainFactory</code> property, which makes the above code translate to <code>base.GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code>. So no change is necessary for such code.</p>
-<p>Within the client (frontend) context the default <code>GrainFactory</code> is available as a property on the <code>GrainClient</code> class. So, the code that used to be <code>GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code> needs to be changed to <code>GrainClient.GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code></p>
-<p><strong>2. <code>Read/Write/ClearStateAsync</code> methods methods that on grain state were moved from state objects to <code>Grain</code> class</strong></p>
-<p>Wherever you have grain code like <code>this.State.WriteStateAsync()</code>, it needs to change to <code>this.WriteStateAsync()</code>. Similar adjustments need to be made to usage of <code>ReadeStateAsync()</code> and <code>CleareStateAsync()</code>.</p>
-<p><strong>3. Binaries have been removed from the Orleans SDK</strong></p>
-<p>If your projects still reference those binaries directly from the SDK folder, you need to switch to using <a href="Installation/NuGets.html">NuGet packages</a> instead. If you are already consuming Orleans via NuGet, you are good.</p>
-<p><strong>4. Local Silo test environment has been removed from the Orleans SDK</strong></p>
-<p>If you were using the Local Silo environment from the SDK folder for testing your grains, you need to add a silo host project to your solution using the &quot;Orleans Dev/Test Host&quot; Visual Studio project template. Before you do that, make sure you install the <a href="https://github.com/dotnet/orleans/releases/download/v1.0.9/orleans_setup.msi">v1.0.9 version of the SDK</a>. Refer to <a href="https://github.com/dotnet/orleans/tree/master/Samples">samples</a> for examples of how that is done.</p>
-<h3 id="release-notes-10">Release notes</h3>
-<ul>
-<li>Graceful shutdown of a silo with deactivation of all grains hosted in it.</li>
-<li>Support for Dependency Injection and better testability of grains:<ul>
-<li>Direct instantiation of grains with passing <code>IGrainIdentity</code> and <code>IGrainRuntime</code> to constructor.</li>
-<li><code>IGrainRuntime</code> is a mockable interface that includes a set of system service interfaces, also mockable.</li>
-<li><code>GrainFactory</code> is a non-static class that is accessed via <code>base.GrainFactory</code>  from within a grain and via  <code>GrainClient.GrainFactory</code>  on the client.</li>
+<h2 id="v109httpsgithubcomdotnetorleansreleasestagv109-july-15th--2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="214" sourceendlinenumber="214"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.9" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="214" sourceendlinenumber="214">v1.0.9</a> July 15th  2015</h2>
+<h3 id="this-release-includes-several-significant-api-changes-that-require-adjustments-in-existing-code-created-with-v108-or-earlier-versions-of-orleans" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="216" sourceendlinenumber="216">This release includes several significant API changes that require adjustments in existing code created with v1.0.8 or earlier versions of Orleans</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="218" sourceendlinenumber="218"><strong>1. <code>GrainFactory</code> is not a static class anymore, so that the default implementation can be substituted for testing and other reasons.</strong></p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="220" sourceendlinenumber="220">Within grain code one can still use code like <code>GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code> because <code>Grain</code> class now has a <code>GrainFactory</code> property, which makes the above code translate to <code>base.GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code>. So no change is necessary for such code.</p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="222" sourceendlinenumber="222">Within the client (frontend) context the default <code>GrainFactory</code> is available as a property on the <code>GrainClient</code> class. So, the code that used to be <code>GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code> needs to be changed to <code>GrainClient.GrainFactory.GetGrain&lt;IFoo&gt;(grainKey)</code></p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="224" sourceendlinenumber="224"><strong>2. <code>Read/Write/ClearStateAsync</code> methods methods that on grain state were moved from state objects to <code>Grain</code> class</strong></p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="226" sourceendlinenumber="226">Wherever you have grain code like <code>this.State.WriteStateAsync()</code>, it needs to change to <code>this.WriteStateAsync()</code>. Similar adjustments need to be made to usage of <code>ReadeStateAsync()</code> and <code>CleareStateAsync()</code>.</p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="228" sourceendlinenumber="228"><strong>3. Binaries have been removed from the Orleans SDK</strong></p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="230" sourceendlinenumber="230">If your projects still reference those binaries directly from the SDK folder, you need to switch to using <a href="Installation/NuGets.html" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="230" sourceendlinenumber="230">NuGet packages</a> instead. If you are already consuming Orleans via NuGet, you are good.</p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="232" sourceendlinenumber="232"><strong>4. Local Silo test environment has been removed from the Orleans SDK</strong></p>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="234" sourceendlinenumber="234">If you were using the Local Silo environment from the SDK folder for testing your grains, you need to add a silo host project to your solution using the &quot;Orleans Dev/Test Host&quot; Visual Studio project template. Before you do that, make sure you install the <a href="https://github.com/dotnet/orleans/releases/download/v1.0.9/orleans_setup.msi" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="234" sourceendlinenumber="234">v1.0.9 version of the SDK</a>. Refer to <a href="https://github.com/dotnet/orleans/tree/master/Samples" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="234" sourceendlinenumber="234">samples</a> for examples of how that is done.</p>
+<h3 id="release-notes-10" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="236" sourceendlinenumber="236">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="238" sourceendlinenumber="254">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="238" sourceendlinenumber="238">Graceful shutdown of a silo with deactivation of all grains hosted in it.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="239" sourceendlinenumber="242">Support for Dependency Injection and better testability of grains:<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="240" sourceendlinenumber="242">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="240" sourceendlinenumber="240">Direct instantiation of grains with passing <code>IGrainIdentity</code> and <code>IGrainRuntime</code> to constructor.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="241" sourceendlinenumber="241"><code>IGrainRuntime</code> is a mockable interface that includes a set of system service interfaces, also mockable.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="242" sourceendlinenumber="242"><code>GrainFactory</code> is a non-static class that is accessed via <code>base.GrainFactory</code>  from within a grain and via  <code>GrainClient.GrainFactory</code>  on the client.</li>
 </ul>
 </li>
-<li>Deprecated generated per-interface <code>GetGrain()</code> static factory methods.</li>
-<li>Added support for concrete grain state classes, deprecated grain state interfaces and code generation of grain classes.</li>
-<li>Removed <code>Read/Write/ClearStateAsync</code> methods from <code>IGrainState</code> and moved them to <code>Grain&lt;T&gt;</code>.</li>
-<li>Performance optimizations of messaging with up to 40% improvements in throughput.</li>
-<li>Added ZooKeeper based cluster membership storage option.</li>
-<li>Removed compile time dependency on Microsoft.WindowsAzure.ServiceRuntime.dll.</li>
-<li>Consolidated dependencies on Azure in OrleansAzureUtils.dll, which is now optional.</li>
-<li>Refactored SQL system store to be more robust and vendor agnostic.</li>
-<li>Added streaming event deliver policy and failure reporting.</li>
-<li>Changed VS project templates to use only NuGet packages and not the SDK.</li>
-<li>Removed binaries and local silo environment from the SDK.</li>
-<li>Numerous bug fixes and other improvements.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="243" sourceendlinenumber="243">Deprecated generated per-interface <code>GetGrain()</code> static factory methods.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="244" sourceendlinenumber="244">Added support for concrete grain state classes, deprecated grain state interfaces and code generation of grain classes.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="245" sourceendlinenumber="245">Removed <code>Read/Write/ClearStateAsync</code> methods from <code>IGrainState</code> and moved them to <code>Grain&lt;T&gt;</code>.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="246" sourceendlinenumber="246">Performance optimizations of messaging with up to 40% improvements in throughput.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="247" sourceendlinenumber="247">Added ZooKeeper based cluster membership storage option.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="248" sourceendlinenumber="248">Removed compile time dependency on Microsoft.WindowsAzure.ServiceRuntime.dll.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="249" sourceendlinenumber="249">Consolidated dependencies on Azure in OrleansAzureUtils.dll, which is now optional.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="250" sourceendlinenumber="250">Refactored SQL system store to be more robust and vendor agnostic.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="251" sourceendlinenumber="251">Added streaming event deliver policy and failure reporting.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="252" sourceendlinenumber="252">Changed VS project templates to use only NuGet packages and not the SDK.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="253" sourceendlinenumber="253">Removed binaries and local silo environment from the SDK.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="254" sourceendlinenumber="254">Numerous bug fixes and other improvements.</li>
 </ul>
-<h2 id="v108httpsgithubcomdotnetorleansreleasestagv108-may-26th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.8">v1.0.8</a> May 26th  2015</h2>
-<h3 id="release-notes-11">Release notes</h3>
-<ul>
-<li>Fixed versions of references Orleans NuGet packages to match the current one.</li>
-<li>Switched message header keys from strings to enums for performance.</li>
-<li>Fixed a deadlock issue in deactivation process.</li>
-<li>Added a NuGet package to simplify testing of grain projects - Microsoft.Orleans.TestingHost.</li>
-<li>Fixed regression of reporting codegen error to Visual Studio Errors window.</li>
-<li>Added version to SDK msi product and folder name.</li>
-<li>Other fixes and improvements.</li>
+<h2 id="v108httpsgithubcomdotnetorleansreleasestagv108-may-26th--2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="256" sourceendlinenumber="256"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.8" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="256" sourceendlinenumber="256">v1.0.8</a> May 26th  2015</h2>
+<h3 id="release-notes-11" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="258" sourceendlinenumber="258">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="260" sourceendlinenumber="266">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="260" sourceendlinenumber="260">Fixed versions of references Orleans NuGet packages to match the current one.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="261" sourceendlinenumber="261">Switched message header keys from strings to enums for performance.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="262" sourceendlinenumber="262">Fixed a deadlock issue in deactivation process.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="263" sourceendlinenumber="263">Added a NuGet package to simplify testing of grain projects - Microsoft.Orleans.TestingHost.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="264" sourceendlinenumber="264">Fixed regression of reporting codegen error to Visual Studio Errors window.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="265" sourceendlinenumber="265">Added version to SDK msi product and folder name.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="266" sourceendlinenumber="266">Other fixes and improvements.</li>
 </ul>
-<h2 id="community-virtual-meetup-5httpswwwyoutubecomwatchvesepblfy554"><a href="https://www.youtube.com/watch?v=eSepBlfY554">Community Virtual Meetup #5</a></h2>
-<p><a href="https://github.com/gabikliot">Gabriel Kliot</a> on the new Orleans Streaming API
+<h2 id="community-virtual-meetup-5httpswwwyoutubecomwatchvesepblfy554" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="269" sourceendlinenumber="269"><a href="https://www.youtube.com/watch?v=eSepBlfY554" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="269" sourceendlinenumber="269">Community Virtual Meetup #5</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="270" sourceendlinenumber="271"><a href="https://github.com/gabikliot" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="270" sourceendlinenumber="270">Gabriel Kliot</a> on the new Orleans Streaming API
 May 22nd 2015</p>
-<h2 id="v107httpsgithubcomdotnetorleansreleasestagv107-may-15th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.7">v1.0.7</a> May 15th  2015</h2>
-<h3 id="release-notes-12">Release notes</h3>
-<ul>
-<li>Major refactoring of the stream adapter API.</li>
-<li>Improvements to the streaming API to support subscription multiplicity.</li>
-<li>Made IAddressable.AsReference strongly-typed.</li>
-<li>Added a Chocolatey package.</li>
-<li>Added support for private storage keys for testing.</li>
-<li>Replaced ExtendedPrimaryKeyAttribute with IGrainWithGuidCompoundKey and IGrainWithIntegerCompoundKey.</li>
-<li>Added support for grain classes that are implementations of generic grain interfaces with concrete type arguments.</li>
-<li>Numerous other fixes and improvements.</li>
+<h2 id="v107httpsgithubcomdotnetorleansreleasestagv107-may-15th--2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="274" sourceendlinenumber="274"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.7" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="274" sourceendlinenumber="274">v1.0.7</a> May 15th  2015</h2>
+<h3 id="release-notes-12" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="276" sourceendlinenumber="276">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="278" sourceendlinenumber="285">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="278" sourceendlinenumber="278">Major refactoring of the stream adapter API.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="279" sourceendlinenumber="279">Improvements to the streaming API to support subscription multiplicity.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="280" sourceendlinenumber="280">Made IAddressable.AsReference strongly-typed.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="281" sourceendlinenumber="281">Added a Chocolatey package.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="282" sourceendlinenumber="282">Added support for private storage keys for testing.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="283" sourceendlinenumber="283">Replaced ExtendedPrimaryKeyAttribute with IGrainWithGuidCompoundKey and IGrainWithIntegerCompoundKey.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="284" sourceendlinenumber="284">Added support for grain classes that are implementations of generic grain interfaces with concrete type arguments.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="285" sourceendlinenumber="285">Numerous other fixes and improvements.</li>
 </ul>
-<h2 id="community-virtual-meetup-4httpswwwyoutubecomwatchv56xz68ltb9c"><a href="https://www.youtube.com/watch?v=56Xz68lTB9c">Community Virtual Meetup #4</a></h2>
-<p><a href="https://github.com/ReubenBond">Reuben Bond</a> on using Orleans at FreeBay
+<h2 id="community-virtual-meetup-4httpswwwyoutubecomwatchv56xz68ltb9c" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="288" sourceendlinenumber="288"><a href="https://www.youtube.com/watch?v=56Xz68lTB9c" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="288" sourceendlinenumber="288">Community Virtual Meetup #4</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="289" sourceendlinenumber="290"><a href="https://github.com/ReubenBond" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="289" sourceendlinenumber="289">Reuben Bond</a> on using Orleans at FreeBay
 April 15th 2015</p>
-<h2 id="v105httpsgithubcomdotnetorleansreleasestagv105-march-30th--2015"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.5">v1.0.5</a> March 30th  2015</h2>
-<h3 id="release-notes-13">Release notes</h3>
-<ul>
-<li>Major reorganization of NuGet packages and project templates.</li>
-<li>Fixes to reflection-only assembly inspection and loading for side-by-side versioning.</li>
-<li>Improved scalability of observers.</li>
-<li>Programmatic configuration of providers.</li>
-<li>Numerous other fixes and improvements.</li>
+<h2 id="v105httpsgithubcomdotnetorleansreleasestagv105-march-30th--2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="293" sourceendlinenumber="293"><a href="https://github.com/dotnet/orleans/releases/tag/v1.0.5" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="293" sourceendlinenumber="293">v1.0.5</a> March 30th  2015</h2>
+<h3 id="release-notes-13" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="295" sourceendlinenumber="295">Release notes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="297" sourceendlinenumber="301">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="297" sourceendlinenumber="297">Major reorganization of NuGet packages and project templates.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="298" sourceendlinenumber="298">Fixes to reflection-only assembly inspection and loading for side-by-side versioning.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="299" sourceendlinenumber="299">Improved scalability of observers.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="300" sourceendlinenumber="300">Programmatic configuration of providers.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="301" sourceendlinenumber="301">Numerous other fixes and improvements.</li>
 </ul>
-<h2 id="community-virtual-meetup-3httpswwwyoutubecomwatchv07up88bpl20"><a href="https://www.youtube.com/watch?v=07Up88bpl20">Community Virtual Meetup #3</a></h2>
-<p><a href="https://github.com/yevhen">Yevhen Bobrov</a> on a Uniform API for Orleans
+<h2 id="community-virtual-meetup-3httpswwwyoutubecomwatchv07up88bpl20" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="304" sourceendlinenumber="304"><a href="https://www.youtube.com/watch?v=07Up88bpl20" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="304" sourceendlinenumber="304">Community Virtual Meetup #3</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="305" sourceendlinenumber="306"><a href="https://github.com/yevhen" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="305" sourceendlinenumber="305">Yevhen Bobrov</a> on a Uniform API for Orleans
 March 6th 2015</p>
-<h2 id="community-virtual-meetup-2httpswwwyoutubecomwatchvd4kjksffnji"><a href="https://www.youtube.com/watch?v=D4kJKSFfNjI">Community Virtual Meetup #2</a></h2>
-<p>Orleans team live Q&amp;A and roadmap
+<h2 id="community-virtual-meetup-2httpswwwyoutubecomwatchvd4kjksffnji" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="308" sourceendlinenumber="308"><a href="https://www.youtube.com/watch?v=D4kJKSFfNjI" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="308" sourceendlinenumber="308">Community Virtual Meetup #2</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="309" sourceendlinenumber="310">Orleans team live Q&amp;A and roadmap
 January 12th 2015</p>
-<h2 id="orleans-open-source-v10-update-january-2015">Orleans Open Source v1.0 Update (January 2015)</h2>
-<h3 id="initial-stable-production-quality-release">Initial stable production-quality release.</h3>
-<p>Since the September 2014 Preview Update we have made a small number of public API changes, mainly related to clean up and more consistent naming. Those changes are summarized below:</p>
-<h3 id="public-type-names-changes">Public Type Names Changes</h3>
-<table>
+<h2 id="orleans-open-source-v10-update-january-2015" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="313" sourceendlinenumber="313">Orleans Open Source v1.0 Update (January 2015)</h2>
+<h3 id="initial-stable-production-quality-release" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="315" sourceendlinenumber="315">Initial stable production-quality release.</h3>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="317" sourceendlinenumber="317">Since the September 2014 Preview Update we have made a small number of public API changes, mainly related to clean up and more consistent naming. Those changes are summarized below:</p>
+<h3 id="public-type-names-changes" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="319" sourceendlinenumber="319">Public Type Names Changes</h3>
+<table sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="321" sourceendlinenumber="333">
 <thead>
 <tr>
 <th>Old API</th>
@@ -413,16 +413,16 @@ January 12th 2015</p>
 </tr>
 </tbody>
 </table>
-<h3 id="other-changes">Other Changes</h3>
-<ul>
-<li>All grain placement attribute (including [<code>StatelessWorker</code>]) now need to be defined on grain implementation class, rather than on grain interface.</li>
-<li><code>LocalPlacementAttribute</code> was removed. There are now only <code>StatelessWorker</code> and <code>PreferLocalPlacement</code>.</li>
-<li>Support for Reactive programming with Async RX.</li>
-<li>Orleans NuGet packages are now published on NuGet.org.
-See this wiki page for advice on how to <a href="Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.html">convert legacy Orleans grain interface / class projects over to using NuGet packages</a>.</li>
+<h3 id="other-changes" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="335" sourceendlinenumber="335">Other Changes</h3>
+<ul sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="337" sourceendlinenumber="341">
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="337" sourceendlinenumber="337">All grain placement attribute (including [<code>StatelessWorker</code>]) now need to be defined on grain implementation class, rather than on grain interface.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="338" sourceendlinenumber="338"><code>LocalPlacementAttribute</code> was removed. There are now only <code>StatelessWorker</code> and <code>PreferLocalPlacement</code>.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="339" sourceendlinenumber="339">Support for Reactive programming with Async RX.</li>
+<li sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="340" sourceendlinenumber="341">Orleans NuGet packages are now published on NuGet.org.
+See this wiki page for advice on how to <a href="Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.html" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="341" sourceendlinenumber="341">convert legacy Orleans grain interface / class projects over to using NuGet packages</a>.</li>
 </ul>
-<h2 id="community-virtual-meetup-1httpwwwyoutubecomwatchv6coq8xzlopg"><a href="http://www.youtube.com/watch?v=6COQ8XzloPg">Community Virtual Meetup #1</a></h2>
-<p><a href="https://github.com/jkonecki">Jakub Konecki</a> on Event Sourced Grains
+<h2 id="community-virtual-meetup-1httpwwwyoutubecomwatchv6coq8xzlopg" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="344" sourceendlinenumber="344"><a href="http://www.youtube.com/watch?v=6COQ8XzloPg" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="344" sourceendlinenumber="344">Community Virtual Meetup #1</a></h2>
+<p sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="345" sourceendlinenumber="346"><a href="https://github.com/jkonecki" sourcefile="Documentation/What&#39;s-new-in-Orleans.md" sourcestartlinenumber="345" sourceendlinenumber="345">Jakub Konecki</a> on Event Sourced Grains
 December 18th 2014</p>
 
             </article>
@@ -460,8 +460,8 @@ December 18th 2014</p>
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Orleans Streams Quick Start | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Orleans Streams Quick Start | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,13 +71,13 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="orleans-streams-quick-start">Orleans Streams Quick Start</h1>
+              <h1 id="orleans-streams-quick-start" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="6" sourceendlinenumber="6">Orleans Streams Quick Start</h1>
               
-<p>This guide will show you a quick way to setup and use Orleans Streams.
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="8" sourceendlinenumber="9">This guide will show you a quick way to setup and use Orleans Streams.
 To learn more about the details of the streaming features, read other parts of this documentation.</p>
-<h2 id="required-configurations">Required Configurations</h2>
-<p>In this guide we&#39;ll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choise for real production applications.</p>
-<pre><code class="lang-xml">&lt;Globals&gt;
+<h2 id="required-configurations" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="11" sourceendlinenumber="11">Required Configurations</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="13" sourceendlinenumber="13">In this guide we&#39;ll use a Simple Message based Stream which uses grain messaging to send stream data to subscribers. We will use the in-memory storage provider to store lists of subscriptions so it is not a wise choise for real production applications.</p>
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="15" sourceendlinenumber="24"><code class="lang-xml">&lt;Globals&gt;
     &lt;StorageProviders&gt;
       &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;Default&quot; /&gt;
       &lt;Provider Type=&quot;Orleans.Storage.MemoryStorage&quot; Name=&quot;PubSubStore&quot; /&gt;
@@ -85,29 +85,29 @@ To learn more about the details of the streaming features, read other parts of t
     &lt;StreamProviders&gt;
       &lt;Provider Type=&quot;Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider&quot; Name=&quot;SMSProvider&quot;/&gt;
     &lt;/StreamProviders&gt;
-</code></pre><p>Now we can create streams, send data using them as producers and also receive data as subscribers.</p>
-<h2 id="producing-events">Producing Events</h2>
-<p>Producing events for streams is relatively easy. You should first get access to the stream provider which you defined in the config above (<code>SMSProvider</code>) and then choose a stream and push data to it.</p>
-<pre><code class="lang-csharp">//Pick a guid for a chat room grain and chat room stream
+</code></pre><p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="26" sourceendlinenumber="26">Now we can create streams, send data using them as producers and also receive data as subscribers.</p>
+<h2 id="producing-events" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="28" sourceendlinenumber="28">Producing Events</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="30" sourceendlinenumber="30">Producing events for streams is relatively easy. You should first get access to the stream provider which you defined in the config above (<code>SMSProvider</code>) and then choose a stream and push data to it.</p>
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="32" sourceendlinenumber="39"><code class="lang-csharp">//Pick a guid for a chat room grain and chat room stream
 var guid = some guid identifying the chat room
 //Get one of the providers which we defined in config
 var streamProvider = GetStreamProvider(&quot;SMSProvider&quot;);
 //Get the reference to a stream
 var stream = streamProvider.GetStream&lt;int&gt;(guid, &quot;RANDOMDATA&quot;);
-</code></pre><p>As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, in a chat room namespace can &quot;Rooms&quot; and GUID be the owning RoomGrain&#39;s GUID.</p>
-<p>Here we use the GUID of some known chat room. Now using the <code>OnNext</code> method of the stream we can push data to it. Let&#39;s do it inside a timer and using random numbers. You could use any other data type for the stream as well.</p>
-<pre><code class="lang-csharp">RegisterTimer(s =&gt;
+</code></pre><p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="41" sourceendlinenumber="41">As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, in a chat room namespace can &quot;Rooms&quot; and GUID be the owning RoomGrain&#39;s GUID.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="43" sourceendlinenumber="43">Here we use the GUID of some known chat room. Now using the <code>OnNext</code> method of the stream we can push data to it. Let&#39;s do it inside a timer and using random numbers. You could use any other data type for the stream as well.</p>
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="45" sourceendlinenumber="50"><code class="lang-csharp">RegisterTimer(s =&gt;
         {
             return stream.OnNextAsync(new System.Random().Next());
         }, null, TimeSpan.FromMilliseconds(1000), TimeSpan.FromMilliseconds(1000));
-</code></pre><h2 id="subscribing-and-receiving-streaming-data">Subscribing and receiving streaming data</h2>
-<p>For receiving data we can use implicit/explicit subscriptions, which are fully described in other pages of the manual. Here we use implicit subscriptions which are easier. When a grain type wants to implicitly subscribe to a stream it uses the attribute <code>ImplicitStreamSubscription (namespace)]</code>.</p>
-<p>For our case we&#39;ll define a ReceiverGrain like this:</p>
-<pre><code class="lang-csharp">[ImplicitStreamSubscription(&quot;RANDOMDATA&quot;)]
+</code></pre><h2 id="subscribing-and-receiving-streaming-data" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="52" sourceendlinenumber="52">Subscribing and receiving streaming data</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="54" sourceendlinenumber="54">For receiving data we can use implicit/explicit subscriptions, which are fully described in other pages of the manual. Here we use implicit subscriptions which are easier. When a grain type wants to implicitly subscribe to a stream it uses the attribute <code>ImplicitStreamSubscription (namespace)]</code>.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="56" sourceendlinenumber="56">For our case we&#39;ll define a ReceiverGrain like this:</p>
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="58" sourceendlinenumber="61"><code class="lang-csharp">[ImplicitStreamSubscription(&quot;RANDOMDATA&quot;)]
 public class ReceiverGrain : Grain, IRandomReceiver
-</code></pre><p>Now whenever some data is pushed to the streams of namespace RANDOMDATA as we have in the timer, a grain of type <code>ReceiverGrain</code> with the same guid of the stream will receive the message. Even if no activations of the grain currently exist, the runtime will automatically create a new one and send the message to it.</p>
-<p>In order for this to work however, we need to complete the subscription process by setting our <code>OnNext</code> method for receiving data. So our <code>ReceiverGrain</code> should call in its <code>OnActivateAsync</code> something like this</p>
-<pre><code class="lang-csharp">//Create a GUID based on our GUID as a grain
+</code></pre><p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="63" sourceendlinenumber="63">Now whenever some data is pushed to the streams of namespace RANDOMDATA as we have in the timer, a grain of type <code>ReceiverGrain</code> with the same guid of the stream will receive the message. Even if no activations of the grain currently exist, the runtime will automatically create a new one and send the message to it.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="65" sourceendlinenumber="65">In order for this to work however, we need to complete the subscription process by setting our <code>OnNext</code> method for receiving data. So our <code>ReceiverGrain</code> should call in its <code>OnActivateAsync</code> something like this</p>
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="67" sourceendlinenumber="76"><code class="lang-csharp">//Create a GUID based on our GUID as a grain
 var guid = this.GetPrimaryKey();
 //Get one of the providers which we defined in config
 var streamProvider = GetStreamProvider(&quot;SMSProvider&quot;);
@@ -115,11 +115,11 @@ var streamProvider = GetStreamProvider(&quot;SMSProvider&quot;);
 var stream = streamProvider.GetStream&lt;int&gt;(guid, &quot;RANDOMDATA&quot;);
 //Set our OnNext method to the lambda which simply prints the data, this doesn&#39;t make new subscriptions
 await stream.SubscribeAsync&lt;int&gt;(async (data, token) =&gt; Console.WriteLine(data));
-</code></pre><p>We are all set now. The only requirement is that something triggers our producer grain&#39;s creation and then it will registers the timer and starts sending random ints to all interested parties.</p>
-<p>Again, this guide skips lots of details and is only good for showing the big picture. Read other parts of this manual and other resources on RX to gain a good understanding on what is available and how.</p>
-<p>Reactive programming can be a very powerful approach to solve many problems. You could for example use LINQ in the subscriber to filter numbers and do all sorts of interesting stuff.</p>
-<h2 id="next">Next</h2>
-<p><a href="Streams-Programming-APIs.html">Orleans Streams Programming APIs</a></p>
+</code></pre><p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="78" sourceendlinenumber="78">We are all set now. The only requirement is that something triggers our producer grain&#39;s creation and then it will registers the timer and starts sending random ints to all interested parties.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="80" sourceendlinenumber="80">Again, this guide skips lots of details and is only good for showing the big picture. Read other parts of this manual and other resources on RX to gain a good understanding on what is available and how.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="82" sourceendlinenumber="82">Reactive programming can be a very powerful approach to solve many problems. You could for example use LINQ in the subscriber to filter numbers and do all sorts of interesting stuff.</p>
+<h2 id="next" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="85" sourceendlinenumber="85">Next</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="86" sourceendlinenumber="86"><a href="Streams-Programming-APIs.html" sourcefile="Documentation/Orleans-Streams/Streams-Quick-Start.md" sourcestartlinenumber="86" sourceendlinenumber="86">Orleans Streams Programming APIs</a></p>
 
             </article>
           </div>
@@ -156,8 +156,8 @@ await stream.SubscribeAsync&lt;int&gt;(async (data, token) =&gt; Console.WriteLi
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Convert Orleans v0.9 csproj to use V1.0 NuGet | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,56 +71,56 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
+              <h1 id="how-to-convert-a-csproj-file-to-use-orleans-nuget-packages" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="7" sourceendlinenumber="7">How To Convert a .csproj File To Use Orleans NuGet Packages</h1>
               
-<p>This note shows how to manually convert a Visual Studio .csproj file which was created with Orleans v0.9 Visual Studio templates from using assembly references based on the $(OrleansSDK) environment variable to using Orleans NuGet packages.</p>
-<p>These examples assume you are using the latest v1.0.3 NuGet packages from Feb-2015.</p>
-<p>For simplicity I will use &quot;v0.9&quot; to refer to the &quot;old&quot; .csproj and &quot;v1.0&quot; to refer to the &quot;new&quot; .csproj although strictly speaking &quot;v1.0 really means &quot;&gt;= v1.0.3&quot; in practice because there was significant restructuring and changes in the Orleans NuGet packages before that point.</p>
-<h1 id="grain-interface-project">Grain Interface Project</h1>
-<h2 id="orleans-grain-interface-project----example-helloworldinterfacescsproj">Orleans Grain Interface project -- Example: HelloWorldInterfaces.csproj</h2>
-<p><em>You might want to preserve a copy of the old .csproj file before you start, if you do not have a copy already preserved in your source code control system.</em></p>
-<p>Steps to to change Orleans Grain Interface project:</p>
-<ol>
-<li>Do Build-&gt;Clean on the project to remove any old binaries.</li>
-<li><p>Remove old v0.9 assembly references for any Orleans binaries.</p>
-<pre><code class="lang-xml"> &lt;ItemGroup&gt;
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="9" sourceendlinenumber="9">This note shows how to manually convert a Visual Studio .csproj file which was created with Orleans v0.9 Visual Studio templates from using assembly references based on the $(OrleansSDK) environment variable to using Orleans NuGet packages.</p>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="11" sourceendlinenumber="11">These examples assume you are using the latest v1.0.3 NuGet packages from Feb-2015.</p>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="13" sourceendlinenumber="13">For simplicity I will use &quot;v0.9&quot; to refer to the &quot;old&quot; .csproj and &quot;v1.0&quot; to refer to the &quot;new&quot; .csproj although strictly speaking &quot;v1.0 really means &quot;&gt;= v1.0.3&quot; in practice because there was significant restructuring and changes in the Orleans NuGet packages before that point.</p>
+<h1 id="grain-interface-project" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="15" sourceendlinenumber="15">Grain Interface Project</h1>
+<h2 id="orleans-grain-interface-project----example-helloworldinterfacescsproj" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="17" sourceendlinenumber="17">Orleans Grain Interface project -- Example: HelloWorldInterfaces.csproj</h2>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="19" sourceendlinenumber="19"><em>You might want to preserve a copy of the old .csproj file before you start, if you do not have a copy already preserved in your source code control system.</em></p>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="21" sourceendlinenumber="21">Steps to to change Orleans Grain Interface project:</p>
+<ol sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="23" sourceendlinenumber="51">
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="23" sourceendlinenumber="23">Do Build-&gt;Clean on the project to remove any old binaries.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="24" sourceendlinenumber="33"><p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="24" sourceendlinenumber="24">Remove old v0.9 assembly references for any Orleans binaries.</p>
+<pre sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="26" sourceendlinenumber="33"><code class="lang-xml"> &lt;ItemGroup&gt;
      &lt;Reference Include=&quot;Orleans&quot;&gt;
            &lt;HintPath&gt;$(OrleansSDK)\Binaries\OrleansClient\Orleans.dll&lt;/HintPath&gt;
            &lt;Private&gt;False&lt;/Private&gt;
       &lt;/Reference&gt;
  &lt;/ItemGroup&gt;
 </code></pre></li>
-<li><p>Remove old v0.9 Orleans code-gen metadata and script trigger.</p>
-<pre><code class="lang-xml"> &lt;PropertyGroup&gt;
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="35" sourceendlinenumber="42"><p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="35" sourceendlinenumber="35">Remove old v0.9 Orleans code-gen metadata and script trigger.</p>
+<pre sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="37" sourceendlinenumber="42"><code class="lang-xml"> &lt;PropertyGroup&gt;
        &lt;OrleansProjectType&gt;Server&lt;/OrleansProjectType&gt;
  &lt;/PropertyGroup&gt;
  &lt;Import Project=&quot;$(OrleansSDK)\Binaries\OrleansClient\Orleans.SDK.targets&quot; /&gt;
 </code></pre></li>
-<li><p><strong>Make sure to re-save the .csproj to disk at this point, otherwise the next step will fail !</strong></p>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="44" sourceendlinenumber="44"><p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="44" sourceendlinenumber="44"><strong>Make sure to re-save the .csproj to disk at this point, otherwise the next step will fail !</strong></p>
 </li>
-<li>Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Interfaces</code> package to the grain interfaces project.<ul>
-<li>Do this by right-click on project node in Solution Explorer, select &quot;Manage NuGet Packages...&quot; context menu item, then search for <strong>Orleans</strong> and select the <code>Microsoft.Orleans.Templates.Interfaces</code> package.</li>
-<li>This will add a <code>packages.config</code> file to the project, and add the normal NuGet link code into the .csproj</li>
-<li>This will also add the Orleans assembly references into the project, and recreate the code-gen metadata and script links for you.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="45" sourceendlinenumber="48">Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Interfaces</code> package to the grain interfaces project.<ul sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="46" sourceendlinenumber="48">
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="46" sourceendlinenumber="46">Do this by right-click on project node in Solution Explorer, select &quot;Manage NuGet Packages...&quot; context menu item, then search for <strong>Orleans</strong> and select the <code>Microsoft.Orleans.Templates.Interfaces</code> package.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="47" sourceendlinenumber="47">This will add a <code>packages.config</code> file to the project, and add the normal NuGet link code into the .csproj</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="48" sourceendlinenumber="48">This will also add the Orleans assembly references into the project, and recreate the code-gen metadata and script links for you.</li>
 </ul>
 </li>
-<li>Ensure .csproj file is saved to disk again.</li>
-<li>Do Build-&gt;Rebuild on the project to rebuild with the new packages and binaries.</li>
-<li>Going forward, you should only need to change the version number in packages.config to use a newer package -- either manually edit the <code>packages.config</code> file or use NuGet Package Manager UI in Visual Studio.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="49" sourceendlinenumber="49">Ensure .csproj file is saved to disk again.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="50" sourceendlinenumber="50">Do Build-&gt;Rebuild on the project to rebuild with the new packages and binaries.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="51" sourceendlinenumber="51">Going forward, you should only need to change the version number in packages.config to use a newer package -- either manually edit the <code>packages.config</code> file or use NuGet Package Manager UI in Visual Studio.</li>
 </ol>
-<h2 id="orleans-grain-class-project----example-helloworldgrainscsproj">Orleans Grain Class project -- Example: HelloWorldGrains.csproj</h2>
-<p>Steps to to change Orleans Grain Class project:</p>
-<p>Steps 1..4 and 6..8 are the same as for the grain interfaces .csproj above.</p>
-<ol>
-<li>Build-&gt;Clean</li>
-<li>Remove old v0.9 Orleans assembly references</li>
-<li>Remove old v0.9 Orleans code-gen metadata</li>
-<li><strong>Save .csproj file to disk</strong></li>
-<li>Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Grains</code> package to the  project.</li>
-<li>Follow Steps 6..8 from the grain interfaces .csproj above.</li>
+<h2 id="orleans-grain-class-project----example-helloworldgrainscsproj" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="53" sourceendlinenumber="53">Orleans Grain Class project -- Example: HelloWorldGrains.csproj</h2>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="55" sourceendlinenumber="55">Steps to to change Orleans Grain Class project:</p>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="57" sourceendlinenumber="57">Steps 1..4 and 6..8 are the same as for the grain interfaces .csproj above.</p>
+<ol sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="59" sourceendlinenumber="64">
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="59" sourceendlinenumber="59">Build-&gt;Clean</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="60" sourceendlinenumber="60">Remove old v0.9 Orleans assembly references</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="61" sourceendlinenumber="61">Remove old v0.9 Orleans code-gen metadata</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="62" sourceendlinenumber="62"><strong>Save .csproj file to disk</strong></li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="63" sourceendlinenumber="63">Use Visual Studio Package manager to add the <code>Microsoft.Orleans.Templates.Grains</code> package to the  project.</li>
+<li sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="64" sourceendlinenumber="64">Follow Steps 6..8 from the grain interfaces .csproj above.</li>
 </ol>
-<h2 id="problems">Problems?</h2>
-<p>If you have problems getting these conversions to work for you, then please post a <strong>full</strong> copy of your .csproj into a <a href="https://gist.github.com/">Gist</a> on your GitHub account and then open a new Issue in the <a href="https://github.com/dotnet/orleans/issues">Orleans GitHub Project</a> asking for assistance and pointing to the Gist for your specific project file.</p>
+<h2 id="problems" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="66" sourceendlinenumber="66">Problems?</h2>
+<p sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="68" sourceendlinenumber="68">If you have problems getting these conversions to work for you, then please post a <strong>full</strong> copy of your .csproj into a <a href="https://gist.github.com/" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="68" sourceendlinenumber="68">Gist</a> on your GitHub account and then open a new Issue in the <a href="https://github.com/dotnet/orleans/issues" sourcefile="Documentation/Convert-Orleans-v0.9-csproj-to-Use-v1.0-NuGet.md" sourcestartlinenumber="68" sourceendlinenumber="68">Orleans GitHub Project</a> asking for assistance and pointing to the Gist for your specific project file.</p>
 
             </article>
           </div>
@@ -157,8 +157,8 @@
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Minimal Orleans Application | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Minimal Orleans Application | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,57 +71,57 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="minimal-orleans-application">Minimal Orleans Application</h1>
+              <h1 id="minimal-orleans-application" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="6" sourceendlinenumber="6">Minimal Orleans Application</h1>
               
-<p>This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.</p>
-<ul>
-<li>It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.</li>
-<li>Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.</li>
-<li>Has no reliance on SQL or Azure</li>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="8" sourceendlinenumber="8">This tutorial provides step by step instructions for creating a basic functioning Orleans application. It is designed to be self-contained and minimalistic, with the following traits.</p>
+<ul sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="11" sourceendlinenumber="13">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="11" sourceendlinenumber="11">It does not need the SDK or Extension to be installed, and relies on the Nuget packages only.</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="12" sourceendlinenumber="12">Tested in both Visual Studio 2013 and 2015 using Orleans 1.2.0.</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="13" sourceendlinenumber="13">Has no reliance on SQL or Azure</li>
 </ul>
-<p>Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
-<p>You can find the final source code in <code>Samples\Tutorial.Minimal</code> folder (<a href="https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal">see latest version online</a>).</p>
-<h2 id="project-setup">Project Setup</h2>
-<p>For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.</p>
-<p>The Solution will eventually look like this.  (Missing files will be added in sections below)</p>
-<p><img src="../Images/MinimalOrleansApplication1.png" alt=""></p>
-<h4 id="within-visual-studio">Within Visual Studio</h4>
-<ol>
-<li>Create a blank solution called OrleansTest</li>
-<li>Create a New Console Application called Host</li>
-<li>Create a New class library called GrainInterfaces</li>
-<li>Create a New class library called GrainCollection</li>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="15" sourceendlinenumber="15">Keep in mind, this is only a tutorial and lacks appropriate error handling and other goodies that would be useful for a production environment. However, it should help the reader get a real hands-on for all the different facets of Orleans and allow them to focus their continued learning on the parts most relevant to them.</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="17" sourceendlinenumber="17">You can find the final source code in <code>Samples\Tutorial.Minimal</code> folder (<a href="https://github.com/dotnet/orleans/tree/master/Samples/Tutorial.Minimal" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="17" sourceendlinenumber="17">see latest version online</a>).</p>
+<h2 id="project-setup" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="19" sourceendlinenumber="19">Project Setup</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="22" sourceendlinenumber="22">For this tutorial we’re going to need to create 3 projects.  A Library that contains the interfaces (Communication interfaces), a library that contains the implementation (called Grains), and a simple console application that will Host our Silo.  For further understanding of this terminology please see the document Getting Started with Orleans.</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="24" sourceendlinenumber="24">The Solution will eventually look like this.  (Missing files will be added in sections below)</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="26" sourceendlinenumber="26"><img src="../Images/MinimalOrleansApplication1.png" alt="" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="26" sourceendlinenumber="26"></p>
+<h4 id="within-visual-studio" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="29" sourceendlinenumber="29">Within Visual Studio</h4>
+<ol sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="31" sourceendlinenumber="34">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="31" sourceendlinenumber="31">Create a blank solution called OrleansTest</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="32" sourceendlinenumber="32">Create a New Console Application called Host</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="33" sourceendlinenumber="33">Create a New class library called GrainInterfaces</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="34" sourceendlinenumber="34">Create a New class library called GrainCollection</li>
 </ol>
-<p>We use just the default project types in c#.</p>
-<h4 id="delete-the-extras">Delete the Extras</h4>
-<ol>
-<li>Delete Class1.cs from GrainCollection</li>
-<li>Delete Class1.cs from GrainInterfaces</li>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="36" sourceendlinenumber="36">We use just the default project types in c#.</p>
+<h4 id="delete-the-extras" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="39" sourceendlinenumber="39">Delete the Extras</h4>
+<ol sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="41" sourceendlinenumber="42">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="41" sourceendlinenumber="41">Delete Class1.cs from GrainCollection</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="42" sourceendlinenumber="42">Delete Class1.cs from GrainInterfaces</li>
 </ol>
-<h4 id="add-the-following-references">Add the following References</h4>
-<ol>
-<li>GrainCollection references GrainInterfaces</li>
-<li>Host references GrainInterfaces</li>
-<li>Host references GrainCollection</li>
+<h4 id="add-the-following-references" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="45" sourceendlinenumber="45">Add the following References</h4>
+<ol sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="47" sourceendlinenumber="49">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="47" sourceendlinenumber="47">GrainCollection references GrainInterfaces</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="48" sourceendlinenumber="48">Host references GrainInterfaces</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="49" sourceendlinenumber="49">Host references GrainCollection</li>
 </ol>
-<h2 id="adding-orleans">Adding Orleans</h2>
-<p>Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide the autocode generation for us our Grains and Interfaces, and the Runtime which is used for hosting.</p>
-<h4 id="with-nuget">With Nuget</h4>
-<ol>
-<li>Add Microsoft.Orleans.Templates.Interfaces to GrainInterfaces</li>
-<li>Add Microsoft.Orleans.Templates.Grains to GrainCollection</li>
-<li>Add Microsoft.Orleans.OrleansRuntime to Host</li>
+<h2 id="adding-orleans" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="52" sourceendlinenumber="52">Adding Orleans</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="54" sourceendlinenumber="54">Orleans is available via Nuget.  The primary goodness is in Microsoft.Orleans.Core but we will be including packages that provide additional functionality.  Specifically, we will be using Template packages, which provide the autocode generation for us our Grains and Interfaces, and the Runtime which is used for hosting.</p>
+<h4 id="with-nuget" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="56" sourceendlinenumber="56">With Nuget</h4>
+<ol sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="58" sourceendlinenumber="60">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="58" sourceendlinenumber="58">Add Microsoft.Orleans.Templates.Interfaces to GrainInterfaces</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="59" sourceendlinenumber="59">Add Microsoft.Orleans.Templates.Grains to GrainCollection</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="60" sourceendlinenumber="60">Add Microsoft.Orleans.OrleansRuntime to Host</li>
 </ol>
-<h2 id="creating-our-grain-interface">Creating our Grain Interface</h2>
-<p>In GrainInterfaces create an interface IHello.cs</p>
-<pre><code class="lang-csharp">
+<h2 id="creating-our-grain-interface" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="62" sourceendlinenumber="62">Creating our Grain Interface</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="64" sourceendlinenumber="64">In GrainInterfaces create an interface IHello.cs</p>
+<pre sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="67" sourceendlinenumber="73"><code class="lang-csharp">
 public interface IHello : Orleans.IGrainWithIntegerKey
 {
     Task&lt;string&gt; SayHello(string msg);
 }
-</code></pre><h2 id="creating-our-implementation">Creating our Implementation</h2>
-<p>In GrainCollection create a class  HelloGrain.cs</p>
-<pre><code class="lang-csharp">
+</code></pre><h2 id="creating-our-implementation" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="75" sourceendlinenumber="75">Creating our Implementation</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="77" sourceendlinenumber="77">In GrainCollection create a class  HelloGrain.cs</p>
+<pre sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="79" sourceendlinenumber="89"><code class="lang-csharp">
 class HelloGrain : Orleans.Grain, IHello
 {
     public Task&lt;string&gt; SayHello(string msg)
@@ -129,21 +129,21 @@ class HelloGrain : Orleans.Grain, IHello
         return Task.FromResult(string.Format(&quot;You said {0}, I say: Hello!&quot;, msg));
     }
 }
-</code></pre><h2 id="host">Host</h2>
-<p>The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).</p>
-<p>However this small implementation should demonstrate the basics of getting started.</p>
-<h4 id="host--appconfig">Host – App.Config</h4>
-<p>Change App.config enable the recommended server style garbage collection</p>
-<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
+</code></pre><h2 id="host" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="91" sourceendlinenumber="91">Host</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="92" sourceendlinenumber="92">The host requires the most amount of attention to get Orleans up and running.    Throughout future tutorials, much of this will change, or go away (Orleans comes with a nice precanned SiloHost and the Extension provides a template that simplifies this).</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="94" sourceendlinenumber="94">However this small implementation should demonstrate the basics of getting started.</p>
+<h4 id="host--appconfig" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="96" sourceendlinenumber="96">Host – App.Config</h4>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="98" sourceendlinenumber="98">Change App.config enable the recommended server style garbage collection</p>
+<pre sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="100" sourceendlinenumber="108"><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;configuration&gt;
   &lt;runtime&gt;
     &lt;gcServer enabled=&quot;true&quot;/&gt;
   &lt;/runtime&gt;
 &lt;/configuration&gt;
-</code></pre><h4 id="host--orleansconfigurationxml">Host – OrleansConfiguration.xml</h4>
-<p>Within the Host project, add an XML file that will be used for cluster configuration called OrleansConfiguration.xml</p>
-<p>Make sure it is set to Copy to Output directory:</p>
-<pre><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+</code></pre><h4 id="host--orleansconfigurationxml" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="110" sourceendlinenumber="110">Host – OrleansConfiguration.xml</h4>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="111" sourceendlinenumber="111">Within the Host project, add an XML file that will be used for cluster configuration called OrleansConfiguration.xml</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="113" sourceendlinenumber="113">Make sure it is set to Copy to Output directory:</p>
+<pre sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="115" sourceendlinenumber="127"><code class="lang-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
     &lt;SeedNode Address=&quot;localhost&quot; Port=&quot;11111&quot; /&gt;
@@ -153,17 +153,17 @@ class HelloGrain : Orleans.Grain, IHello
     &lt;ProxyingGateway Address=&quot;localhost&quot; Port=&quot;30000&quot; /&gt;
   &lt;/Defaults&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre><p>It is possible to configure this within the code, but it is fairly temperamental.</p>
-<h4 id="host--programcs">Host – Program.cs</h4>
-<p>Program.cs is our most length code block. We are attempting to accomplish a number of objectives</p>
-<ol>
-<li>Initialize Orleans in its own AppDomain</li>
-<li>Run a trivial example (DoSomeClientWork)</li>
-<li>Wait for the user to press enter</li>
-<li>Shutdown gracefully</li>
+</code></pre><p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="129" sourceendlinenumber="129">It is possible to configure this within the code, but it is fairly temperamental.</p>
+<h4 id="host--programcs" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="132" sourceendlinenumber="132">Host – Program.cs</h4>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="133" sourceendlinenumber="133">Program.cs is our most length code block. We are attempting to accomplish a number of objectives</p>
+<ol sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="135" sourceendlinenumber="138">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="135" sourceendlinenumber="135">Initialize Orleans in its own AppDomain</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="136" sourceendlinenumber="136">Run a trivial example (DoSomeClientWork)</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="137" sourceendlinenumber="137">Wait for the user to press enter</li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="138" sourceendlinenumber="138">Shutdown gracefully</li>
 </ol>
-<p>The Orleans samples come with a very nice class called HostWrapper, which abstracts some of the boiler plate within this example.  We&#39;re going to do this by hand, but for a more robust implementation, it is worth exploring.</p>
-<pre><code class="lang-csharp">using Orleans.Runtime.Host;
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="140" sourceendlinenumber="140">The Orleans samples come with a very nice class called HostWrapper, which abstracts some of the boiler plate within this example.  We&#39;re going to do this by hand, but for a more robust implementation, it is worth exploring.</p>
+<pre sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="143" sourceendlinenumber="211"><code class="lang-csharp">using Orleans.Runtime.Host;
 using Orleans;
 using System.Net;
 
@@ -229,17 +229,17 @@ class Program
     }
 
 }
-</code></pre><h2 id="running-the-application">Running the application</h2>
-<p>At this point we should be able to run Host. A console should appear with a large amount of logging text, at the end it should look like this</p>
-<p><img src="../Images/MinimalOrleansApplication2.png" alt=""></p>
-<p>Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.</p>
-<h2 id="further-reading">Further Reading</h2>
-<ul>
-<li><a href="http://dotnet.github.io/orleans/NuGets">List of Orleans Packages</a></li>
-<li><a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/">Orleans Configuration Guide</a></li>
-<li><a href="http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf">Orleans Best Practices</a></li>
-<li><a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo">Running in a Stand Alone Silo</a></li>
-<li><a href="http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample">Azure Web Sample</a></li>
+</code></pre><h2 id="running-the-application" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="214" sourceendlinenumber="214">Running the application</h2>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="215" sourceendlinenumber="215">At this point we should be able to run Host. A console should appear with a large amount of logging text, at the end it should look like this</p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="217" sourceendlinenumber="217"><img src="../Images/MinimalOrleansApplication2.png" alt="" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="217" sourceendlinenumber="217"></p>
+<p sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="219" sourceendlinenumber="219">Within the appropriate bin directory (Debug/Release) there will be a number of log files showing this information as well.  The amount and method of logging is configurable.</p>
+<h2 id="further-reading" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="222" sourceendlinenumber="222">Further Reading</h2>
+<ul sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="224" sourceendlinenumber="228">
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="224" sourceendlinenumber="224"><a href="http://dotnet.github.io/orleans/NuGets" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="224" sourceendlinenumber="224">List of Orleans Packages</a></li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="225" sourceendlinenumber="225"><a href="http://dotnet.github.io/orleans/Orleans-Configuration-Guide/" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="225" sourceendlinenumber="225">Orleans Configuration Guide</a></li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="226" sourceendlinenumber="226"><a href="http://research.microsoft.com/pubs/244727/Orleans%20Best%20Practices.pdf" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="226" sourceendlinenumber="226">Orleans Best Practices</a></li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="227" sourceendlinenumber="227"><a href="http://dotnet.github.io/orleans/Step-by-step-Tutorials/Running-in-a-Stand-alone-Silo" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="227" sourceendlinenumber="227">Running in a Stand Alone Silo</a></li>
+<li sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="228" sourceendlinenumber="228"><a href="http://dotnet.github.io/orleans/Samples-Overview/Azure-Web-Sample" sourcefile="Tutorials/Minimal-Orleans-Application.md" sourcestartlinenumber="228" sourceendlinenumber="228">Azure Web Sample</a></li>
 </ul>
 
             </article>
@@ -277,8 +277,8 @@ class Program
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

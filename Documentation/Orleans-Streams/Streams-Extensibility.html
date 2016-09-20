@@ -8,7 +8,7 @@
     <title>Orleans Streams Extensibility | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Orleans Streams Extensibility | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,62 +71,62 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="orleans-streams-extensibility">Orleans Streams Extensibility</h1>
+              <h1 id="orleans-streams-extensibility" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="6" sourceendlinenumber="6">Orleans Streams Extensibility</h1>
               
-<p>There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:</p>
-<ol>
-<li>Utilize or extend Stream Provider Configuration.</li>
-<li>Write a Custom Queue Adapter.</li>
-<li>Writ a New Stream Provider</li>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="8" sourceendlinenumber="8">There are three ways developers can extend the currently implemented behaviour of Orleans Streaming:</p>
+<ol sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="10" sourceendlinenumber="12">
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="10" sourceendlinenumber="10">Utilize or extend Stream Provider Configuration.</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="11" sourceendlinenumber="11">Write a Custom Queue Adapter.</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="12" sourceendlinenumber="12">Writ a New Stream Provider</li>
 </ol>
-<p>We will describe those below. Please read the <a href="Streams-Implementation.html">Orleans Streams Implementation</a> before reading this section to have a high level view of the internal implementation.</p>
-<h2 id="stream-provider-configuration">Stream Provider Configuration</h2>
-<p>Currently implemented stream providers support a number of configuration options.</p>
-<p><strong>Simple Message Stream Provider Configuration</strong>. SMS Stream Provider currently supports only a single configuration option:</p>
-<ol>
-<li><strong>FireAndForgetDelivery</strong>: this option specifies if the messages sent by SMS stream producer are sent as fire and forget without the way to know if they were delivered or not. When FireAndForgetDelivery is set to false (messages are sent not as FireAndForget), the stream producer&#39;s call <code>stream.OnNext()</code> returns a Task that represents the processing status of the stream consumer. If this Task succeeds, the producer knows for sure that the message was delivered and processed successfully. If FireAndForgetDelivery is set to true, the returned Task only expresses that the Orleans runtime has accepted the message and queued it for further delivery. The default value for FireAndForgetDelivery is false.</li>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="14" sourceendlinenumber="14">We will describe those below. Please read the <a href="Streams-Implementation.html" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="14" sourceendlinenumber="14">Orleans Streams Implementation</a> before reading this section to have a high level view of the internal implementation.</p>
+<h2 id="stream-provider-configuration" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="16" sourceendlinenumber="16">Stream Provider Configuration</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="18" sourceendlinenumber="18">Currently implemented stream providers support a number of configuration options.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="20" sourceendlinenumber="20"><strong>Simple Message Stream Provider Configuration</strong>. SMS Stream Provider currently supports only a single configuration option:</p>
+<ol sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="22" sourceendlinenumber="22">
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="22" sourceendlinenumber="22"><strong>FireAndForgetDelivery</strong>: this option specifies if the messages sent by SMS stream producer are sent as fire and forget without the way to know if they were delivered or not. When FireAndForgetDelivery is set to false (messages are sent not as FireAndForget), the stream producer&#39;s call <code>stream.OnNext()</code> returns a Task that represents the processing status of the stream consumer. If this Task succeeds, the producer knows for sure that the message was delivered and processed successfully. If FireAndForgetDelivery is set to true, the returned Task only expresses that the Orleans runtime has accepted the message and queued it for further delivery. The default value for FireAndForgetDelivery is false.</li>
 </ol>
-<p><strong>Persistent Stream Provider Configuration</strong>. All persistent stream providers support the following configuration options:</p>
-<ol>
-<li><strong>GetQueueMessagesTimerPeriod</strong> - how much time the pulling agents wait after the last attempt to pull from the queue that did not return any items before the agent attempts to pull again. Default is 100 milliseconds.</li>
-<li><strong>InitQueueTimeout</strong> - how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.</li>
-<li><strong>QueueBalancerType</strong> - the type of balancing algorithm to be used to balance queues to silos and agents. Default is ConsistentRingBalancer.</li>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="24" sourceendlinenumber="24"><strong>Persistent Stream Provider Configuration</strong>. All persistent stream providers support the following configuration options:</p>
+<ol sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="26" sourceendlinenumber="28">
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="26" sourceendlinenumber="26"><strong>GetQueueMessagesTimerPeriod</strong> - how much time the pulling agents wait after the last attempt to pull from the queue that did not return any items before the agent attempts to pull again. Default is 100 milliseconds.</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="27" sourceendlinenumber="27"><strong>InitQueueTimeout</strong> - how much time the pulling agents waits for the adapter to initialize the connection with the queue. Default is 5 seconds.</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="28" sourceendlinenumber="28"><strong>QueueBalancerType</strong> - the type of balancing algorithm to be used to balance queues to silos and agents. Default is ConsistentRingBalancer.</li>
 </ol>
-<p><strong>Azure Queue Stream Provider Configuration</strong>. Azure Queue stream provider supports the following configuration options, in addition to what is supported by Persistent Stream Provider:</p>
-<ol>
-<li><strong>DataConnectionString</strong> - the Azure Queue storage connection string.</li>
-<li><strong>DeploymentId</strong> - the deployment id of this Orleans cluster (usually similar to Azure Deployment Id).</li>
-<li><strong>CacheSize</strong> - the size of the persistent provider cache that is used to store stream message for further delivery. Default is 4096.</li>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="30" sourceendlinenumber="30"><strong>Azure Queue Stream Provider Configuration</strong>. Azure Queue stream provider supports the following configuration options, in addition to what is supported by Persistent Stream Provider:</p>
+<ol sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="32" sourceendlinenumber="34">
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="32" sourceendlinenumber="32"><strong>DataConnectionString</strong> - the Azure Queue storage connection string.</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="33" sourceendlinenumber="33"><strong>DeploymentId</strong> - the deployment id of this Orleans cluster (usually similar to Azure Deployment Id).</li>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="34" sourceendlinenumber="34"><strong>CacheSize</strong> - the size of the persistent provider cache that is used to store stream message for further delivery. Default is 4096.</li>
 </ol>
-<p>It would be totally possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over  queue names used by the Queue Adapter. This is currently abstracted away with <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs"><code>IStreamQueueMapper</code></a>, but there is currently no way to configure which <code>IStreamQueueMapper</code> to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a completely new  provider.</p>
-<h2 id="writing-a-custom-queue-adapter">Writing a Custom Queue Adapter</h2>
-<p>If you want to use a different queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details on how this should be done. Please refer to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/Streams/AzureQueue/AzureQueueAdapterFactory.cs"><code>AzureQueueAdapterFactory</code></a> for an example.</p>
-<ol>
-<li><p>Start by defining a <code>MyQueueFactory</code> class that implements <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs"><strong><code>IQueueAdapterFactory</code></strong></a>. You need to:</p>
-<p>  a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.</p>
-<p>  b. Implement a method that returns your <code>IQueueAdapter</code>.</p>
-<p>  c. Implement a method that returns <code>IQueueAdapterCache</code>. Theoretically, you can build your own <code>IQueueAdapterCache</code>, but you don&#39;t have to. It is a good idea just to allocate and return an Orleans <code>SimpleQueueAdapterCache</code>.</p>
-<p>  d. Implement a method that returns <code>IStreamQueueMapper</code>. Again, it is theoretically possible to build your own <code>IStreamQueueMapper</code>, but you don&#39;t have to. It is a good idea just to allocate and return an Orleans <code>HashRingBasedStreamQueueMapper</code>.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="36" sourceendlinenumber="36">It would be totally possible and a lot of times easy to provide additional configuration options. For example, in some scenarios developers might want more control over  queue names used by the Queue Adapter. This is currently abstracted away with <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IStreamQueueMapper.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="36" sourceendlinenumber="36"><code>IStreamQueueMapper</code></a>, but there is currently no way to configure which <code>IStreamQueueMapper</code> to use without writing a new code. We would be happy to provide such an option, if needed. So please consider adding more configuration options to existing stream providers before writing a completely new  provider.</p>
+<h2 id="writing-a-custom-queue-adapter" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="39" sourceendlinenumber="39">Writing a Custom Queue Adapter</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="41" sourceendlinenumber="41">If you want to use a different queueing technology, you need to write a queue adapter that abstracts away the access to that queue. Below we provide details on how this should be done. Please refer to <a href="https://github.com/dotnet/orleans/blob/master/src/OrleansProviders/Streams/AzureQueue/AzureQueueAdapterFactory.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="41" sourceendlinenumber="41"><code>AzureQueueAdapterFactory</code></a> for an example.</p>
+<ol sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="59">
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="51"><p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43">Start by defining a <code>MyQueueFactory</code> class that implements <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterFactory.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43"><strong><code>IQueueAdapterFactory</code></strong></a>. You need to:</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43">  a. Initialize the factory: read the passed config values, potentially allocate some data structures if you need to, etc.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43">  b. Implement a method that returns your <code>IQueueAdapter</code>.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43">  c. Implement a method that returns <code>IQueueAdapterCache</code>. Theoretically, you can build your own <code>IQueueAdapterCache</code>, but you don&#39;t have to. It is a good idea just to allocate and return an Orleans <code>SimpleQueueAdapterCache</code>.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="43" sourceendlinenumber="43">  d. Implement a method that returns <code>IStreamQueueMapper</code>. Again, it is theoretically possible to build your own <code>IStreamQueueMapper</code>, but you don&#39;t have to. It is a good idea just to allocate and return an Orleans <code>HashRingBasedStreamQueueMapper</code>.</p>
 </li>
-<li><p>Implement <code>MyQueueAdapter</code> class that implements the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs"><strong><code>IQueueAdapter</code></strong></a> interface, which is an interfaces that manages access to a <strong>sharded queue</strong>. <code>IQueueAdapter</code> manages access to a set of queues/queue partitions (those are the queues that were returned by <code>IStreamQueueMapper</code>). It provides an ability to enqueue a message in a specified the queue and create an <code>IQueueAdapterReceiver</code> for a particular queue.</p>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="53" sourceendlinenumber="53"><p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="53" sourceendlinenumber="53">Implement <code>MyQueueAdapter</code> class that implements the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapter.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="53" sourceendlinenumber="53"><strong><code>IQueueAdapter</code></strong></a> interface, which is an interfaces that manages access to a <strong>sharded queue</strong>. <code>IQueueAdapter</code> manages access to a set of queues/queue partitions (those are the queues that were returned by <code>IStreamQueueMapper</code>). It provides an ability to enqueue a message in a specified the queue and create an <code>IQueueAdapterReceiver</code> for a particular queue.</p>
 </li>
-<li><p>Implement <code>MyQueueAdapterReceiver</code> class that implements the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs"><strong><code>IQueueAdapterReceiver</code></strong></a>, which is an interfaces that manages access to <strong>one queue (one queue partition)</strong>. In addition to initialization and shutdown, it basically provides one method: retrieve up to maxCount messages from the queue.</p>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="55" sourceendlinenumber="55"><p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="55" sourceendlinenumber="55">Implement <code>MyQueueAdapterReceiver</code> class that implements the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/QueueAdapters/IQueueAdapterReceiver.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="55" sourceendlinenumber="55"><strong><code>IQueueAdapterReceiver</code></strong></a>, which is an interfaces that manages access to <strong>one queue (one queue partition)</strong>. In addition to initialization and shutdown, it basically provides one method: retrieve up to maxCount messages from the queue.</p>
 </li>
-<li><p>Declare <code>public class MyQueueStreamProvider : PersistentStreamProvider&lt;MyQueueFactory&gt;</code>. This is your new Stream Provider.</p>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="57" sourceendlinenumber="57"><p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="57" sourceendlinenumber="57">Declare <code>public class MyQueueStreamProvider : PersistentStreamProvider&lt;MyQueueFactory&gt;</code>. This is your new Stream Provider.</p>
 </li>
-<li><p><strong>Configuration</strong>: in order to load and use you new stream provider you need to configure it properly via silo config file. If you need to use it on the client, you need to add a similar config element to the client config file. It is also possible to configure the stream provider programmatically. Below is an example of silo configuration:</p>
+<li sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="59" sourceendlinenumber="59"><p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="59" sourceendlinenumber="59"><strong>Configuration</strong>: in order to load and use you new stream provider you need to configure it properly via silo config file. If you need to use it on the client, you need to add a similar config element to the client config file. It is also possible to configure the stream provider programmatically. Below is an example of silo configuration:</p>
 </li>
 </ol>
-<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+<pre sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="61" sourceendlinenumber="69"><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
     &lt;StreamProviders&gt;
       &lt;Provider Type=&quot;My.App.MyQueueStreamProvider&quot; Name=&quot;MyStreamProvider&quot; GetQueueMessagesTimerPeriod=&quot;100ms&quot; AdditionalProperty=&quot;MyProperty&quot;/&gt;
     &lt;/StreamProviders&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre><h2 id="writing-a-completely-new-stream-provider">Writing a Completely New Stream Provider</h2>
-<p>It is also possible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs"><code>IStreamProviderImpl</code></a> interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totally up to you how to implement it. Implementing a completely new Stream Provider might turn to be a rather complicated task, since you might need access to various internal runtime components, some of which may have internal access.</p>
-<p>We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.</p>
+</code></pre><h2 id="writing-a-completely-new-stream-provider" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="71" sourceendlinenumber="71">Writing a Completely New Stream Provider</h2>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="73" sourceendlinenumber="73">It is also possible to write a completely new Stream Provider. In such a case there is very little integration that needs to be done from Orleans perspective. You just need to implement the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Providers/IStreamProviderImpl.cs" sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="73" sourceendlinenumber="73"><code>IStreamProviderImpl</code></a> interface, which is a thin interface that allows application code to get a handle to the stream. Beyond that, it is totally up to you how to implement it. Implementing a completely new Stream Provider might turn to be a rather complicated task, since you might need access to various internal runtime components, some of which may have internal access.</p>
+<p sourcefile="Documentation/Orleans-Streams/Streams-Extensibility.md" sourcestartlinenumber="75" sourceendlinenumber="75">We currently do not envision scenarios where one would need to implement a completely new Stream Provider and could not instead achieve his goals through the two options outlined above: either via extended configuration or by writing a Queue Adapter. However, if you think you have such a scenario, we would like to hear about it and work together on simplifying writing new Stream Providers.</p>
 
             </article>
           </div>
@@ -163,8 +163,8 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

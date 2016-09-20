@@ -8,7 +8,7 @@
     <title>Runtime Tables | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Runtime Tables | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,127 +71,127 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="runtime-tables">Runtime Tables</h1>
+              <h1 id="runtime-tables" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="6" sourceendlinenumber="6">Runtime Tables</h1>
               
-<p>Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables and provide more details on their internal structure.</p>
-<p>Runtime tables:</p>
-<ol>
-<li>Orleans Silo Instances table</li>
-<li>Reminders table</li>
-<li>Silo Metrics table</li>
-<li>Clients Metrics table</li>
-<li>Silo Statistics table</li>
-<li>Clients Statistics table</li>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="8" sourceendlinenumber="8">Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables and provide more details on their internal structure.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="10" sourceendlinenumber="10">Runtime tables:</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="12" sourceendlinenumber="17">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="12" sourceendlinenumber="12">Orleans Silo Instances table</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="13" sourceendlinenumber="13">Reminders table</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="14" sourceendlinenumber="14">Silo Metrics table</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="15" sourceendlinenumber="15">Clients Metrics table</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="16" sourceendlinenumber="16">Silo Statistics table</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="17" sourceendlinenumber="17">Clients Statistics table</li>
 </ol>
-<h2 id="orleans-silo-instances-table">Orleans Silo Instances table</h2>
-<p>Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the <a href="Cluster-Management.html">Cluster Management Protocol</a> that maintains this table.</p>
-<p>All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40"><code>SiloInstanceTableEntry</code></a>):</p>
-<ol>
-<li><em>PartitionKey</em> - deployment id.</li>
-<li><em>RowKey</em> - Silo IP Address + &quot;-&quot; + Silo Port + &quot;-&quot; + Silo Generation number (epoch)</li>
-<li><em>DeploymentId</em> - the deployment id of this Orleans service</li>
-<li><em>Address</em> - IP address</li>
-<li><em>Port</em> - silo to silo TCP port</li>
-<li><em>Generation</em> - Generation number (epoch number)</li>
-<li><em>HostName</em> - silo Hostname</li>
-<li><em>Status</em> - status of this silo, as set by cluster management protocol. Any of the type <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs"><code>Orleans.Runtime.SiloStatus</code></a></li>
-<li><em>ProxyPort</em> - silo to clients TCP port</li>
-<li><em>Primary</em> - whether this silo is primary or not. Deprecated.</li>
-<li><em>RoleName</em> - If running in Azure - the name of this role. If running on premises, the name of the executing assembly.</li>
-<li><em>InstanceName</em> - If running in Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.</li>
-<li><em>UpdateZone</em> - Azure update zone, if running in Azure.</li>
-<li><em>FaultZone</em> - Azure fault zone, if running in Azure.</li>
-<li><em>SuspectingSilos</em> - the list of silos that suspect this silo. Managed by cluster management protocol.</li>
-<li><em>SuspectingTimes</em> - the list of times when this silo was suspected. Managed by cluster management protocol.</li>
-<li><em>StartTime</em> - the time when this silo was started.</li>
-<li><em>IAmAliveTime</em> - the last time this silo reported that it is alive. Used for diagnostics and troubleshooting only.</li>
+<h2 id="orleans-silo-instances-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="19" sourceendlinenumber="19">Orleans Silo Instances table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="21" sourceendlinenumber="21">Orleans Silo Instances table, also commonly referred to as Membership table, lists the set of silos that make an Orleans deployment. More details can be found in the description of the <a href="Cluster-Management.html" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="21" sourceendlinenumber="21">Cluster Management Protocol</a> that maintains this table.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="23" sourceendlinenumber="23">All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/OrleansSiloInstanceManager.cs#L40" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="23" sourceendlinenumber="23"><code>SiloInstanceTableEntry</code></a>):</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="25" sourceendlinenumber="42">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="25" sourceendlinenumber="25"><em>PartitionKey</em> - deployment id.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="26" sourceendlinenumber="26"><em>RowKey</em> - Silo IP Address + &quot;-&quot; + Silo Port + &quot;-&quot; + Silo Generation number (epoch)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="27" sourceendlinenumber="27"><em>DeploymentId</em> - the deployment id of this Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="28" sourceendlinenumber="28"><em>Address</em> - IP address</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="29" sourceendlinenumber="29"><em>Port</em> - silo to silo TCP port</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="30" sourceendlinenumber="30"><em>Generation</em> - Generation number (epoch number)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="31" sourceendlinenumber="31"><em>HostName</em> - silo Hostname</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="32" sourceendlinenumber="32"><em>Status</em> - status of this silo, as set by cluster management protocol. Any of the type <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Runtime/SiloStatus.cs" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="32" sourceendlinenumber="32"><code>Orleans.Runtime.SiloStatus</code></a></li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="33" sourceendlinenumber="33"><em>ProxyPort</em> - silo to clients TCP port</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="34" sourceendlinenumber="34"><em>Primary</em> - whether this silo is primary or not. Deprecated.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="35" sourceendlinenumber="35"><em>RoleName</em> - If running in Azure - the name of this role. If running on premises, the name of the executing assembly.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="36" sourceendlinenumber="36"><em>InstanceName</em> - If running in Azure - the name of this role instance. If running on premises, the silo name that the silo host gave it.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="37" sourceendlinenumber="37"><em>UpdateZone</em> - Azure update zone, if running in Azure.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="38" sourceendlinenumber="38"><em>FaultZone</em> - Azure fault zone, if running in Azure.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="39" sourceendlinenumber="39"><em>SuspectingSilos</em> - the list of silos that suspect this silo. Managed by cluster management protocol.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="40" sourceendlinenumber="40"><em>SuspectingTimes</em> - the list of times when this silo was suspected. Managed by cluster management protocol.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="41" sourceendlinenumber="41"><em>StartTime</em> - the time when this silo was started.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="42" sourceendlinenumber="42"><em>IAmAliveTime</em> - the last time this silo reported that it is alive. Used for diagnostics and troubleshooting only.</li>
 </ol>
-<p>There is also a special row in this table, called membership version row, with the following columns:</p>
-<ol>
-<li><em>PartitionKey</em> - deployment id.</li>
-<li><em>RowKey</em> - &quot;VersionRow&quot; costant string</li>
-<li><em>DeploymentId</em></li>
-<li><em>MembershipVersion</em> - the latest version of the current membership configuration.</li>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="44" sourceendlinenumber="44">There is also a special row in this table, called membership version row, with the following columns:</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="46" sourceendlinenumber="49">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="46" sourceendlinenumber="46"><em>PartitionKey</em> - deployment id.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="47" sourceendlinenumber="47"><em>RowKey</em> - &quot;VersionRow&quot; costant string</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="48" sourceendlinenumber="48"><em>DeploymentId</em></li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="49" sourceendlinenumber="49"><em>MembershipVersion</em> - the latest version of the current membership configuration.</li>
 </ol>
-<h3 id="naming">Naming:</h3>
-<p>The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
-First, it is important to note that <a href="http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html">Orleans cluster protocol</a> does not use any of these names for distinguishing between silos. Instead it uses <code>IP:port:epoch</code> as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.</p>
-<p>Hostname is always set to the name of this host, as returned by <code>Dns.GetHostName()</code>.
+<h3 id="naming" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="51" sourceendlinenumber="51">Naming:</h3>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="52" sourceendlinenumber="53">The silo instance row has 3 names: hostname, rolename and instance name. What is the difference?
+First, it is important to note that <a href="http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management.html" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="53" sourceendlinenumber="53">Orleans cluster protocol</a> does not use any of these names for distinguishing between silos. Instead it uses <code>IP:port:epoch</code> as a unique identity of a silo instance. Therefore, setting of those 3 names has no impact on runtime correctness. It is in the table merely to help diagnostics and operational troubleshooting.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="55" sourceendlinenumber="56">Hostname is always set to the name of this host, as returned by <code>Dns.GetHostName()</code>.
 Role name is a logical name of the whole service and instance name is the name of this specific silo instance within this service.</p>
-<p>Role name and Instance name depend on the hosting - where the silo runs. Each silo host can set those differently.
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="58" sourceendlinenumber="60">Role name and Instance name depend on the hosting - where the silo runs. Each silo host can set those differently.
 Azure host (<code>AzureSiloHost</code>) sets the role name to Azure role name (<code>myRoleInstance.Role.Name</code>) and instance name to Azure role Instance name (<code>myRoleInstance.Id</code>).
 On premises (<code>SiloHost</code>) the role name is the executing  assembly name (<code>Assembly.GetExecutingAssembly().GetName().Name</code>) and the instance name is the name the host gave to that silo when it was started.</p>
-<h2 id="orleans-reminders-table">Orleans Reminders table</h2>
-<p>Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/ReminderService/RemindersTableManager.cs#L38"><code>ReminderTableEntry</code></a>):</p>
-<ol>
-<li><em>PartitionKey</em> - ServiceId + &quot;_&quot; + GrainRefConsistentHash</li>
-<li><em>RowKey</em> -  GrainReference + &quot;-&quot; ReminderName</li>
-<li><em>GrainReference</em> - the grain reference of the grain that created this reminder.</li>
-<li><em>ReminderName</em> - the name of this reminder</li>
-<li><em>ServiceId</em> - the service id of the currently running Orleans service</li>
-<li><em>DeploymentId</em> - the deployment id of the currently running Orleans service</li>
-<li><em>StartAt</em> - the time when this reminder was supposed to tick in the first time</li>
-<li><em>Period</em> - the time period for this reminder</li>
-<li><em>GrainRefConsistentHash</em> - the consistent hash of the GrainReference</li>
+<h2 id="orleans-reminders-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="63" sourceendlinenumber="63">Orleans Reminders table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="65" sourceendlinenumber="65">Orleans Reminders table durably stores all the reminders registered in the system. Each reminder has a separate row. All rows in this table consist of the following columns (<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/ReminderService/RemindersTableManager.cs#L38" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="65" sourceendlinenumber="65"><code>ReminderTableEntry</code></a>):</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="67" sourceendlinenumber="75">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="67" sourceendlinenumber="67"><em>PartitionKey</em> - ServiceId + &quot;_&quot; + GrainRefConsistentHash</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="68" sourceendlinenumber="68"><em>RowKey</em> -  GrainReference + &quot;-&quot; ReminderName</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="69" sourceendlinenumber="69"><em>GrainReference</em> - the grain reference of the grain that created this reminder.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="70" sourceendlinenumber="70"><em>ReminderName</em> - the name of this reminder</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="71" sourceendlinenumber="71"><em>ServiceId</em> - the service id of the currently running Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="72" sourceendlinenumber="72"><em>DeploymentId</em> - the deployment id of the currently running Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="73" sourceendlinenumber="73"><em>StartAt</em> - the time when this reminder was supposed to tick in the first time</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="74" sourceendlinenumber="74"><em>Period</em> - the time period for this reminder</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="75" sourceendlinenumber="75"><em>GrainRefConsistentHash</em> - the consistent hash of the GrainReference</li>
 </ol>
-<h2 id="silo-metrics-table">Silo Metrics table</h2>
-<p>Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - <a href="http://en.wikipedia.org/wiki/Performance_indicator">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36"><code>SiloMetricsData</code></a>).</p>
-<ol>
-<li><em>PartitionKey</em> - DeploymentId</li>
-<li><em>RowKey</em> -  silo name</li>
-<li><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
-<li><em>Address</em> - the silo address (ip:port:epoch) of this silo</li>
-<li><em>SiloName</em> - the name of this silo (in Azure it is its Instance name)</li>
-<li><em>GatewayAddress</em> - the gateway ip:port of tis silo</li>
-<li><em>HostName</em> - the hostname of this silo</li>
-<li><em>CPU</em> - current CPU utilization</li>
-<li><em>MemoryUsage</em> - current memory usage (<code>GC.GetTotalMemory(false)</code>)</li>
-<li><em>Activations</em> - number of activations on this silo</li>
-<li><em>RecentlyUsedActivations</em> - number of activations on this silo that were used in the last 10 minutes (Note: this number may currently not be accurate if  different age limits are used for different grain types).</li>
-<li><em>SendQueue</em> - the current size of the send queue (number of messages waiting to be send). Only captures remote messages to other silos (not including messages to the clients).</li>
-<li><em>ReceiveQueue</em> - the current size of the receive queue (number of messages that arrived to this silo and are waiting to be dispatched). Captures both remote and local messages from other silos as well as from the clients.</li>
-<li><em>RequestQueue</em></li>
-<li><em>SentMessages</em> - total number of remote messages sent to other silos as well as to the clients.</li>
-<li><em>ReceivedMessages</em> - total number of remote received messages, from other silos as well as from the clients.</li>
-<li><em>LoadShedding</em> - whether this silo is currently overloaded and is in the load shedding mode.</li>
-<li><em>Clients</em> - number of currently connected clients</li>
+<h2 id="silo-metrics-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="78" sourceendlinenumber="78">Silo Metrics table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="80" sourceendlinenumber="80">Silo metrics table contains a small set of per-silo important key performance metrics (usually known as KPI - <a href="http://en.wikipedia.org/wiki/Performance_indicator" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="80" sourceendlinenumber="80">Key Performance Indicators</a>). Each silo has one row, periodically updated in-place by its silo (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/SiloMetricsTableDataManager.cs#L36" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="80" sourceendlinenumber="80"><code>SiloMetricsData</code></a>).</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="82" sourceendlinenumber="99">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="82" sourceendlinenumber="82"><em>PartitionKey</em> - DeploymentId</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="83" sourceendlinenumber="83"><em>RowKey</em> -  silo name</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="84" sourceendlinenumber="84"><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="85" sourceendlinenumber="85"><em>Address</em> - the silo address (ip:port:epoch) of this silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="86" sourceendlinenumber="86"><em>SiloName</em> - the name of this silo (in Azure it is its Instance name)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="87" sourceendlinenumber="87"><em>GatewayAddress</em> - the gateway ip:port of tis silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="88" sourceendlinenumber="88"><em>HostName</em> - the hostname of this silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="89" sourceendlinenumber="89"><em>CPU</em> - current CPU utilization</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="90" sourceendlinenumber="90"><em>MemoryUsage</em> - current memory usage (<code>GC.GetTotalMemory(false)</code>)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="91" sourceendlinenumber="91"><em>Activations</em> - number of activations on this silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="92" sourceendlinenumber="92"><em>RecentlyUsedActivations</em> - number of activations on this silo that were used in the last 10 minutes (Note: this number may currently not be accurate if  different age limits are used for different grain types).</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="93" sourceendlinenumber="93"><em>SendQueue</em> - the current size of the send queue (number of messages waiting to be send). Only captures remote messages to other silos (not including messages to the clients).</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="94" sourceendlinenumber="94"><em>ReceiveQueue</em> - the current size of the receive queue (number of messages that arrived to this silo and are waiting to be dispatched). Captures both remote and local messages from other silos as well as from the clients.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="95" sourceendlinenumber="95"><em>RequestQueue</em></li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="96" sourceendlinenumber="96"><em>SentMessages</em> - total number of remote messages sent to other silos as well as to the clients.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="97" sourceendlinenumber="97"><em>ReceivedMessages</em> - total number of remote received messages, from other silos as well as from the clients.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="98" sourceendlinenumber="98"><em>LoadShedding</em> - whether this silo is currently overloaded and is in the load shedding mode.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="99" sourceendlinenumber="99"><em>Clients</em> - number of currently connected clients</li>
 </ol>
-<h2 id="clients-metrics-table">Clients Metrics table</h2>
-<p>Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/ClientMetricsTableDataManager.cs#L38"><code>ClientMetricsData</code></a>).</p>
-<ol>
-<li><em>PartitionKey</em> - DeploymentId</li>
-<li><em>RowKey</em> - Address</li>
-<li><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
-<li><em>Address</em> - the address (ip:port) of this client</li>
-<li><em>ClientId</em> - the unique name of this client (pseudo client grain id)</li>
-<li><em>HostName</em> - the hostname of this client</li>
-<li><em>CPU</em> - current CPU utilization</li>
-<li><em>MemoryUsage</em> - current memory usage (<code>GC.GetTotalMemory(false)</code>)</li>
-<li><em>SendQueue</em> - the current size of the send queue (number of messages waiting to be send). Captures remote messages to other silos.</li>
-<li><em>ReceiveQueue</em> - the current size of the receive queue (number of messages that arrived to this client and are waiting to be dispatched, including responses).</li>
-<li><em>SentMessages</em> - total number of remote messages sent to silos.</li>
-<li><em>ReceivedMessages</em> - total number of remote received messages from silos.</li>
-<li><em>ConnectedGatewayCount</em> - number of gateways that this client is currently connected to.</li>
+<h2 id="clients-metrics-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="102" sourceendlinenumber="102">Clients Metrics table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="104" sourceendlinenumber="104">Silo metrics table containes a small set of per-Orleans-client important key performance metrics. Each client has one row,  periodically updated in-place by its client. Client metrics are essentilay a subset of silo metrics (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/ClientMetricsTableDataManager.cs#L38" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="104" sourceendlinenumber="104"><code>ClientMetricsData</code></a>).</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="106" sourceendlinenumber="118">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="106" sourceendlinenumber="106"><em>PartitionKey</em> - DeploymentId</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="107" sourceendlinenumber="107"><em>RowKey</em> - Address</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="108" sourceendlinenumber="108"><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="109" sourceendlinenumber="109"><em>Address</em> - the address (ip:port) of this client</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="110" sourceendlinenumber="110"><em>ClientId</em> - the unique name of this client (pseudo client grain id)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="111" sourceendlinenumber="111"><em>HostName</em> - the hostname of this client</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="112" sourceendlinenumber="112"><em>CPU</em> - current CPU utilization</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="113" sourceendlinenumber="113"><em>MemoryUsage</em> - current memory usage (<code>GC.GetTotalMemory(false)</code>)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="114" sourceendlinenumber="114"><em>SendQueue</em> - the current size of the send queue (number of messages waiting to be send). Captures remote messages to other silos.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="115" sourceendlinenumber="115"><em>ReceiveQueue</em> - the current size of the receive queue (number of messages that arrived to this client and are waiting to be dispatched, including responses).</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="116" sourceendlinenumber="116"><em>SentMessages</em> - total number of remote messages sent to silos.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="117" sourceendlinenumber="117"><em>ReceivedMessages</em> - total number of remote received messages from silos.</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="118" sourceendlinenumber="118"><em>ConnectedGatewayCount</em> - number of gateways that this client is currently connected to.</li>
 </ol>
-<h2 id="silo-statistics-table">Silo Statistics table</h2>
-<p>Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper <a href="http://research.microsoft.com/apps/pubs/?id=217109">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept</a>.
+<h2 id="silo-statistics-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="121" sourceendlinenumber="121">Silo Statistics table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="123" sourceendlinenumber="124">Silo Statistics table containes a large set of per-silo detailed statistic counters. Most of them are low level performance statistics, which are usualy used in troubleshooting scenarios. A set of examples and methodology of how those statistics can be used are described in our paper <a href="http://research.microsoft.com/apps/pubs/?id=217109" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="123" sourceendlinenumber="123">PAD: Performance Anomaly Detection in Multi-Server Distributed Systems and a proof of concept</a>.
 Each statistic value is one row. This table is append only. Every silo periodicaly (usually every 5 minutes, configurable) appends all its latest statistic counter values. The number of counters per silo is currently about 200. So every 5 minutes every silo appends around 200 rows to this table.</p>
-<p>Each row is in the format (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38"><code>StatsTableData</code></a>):</p>
-<ol>
-<li><em>PartitionKey</em> - <code>DeploymentId$ReverseTimestampToTheNearestHour</code> - deploymentId and last hour</li>
-<li><em>RowKey</em> - <code>ReverseTimestampToTheNearestSecond$Name$counter</code> - current second, silo name, monotonically growing sequence number</li>
-<li><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
-<li><em>Time</em> -  the current time of the reporting on the reporting silo</li>
-<li><em>Address</em> - the silo address (ip:port:epoch) of this silo</li>
-<li><em>Name</em> - the name of this silo (in Azure it is its Instance name)</li>
-<li><em>HostName</em> - the host name of this silo</li>
-<li><em>Statistic</em> - the name of the statistic counter</li>
-<li><em>StatValue</em> - the value of the statistic counter</li>
-<li><em>IsDelta</em> - if this the statistic counter value is delta since last value reported or an absolute value</li>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="126" sourceendlinenumber="126">Each row is in the format (<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L38" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="126" sourceendlinenumber="126"><code>StatsTableData</code></a>):</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="128" sourceendlinenumber="137">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="128" sourceendlinenumber="128"><em>PartitionKey</em> - <code>DeploymentId$ReverseTimestampToTheNearestHour</code> - deploymentId and last hour</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="129" sourceendlinenumber="129"><em>RowKey</em> - <code>ReverseTimestampToTheNearestSecond$Name$counter</code> - current second, silo name, monotonically growing sequence number</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="130" sourceendlinenumber="130"><em>DeploymentId</em> -  the deployment id of this Orleans service</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="131" sourceendlinenumber="131"><em>Time</em> -  the current time of the reporting on the reporting silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="132" sourceendlinenumber="132"><em>Address</em> - the silo address (ip:port:epoch) of this silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="133" sourceendlinenumber="133"><em>Name</em> - the name of this silo (in Azure it is its Instance name)</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="134" sourceendlinenumber="134"><em>HostName</em> - the host name of this silo</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="135" sourceendlinenumber="135"><em>Statistic</em> - the name of the statistic counter</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="136" sourceendlinenumber="136"><em>StatValue</em> - the value of the statistic counter</li>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="137" sourceendlinenumber="137"><em>IsDelta</em> - if this the statistic counter value is delta since last value reported or an absolute value</li>
 </ol>
-<p>The rationale behind the choice of partition key and row key is described <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L149">here</a> and <a href="https://github.com/dotnet/orleans/issues/34">here</a>.</p>
-<h2 id="clients-statistics-table">Clients Statistics table</h2>
-<p>Same as Silo Statistics table but for client.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="139" sourceendlinenumber="139">The rationale behind the choice of partition key and row key is described <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/AzureUtils/StatsTableDataManager.cs#L149" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="139" sourceendlinenumber="139">here</a> and <a href="https://github.com/dotnet/orleans/issues/34" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="139" sourceendlinenumber="139">here</a>.</p>
+<h2 id="clients-statistics-table" sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="141" sourceendlinenumber="141">Clients Statistics table</h2>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Runtime-Tables.md" sourcestartlinenumber="143" sourceendlinenumber="143">Same as Silo Statistics table but for client.</p>
 
             </article>
           </div>
@@ -228,8 +228,8 @@ Each statistic value is one row. This table is append only. Every silo periodica
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

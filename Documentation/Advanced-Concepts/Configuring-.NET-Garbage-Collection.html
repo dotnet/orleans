@@ -8,7 +8,7 @@
     <title>Configuring .NET Garbage Collection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Configuring .NET Garbage Collection | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,18 +71,18 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="configuring-net-garbage-collection">Configuring .NET Garbage Collection</h1>
+              <h1 id="configuring-net-garbage-collection" sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="6" sourceendlinenumber="6">Configuring .NET Garbage Collection</h1>
               
-<p>For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found is to set gcServer=true and gcConcurrent=false. These are easy to set via the application config file when a silo runs as a standalone process. You can use OrleansHost.exe.config included in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/">Microsoft.Orleans.OrleansHost</a> NuGet package as an example.</p>
-<pre><code class="lang-xml">&lt;configuration&gt;
+<p sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="8" sourceendlinenumber="8">For good performance, is it important to configure .NET garbage collection for the silo process the right way. The best combination of settings we found is to set gcServer=true and gcConcurrent=false. These are easy to set via the application config file when a silo runs as a standalone process. You can use OrleansHost.exe.config included in the <a href="https://www.nuget.org/packages/Microsoft.Orleans.OrleansHost/" sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="8" sourceendlinenumber="8">Microsoft.Orleans.OrleansHost</a> NuGet package as an example.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="10" sourceendlinenumber="17"><code class="lang-xml">&lt;configuration&gt;
   &lt;runtime&gt;
     &lt;gcServer enabled=&quot;true&quot;/&gt;
     &lt;gcConcurrent enabled=&quot;false&quot;/&gt;
   &lt;/runtime&gt;
 &lt;/configuration&gt;
-</code></pre><p>However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  <a href="http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx">http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx</a></p>
-<p><strong>IMPORTANT NOTE</strong></p>
-<p><a href="https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx">Server garbage collection is available only on multiprocessor computers</a>. Therefore,
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="19" sourceendlinenumber="19">However, this is not as easy to do if a silo runs as part of an Azure Worker Role, which by default is configured to use workstation GC. This blog post shows how to set the same configuration for an Azure Worker Role -  <a href="http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx" sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="19" sourceendlinenumber="19">http://blogs.msdn.com/b/cclayton/archive/2014/06/05/server-garbage-collection-mode-in-microsoft-azure.aspx</a></p>
+<p sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="21" sourceendlinenumber="21"><strong>IMPORTANT NOTE</strong></p>
+<p sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="23" sourceendlinenumber="24"><a href="https://msdn.microsoft.com/en-us/library/system.runtime.gcsettings.isservergc(v=vs.110).aspx" sourcefile="Documentation/Advanced-Concepts/Configuring-.NET-Garbage-Collection.md" sourcestartlinenumber="23" sourceendlinenumber="23">Server garbage collection is available only on multiprocessor computers</a>. Therefore,
 even if you configure the Garbage Collection either via Application Configuration file (app.config or web.config) or via the scripts on the referred blog post, if the silo is running on a (virtual) machine with a single core, you will not get the benefits of <code>gcServer=true</code>.</p>
 
             </article>
@@ -120,8 +120,8 @@ even if you configure the Garbage Collection either via Application Configuratio
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

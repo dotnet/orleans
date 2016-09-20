@@ -8,7 +8,7 @@
     <title>Actor Identity | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Actor Identity | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,66 +71,66 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="actor-identity">Actor Identity</h1>
+              <h1 id="actor-identity" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="6" sourceendlinenumber="6">Actor Identity</h1>
               
-<p>In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="8" sourceendlinenumber="9">In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
 Thus, when an object is created using new, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.</p>
-<p>In distributed systems, object references cannot represent instance identity, since references are typically limited to a single address space.
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="11" sourceendlinenumber="15">In distributed systems, object references cannot represent instance identity, since references are typically limited to a single address space.
 That is certainly the case for .NET references.
 Furthermore, a virtual actor must have an identity regardless of whether it is active, so that we can activate it on demand.
 Therefore grains have a primary key.
 The primary key can be either a GUID (A Globally Unique Identifier), a long integer, or a string.</p>
-<p>The primary key is scoped to the grain type.
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="17" sourceendlinenumber="18">The primary key is scoped to the grain type.
 Therefore, the complete identity of a grain is formed from the actor type and its key.</p>
-<p>The caller of the grain decides a long, a GUID, or a string scheme should be used.
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="20" sourceendlinenumber="22">The caller of the grain decides a long, a GUID, or a string scheme should be used.
 In fact the underlying data is the same, so the schemes can be used interchangeably.
 When a long is used, a GUID is actually created, and padded with zeros.</p>
-<p>Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using <code>0</code> (a valid GUID) as its key.
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="24" sourceendlinenumber="25">Situations that require a singleton grain instance, such as a dictionary or registry, benefit from using <code>0</code> (a valid GUID) as its key.
 This is merely a convention, but by adhering, it becomes clear at the call site that it is what is going on, as we saw in the first tutorial:</p>
-<h2 id="using-guids">Using GUIDs</h2>
-<p>GUIDs are useful when there are several processes that could request a grain, such as a number of web servers in a web farm.
+<h2 id="using-guids" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="27" sourceendlinenumber="27">Using GUIDs</h2>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="29" sourceendlinenumber="31">GUIDs are useful when there are several processes that could request a grain, such as a number of web servers in a web farm.
 You don&#39;t need to coordinate the allocation of keys, which could introduce a single point of failure in the system, or a system-side lock on a resource which could present a bottleneck.
 There is a very low chance of GUIDs colliding, so they would probably be the default choice when architecting an Orleans system.</p>
-<p>Referencing a grain by GUID in client code:</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(Guid.NewGuid());
-</code></pre><p>Retrieving the primary key from grain code:</p>
-<pre><code class="lang-csharp">public override Task OnActivateAsync()
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="33" sourceendlinenumber="33">Referencing a grain by GUID in client code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="35" sourceendlinenumber="37"><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(Guid.NewGuid());
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="39" sourceendlinenumber="39">Retrieving the primary key from grain code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="41" sourceendlinenumber="47"><code class="lang-csharp">public override Task OnActivateAsync()
 {
     Guid primaryKey = this.GetPrimaryKey();
     return base.OnActivateAsync();
 }
-</code></pre><h2 id="using-longs">Using Longs</h2>
-<p>A long integer is also available, which would make sense if the grain is persisted to a relational database, where numerical indexes are preferred over GUIDs.</p>
-<p>Referencing a grain by long integer in client code:</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(1);
-</code></pre><p>Retrieving the primary key form grain code:</p>
-<pre><code class="lang-csharp">public override Task OnActivateAsync()
+</code></pre><h2 id="using-longs" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="49" sourceendlinenumber="49">Using Longs</h2>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="51" sourceendlinenumber="51">A long integer is also available, which would make sense if the grain is persisted to a relational database, where numerical indexes are preferred over GUIDs.</p>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="53" sourceendlinenumber="53">Referencing a grain by long integer in client code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="55" sourceendlinenumber="57"><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(1);
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="59" sourceendlinenumber="59">Retrieving the primary key form grain code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="61" sourceendlinenumber="67"><code class="lang-csharp">public override Task OnActivateAsync()
 {
     long primaryKey = this.GetPrimaryKeyLong();
     return base.OnActivateAsync();
 }
-</code></pre><h2 id="using-strings">Using Strings</h2>
-<p>A string is also available.</p>
-<p>Referencing a grain by String in client code:</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(&quot;myGrainKey&quot;);
-</code></pre><p>Retrieving the primary key form grain code:</p>
-<pre><code class="lang-csharp">public override Task OnActivateAsync()
+</code></pre><h2 id="using-strings" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="69" sourceendlinenumber="69">Using Strings</h2>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="71" sourceendlinenumber="71">A string is also available.</p>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="73" sourceendlinenumber="73">Referencing a grain by String in client code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="75" sourceendlinenumber="77"><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(&quot;myGrainKey&quot;);
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="79" sourceendlinenumber="79">Retrieving the primary key form grain code:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="81" sourceendlinenumber="87"><code class="lang-csharp">public override Task OnActivateAsync()
 {
     string primaryKey = this.GetPrimaryKeyString();
     return base.OnActivateAsync();
 }
-</code></pre><p>The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
-<h2 id="using-compound-primary-key">Using Compound Primary Key</h2>
-<p>If you have a system that doesn&#39;t fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.</p>
-<p>You can inherit your interface from &#39;IGrainWithGuidCompoundKey&#39; or &#39;IGrainWithIntegerCompoundKey&quot; interface like this:</p>
-<pre><code class="lang-csharp">public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="89" sourceendlinenumber="89">The stock ticker example used in the <a href="Interaction-with-Libraries-and-Services.html" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="89" sourceendlinenumber="89">Interaction with Libraries and Services</a> uses a string keys to activate grains representing different stock symbols.</p>
+<h2 id="using-compound-primary-key" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="91" sourceendlinenumber="91">Using Compound Primary Key</h2>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="93" sourceendlinenumber="93">If you have a system that doesn&#39;t fit well with either GUIDs or longs, you can opt for a compound primary key which allows you to use a combination of a GUID or long and a string to reference a grain.</p>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="95" sourceendlinenumber="95">You can inherit your interface from &#39;IGrainWithGuidCompoundKey&#39; or &#39;IGrainWithIntegerCompoundKey&quot; interface like this:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="97" sourceendlinenumber="102"><code class="lang-csharp">public interface IExampleGrain : Orleans.IGrainWithIntegerCompoundKey
 {
     Task Hello();
 }
-</code></pre><p>In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory.</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;);
-</code></pre><p>To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
-<pre><code class="lang-csharp">public class ExampleGrain : Orleans.Grain, IExampleGrain
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="104" sourceendlinenumber="104">In client code, this adds a second argument to the <code>GetGrain</code> method on the grain factory.</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="106" sourceendlinenumber="108"><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IExample&gt;(0, &quot;a string!&quot;);
+</code></pre><p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="110" sourceendlinenumber="110">To access the compound key in the grain, we can call an overload on the <code>GetPrimaryKey</code> method:</p>
+<pre sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="112" sourceendlinenumber="123"><code class="lang-csharp">public class ExampleGrain : Orleans.Grain, IExampleGrain
 {
     public Task Hello()
     {
@@ -140,9 +140,9 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
         return TaskDone.Done;
     }
 }
-</code></pre><h2 id="next">Next</h2>
-<p>Let&#39;s add another type of grain into the solution, and demonstrate inter-grain communication.</p>
-<p><a href="A-Service-is-a-Collection-of-Communicating-Actors.html">A Service is a Collection of Communicating Actors</a></p>
+</code></pre><h2 id="next" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="125" sourceendlinenumber="125">Next</h2>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="127" sourceendlinenumber="127">Let&#39;s add another type of grain into the solution, and demonstrate inter-grain communication.</p>
+<p sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="129" sourceendlinenumber="129"><a href="A-Service-is-a-Collection-of-Communicating-Actors.html" sourcefile="Tutorials/Actor-Identity.md" sourcestartlinenumber="129" sourceendlinenumber="129">A Service is a Collection of Communicating Actors</a></p>
 
             </article>
           </div>
@@ -179,8 +179,8 @@ There is a very low chance of GUIDs colliding, so they would probably be the def
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

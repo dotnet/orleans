@@ -8,7 +8,7 @@
     <title>Declarative Persistence | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Declarative Persistence | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,20 +71,20 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="declarative-persistence">Declarative Persistence</h1>
+              <h1 id="declarative-persistence" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="6" sourceendlinenumber="6">Declarative Persistence</h1>
               
-<p>In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of &#39;cache with behavior,&#39; an object-oriented cache, if you will.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="8" sourceendlinenumber="9">In the second tutorial, we saw how grain state survived the client being shut down, which opens up for a lot of cache-like scenarios, where Orleans is relied upon as a kind of &#39;cache with behavior,&#39; an object-oriented cache, if you will.
 That is already very valuable and goes a long way toward achieving server-side scalability with a simple, familiar, programming model and the built-in single-threaded execution guarantees.</p>
-<p>However, it is sometimes the case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.</p>
-<p>Fortunately, Orleans offers a simple declarative model for identifying the state that needs to be stored in a permanent location, while leaving the decision when to save and restore state under programmatic control.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="11" sourceendlinenumber="11">However, it is sometimes the case that some of the state you are accumulating belongs in some form of permanent storage, so that it can survive a silo shutdown, or a grain migrating from one silo to another for load-balancing or a complete restart/shutdown of the service. What we have seen so far will not support such situations.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="13" sourceendlinenumber="14">Fortunately, Orleans offers a simple declarative model for identifying the state that needs to be stored in a permanent location, while leaving the decision when to save and restore state under programmatic control.
 You are not required to use the declarative persistence mechanism and can still access storage directly from your grain code, but it’s a nice way to save you some boilerplate code and build applications that are portable across various storage services.</p>
-<h2 id="getting-started">Getting Started</h2>
-<p>We&#39;ll continue to build on our employee-and-manager sample.</p>
-<p>The first thing we need to do is make the identities of our workers and managers a little more predictable.
+<h2 id="getting-started" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="16" sourceendlinenumber="16">Getting Started</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="17" sourceendlinenumber="17">We&#39;ll continue to build on our employee-and-manager sample.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="19" sourceendlinenumber="21">The first thing we need to do is make the identities of our workers and managers a little more predictable.
 In the sample, they were assigned GUIDs using <code>Guid.NewGuid()</code>, which is convenient, but doesn&#39;t let us find them in a subsequent run.
 Therefore, we&#39;ll create a set of GUIDs first, then use them as the worker identities.</p>
-<p>The modified <code>Main</code> program looks like this:</p>
-<pre><code class="lang-csharp">static void Main(string[] args)
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="23" sourceendlinenumber="23">The modified <code>Main</code> program looks like this:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="25" sourceendlinenumber="51"><code class="lang-csharp">static void Main(string[] args)
 {
      ...
     var ids = new string[] {
@@ -109,9 +109,9 @@ Therefore, we&#39;ll create a set of GUIDs first, then use them as the worker id
     var m1 = GrainClient.GrainFactory.GetGrain&lt;IManager&gt;(Guid.Parse(ids[6]));
     ...
 }
-</code></pre><p>Next, we&#39;ll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="53" sourceendlinenumber="54">Next, we&#39;ll do some silo configuration, in order to configure the storage provider that will give us access to persistent storage.
 The silo host project includes a file <em>OrleansHostWrapper.cs</em> which is where we find the following section:</p>
-<pre><code class="lang-csharp">var config = ClusterConfiguration.LocalhostPrimarySilo();
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="56" sourceendlinenumber="66"><code class="lang-csharp">var config = ClusterConfiguration.LocalhostPrimarySilo();
 config.AddMemoryStorageProvider();
 
 // Add this line to use the Azure storage emulator
@@ -120,61 +120,61 @@ config.AddMemoryStorageProvider();
 // config.AddAzureBlobStorageProvider(&quot;AzureStore&quot;, &quot;[insert data connection string]&quot;);
 
 siloHost = new SiloHost(siloName, config);
-</code></pre><p>If this is hosted in Azure Cloud Services, then one can use:</p>
-<pre><code class="lang-csharp">config.AddAzureBlobStorageProvider(&quot;AzureStore&quot;);
-</code></pre><p>and it will pick up the same connection string used in <code>config.Globals.DataConnectionString</code>.</p>
-<p>The <code>MemoryStorage</code> provider is fairly uninteresting, since it doesn&#39;t actually provide any permanent storage; it&#39;s intended for debugging persistent grains while having no access to a persistent store.
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="68" sourceendlinenumber="68">If this is hosted in Azure Cloud Services, then one can use:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="70" sourceendlinenumber="72"><code class="lang-csharp">config.AddAzureBlobStorageProvider(&quot;AzureStore&quot;);
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="74" sourceendlinenumber="74">and it will pick up the same connection string used in <code>config.Globals.DataConnectionString</code>.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="76" sourceendlinenumber="77">The <code>MemoryStorage</code> provider is fairly uninteresting, since it doesn&#39;t actually provide any permanent storage; it&#39;s intended for debugging persistent grains while having no access to a persistent store.
 In our case, that makes it hard to demonstrate persistence, so we will rely on a real storage provider.</p>
-<p>Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should add one of the other two lines, but not both. You can use either the <code>AddAzureTableStorageProvider()</code> function or the <code>AddAzureBlobStorageProvider()</code> function depending on how you want to store information.</p>
-<p>In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="79" sourceendlinenumber="79">Depending on whether you have already set up (and want to use) an Azure storage account, or would like to rely on the Azure storage emulator, you should add one of the other two lines, but not both. You can use either the <code>AddAzureTableStorageProvider()</code> function or the <code>AddAzureBlobStorageProvider()</code> function depending on how you want to store information.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="81" sourceendlinenumber="82">In the case of the former, you have to start the Azure storage emulator after installing the latest version of the Azure SDK.
 In the case of the latter, you will have to create a Azure storage account and enter the name and keys in the configuration file.</p>
-<p>With one of those enabled, we&#39;re ready to tackle the grain code.</p>
-<blockquote><p>Note: The built-in storage provider classes <code>Orleans.Storage.AzureBlobStorage</code> and <code>Orleans.Storage.AzureTableStorage</code>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="84" sourceendlinenumber="84">With one of those enabled, we&#39;re ready to tackle the grain code.</p>
+<blockquote sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="86" sourceendlinenumber="88"><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="86" sourceendlinenumber="88">Note: The built-in storage provider classes <code>Orleans.Storage.AzureBlobStorage</code> and <code>Orleans.Storage.AzureTableStorage</code>
 are in the  <em>OrleansAzureUtils.dll</em> assembly, make sure this assembly is referenced in your silo worker role project
 with <em>CopyLocal=&#39;True&#39;</em>.</p>
 </blockquote>
-<h2 id="declaring-state">Declaring State</h2>
-<p>Identifying that a grain should use persistent state takes three steps:</p>
-<ol>
-<li>declaring a class for the state,</li>
-<li>changing the grain base class, and</li>
-<li>identifying the storage provider.</li>
+<h2 id="declaring-state" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="90" sourceendlinenumber="90">Declaring State</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="92" sourceendlinenumber="92">Identifying that a grain should use persistent state takes three steps:</p>
+<ol sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="94" sourceendlinenumber="96">
+<li sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="94" sourceendlinenumber="94">declaring a class for the state,</li>
+<li sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="95" sourceendlinenumber="95">changing the grain base class, and</li>
+<li sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="96" sourceendlinenumber="96">identifying the storage provider.</li>
 </ol>
-<p>The first step, declaring a state class in the grain implementations project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.</p>
-<p>For employees, we want to persist all the state:</p>
-<pre><code class="lang-csharp">public class  EmployeeState
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="98" sourceendlinenumber="98">The first step, declaring a state class in the grain implementations project, simply means identifying the information of an actor that should be persisted and creating what looks like a record of the persistent data -- each state component is represented by a property with a getter and a setter.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="100" sourceendlinenumber="100">For employees, we want to persist all the state:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="102" sourceendlinenumber="108"><code class="lang-csharp">public class  EmployeeState
 {
     public int Level { get; set; }
     public IManager Manager { get; set; }
 }
-</code></pre><p>and for managers, we must store the direct reports, but the <code>_me</code> reference may continue to be created during activation.</p>
-<pre><code class="lang-csharp">public class ManagerState
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="110" sourceendlinenumber="110">and for managers, we must store the direct reports, but the <code>_me</code> reference may continue to be created during activation.</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="112" sourceendlinenumber="117"><code class="lang-csharp">public class ManagerState
 {
     public List&lt;IEmployee&gt; Reports { get; set; }
 }
-</code></pre><p>Then, we change the grain class declaration to identify the state interface (e.g., from <code>Orleans.Grain</code> to <code>Orleans.Grain&lt;EmployeeState&gt;</code>) and remove the variables that we want persisted. Make sure to remove <code>level</code>, and <code>manager</code> from the <code>Employee</code> class and <code>_reports</code> from the <code>Manager</code> class. In addition, we must update the other functions to reflect these removals.</p>
-<p> We also add an attribute to identify the storage provider:</p>
-<pre><code class="lang-csharp">[StorageProvider(ProviderName = &quot;AzureStore&quot;)]
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="119" sourceendlinenumber="119">Then, we change the grain class declaration to identify the state interface (e.g., from <code>Orleans.Grain</code> to <code>Orleans.Grain&lt;EmployeeState&gt;</code>) and remove the variables that we want persisted. Make sure to remove <code>level</code>, and <code>manager</code> from the <code>Employee</code> class and <code>_reports</code> from the <code>Manager</code> class. In addition, we must update the other functions to reflect these removals.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="121" sourceendlinenumber="121"> We also add an attribute to identify the storage provider:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="123" sourceendlinenumber="126"><code class="lang-csharp">[StorageProvider(ProviderName = &quot;AzureStore&quot;)]
 public class Employee : Orleans.Grain&lt;EmployeeState&gt;, Interfaces.IEmployee
-</code></pre><p>and</p>
-<pre><code class="lang-csharp">[StorageProvider(ProviderName=&quot;AzureStore&quot;)]
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="128" sourceendlinenumber="128">and</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="131" sourceendlinenumber="134"><code class="lang-csharp">[StorageProvider(ProviderName=&quot;AzureStore&quot;)]
 public class Manager : Orleans.Grain&lt;ManagerState&gt;, IManager
-</code></pre><p>At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file.
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="136" sourceendlinenumber="137">At risk of stating the obvious, the name of the storage provider attribute should match the name in the configuration file.
 This indirection is what allows you to delay choices around where to store grain state until deployment.</p>
-<p>Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="139" sourceendlinenumber="140">Given these declarative changes, the grain should no longer rely on a private fields to keep compensation level and manager.
 Instead, the grain base class gives us access to the state via a <code>State</code> property that is available to the grain.</p>
-<p>For example:</p>
-<pre><code class="lang-csharp">public Task SetManager(IManager manager)
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="142" sourceendlinenumber="142">For example:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="144" sourceendlinenumber="150"><code class="lang-csharp">public Task SetManager(IManager manager)
 {
    State.Manager = manager;
    return TaskDone.Done;
 }
-</code></pre><h2 id="controlling-checkpoints">Controlling Checkpoints</h2>
-<p>The question that remains is when the persistent state gets saved to the storage provider.</p>
-<p>One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not.</p>
-<p>Saving the state using the storage provider is easily accomplished by calling <code>base.WriteStateAsync()</code>.</p>
-<p>Thus, the final version of the <code>Promote()</code> and <code>SetManager()</code> methods looks like this:</p>
-<pre><code class="lang-csharp">public Task Promote(int newLevel)
+</code></pre><h2 id="controlling-checkpoints" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="152" sourceendlinenumber="152">Controlling Checkpoints</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="154" sourceendlinenumber="154">The question that remains is when the persistent state gets saved to the storage provider.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="156" sourceendlinenumber="156">One choice that the Orleans designers could have made would be to have the runtime save state after every method invocation, but that turns out to be undesirable because it is far too conservative -- not all invocations will actually modify the state on all invocations, and some will never modify it. Rather than employing a complex system to evaluate state differentials after each method, Orleans asks the grain developer to add the necessary logic to determine whether state needs to be saved or not.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="158" sourceendlinenumber="158">Saving the state using the storage provider is easily accomplished by calling <code>base.WriteStateAsync()</code>.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="160" sourceendlinenumber="160">Thus, the final version of the <code>Promote()</code> and <code>SetManager()</code> methods looks like this:</p>
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="162" sourceendlinenumber="174"><code class="lang-csharp">public Task Promote(int newLevel)
 {
     State.Level = newLevel;
     return base.WriteStateAsync();
@@ -185,9 +185,9 @@ public Task SetManager(IManager manager)
     State.Manager = manager;
     return base.WriteStateAsync();
 }
-</code></pre><p>In the <code>Manager</code> class, there&#39;s only one method that need to be modified to write out data, <code>AddDirectReport()</code>.
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="176" sourceendlinenumber="177">In the <code>Manager</code> class, there&#39;s only one method that need to be modified to write out data, <code>AddDirectReport()</code>.
 It should look like this:</p>
-<pre><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
+<pre sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="179" sourceendlinenumber="196"><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
 {
     if (State.Reports == null)
     {
@@ -203,36 +203,36 @@ It should look like this:</p>
 
     await base.WriteStateAsync();
 }
-</code></pre><p>Let&#39;s try this out!</p>
-<p>Set a breakpoint in <code>Employee.Promote()</code>.</p>
-<p>When we run the client code the first time and hit the breakpoint, the level field should be <code>0</code> and the newLevel parameter either <code>10</code> or <code>11</code>:</p>
-<p><img src="../Images/Persistence%202.PNG" alt=""></p>
-<p>Let the application finish (reach the &#39;Hit Enter...&#39; prompt) and exit.
+</code></pre><p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="198" sourceendlinenumber="198">Let&#39;s try this out!</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="200" sourceendlinenumber="200">Set a breakpoint in <code>Employee.Promote()</code>.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="202" sourceendlinenumber="202">When we run the client code the first time and hit the breakpoint, the level field should be <code>0</code> and the newLevel parameter either <code>10</code> or <code>11</code>:</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="204" sourceendlinenumber="204"><img src="../Images/Persistence%202.PNG" alt="" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="204" sourceendlinenumber="204"></p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="206" sourceendlinenumber="207">Let the application finish (reach the &#39;Hit Enter...&#39; prompt) and exit.
 Run it again, and compare what happens when you look at state this second time around:</p>
-<p><img src="../Images/Persistence%203.PNG" alt=""></p>
-<h2 id="just-making-sure">Just Making Sure...</h2>
-<p>It&#39;s worth checking what Azure thinks about the data.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="209" sourceendlinenumber="209"><img src="../Images/Persistence%203.PNG" alt="" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="209" sourceendlinenumber="209"></p>
+<h2 id="just-making-sure" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="212" sourceendlinenumber="212">Just Making Sure...</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="214" sourceendlinenumber="216">It&#39;s worth checking what Azure thinks about the data.
 Using a storage explorer such as Azure Storage Explorer (ASE) or the one built in to Server Explorer in Visual Studio 2013, open the storage account (or developer storage of the emulator) and find the &#39;OrleansGrainState&#39; table.
 It should look something like this (you have to hit &#39;Query&#39; in ASE):</p>
-<p><img src="../Images/Persistence%204.PNG" alt=""></p>
-<p>If everything is working correctly, the grain keys should appear in the <code>PartitionKey</code> column, and the qualified class name of the grains should appear in the <code>RowKey</code> column.</p>
-<h2 id="mixing-things">Mixing Things</h2>
-<p>A grain may contain a combination of persisted and transient state.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="218" sourceendlinenumber="218"><img src="../Images/Persistence%204.PNG" alt="" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="218" sourceendlinenumber="218"></p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="220" sourceendlinenumber="220">If everything is working correctly, the grain keys should appear in the <code>PartitionKey</code> column, and the qualified class name of the grains should appear in the <code>RowKey</code> column.</p>
+<h2 id="mixing-things" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="222" sourceendlinenumber="222">Mixing Things</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="224" sourceendlinenumber="227">A grain may contain a combination of persisted and transient state.
 Any transient state should be represented by private fields in the grain class.
 A common use for mixing the two is to cache some computed version of the persisted state in private fields while it is present in memory.
 For example, a stack of elements may be externally represented as a <code>List&lt;T&gt;</code>, but internally, as a <code>Stack&lt;T&gt;</code>.</p>
-<p>In the case of our <code>Manager</code> class, the <code>_me</code> field is simply a cached value, something we don&#39;t even need to keep as a field in the first place, it can be created any time we need it, but since it&#39;s going to be a commonly used value, it&#39;s worth keeping it around in a transient field.</p>
-<h2 id="automatic-loading-of-state">Automatic loading of state</h2>
-<p>If a grain type has state, at activation time the state will be loaded from storage and then <code>OnActivateAsync</code> is called so you can be sure that the state is loaded when initializing your grain. This is the only case that Orleans calls <code>ReadStateAsync</code> automatically. If you want to write the state or read it in some other place, you should do it on your own. Normally you should not need to call <code>ReadStateAsync</code> yourself unless you are doing something specific regarding handling corrupted state or something else.</p>
-<h2 id="handling-failures-using-persistence">Handling failures using persistence</h2>
-<p>Generally speaking reading and writing a grain&#39;s state is a good mechanism to handle failures as well as serving its original intent.
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="229" sourceendlinenumber="229">In the case of our <code>Manager</code> class, the <code>_me</code> field is simply a cached value, something we don&#39;t even need to keep as a field in the first place, it can be created any time we need it, but since it&#39;s going to be a commonly used value, it&#39;s worth keeping it around in a transient field.</p>
+<h2 id="automatic-loading-of-state" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="231" sourceendlinenumber="231">Automatic loading of state</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="233" sourceendlinenumber="233">If a grain type has state, at activation time the state will be loaded from storage and then <code>OnActivateAsync</code> is called so you can be sure that the state is loaded when initializing your grain. This is the only case that Orleans calls <code>ReadStateAsync</code> automatically. If you want to write the state or read it in some other place, you should do it on your own. Normally you should not need to call <code>ReadStateAsync</code> yourself unless you are doing something specific regarding handling corrupted state or something else.</p>
+<h2 id="handling-failures-using-persistence" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="235" sourceendlinenumber="235">Handling failures using persistence</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="237" sourceendlinenumber="241">Generally speaking reading and writing a grain&#39;s state is a good mechanism to handle failures as well as serving its original intent.
 There is a possibility that your grain call fails in the middle of a method due to different reasons and you end up with a state which is half changed.
 In this case reading from storage can return your state to the last correct state.
 Alternatively, having gotten into such a state, the grain can request to get immediately deactivated by calling  DeactivateOnIdle(), so that its a next request to it would trigger reactivation of the grain, which would reread the persistent state and reconstruct its in-memory copy.
 Deactivation is the cleanest way of resetting a grain to its last know good state, but if you want to avoid the cost of the reactivation process, you can reset its state and rerun any initialization logic (for example, by calling <code>OnActivateAsync</code>) instead of deactivating the grain.</p>
-<h2 id="next">Next</h2>
-<p>Next, we&#39;ll see how we can call our grains from an MVC web application.</p>
-<p><a href="Failure-Handling.html">Handling Failure</a></p>
+<h2 id="next" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="243" sourceendlinenumber="243">Next</h2>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="245" sourceendlinenumber="245">Next, we&#39;ll see how we can call our grains from an MVC web application.</p>
+<p sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="247" sourceendlinenumber="247"><a href="Failure-Handling.html" sourcefile="Tutorials/Declarative-Persistence.md" sourcestartlinenumber="247" sourceendlinenumber="247">Handling Failure</a></p>
 
             </article>
           </div>
@@ -269,8 +269,8 @@ Deactivation is the cleanest way of resetting a grain to its last know good stat
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

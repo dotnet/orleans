@@ -8,7 +8,7 @@
     <title>Developing a Grain | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Developing a Grain | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -72,13 +72,13 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               
-              <p>Please read about <a href="Grains.html">Grains</a> before reading this article.</p>
-<h2 id="grain-interfaces">Grain Interfaces</h2>
-<p>Grains interact with each other by invoking methods declared as part of the respective grain interfaces.
+              <p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="7" sourceendlinenumber="7">Please read about <a href="Grains.html" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="7" sourceendlinenumber="7">Grains</a> before reading this article.</p>
+<h2 id="grain-interfaces" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="9" sourceendlinenumber="9">Grain Interfaces</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="11" sourceendlinenumber="13">Grains interact with each other by invoking methods declared as part of the respective grain interfaces.
 A grain class implements one or more previously declared grain interfaces.
 All methods of a grain interface must return a <code>Task</code> (for <code>void</code> methods) or a <code>Task&lt;T&gt;</code> (for methods returning values of type <code>T</code>).</p>
-<p>The following is an excerpt from the <a href="/orleans/Samples-Overview/Presence-Service">Presence Service</a> sample:</p>
-<pre><code class="lang-csharp">//an example of a Grain Interface
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="15" sourceendlinenumber="15">The following is an excerpt from the <a href="/orleans/Samples-Overview/Presence-Service" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="15" sourceendlinenumber="15">Presence Service</a> sample:</p>
+<pre sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="17" sourceendlinenumber="53"><code class="lang-csharp">//an example of a Grain Interface
 public interface IPlayerGrain : IGrainWithGuidKey
 {
   Task&lt;IGameGrain&gt; GetCurrentGame();
@@ -113,30 +113,30 @@ public class PlayerGrain : Grain, IPlayerGrain
        return TaskDone.Done;
    }
 }
-</code></pre><h2 id="grain-reference">Grain Reference</h2>
-<p>A Grain Reference is a proxy object that implements the same grain interface implemented by the corresponding grain class. Using asynchronous messaging, it provides full-duplex communication with other grains, as well as <a href="/Orleans/Getting-Started-With-Orleans/Clients">Orleans Client</a> code.
+</code></pre><h2 id="grain-reference" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="55" sourceendlinenumber="55">Grain Reference</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="57" sourceendlinenumber="58">A Grain Reference is a proxy object that implements the same grain interface implemented by the corresponding grain class. Using asynchronous messaging, it provides full-duplex communication with other grains, as well as <a href="/Orleans/Getting-Started-With-Orleans/Clients" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="57" sourceendlinenumber="57">Orleans Client</a> code.
 A grain reference can be constructed by passing the identity of a grain to the <code>GrainFactory.GetGrain&lt;T&gt;()</code> method, where T is the grain interface. Developers can use grain references like any other .NET object. It can be passed to a method, used as a method return value, etc.</p>
-<p>The following are examples of how to construct a grain reference of the <code>IPlayerGrain</code> interface defined above.</p>
-<p>In Orleans Client code:</p>
-<pre><code class="lang-csharp">    //construct the grain reference of a specific player
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="60" sourceendlinenumber="60">The following are examples of how to construct a grain reference of the <code>IPlayerGrain</code> interface defined above.</p>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="62" sourceendlinenumber="62">In Orleans Client code:</p>
+<pre sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="64" sourceendlinenumber="67"><code class="lang-csharp">    //construct the grain reference of a specific player
     IPlayerGrain player = GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);
-</code></pre><p>From inside a Grain class:</p>
-<pre><code class="lang-csharp">    //construct the grain reference of a specific player
+</code></pre><p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="68" sourceendlinenumber="68">From inside a Grain class:</p>
+<pre sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="70" sourceendlinenumber="73"><code class="lang-csharp">    //construct the grain reference of a specific player
     IPlayerGrain player = GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);
-</code></pre><h2 id="grain-method-invocation">Grain Method Invocation</h2>
-<p>The Orleans programming model is based on Asynchronous Programming with async and await. A detailed article about the subject is <a href="https://msdn.microsoft.com/en-us/library/hh191443.aspx">here</a>.</p>
-<p>Using the grain reference from the previous example, the following is an example of grain method invocation:</p>
-<pre><code class="lang-csharp">//Invoking a grain method asynchronously
+</code></pre><h2 id="grain-method-invocation" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="75" sourceendlinenumber="75">Grain Method Invocation</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="77" sourceendlinenumber="77">The Orleans programming model is based on Asynchronous Programming with async and await. A detailed article about the subject is <a href="https://msdn.microsoft.com/en-us/library/hh191443.aspx" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="77" sourceendlinenumber="77">here</a>.</p>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="79" sourceendlinenumber="79">Using the grain reference from the previous example, the following is an example of grain method invocation:</p>
+<pre sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="81" sourceendlinenumber="89"><code class="lang-csharp">//Invoking a grain method asynchronously
 Task joinGameTask = player.JoinGame(this);
 //The `await` keyword effectively turns the remainder of the method into a closure that will asynchronously execute upon completion of the Task being awaited without blocking the executing thread.
 await joinGameTask;
 //The next lines will be turned into a closure by the C# compiler.
 players.Add(playerId);
-</code></pre><p>It is possible to join two or more <code>Task</code>s; the join creates a new <code>Task</code> that is resolved when all of its constituent <code>Task</code>s are completed. This is a useful pattern when a grain needs to start multiple computations and wait for all of them to complete before proceeding.
+</code></pre><p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="91" sourceendlinenumber="93">It is possible to join two or more <code>Task</code>s; the join creates a new <code>Task</code> that is resolved when all of its constituent <code>Task</code>s are completed. This is a useful pattern when a grain needs to start multiple computations and wait for all of them to complete before proceeding.
 For example, a front-end grain that generates a web page made of many parts might make multiple back-end calls, one for each part, and receive a <code>Task</code> for each result.
 The grain would then wait for the join of all of these <code>Task</code>s; when the join is resolved, the individual <code>Task</code>s have been completed, and all the data required to format the web page has been received.</p>
-<p>Example:</p>
-<pre><code class="lang-csharp">List&lt;Task&gt; tasks = new List&lt;Task&gt;();
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="95" sourceendlinenumber="95">Example:</p>
+<pre sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="97" sourceendlinenumber="106"><code class="lang-csharp">List&lt;Task&gt; tasks = new List&lt;Task&gt;();
 ChirperMessage chirp = CreateNewChirpMessage(text);
 foreach (IChirperSubscriber subscriber in Followers.Values)
 {
@@ -144,10 +144,10 @@ foreach (IChirperSubscriber subscriber in Followers.Values)
 }
 Task joinedTask = Task.WhenAll(tasks);
 await joinedTask;
-</code></pre><h2 id="taskdonedone-utility-property">TaskDone.Done Utility Property</h2>
-<p>There is no &quot;standard&quot; way to conveniently return an already completed &quot;void&quot; <code>Task</code>, so Orleans sample code defines <code>TaskDone.Done</code> for that purpose.</p>
-<h2 id="next">Next</h2>
-<p><a href="Developing-a-Client.html">Developing a Client</a></p>
+</code></pre><h2 id="taskdonedone-utility-property" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="108" sourceendlinenumber="108">TaskDone.Done Utility Property</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="110" sourceendlinenumber="110">There is no &quot;standard&quot; way to conveniently return an already completed &quot;void&quot; <code>Task</code>, so Orleans sample code defines <code>TaskDone.Done</code> for that purpose.</p>
+<h2 id="next" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="112" sourceendlinenumber="112">Next</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="114" sourceendlinenumber="114"><a href="Developing-a-Client.html" sourcefile="Documentation/Getting-Started-With-Orleans/Developing-a-Grain.md" sourcestartlinenumber="114" sourceendlinenumber="114">Developing a Client</a></p>
 
             </article>
           </div>
@@ -184,8 +184,8 @@ await joinedTask;
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>
