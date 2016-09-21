@@ -62,16 +62,6 @@ namespace Orleans.Serialization
 
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
 
-        /// <summary>
-        /// Toggles whether or not to use the .NET serializer (true) or the Orleans serializer (false).
-        /// This is usually set through config.
-        /// </summary>
-        internal static bool UseStandardSerializer
-        {
-            get;
-            set;
-        }
-
 #if NETSTANDARD
         // Workaround for CoreCLR where FormatterServices.GetUninitializedObject is not public (but might change in RTM so we could remove this then).
         private static readonly Func<Type, object> getUninitializedObjectDelegate =
@@ -169,10 +159,9 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static void Initialize(bool useStandardSerializer, List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
+        internal static void Initialize(List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
         {
             RegisterBuiltInSerializers();
-            UseStandardSerializer = useStandardSerializer;
 
 #if NETSTANDARD
             if (!useJsonFallbackSerializer)
@@ -245,7 +234,6 @@ namespace Orleans.Serialization
             deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
             logger = LogManager.GetLogger("SerializationManager", LoggerType.Runtime);
-            UseStandardSerializer = false; // Default
 
             // Built-in handlers: Tuples
             Register(typeof(Tuple<>), BuiltInTypes.DeepCopyTuple, BuiltInTypes.SerializeTuple, BuiltInTypes.DeserializeTuple);
@@ -2221,14 +2209,6 @@ namespace Orleans.Serialization
             public DeepCopier DeepCopy { get; private set; }
             public Serializer Serialize { get; private set; }
             public Deserializer Deserialize { get; private set; }
-        }
-
-        public static bool ShouldFindSerializationInfo(Assembly assembly)
-        {
-            // If we're using the .Net serializer, then don't bother with this at all
-            if (UseStandardSerializer) return false;
-            
-            return true;
         }
 
         public static JsonSerializerSettings GetDefaultJsonSerializerSettings()

@@ -123,7 +123,6 @@ namespace Orleans.Runtime
             }
 
             // Process each type in the assembly.
-            var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
             var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, Logger).ToArray();
 
             // Process each type in the assembly.
@@ -137,10 +136,8 @@ namespace Orleans.Runtime
                     {
                         Logger.Verbose3("Processing type {0}", typeName);
                     }
-                    if (shouldProcessSerialization)
-                    {
-                        SerializationManager.FindSerializationInfo(type);
-                    }
+
+                    SerializationManager.FindSerializationInfo(type);
     
                     GrainFactory.FindSupportClasses(type);
                 }

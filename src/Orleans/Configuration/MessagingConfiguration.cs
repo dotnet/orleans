@@ -61,13 +61,6 @@ namespace Orleans.Runtime.Configuration
         ///  This is the period of time a gateway will wait before dropping a disconnected client.
         /// </summary>
         TimeSpan ClientDropTimeout { get; set; }
-        /// <summary>
-        /// The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-        /// of the custom Orleans serializer.
-        /// This parameter is intended for use only for testing and troubleshooting.
-        /// In production, the custom Orleans serializer should always be used because it performs significantly better.
-        /// </summary>
-        bool UseStandardSerializer { get; set; }
 
         /// <summary>
         /// The size of a buffer in the messaging buffer pool.
@@ -113,7 +106,6 @@ namespace Orleans.Runtime.Configuration
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
         public TimeSpan ClientDropTimeout { get; set; }
-        public bool UseStandardSerializer { get; set; }
         public bool UseJsonFallbackSerializer { get; set; }
 
         public int BufferPoolBufferSize { get; set; }
@@ -137,7 +129,6 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
-        private const bool DEFAULT_USE_STANDARD_SERIALIZER = false;
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
@@ -166,7 +157,6 @@ namespace Orleans.Runtime.Configuration
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
             ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
             ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
-            UseStandardSerializer = DEFAULT_USE_STANDARD_SERIALIZER;
 
             BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = DEFAULT_BUFFER_POOL_MAX_SIZE;
@@ -209,8 +199,6 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.AppendFormat("       Client Sender Buckets: {0}", ClientSenderBuckets).AppendLine();
             }
-            sb.AppendFormat("       Use standard (.NET) serializer: {0}", UseStandardSerializer)
-                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
             sb.AppendFormat("       Use fallback json serializer: {0}", UseJsonFallbackSerializer)
                 .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
             sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolBufferSize).AppendLine();
@@ -281,12 +269,6 @@ namespace Orleans.Runtime.Configuration
                     ClientSenderBuckets = ConfigUtilities.ParseInt(child.GetAttribute("ClientSenderBuckets"),
                                                             "Invalid integer value for the ClientSenderBuckets attribute on the Messaging element");
                 }
-            }
-            if (child.HasAttribute("UseStandardSerializer"))
-            {
-                UseStandardSerializer =
-                    ConfigUtilities.ParseBool(child.GetAttribute("UseStandardSerializer"),
-                                              "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
             }
 
             if (child.HasAttribute("UseJsonFallbackSerializer"))

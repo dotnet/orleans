@@ -12,7 +12,7 @@ namespace UnitTests.OrleansRuntime
         public ExceptionsTests()
         {
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.Initialize(false, null, false);
+            SerializationManager.Initialize(null, false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
