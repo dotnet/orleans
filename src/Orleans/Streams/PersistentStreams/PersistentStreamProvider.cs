@@ -60,7 +60,7 @@ namespace Orleans.Providers.Streams.Common
             }
             public object GetService(Type serviceType)
             {
-                var service = providerRuntime?.ServiceProvider?.GetService(serviceType);
+                var service = providerRuntime.ServiceProvider?.GetService(serviceType);
                 if (service != null)
                 {
                     return service;
