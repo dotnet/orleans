@@ -269,9 +269,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="state"></param>
         /// <param name="identity"></param>
         /// <param name="runtime"></param>
+        /// <param name="state"></param>
+        /// <param name="storage"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {

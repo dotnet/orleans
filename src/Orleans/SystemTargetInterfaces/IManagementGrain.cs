@@ -58,17 +58,14 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task ForceGarbageCollection(SiloAddress[] hostsIds);
-        /// <summary>
-        /// Perform a run of the Orleans activation collecter in the specified silos.
-        /// </summary>
+        /// <summary>Perform a run of the Orleans activation collecter in the specified silos.</summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <param name="ageLimit">Maximum idle time of activations to be collected.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task ForceActivationCollection(SiloAddress[] hostsIds, TimeSpan ageLimit);
         Task ForceActivationCollection(TimeSpan ageLimit);
-        /// <summary>
-        /// Perform a run of the silo statistics collector in the specified silos.
-        /// </summary>
-        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
+        /// <summary>Perform a run of the silo statistics collector in the specified silos.</summary>
+        /// <param name="siloAddresses">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses);
 
@@ -124,7 +121,7 @@ namespace Orleans.Runtime
         /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
-        
+
         /// <summary>
         /// Update the configuration information dynamically. Only a subset of configuration information
         /// can be updated - will throw an error (and make no config changes) if you specify attributes
@@ -149,6 +146,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hostIds">Silos to update, or null for all silos</param>
         /// <param name="configuration">XML elements and attributes to update</param>
+        /// <param name="tracing">Tracing level settings</param>
         /// <returns></returns>
         Task UpdateConfiguration(SiloAddress[] hostIds, Dictionary<string, string> configuration, Dictionary<string, string> tracing);
 

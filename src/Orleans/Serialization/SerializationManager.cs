@@ -1137,7 +1137,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Encodes the object to the provided binary token stream.
         /// </summary>
-        /// <param name="raw">The input data to be serialized.</param>
+        /// <param name="obj">The input data to be serialized.</param>
         /// <param name="stream">The output stream to write to.</param>
         /// <param name="expected">Current expected Type on this stream.</param>
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
@@ -2166,11 +2166,11 @@ namespace Orleans.Serialization
             var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
             logger.LogWithoutBulkingAndTruncating(Severity.Verbose, ErrorCode.SerMgr_ArtifactReport, report);
         }
-        
+
         /// <summary>
         /// Loads the external srializers and places them into a hash set
         /// </summary>
-        /// <param name="type">The list of types that implement <see cref="IExternalSerializer"/></param>
+        /// <param name="providerTypes">The list of types that implement <see cref="IExternalSerializer"/></param>
         private static void RegisterSerializationProviders(List<TypeInfo> providerTypes)
         {
             if (providerTypes == null)

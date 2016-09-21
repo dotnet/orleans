@@ -48,13 +48,14 @@ namespace Orleans.Streams
 
     public static class QueueAdapterExtensions
     {
-        /// <summary>
-        /// Writes a set of events to the queue as a single batch associated with the provided streamId.
-        /// </summary>
+        /// <summary>Writes a set of events to the queue as a single batch associated with the provided streamId.</summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="adapter"></param>
-        /// <param name="streamId"></param>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
         /// <param name="evt"></param>
+        /// <param name="token"></param>
+        /// <param name="requestContext"></param>
         /// <returns></returns>
         public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, Guid streamGuid, String streamNamespace, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {

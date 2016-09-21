@@ -48,6 +48,8 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="bufferSize">The size, in bytes, of each buffer.</param>
         /// <param name="maxBuffers">The maximum number of buffers to keep around, unused; by default, the number of unused buffers is unbounded.</param>
+        /// <param name="preallocationSize">Initial number of buffers to allocate.</param>
+        /// <param name="name">Name of the buffer pool.</param>
         private BufferPool(int bufferSize, int maxBuffers, int preallocationSize, string name)
         {
             Name = name;
