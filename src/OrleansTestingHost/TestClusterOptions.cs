@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
@@ -17,14 +19,22 @@ namespace Orleans.TestingHost
     [Serializable]
     public class TestClusterOptions
     {
+        public enum ExtendedConfigurationOptions
+        {
+            DataConnectionString,
+            TraceToConsole,
+            InitialSilosCount,
+            LogsFolder,
+        }
+
         private ClusterConfiguration _clusterConfiguration;
         private ClientConfiguration _clientConfiguration;
 
         /// <summary>
-        /// Create a new TestClusterOptions with the default initial silo count. See <see cref="DefaultInitialSilosCount"/>.
+        /// Create a new TestClusterOptions with the default initial silo count. See <see cref="ExtendedConfiguration"/>.
         /// </summary>
         public TestClusterOptions()
-            : this(DefaultInitialSilosCount)
+            : this(GetInitialSilosCount(DefaultExtendedConfiguration))
         {
         }
 
@@ -39,20 +49,57 @@ namespace Orleans.TestingHost
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
         }
 
+        public static ConfigurationBuilder DefaultConfigurationBuilder()
+        {
+            var builder = new ConfigurationBuilder();
+            builder.AddInMemoryCollection(new Dictionary<string, string>
+            {
+                { nameof(ExtendedConfigurationOptions.DataConnectionString), "UseDevelopmentStorage=true" },
+                { nameof(ExtendedConfigurationOptions.LogsFolder), "logs" },
+                { nameof(ExtendedConfigurationOptions.TraceToConsole), "true" },
+                { nameof(ExtendedConfigurationOptions.InitialSilosCount), "2" }
+            });
+            return builder;
+        }
+
         /// <summary>
         /// The default initial silos count. See <see cref="TestClusterOptions"/>.
         /// </summary>
-        public static short DefaultInitialSilosCount { get; set; } = 2;
+        public static short GetInitialSilosCount(IConfiguration configuration)
+        {
+                short defaultValue;
+                return short.TryParse(configuration[nameof(ExtendedConfigurationOptions.InitialSilosCount)], out defaultValue)
+                        ? defaultValue
+                        : (short)2;
+        }
 
         /// <summary>
         /// Is set to true, by default the cluster will output traces in the console
         /// </summary>
-        public static bool DefaultTraceToConsole { get; set; } = true;
+        public static bool GetTraceToConsole(IConfiguration configuration)
+        {
+                bool defaultValue;
+                return bool.TryParse(configuration[nameof(ExtendedConfigurationOptions.TraceToConsole)], out defaultValue)
+                        ? defaultValue
+                        : true;
+        }
 
         /// <summary>
         /// Default subfolder the the logs
         /// </summary>
-        public static string DefaultLogsFolder { get; set; } = "logs";
+        public static string GetLogsFolder(IConfiguration configuration) => configuration[nameof(ExtendedConfigurationOptions.LogsFolder)];
+
+        /// <summary>
+        /// Default data connection string
+        /// </summary>
+        public static string GetDataConnectionString(IConfiguration configuration) => configuration[nameof(ExtendedConfigurationOptions.DataConnectionString)];
+
+        /// <summary>
+        /// Configure defaults for building the configurations
+        /// </summary>
+        public static IConfiguration DefaultExtendedConfiguration { get; set; } = DefaultConfigurationBuilder().Build();
+
+        public IConfiguration ExtendedConfiguration { get; set; } = DefaultExtendedConfiguration;
 
         /// <summary>
         /// Base port number to use for silo's gateways
@@ -100,7 +147,7 @@ namespace Orleans.TestingHost
             int baseSiloPort = this.BaseSiloPort;
             int baseGatewayPort = this.BaseGatewayPort;
 
-            return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount);
+            return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount, this.ExtendedConfiguration);
         }
 
         /// <summary>
@@ -110,19 +157,21 @@ namespace Orleans.TestingHost
         /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>
         /// <param name="silosCount">The number of initial silos to deploy.</param>
         /// <returns>The builded cluster configuration</returns>
-        public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount)
+        public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount, IConfiguration extendedConfiguration)
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
             config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
-            config.Defaults.TraceToConsole = DefaultTraceToConsole;
-            if (!string.IsNullOrWhiteSpace(DefaultLogsFolder))
+            config.Defaults.TraceToConsole = GetTraceToConsole(extendedConfiguration);
+
+            var defaultLogsFolder = GetLogsFolder(extendedConfiguration);
+            if (!string.IsNullOrWhiteSpace(defaultLogsFolder))
             {
-                if (!Directory.Exists(DefaultLogsFolder))
+                if (!Directory.Exists(defaultLogsFolder))
                 {
-                    Directory.CreateDirectory(DefaultLogsFolder);
+                    Directory.CreateDirectory(defaultLogsFolder);
                 }
 
-                config.Defaults.TraceFilePattern = $"{DefaultLogsFolder}\\{config.Defaults.TraceFilePattern}";
+                config.Defaults.TraceFilePattern = $"{defaultLogsFolder}\\{config.Defaults.TraceFilePattern}";
             }
 
             AddNodeConfiguration(config, Silo.SiloType.Primary, 0, baseSiloPort, baseGatewayPort);
@@ -133,7 +182,7 @@ namespace Orleans.TestingHost
 
             config.Globals.ExpectedClusterSize = silosCount;
 
-            config.AdjustForTestEnvironment();
+            config.AdjustForTestEnvironment(extendedConfiguration["DataConnectionString"]);
             return config;
         }
 
@@ -182,7 +231,7 @@ namespace Orleans.TestingHost
         {
             var config = new ClientConfiguration();
             config.TraceFilePattern = clusterConfig.Defaults.TraceFilePattern;
-            config.TraceToConsole = DefaultTraceToConsole;
+            config.TraceToConsole = clusterConfig.Defaults.TraceToConsole;
             switch (clusterConfig.Globals.LivenessType)
             {
                 case GlobalConfiguration.LivenessProviderType.AzureTable:
@@ -227,7 +276,7 @@ namespace Orleans.TestingHost
             config.LargeMessageWarningThreshold = clusterConfig.Defaults.LargeMessageWarningThreshold;
 
             // TODO: copy test environment config from globals instead of from constants
-            config.AdjustForTestEnvironment();
+            config.AdjustForTestEnvironment(clusterConfig.Globals.DataConnectionString);
             return config;
         }
 

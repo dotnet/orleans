@@ -28,7 +28,7 @@ namespace UnitTests.Tester
     {
         static TestClusterPerTest()
         {
-            TestClusterOptions.DefaultTraceToConsole = false;
+            BaseTestClusterFixture.InitializeDefaults();
         }
 
         protected TestCluster HostedCluster { get; private set; }

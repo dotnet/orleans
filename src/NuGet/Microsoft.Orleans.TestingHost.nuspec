@@ -19,8 +19,9 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />      
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+      <dependency id="Microsoft.Extensions.Configuration" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>

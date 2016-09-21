@@ -25,8 +25,10 @@ namespace Tester.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-                EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestClusterOptions.DefaultExtendedConfiguration["EventHubConnectionString"],
+                EHConsumerGroup, EHPath));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName) { CacheSizeMb = 3 };
@@ -95,7 +97,7 @@ namespace Tester.StreamingTests
             var settings = new Dictionary<string, string>();
             // get initial settings from configs
             ProviderSettings.WriteProperties(settings);
-            EventHubConfig.WriteProperties(settings);
+            EventHubConfig.Value.WriteProperties(settings);
             CheckpointerSettings.WriteProperties(settings);
             return settings;
         }
