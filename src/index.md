@@ -74,9 +74,9 @@ The implementation is executed inside the Orleans framework:
 ``` csharp
 public class MyGrain : IMyGrain
 {
-    public async Task<string> SayHello(string name)
+    public Task<string> SayHello(string name)
     {
-        return "Hello " + name;
+        return Task.FromResult($"Hello {name}");
     }
 }
 ```
