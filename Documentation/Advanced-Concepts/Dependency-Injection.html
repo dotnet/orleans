@@ -8,7 +8,7 @@
     <title>Dependency Injection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Dependency Injection | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,39 +71,39 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="what-is-dependency-injection">What is Dependency Injection</h1>
+              <h1 id="what-is-dependency-injection" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="6" sourceendlinenumber="6">What is Dependency Injection</h1>
               
-<p>Dependency injection (DI) is a software design pattern that implements inversion of control for resolving dependencies.</p>
-<p>Orleans is using the abstraction written by the developers of <a href="https://docs.asp.net">ASP.NET Core</a>. For a detailed explanation about how does it work, check out the <a href="https://docs.asp.net/en/latest/fundamentals/dependency-injection.html#dependency-injection">official documentation</a>.</p>
-<h1 id="di-in-orleans">DI in Orleans</h1>
-<p>Dependency Injection is currently supported only on the server side within Orleans.</p>
-<p>Orleans makes it possible to inject dependencies into application <a href="../Getting-Started-With-Orleans/Grains.html">Grains</a>.</p>
-<p>However Orleans supports every container dependent injection mechanisms, one of the most commonly used method is constructor injection.</p>
-<p>Theoretically any type can be injected which was previously registered in a <a href="https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html"><code>IServiceCollection</code></a> during Silo startup.</p>
-<p><strong>Note</strong>:
-As Orleans is evolving, as of the current plans it will be possible to leverage dependency injection in other application classes as well, like <a href="../Orleans-Streams/Stream-Providers.html"><code>StreamProviders</code></a>. </p>
-<h1 id="configuring-di">Configuring DI</h1>
-<p>The DI configuration is a global configuration value and must be configured there.</p>
-<p>Orleans is using a similar approach as ASP.NET Core to configure DI. You must have a <code>Startup</code> class within your application which must contain a <code>ConfigureServices</code> method. It must return an object instance of type: <code>IServiceProvider</code>.</p>
-<p>Configuration is done by specifying the type of your <code>Startup</code> class via one of the methods described below.</p>
-<p><strong>Note</strong>:
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="8" sourceendlinenumber="8">Dependency injection (DI) is a software design pattern that implements inversion of control for resolving dependencies.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="10" sourceendlinenumber="10">Orleans is using the abstraction written by the developers of <a href="https://docs.asp.net" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="10" sourceendlinenumber="10">ASP.NET Core</a>. For a detailed explanation about how does it work, check out the <a href="https://docs.asp.net/en/latest/fundamentals/dependency-injection.html#dependency-injection" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="10" sourceendlinenumber="10">official documentation</a>.</p>
+<h1 id="di-in-orleans" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="12" sourceendlinenumber="12">DI in Orleans</h1>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="14" sourceendlinenumber="14">Dependency Injection is currently supported only on the server side within Orleans.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="16" sourceendlinenumber="16">Orleans makes it possible to inject dependencies into application <a href="../Getting-Started-With-Orleans/Grains.html" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="16" sourceendlinenumber="16">Grains</a>.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="18" sourceendlinenumber="18">However Orleans supports every container dependent injection mechanisms, one of the most commonly used method is constructor injection.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="20" sourceendlinenumber="20">Theoretically any type can be injected which was previously registered in a <a href="https://docs.asp.net/projects/api/en/latest/autoapi/Microsoft/Extensions/DependencyInjection/IServiceCollection/index.html" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="20" sourceendlinenumber="20"><code>IServiceCollection</code></a> during Silo startup.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="22" sourceendlinenumber="23"><strong>Note</strong>:
+As Orleans is evolving, as of the current plans it will be possible to leverage dependency injection in other application classes as well, like <a href="../Orleans-Streams/Stream-Providers.html" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="23" sourceendlinenumber="23"><code>StreamProviders</code></a>. </p>
+<h1 id="configuring-di" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="25" sourceendlinenumber="25">Configuring DI</h1>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="27" sourceendlinenumber="27">The DI configuration is a global configuration value and must be configured there.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="29" sourceendlinenumber="29">Orleans is using a similar approach as ASP.NET Core to configure DI. You must have a <code>Startup</code> class within your application which must contain a <code>ConfigureServices</code> method. It must return an object instance of type: <code>IServiceProvider</code>.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="31" sourceendlinenumber="31">Configuration is done by specifying the type of your <code>Startup</code> class via one of the methods described below.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="33" sourceendlinenumber="34"><strong>Note</strong>:
 Previously DI configuration was specified at the cluster node level, this was changed in the recent release. </p>
-<h2 id="configuring-from-code">Configuring from Code</h2>
-<p>It is possible to tell Orleans what <code>Startup</code> type you like to use with code based configuration. There is an extension method named <code>UseStartup</code> on the <code>ClusterConfiguration</code> class which you can use to do that.</p>
-<pre><code class="lang-csharp">var configuration = new ClusterConfiguration();
+<h2 id="configuring-from-code" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="36" sourceendlinenumber="36">Configuring from Code</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="38" sourceendlinenumber="38">It is possible to tell Orleans what <code>Startup</code> type you like to use with code based configuration. There is an extension method named <code>UseStartup</code> on the <code>ClusterConfiguration</code> class which you can use to do that.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="40" sourceendlinenumber="44"><code class="lang-csharp">var configuration = new ClusterConfiguration();
 
 configuration.UseStartupType&lt;MyApplication.Configuration.MyStartup&gt;();
-</code></pre><h2 id="configuring-via-xml">Configuring via XML</h2>
-<p>To register your <code>Startup</code> class with Orleans you&#39;ve to add a <code>Startup</code> element to the <code>Globals</code> section and in the <code>Type</code> attribute you&#39;ve to specify the assembly qualified name for the type.</p>
-<pre><code class="lang-XML">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
+</code></pre><h2 id="configuring-via-xml" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="46" sourceendlinenumber="46">Configuring via XML</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="48" sourceendlinenumber="48">To register your <code>Startup</code> class with Orleans you&#39;ve to add a <code>Startup</code> element to the <code>Globals</code> section and in the <code>Type</code> attribute you&#39;ve to specify the assembly qualified name for the type.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="50" sourceendlinenumber="57"><code class="lang-XML">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;tns:OrleansConfiguration xmlns:tns=&quot;urn:orleans&quot;&gt;
   &lt;tns:Globals&gt;
     &lt;tns:Startup Type=&quot;MyApplication.Configuration.Startup,MyApplication&quot; /&gt;
   &lt;/tns:Globals&gt;
 &lt;/tns:OrleansConfiguration&gt;
-</code></pre><h1 id="example">Example</h1>
-<p>Here is a complete <code>Startup</code> class example:</p>
-<pre><code class="lang-csharp">namespace MyApplication.Configuration
+</code></pre><h1 id="example" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="58" sourceendlinenumber="58">Example</h1>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="60" sourceendlinenumber="60">Here is a complete <code>Startup</code> class example:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="62" sourceendlinenumber="75"><code class="lang-csharp">namespace MyApplication.Configuration
 {
     public class MyStartup
     {
@@ -115,8 +115,8 @@ configuration.UseStartupType&lt;MyApplication.Configuration.MyStartup&gt;();
         }
     }
 }
-</code></pre><p>This example shows how a <a href="../Getting-Started-With-Orleans/Grains.html"><code>Grain</code></a> can utilize <code>IInjectedService</code> via constructor injection and also the complete declaration and implementation of the injected service:</p>
-<pre><code class="lang-csharp">public interface ISimpleDIGrain : IGrainWithIntegerKey
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="77" sourceendlinenumber="77">This example shows how a <a href="../Getting-Started-With-Orleans/Grains.html" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="77" sourceendlinenumber="77"><code>Grain</code></a> can utilize <code>IInjectedService</code> via constructor injection and also the complete declaration and implementation of the injected service:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="79" sourceendlinenumber="112"><code class="lang-csharp">public interface ISimpleDIGrain : IGrainWithIntegerKey
 {
     Task&lt;long&gt; GetTicksFromService();
 }
@@ -184,8 +184,8 @@ public class InjectedService : IInjectedService
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

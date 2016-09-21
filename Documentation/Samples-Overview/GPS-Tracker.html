@@ -8,7 +8,7 @@
     <title>GPS Tracker | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="GPS Tracker | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,34 +71,34 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="gps-tracker">GPS Tracker</h1>
+              <h1 id="gps-tracker" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="6" sourceendlinenumber="6">GPS Tracker</h1>
               
-<p>A sample application to show how Orleans could be used in conjunction with <a href="https://orleans.codeplex.com/wikipage?title=https%3a%2f%2fgithub.com%2fSignalR%2fSignalR&amp;referringTitle=GPS%20Tracker">SignalR</a> to monitor the position of a number of GPS enabled devices, and report these to a web browser.</p>
-<p><img src="GPS.png" alt=""></p>
-<p>In order to run this sample, you need a Bing Maps API key. The key is used by the <code>GPSTracker.Web</code> project, in Views\Home\Index.cshtml.</p>
-<p><a href="http://msdn.microsoft.com/en-us/library/ff428642.aspx">Get a Bing Maps Key</a></p>
-<h3 id="running-the-sample">Running the Sample</h3>
-<p>Running the sample locally:</p>
-<ol>
-<li>Open the <code>GPSTracker.sln</code> file in Visual Studio 2013, and build the solution.</li>
-<li>Start the local Orleans Silo by running the <code>Host</code> project of the solution.</li>
-<li>In Visual Studio, right click on the <code>GPSTracker.Web</code> project, and click <code>Set as StartUp Project</code>.</li>
-<li>Press F5 to start <code>GPSTracker.Web</code> web application.</li>
-<li>Your browser should open on a map of San Francisco.</li>
-<li>In a command window, navigate to the <code>GPSTracker.FakeDeviceGateway\bin\Debug</code> directory, and run the &#39;GPSTracker.FakeDeviceGateway.exe&#39; program.</li>
-<li>Pushpins should appear on the map, and move around. Blue ones are moving slow, orange faster.</li>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="8" sourceendlinenumber="8">A sample application to show how Orleans could be used in conjunction with <a href="https://orleans.codeplex.com/wikipage?title=https%3a%2f%2fgithub.com%2fSignalR%2fSignalR&amp;referringTitle=GPS%20Tracker" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="8" sourceendlinenumber="8">SignalR</a> to monitor the position of a number of GPS enabled devices, and report these to a web browser.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="10" sourceendlinenumber="10"><img src="GPS.png" alt="" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="10" sourceendlinenumber="10"></p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="12" sourceendlinenumber="12">In order to run this sample, you need a Bing Maps API key. The key is used by the <code>GPSTracker.Web</code> project, in Views\Home\Index.cshtml.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="15" sourceendlinenumber="15"><a href="http://msdn.microsoft.com/en-us/library/ff428642.aspx" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="15" sourceendlinenumber="15">Get a Bing Maps Key</a></p>
+<h3 id="running-the-sample" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="17" sourceendlinenumber="17">Running the Sample</h3>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="19" sourceendlinenumber="19">Running the sample locally:</p>
+<ol sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="21" sourceendlinenumber="27">
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="21" sourceendlinenumber="21">Open the <code>GPSTracker.sln</code> file in Visual Studio 2013, and build the solution.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="22" sourceendlinenumber="22">Start the local Orleans Silo by running the <code>Host</code> project of the solution.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="23" sourceendlinenumber="23">In Visual Studio, right click on the <code>GPSTracker.Web</code> project, and click <code>Set as StartUp Project</code>.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="24" sourceendlinenumber="24">Press F5 to start <code>GPSTracker.Web</code> web application.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="25" sourceendlinenumber="25">Your browser should open on a map of San Francisco.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="26" sourceendlinenumber="26">In a command window, navigate to the <code>GPSTracker.FakeDeviceGateway\bin\Debug</code> directory, and run the &#39;GPSTracker.FakeDeviceGateway.exe&#39; program.</li>
+<li sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="27" sourceendlinenumber="27">Pushpins should appear on the map, and move around. Blue ones are moving slow, orange faster.</li>
 </ol>
-<h3 id="how-it-works">How it Works</h3>
-<p>The <code>GPSTracker.FakeDeviceGateway.exe</code> program simulates data generated from 20 GPS devices. It randomly alters their speed and heading to simulate the devices moving within rectangular boundaries. It sends the position data to Orleans once a second.</p>
-<p>In Orleans, each device is represented by a <code>Device</code> grain. The grain records the previous position of the device, and can therefore calculate the speed of the device. If the devices has moved, the &#39;Device&#39; grain forwards position and speed to a <code>PushNotification</code> grain.</p>
-<p>This &#39;PushNotification&#39; grain maintains a C# SignalR client, which connects to a SignalR hub hosted in the <code>GPSTracker.Web</code> project. This allows the grain to &#39;push&#39; messages to the hub without the need for polling the Orleans API. The grain will batch messages together to improve network performance.</p>
-<p>The <code>GPSTracker.Web</code> application forwards all messages to connected web browsers using SignalR.</p>
-<p>JavaScript running in the browser positions the pins using a Bing Maps control. If the pin has a low velocity it colors it blue, otherwise orange.</p>
-<h3 id="advantages-of-using-orleans">Advantages of using Orleans</h3>
-<p>This sample is designed to show Orleans as a low-latency messaging system. Orleans is able to hold state for each device in memory (of which there may be many), allowing a quick calculation to be performed (calculating velocity) based on previous state.</p>
-<p>The grain in Orleans can also decide whether the message is worthy of forwarding downstream (has the device moved?) and can therefore filter out unnecessary messages and reduce noise.</p>
-<p>The sample also illustrates how SignalR may be used from inside a grain to allow &#39;push&#39; messaging directly to clients.</p>
-<p>In a real life scenario you would probably not forward all messages to the browser, and would filter based on groups or device type.</p>
+<h3 id="how-it-works" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="29" sourceendlinenumber="29">How it Works</h3>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="30" sourceendlinenumber="30">The <code>GPSTracker.FakeDeviceGateway.exe</code> program simulates data generated from 20 GPS devices. It randomly alters their speed and heading to simulate the devices moving within rectangular boundaries. It sends the position data to Orleans once a second.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="32" sourceendlinenumber="32">In Orleans, each device is represented by a <code>Device</code> grain. The grain records the previous position of the device, and can therefore calculate the speed of the device. If the devices has moved, the &#39;Device&#39; grain forwards position and speed to a <code>PushNotification</code> grain.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="34" sourceendlinenumber="34">This &#39;PushNotification&#39; grain maintains a C# SignalR client, which connects to a SignalR hub hosted in the <code>GPSTracker.Web</code> project. This allows the grain to &#39;push&#39; messages to the hub without the need for polling the Orleans API. The grain will batch messages together to improve network performance.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="36" sourceendlinenumber="36">The <code>GPSTracker.Web</code> application forwards all messages to connected web browsers using SignalR.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="38" sourceendlinenumber="38">JavaScript running in the browser positions the pins using a Bing Maps control. If the pin has a low velocity it colors it blue, otherwise orange.</p>
+<h3 id="advantages-of-using-orleans" sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="40" sourceendlinenumber="40">Advantages of using Orleans</h3>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="41" sourceendlinenumber="41">This sample is designed to show Orleans as a low-latency messaging system. Orleans is able to hold state for each device in memory (of which there may be many), allowing a quick calculation to be performed (calculating velocity) based on previous state.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="43" sourceendlinenumber="43">The grain in Orleans can also decide whether the message is worthy of forwarding downstream (has the device moved?) and can therefore filter out unnecessary messages and reduce noise.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="45" sourceendlinenumber="45">The sample also illustrates how SignalR may be used from inside a grain to allow &#39;push&#39; messaging directly to clients.</p>
+<p sourcefile="Documentation/Samples-Overview/GPS-Tracker.md" sourcestartlinenumber="47" sourceendlinenumber="47">In a real life scenario you would probably not forward all messages to the browser, and would filter based on groups or device type.</p>
 
             </article>
           </div>
@@ -135,8 +135,8 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

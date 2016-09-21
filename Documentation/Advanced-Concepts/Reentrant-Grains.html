@@ -8,7 +8,7 @@
     <title>Reentrant Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Reentrant Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,17 +71,17 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="reentrant-grains">Reentrant Grains</h1>
+              <h1 id="reentrant-grains" sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="6" sourceendlinenumber="6">Reentrant Grains</h1>
               
-<p>By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request.
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="8" sourceendlinenumber="10">By default, the Orleans scheduler requires an activation to completely finish processing one request before invoking the next request.
 An activation cannot receive a new request until all of the <code>Task</code>s created (directly or indirectly) in the processing of the current request have been resolved and all of their associated closures executed.
 <code>Grain</code> implementation classes may be marked with the <code>[Reentrant]</code> attribute to indicate that turns belonging to different requests may be freely interleaved.</p>
-<p>In other words, a reentrant activation may start executing another request while a previous request has not finished processing and has pending closures.
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="12" sourceendlinenumber="14">In other words, a reentrant activation may start executing another request while a previous request has not finished processing and has pending closures.
 Execution of turns of both requests are still limited to a single thread.
 So the activation is still executing one turn at a time, and each turn is executing on behalf of only one of the activation’s requests.</p>
-<p>Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains <strong>may</strong> see the execution of code for different requests interleaving. That is, the continuation turns from different requests may interleave.</p>
-<p>For example, with the below pseudo-code, when Foo and Bar are 2 methods of the same grain class:</p>
-<pre><code class="lang-csharp">Task Foo()
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="16" sourceendlinenumber="16">Reentrant grain code will never run multiple pieces of grain code in parallel (execution of grain code will always be single-threaded), but reentrant grains <strong>may</strong> see the execution of code for different requests interleaving. That is, the continuation turns from different requests may interleave.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="18" sourceendlinenumber="18">For example, with the below pseudo-code, when Foo and Bar are 2 methods of the same grain class:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="20" sourceendlinenumber="32"><code class="lang-csharp">Task Foo()
 {
     await task1;    // line 1
     return Do2();   // line 2
@@ -92,15 +92,15 @@ Task Bar()
     await task2;   // line 3
     return Do2();  // line 4
 }
-</code></pre><p>If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
-<p>For example, the following order of execution is possible:</p>
-<p>Line 1, line 3, line 2 and line 4. That is, the turns from different requests interleave.</p>
-<p>If the grain was not reentrant, the only possible executions would be: line 1, line 2, line 3, line 4 OR: line 3, line 4, line 1, line 2 (new request cannot start before the previous one finished).</p>
-<p>Reentrant grains should have slightly less overhead because of fewer activations, scheduling queues, smaller directory, and resources proportional to the number of activations. How small or large the “slightly” depends on what order of numbers we are talking about here, and on the potential overhead of handling interleaving requests (extra copies of state, etc.).</p>
-<p>The main tradeoff in choosing between reentrant and non-reentrant grains is the code complexity to make interleaving work correctly and the difficulty to reason about it.</p>
-<p>In a trivial case when the grains are stateless and the logic is simple, fewer (but not too few, so that all the hardware threads are used) reentrant grains should be in general slightly more efficient.</p>
-<p>If the code is more complex, then a larger number of non-reentrant grains, even if slightly less efficient overall, should save you a lot of grief of figuring out non-obvious interleaving issues.</p>
-<p>In the end answer will depend on the specifics of the application.</p>
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="34" sourceendlinenumber="34">If this grain is marked <code>[Reentrant]</code>, the execution of Foo and Bar may interleave.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="36" sourceendlinenumber="36">For example, the following order of execution is possible:</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="38" sourceendlinenumber="38">Line 1, line 3, line 2 and line 4. That is, the turns from different requests interleave.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="40" sourceendlinenumber="40">If the grain was not reentrant, the only possible executions would be: line 1, line 2, line 3, line 4 OR: line 3, line 4, line 1, line 2 (new request cannot start before the previous one finished).</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="42" sourceendlinenumber="42">Reentrant grains should have slightly less overhead because of fewer activations, scheduling queues, smaller directory, and resources proportional to the number of activations. How small or large the “slightly” depends on what order of numbers we are talking about here, and on the potential overhead of handling interleaving requests (extra copies of state, etc.).</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="44" sourceendlinenumber="44">The main tradeoff in choosing between reentrant and non-reentrant grains is the code complexity to make interleaving work correctly and the difficulty to reason about it.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="46" sourceendlinenumber="46">In a trivial case when the grains are stateless and the logic is simple, fewer (but not too few, so that all the hardware threads are used) reentrant grains should be in general slightly more efficient.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="48" sourceendlinenumber="48">If the code is more complex, then a larger number of non-reentrant grains, even if slightly less efficient overall, should save you a lot of grief of figuring out non-obvious interleaving issues.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Reentrant-Grains.md" sourcestartlinenumber="50" sourceendlinenumber="50">In the end answer will depend on the specifics of the application.</p>
 
             </article>
           </div>
@@ -137,8 +137,8 @@ Task Bar()
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

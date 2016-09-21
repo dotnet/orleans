@@ -8,7 +8,7 @@
     <title>Debugging and Symbols | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Debugging and Symbols | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -72,13 +72,13 @@
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
               
-              <p>An Orleans-based application can be easily debugged during development by simply attaching debugger to the silo host process, such as a host crteated with the Orleans Dev/Test Host project template, OrleansHost.exe, Azure Compute Emulator or any other host process.
+              <p sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="7" sourceendlinenumber="9">An Orleans-based application can be easily debugged during development by simply attaching debugger to the silo host process, such as a host crteated with the Orleans Dev/Test Host project template, OrleansHost.exe, Azure Compute Emulator or any other host process.
 In production, it is rarely a good idea to stop a silo at a breakpoint because the frozen silo will soon get voted dead by the cluster membership protocol and will not be able to communicate with other silos in the cluster.
 Hence, in productions tracing is the primary &#39;debugging&#39; mechanism.</p>
-<h2 id="symbols">Symbols</h2>
-<p>Symbols for Orleans binaries are published to <a href="https://nuget.smbsrc.net"><a href="https://nuget.smbsrc.net">https://nuget.smbsrc.net</a></a> symbols server. Add it to the list of symbols server in the Visual Studio options under Debugging/Symbols for debugging Orleans code. Make sure there is traling slash in the URL. Visual Studio 2015 has a bug with parsing it.</p>
-<h2 id="sources">Sources</h2>
-<p>You can download zipped sources for specific releases of Orleans from the <a href="https://github.com/dotnet/orleans/releases">Releases page</a>.</p>
+<h2 id="symbols" sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="12" sourceendlinenumber="12">Symbols</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="13" sourceendlinenumber="13">Symbols for Orleans binaries are published to <a href="https://nuget.smbsrc.net" sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="13" sourceendlinenumber="13"><a href="https://nuget.smbsrc.net" sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="13" sourceendlinenumber="13">https://nuget.smbsrc.net</a></a> symbols server. Add it to the list of symbols server in the Visual Studio options under Debugging/Symbols for debugging Orleans code. Make sure there is traling slash in the URL. Visual Studio 2015 has a bug with parsing it.</p>
+<h2 id="sources" sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="15" sourceendlinenumber="15">Sources</h2>
+<p sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="17" sourceendlinenumber="17">You can download zipped sources for specific releases of Orleans from the <a href="https://github.com/dotnet/orleans/releases" sourcefile="Documentation/Getting-Started-With-Orleans/Debugging.md" sourcestartlinenumber="17" sourceendlinenumber="17">Releases page</a>.</p>
 
             </article>
           </div>
@@ -115,8 +115,8 @@ Hence, in productions tracing is the primary &#39;debugging&#39; mechanism.</p>
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

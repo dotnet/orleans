@@ -8,7 +8,7 @@
     <title>Client Configuration | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Client Configuration | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,44 +71,44 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="client-configuration">Client Configuration</h1>
+              <h1 id="client-configuration" sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="6" sourceendlinenumber="6">Client Configuration</h1>
               
-<p>The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
-<h2 id="fixed-gateway-configuration">Fixed Gateway Configuration</h2>
-<p>A fixed set of gateways is specified in the ClientConfiguration.xml with one or more Gateway nodes:</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="8" sourceendlinenumber="8">The key parameter that has to be configured for a client is the silo’s client gateway endpoint(s) to connect to. There are two ways to do that: manually configure one or more gateway endpoints or point the client to the Azure Table used by silos’ cluster membership. In the latter case the client automatically discovers what silos with client gateways enabled are available within the deployment, and adjusts its connections to the gateways as they join or leave the cluster. This option is reliable and recommended for production deployment.</p>
+<h2 id="fixed-gateway-configuration" sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="10" sourceendlinenumber="10">Fixed Gateway Configuration</h2>
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="11" sourceendlinenumber="11">A fixed set of gateways is specified in the ClientConfiguration.xml with one or more Gateway nodes:</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="13" sourceendlinenumber="19"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;gateway1&quot; Port=&quot;30000&quot;/&gt;
   &lt;Gateway Address=&quot;gateway2&quot; Port=&quot;30000&quot;/&gt;
   &lt;Gateway Address=&quot;gateway3&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><p> One gateway is generally enough. Multiple gateway connections help increase throughput and reliability of the system.</p>
-<h2 id="gateway-configuration-based-on-cluster-membership">Gateway Configuration Based on Cluster Membership</h2>
-<p>To configure the client to automatically find gateways from the silo cluster membership table, you need to specify the Azure Table or SQL Server connection string and the target deployment ID.</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+</code></pre><p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="21" sourceendlinenumber="21"> One gateway is generally enough. Multiple gateway connections help increase throughput and reliability of the system.</p>
+<h2 id="gateway-configuration-based-on-cluster-membership" sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="23" sourceendlinenumber="23">Gateway Configuration Based on Cluster Membership</h2>
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="24" sourceendlinenumber="24">To configure the client to automatically find gateways from the silo cluster membership table, you need to specify the Azure Table or SQL Server connection string and the target deployment ID.</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="27" sourceendlinenumber="33"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;AzureTable&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;Azure storage connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><p> or</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+</code></pre><p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="35" sourceendlinenumber="35"> or</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="37" sourceendlinenumber="43"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;SqlServer&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;SQL connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><p> or</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+</code></pre><p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="45" sourceendlinenumber="45"> or</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="47" sourceendlinenumber="53"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;SystemStore SystemStoreType=&quot;ZooKeeper&quot;
                DeploymentId=&quot;target deployment ID&quot;
                DataConnectionString=&quot;ZooKeeper connection string&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><h2 id="local-silo">Local Silo</h2>
-<p>For the local development/test configuration that uses a local silo, the client gateway should be configured to &#39;localhost.&#39;</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+</code></pre><h2 id="local-silo" sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="56" sourceendlinenumber="56">Local Silo</h2>
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="57" sourceendlinenumber="57">For the local development/test configuration that uses a local silo, the client gateway should be configured to &#39;localhost.&#39;</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="60" sourceendlinenumber="64"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Gateway Address=&quot;localhost&quot; Port=&quot;30000&quot;/&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><h2 id="web-role-client-in-azure">Web Role Client in Azure</h2>
-<p>When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role.</p>
-<pre><code class="lang-xml">&lt;ServiceConfiguration  ...&gt;
+</code></pre><h2 id="web-role-client-in-azure" sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="66" sourceendlinenumber="66">Web Role Client in Azure</h2>
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="67" sourceendlinenumber="67">When the client is a web role running inside the same Azure deployment as the silo worker roles, all gateway address information is read from the OrleansSiloInstances table when OrleansAzureClient.Initialize() is called. The Azure storage connection string used to find the correct OrleansSiloInstances table is specified in the &quot;DataConnectionString&quot; setting defined in the service configuration for the deployment &amp; role.</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="70" sourceendlinenumber="79"><code class="lang-xml">&lt;ServiceConfiguration  ...&gt;
   &lt;Role name=&quot;WebRole&quot;&gt; ...
     &lt;ConfigurationSettings&gt;
       &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot; /&gt;
@@ -116,15 +116,15 @@
   &lt;/Role&gt;
   ...
 &lt;/ServiceConfiguration&gt;
-</code></pre><p>Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
-<p>When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for gateway address discovery, no additional gateway address info in required in the client config file. Typically the ClientConfiguration.xml file will only contain some minimal debug / tracing configuration settings, although even that is not required.</p>
-<pre><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
+</code></pre><p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="81" sourceendlinenumber="81">Both the silo worker roles and web client roles need to be use the same Azure storage account in order to successfully discover each other successfully.</p>
+<p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="83" sourceendlinenumber="83">When using OrleansAzureClient.Initialize() and OrleansSiloInstances table for gateway address discovery, no additional gateway address info in required in the client config file. Typically the ClientConfiguration.xml file will only contain some minimal debug / tracing configuration settings, although even that is not required.</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="86" sourceendlinenumber="92"><code class="lang-xml">&lt;ClientConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Tracing DefaultTraceLevel=&quot;Info&quot; &gt;
     &lt;TraceLevelOverride LogPrefix=&quot;Application&quot; TraceLevel=&quot;Info&quot; /&gt;
   &lt;/Tracing&gt;
 &lt;/ClientConfiguration&gt;
-</code></pre><p>Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.</p>
-<pre><code class="lang-csharp">var dataConnection = &quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot;;
+</code></pre><p sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="95" sourceendlinenumber="95">Code-based client configuration. This is a reference only example and SHOULD NOT be used AS-IS - you may need to fine-tune client parameters for your specific environment.</p>
+<pre sourcefile="Documentation/Orleans-Configuration-Guide/Client-Configuration.md" sourcestartlinenumber="97" sourceendlinenumber="150"><code class="lang-csharp">var dataConnection = &quot;DefaultEndpointsProtocol=https;AccountName=MYACCOUNTNAME;AccountKey=MYACCOUNTKEY&quot;;
 
 var config = new ClientConfiguration
 {
@@ -212,8 +212,8 @@ while (!GrainClient.IsInitialized)
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

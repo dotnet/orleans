@@ -8,7 +8,7 @@
     <title>PowerShell Client Module | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="PowerShell Client Module | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,91 +71,91 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="powershell-client-module">PowerShell Client Module</h1>
+              <h1 id="powershell-client-module" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="6" sourceendlinenumber="6">PowerShell Client Module</h1>
               
-<p>The Orleans PowerShell Client Module is a set of <a href="https://technet.microsoft.com/en-us/library/dd772285.aspx">PowerShell Cmdlets</a> that wraps
-<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs">GrainClient</a> in a set of convenient commands making possible to interact with not just
-<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs">ManagementGrain</a> but any <code>IGrain</code> just as a regular Orleans application can by using Powershell scripts.</p>
-<p>These Cmdlets enable a series of scenarions from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershel scripts.</p>
-<p>Here is how to use it:</p>
-<h2 id="installing-the-module">Installing the module</h2>
-<h3 id="from-source">From Source</h3>
-<p>You can build from source the <code>OrleansPSUtils</code> project and just import it with:</p>
-<pre><code class="lang-powershell">
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="8" sourceendlinenumber="10">The Orleans PowerShell Client Module is a set of <a href="https://technet.microsoft.com/en-us/library/dd772285.aspx" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="8" sourceendlinenumber="8">PowerShell Cmdlets</a> that wraps
+<a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Core/GrainClient.cs" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="9" sourceendlinenumber="9">GrainClient</a> in a set of convenient commands making possible to interact with not just
+<a href="https://github.com/dotnet/orleans/blob/master/src/OrleansRuntime/Core/ManagementGrain.cs" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="10" sourceendlinenumber="10">ManagementGrain</a> but any <code>IGrain</code> just as a regular Orleans application can by using Powershell scripts.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="12" sourceendlinenumber="12">These Cmdlets enable a series of scenarions from start maintenance tasks, tests, monitoring or any other kind of automation by leveraging Powershel scripts.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="14" sourceendlinenumber="14">Here is how to use it:</p>
+<h2 id="installing-the-module" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="16" sourceendlinenumber="16">Installing the module</h2>
+<h3 id="from-source" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="18" sourceendlinenumber="18">From Source</h3>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="19" sourceendlinenumber="19">You can build from source the <code>OrleansPSUtils</code> project and just import it with:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="21" sourceendlinenumber="25"><code class="lang-powershell">
 PS&gt; Import-Module .\projectOutputDir\Orleans.psd1
-</code></pre><p>Althought you can do that, there is a much easier and interesting way for doing that by installing it from <strong>PowerShell Galery</strong>.</p>
-<h3 id="from-powershell-gallery">From PowerShell Gallery</h3>
-<p>Powershell modules today are easily shared just as Nuget packages but instead of nuget.org, they are hosted on <a href="https://www.powershellgallery.com/">PowerShell Gallery</a>.</p>
-<ul>
-<li>To install it on a specific folder just run:</li>
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="27" sourceendlinenumber="27">Althought you can do that, there is a much easier and interesting way for doing that by installing it from <strong>PowerShell Galery</strong>.</p>
+<h3 id="from-powershell-gallery" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="29" sourceendlinenumber="29">From PowerShell Gallery</h3>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="31" sourceendlinenumber="31">Powershell modules today are easily shared just as Nuget packages but instead of nuget.org, they are hosted on <a href="https://www.powershellgallery.com/" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="31" sourceendlinenumber="31">PowerShell Gallery</a>.</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="33" sourceendlinenumber="33">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="33" sourceendlinenumber="33">To install it on a specific folder just run:</li>
 </ul>
-<pre><code class="lang-powershell">
+<pre sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="35" sourceendlinenumber="39"><code class="lang-powershell">
 PS&gt; Save-Module -Name Orleans -Path &lt;path&gt;
-</code></pre><ul>
-<li>To install it on your PowerShell modules path (<strong>the recommended way</strong>), just run:</li>
+</code></pre><ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="41" sourceendlinenumber="41">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="41" sourceendlinenumber="41">To install it on your PowerShell modules path (<strong>the recommended way</strong>), just run:</li>
 </ul>
-<pre><code class="lang-powershell">
+<pre sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="43" sourceendlinenumber="47"><code class="lang-powershell">
 PS&gt; Install-Module -Name Orleans
-</code></pre><ul>
-<li>If you plan to use this module on an <a href="https://azure.microsoft.com/en-us/services/automation/">Azure Automation</a>, just click on the button bellow:
+</code></pre><ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="49" sourceendlinenumber="52">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="49" sourceendlinenumber="52">If you plan to use this module on an <a href="https://azure.microsoft.com/en-us/services/automation/" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="49" sourceendlinenumber="49">Azure Automation</a>, just click on the button bellow:
 <button style="border:none;background-image:none; background-color:transparent " type="button" title="Deploy this module to Azure Automation." onclick="window.open('https://www.powershellgallery.com/packages/Orleans/DeployItemToAzureAutomation?itemType=PSModule', target = '_blank')">
   <img src="https://www.powershellgallery.com/Content/Images/DeployToAzureAutomationButton.png">
 </button></li>
 </ul>
-<h2 id="using-the-module">Using the module</h2>
-<p>Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:</p>
-<pre><code class="lang-powershell">
+<h2 id="using-the-module" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="56" sourceendlinenumber="56">Using the module</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="58" sourceendlinenumber="58">Regardless of the way you decide to install it, the first thing you need to do in order to actually use it is import the module on the current PowerShell session so the Cmdlets get available by running this:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="60" sourceendlinenumber="64"><code class="lang-powershell">
 PS&gt; Import-Module &quot;Orleans&quot;
-</code></pre><p><strong>Note</strong>:
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="66" sourceendlinenumber="68"><strong>Note</strong>:
 In case of building from source, you must import it as suggested on the Install section by using the path to the <code>.psd1</code> instead of using the module name since it will not be on the <code>$env:PSModulePath</code> PowerShell runtime variable.
 Again, it is highly recommended that you install from PowerShell Gallery instead.</p>
-<p>After the module is imported (which means it is loaded on PowerShell session), you will have the following Cmdlets available:</p>
-<ul>
-<li><code>Start-GrainClient</code></li>
-<li><code>Stop-GrainClient</code></li>
-<li><code>Get-Grain</code></li>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="70" sourceendlinenumber="70">After the module is imported (which means it is loaded on PowerShell session), you will have the following Cmdlets available:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="72" sourceendlinenumber="74">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="72" sourceendlinenumber="72"><code>Start-GrainClient</code></li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="73" sourceendlinenumber="73"><code>Stop-GrainClient</code></li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="74" sourceendlinenumber="74"><code>Get-Grain</code></li>
 </ul>
-<h4 id="start-grainclient"><code>Start-GrainClient</code></h4>
-<p>This module is a wrapper around <code>GrainClient.Initialize()</code> and its overloads.</p>
-<p><strong>Usage</strong>:     </p>
-<ul>
-<li><p><strong><code>Start-GrainClient</code></strong></p>
-<ul>
-<li>The same as call <code>GrainClient.Initialize()</code> which will look for the known Orleans Client configuration file names</li>
-</ul>
-</li>
-<li><p><strong><code>Start-GrainClient [-ConfigFilePath] &lt;string&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
-<ul>
-<li>Will use the provided file path as in <code>GrainClient.Initialize(filePath)</code></li>
+<h4 id="start-grainclient" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="76" sourceendlinenumber="76"><code>Start-GrainClient</code></h4>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="78" sourceendlinenumber="78">This module is a wrapper around <code>GrainClient.Initialize()</code> and its overloads.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="80" sourceendlinenumber="80"><strong>Usage</strong>:     </p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="84" sourceendlinenumber="102">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="84" sourceendlinenumber="86"><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="84" sourceendlinenumber="84"><strong><code>Start-GrainClient</code></strong></p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="86" sourceendlinenumber="86">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="86" sourceendlinenumber="86">The same as call <code>GrainClient.Initialize()</code> which will look for the known Orleans Client configuration file names</li>
 </ul>
 </li>
-<li><p><strong><code>Start-GrainClient [-ConfigFile] &lt;FileInfo&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
-<ul>
-<li>Use an instance of the <code>System.FileInfo</code> class representing the config file just as <code>GrainClient.Initialize(fileInfo)</code></li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="88" sourceendlinenumber="90"><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="88" sourceendlinenumber="88"><strong><code>Start-GrainClient [-ConfigFilePath] &lt;string&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="90" sourceendlinenumber="90">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="90" sourceendlinenumber="90">Will use the provided file path as in <code>GrainClient.Initialize(filePath)</code></li>
 </ul>
 </li>
-<li><p><strong><code>Start-GrainClient [-Config] &lt;ClientConfiguration&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
-<ul>
-<li>Use an instance of a <code>Orleans.Runtime.Configuration.ClientConfiguration</code> like in <code>GrainClient.Initialize(config)</code></li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="92" sourceendlinenumber="94"><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="92" sourceendlinenumber="92"><strong><code>Start-GrainClient [-ConfigFile] &lt;FileInfo&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="94" sourceendlinenumber="94">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="94" sourceendlinenumber="94">Use an instance of the <code>System.FileInfo</code> class representing the config file just as <code>GrainClient.Initialize(fileInfo)</code></li>
 </ul>
 </li>
-<li><p><strong><code>Start-GrainClient [-GatewayAddress] &lt;IPEndPoint&gt; [[-OverrideConfig] &lt;bool&gt;] [[-Timeout] &lt;timespan&gt;]</code></strong></p>
-<ul>
-<li>Takes a Orleans Cluster Gateway Address Endpoint</li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="96" sourceendlinenumber="98"><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="96" sourceendlinenumber="96"><strong><code>Start-GrainClient [-Config] &lt;ClientConfiguration&gt; [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="98" sourceendlinenumber="98">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="98" sourceendlinenumber="98">Use an instance of a <code>Orleans.Runtime.Configuration.ClientConfiguration</code> like in <code>GrainClient.Initialize(config)</code></li>
+</ul>
+</li>
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="100" sourceendlinenumber="102"><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="100" sourceendlinenumber="100"><strong><code>Start-GrainClient [-GatewayAddress] &lt;IPEndPoint&gt; [[-OverrideConfig] &lt;bool&gt;] [[-Timeout] &lt;timespan&gt;]</code></strong></p>
+<ul sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="102" sourceendlinenumber="102">
+<li sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="102" sourceendlinenumber="102">Takes a Orleans Cluster Gateway Address Endpoint</li>
 </ul>
 </li>
 </ul>
-<p><strong>Note</strong>:
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="105" sourceendlinenumber="106"><strong>Note</strong>:
 The <code>Timeout</code> parameter is optional and if it is informed and greater than <code>System.TimeSpan.Zero</code>, it will call <code>Orleans.GrainClient.SetResponseTimeout(Timeout)</code> internally.</p>
-<h4 id="stop-grainclient"><code>Stop-GrainClient</code></h4>
-<p>Takes no parameters and when called, if the <code>GrainClient</code> is initialized will gracefuly uninitialize.</p>
-<h4 id="get-grain"><code>Get-Grain</code></h4>
-<p>Wrapper around <code>GrainClient.GrainFactory.GetGrain&lt;T&gt;()</code> and its overloads.</p>
-<p>The mandatory parameter is <code>-GrainType</code> and the <code>-XXXKey</code> for the current Grain key types supported by Orleans (<code>string</code>, <code>Guid</code>, <code>long</code>) and also the <code>-KeyExrension</code> that can be used on Grains with compound keys.</p>
-<p>This Cmdlet return a grain reference of the type passed by as parameter on <code>-GrainType</code>.</p>
-<h2 id="example">Example:</h2>
-<p>A simple example on calling <code>MyInterfacesNamespace.IMyGrain.SayHeloTo</code> grain method:</p>
-<pre><code class="lang-powershell">
+<h4 id="stop-grainclient" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="108" sourceendlinenumber="108"><code>Stop-GrainClient</code></h4>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="110" sourceendlinenumber="110">Takes no parameters and when called, if the <code>GrainClient</code> is initialized will gracefuly uninitialize.</p>
+<h4 id="get-grain" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="112" sourceendlinenumber="112"><code>Get-Grain</code></h4>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="114" sourceendlinenumber="114">Wrapper around <code>GrainClient.GrainFactory.GetGrain&lt;T&gt;()</code> and its overloads.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="116" sourceendlinenumber="116">The mandatory parameter is <code>-GrainType</code> and the <code>-XXXKey</code> for the current Grain key types supported by Orleans (<code>string</code>, <code>Guid</code>, <code>long</code>) and also the <code>-KeyExrension</code> that can be used on Grains with compound keys.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="118" sourceendlinenumber="118">This Cmdlet return a grain reference of the type passed by as parameter on <code>-GrainType</code>.</p>
+<h2 id="example" sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="120" sourceendlinenumber="120">Example:</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="122" sourceendlinenumber="122">A simple example on calling <code>MyInterfacesNamespace.IMyGrain.SayHeloTo</code> grain method:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="124" sourceendlinenumber="147"><code class="lang-powershell">
 PS&gt; Import-Module &quot;Orleans&quot;
 
 PS&gt; $configFilePath = Resolve-Path(&quot;.\ClientConfig.xml&quot;).Path
@@ -176,9 +176,9 @@ PS&gt; Write-Output $message
 Hello Gutemberg!
 
 PS&gt; Stop-GrainClient
-</code></pre><p>Thats it for now. We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="149" sourceendlinenumber="150">Thats it for now. We plan to update this page as we introduce more Cmdlets like use Observers, Streams and other Orleans core features more natively on Powershell.
 We hope that this help people as a starting point for automation. As always, this is a work-in-progress and we love contributions! :)</p>
-<p>Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Powershell-Client.md" sourcestartlinenumber="152" sourceendlinenumber="152">Please note that the intent is not to reimplement the whole client on PowerShell but instead, give IT and DevOps teams a way to interact with the Grains without need to implement a .Net application.</p>
 
             </article>
           </div>
@@ -215,8 +215,8 @@ We hope that this help people as a starting point for automation. As always, thi
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

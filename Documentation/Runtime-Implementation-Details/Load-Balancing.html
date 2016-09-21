@@ -8,7 +8,7 @@
     <title>Load Balancing | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Load Balancing | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,27 +71,27 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="load-balancing">Load Balancing</h1>
+              <h1 id="load-balancing" sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="6" sourceendlinenumber="6">Load Balancing</h1>
               
-<p><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
-<ol>
-<li><p><strong>Default actor placement strategy is random</strong> - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="8" sourceendlinenumber="8"><strong>Load balancing, in a broad sense, is one of the pillars of the Orleans runtime</strong>. Orleans runtime tries to make everything balanced, since balancing allows to maximize resource usage and avoid hotspots, which leads to better performance, as well as helps with elasticity. Load balancing in Orleans applies in multiple places. Below is a non-exhaustive list of places where the runtime performs balancing:</p>
+<ol sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="10" sourceendlinenumber="22">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="10" sourceendlinenumber="10"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="10" sourceendlinenumber="10"><strong>Default actor placement strategy is random</strong> - new activations are placed randomly across silos. That results in a balanced placement and prevents hotspots for most scenarios.</p>
 </li>
-<li><p>A more advanced <strong>ActivationCountPlacement</strong> tries to equalize the number of activations on all silos, which results in a more even distribution of activations across silos. This is especially important for elasticity.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="12" sourceendlinenumber="12"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="12" sourceendlinenumber="12">A more advanced <strong>ActivationCountPlacement</strong> tries to equalize the number of activations on all silos, which results in a more even distribution of activations across silos. This is especially important for elasticity.</p>
 </li>
-<li><p><strong>Grain Directory service</strong> is built on top of a Distributed Hash Table, which inherently is balanced. The directory service maps grains to activations, each silo owns part of the global mapping table, and this table is globally partitioned in a balanced way across all silos. We use consistent hashing with virtual buckets for that.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="14" sourceendlinenumber="14"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="14" sourceendlinenumber="14"><strong>Grain Directory service</strong> is built on top of a Distributed Hash Table, which inherently is balanced. The directory service maps grains to activations, each silo owns part of the global mapping table, and this table is globally partitioned in a balanced way across all silos. We use consistent hashing with virtual buckets for that.</p>
 </li>
-<li><p>Clients connect to all <strong>gateways</strong> and spread their requests across them, in a balanced way.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="16" sourceendlinenumber="16"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="16" sourceendlinenumber="16">Clients connect to all <strong>gateways</strong> and spread their requests across them, in a balanced way.</p>
 </li>
-<li><p><strong>Reminder service</strong> is a distributed partitioned runtime service. The assignment of which silo is responsible to serve which reminder is balanced across all silos via consistent hashing, just like in grain directory.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="18" sourceendlinenumber="18"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="18" sourceendlinenumber="18"><strong>Reminder service</strong> is a distributed partitioned runtime service. The assignment of which silo is responsible to serve which reminder is balanced across all silos via consistent hashing, just like in grain directory.</p>
 </li>
-<li><p><strong>Performance critical components within a silo are partitioned, and the work across them is locally balanced</strong>. That way the silo runtime can fully utilize all available CPU cores and not create in-silo bottlenecks. This applies to all local resources: allocation of work to threads, sockets, dispatch responsibilities, queues, etc.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="20" sourceendlinenumber="20"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="20" sourceendlinenumber="20"><strong>Performance critical components within a silo are partitioned, and the work across them is locally balanced</strong>. That way the silo runtime can fully utilize all available CPU cores and not create in-silo bottlenecks. This applies to all local resources: allocation of work to threads, sockets, dispatch responsibilities, queues, etc.</p>
 </li>
-<li><p><strong>StreamQueueBalance</strong> balances the responsibility of pulling events from persistence queues across silos in the cluster.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="22" sourceendlinenumber="22"><p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="22" sourceendlinenumber="22"><strong>StreamQueueBalance</strong> balances the responsibility of pulling events from persistence queues across silos in the cluster.</p>
 </li>
 </ol>
-<p>Also notice that <strong>balancing, in a broad sense, does not necessarily mean loss of locality</strong>. One can be balanced and still maintain a good locality. For example, when balancing means sharding/partitioning, you can partition responsibility for a certain logical task, while still maintaining  locality within each partition. That applies both for local and distributed balancing.</p>
-<p>Refer to this presentation on <a href="http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx">Balancing Techniques in Orleans</a> for more details.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="24" sourceendlinenumber="24">Also notice that <strong>balancing, in a broad sense, does not necessarily mean loss of locality</strong>. One can be balanced and still maintain a good locality. For example, when balancing means sharding/partitioning, you can partition responsibility for a certain logical task, while still maintaining  locality within each partition. That applies both for local and distributed balancing.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="26" sourceendlinenumber="26">Refer to this presentation on <a href="http://dotnet.github.io/orleans/Presentations/Balancing Techniques in Orleans.pptx" sourcefile="Documentation/Runtime-Implementation-Details/Load-Balancing.md" sourcestartlinenumber="26" sourceendlinenumber="26">Balancing Techniques in Orleans</a> for more details.</p>
 
             </article>
           </div>
@@ -128,8 +128,8 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

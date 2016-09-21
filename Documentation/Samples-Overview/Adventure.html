@@ -8,7 +8,7 @@
     <title>Adventure | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Adventure | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,34 +71,34 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="adventure">Adventure</h1>
+              <h1 id="adventure" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="6" sourceendlinenumber="6">Adventure</h1>
               
-<p>A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.</p>
-<h3 id="instructions">Instructions:</h3>
-<ol>
-<li>Build Adventure.sln</li>
-<li>Start your local Silo from a command window using command file  #1.</li>
-<li>The game map initialization script, #2</li>
-<li>Start the client #3</li>
-<li>Reminisce about the good old days before graphical user interfaces</li>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="8" sourceendlinenumber="8">A simple multiplayer text adventure game inspired by old-fashioned, text-based adventure games.</p>
+<h3 id="instructions" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="10" sourceendlinenumber="10">Instructions:</h3>
+<ol sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="11" sourceendlinenumber="15">
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="11" sourceendlinenumber="11">Build Adventure.sln</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="12" sourceendlinenumber="12">Start your local Silo from a command window using command file  #1.</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="13" sourceendlinenumber="13">The game map initialization script, #2</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="14" sourceendlinenumber="14">Start the client #3</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="15" sourceendlinenumber="15">Reminisce about the good old days before graphical user interfaces</li>
 </ol>
-<h3 id="overview">Overview</h3>
-<p>The AdventureSetup program reads a game description (&quot;map&quot;) from AdventureConfig.txt.</p>
-<p>It sets up a series of &quot;rooms&quot; e.g. forest, beach, caves, a clearing etc . These locations are connected to other rooms to model the places and layout of the game. The sample configuration describes only a handful of locations.</p>
-<p>Rooms can contain &quot;things&quot; such as keys, swords etc.</p>
-<p>The AdventureClient program sets up your player and provides a simple text based user interface to allow you to play the game.</p>
-<p>You can move around rooms and interact with things using a simple command language, saying things such as &quot;go north&quot; or &quot;take brass key&quot;.</p>
-<h3 id="why-orleans">Why Orleans?</h3>
-<p>Orleans allows the game to be described via very simple C# code while allowing it to scale to a massive multiplayer game. For this motivation to be meaningful, the labyrinth of rooms needs to be very large and need to support a large number of simultaneous players. One value of Orleans is that the service can be designed for growth, the overhead of running it at a small scale is not significant, and you can remain confident that it will scale if the need arises.</p>
-<h3 id="how-is-it-modeled">How is it modeled?</h3>
-<p>Player and Rooms are modeled as grains. These grains allow us to distribute the game with each grain modelling state and functionality.</p>
-<p>Things such as keys are modeled as plain old objects - they are really just simple immutable data structures that move around rooms and among players; they don&#39;t need to be grains.</p>
-<h3 id="things-for-you-to-do-if-you-are-so-inclined">Things for you to do if you are so inclined</h3>
-<ol>
-<li>Make the map much, much, bigger</li>
-<li>Make the brass key unlock something</li>
-<li>Allow players to message each other</li>
-<li>Make eating food and drinking water possible and meaningful</li>
+<h3 id="overview" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="17" sourceendlinenumber="17">Overview</h3>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="18" sourceendlinenumber="18">The AdventureSetup program reads a game description (&quot;map&quot;) from AdventureConfig.txt.</p>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="20" sourceendlinenumber="20">It sets up a series of &quot;rooms&quot; e.g. forest, beach, caves, a clearing etc . These locations are connected to other rooms to model the places and layout of the game. The sample configuration describes only a handful of locations.</p>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="22" sourceendlinenumber="22">Rooms can contain &quot;things&quot; such as keys, swords etc.</p>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="24" sourceendlinenumber="24">The AdventureClient program sets up your player and provides a simple text based user interface to allow you to play the game.</p>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="26" sourceendlinenumber="26">You can move around rooms and interact with things using a simple command language, saying things such as &quot;go north&quot; or &quot;take brass key&quot;.</p>
+<h3 id="why-orleans" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="28" sourceendlinenumber="28">Why Orleans?</h3>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="29" sourceendlinenumber="29">Orleans allows the game to be described via very simple C# code while allowing it to scale to a massive multiplayer game. For this motivation to be meaningful, the labyrinth of rooms needs to be very large and need to support a large number of simultaneous players. One value of Orleans is that the service can be designed for growth, the overhead of running it at a small scale is not significant, and you can remain confident that it will scale if the need arises.</p>
+<h3 id="how-is-it-modeled" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="31" sourceendlinenumber="31">How is it modeled?</h3>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="32" sourceendlinenumber="32">Player and Rooms are modeled as grains. These grains allow us to distribute the game with each grain modelling state and functionality.</p>
+<p sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="34" sourceendlinenumber="34">Things such as keys are modeled as plain old objects - they are really just simple immutable data structures that move around rooms and among players; they don&#39;t need to be grains.</p>
+<h3 id="things-for-you-to-do-if-you-are-so-inclined" sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="36" sourceendlinenumber="36">Things for you to do if you are so inclined</h3>
+<ol sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="37" sourceendlinenumber="40">
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="37" sourceendlinenumber="37">Make the map much, much, bigger</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="38" sourceendlinenumber="38">Make the brass key unlock something</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="39" sourceendlinenumber="39">Allow players to message each other</li>
+<li sourcefile="Documentation/Samples-Overview/Adventure.md" sourcestartlinenumber="40" sourceendlinenumber="40">Make eating food and drinking water possible and meaningful</li>
 </ol>
 
             </article>
@@ -136,8 +136,8 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

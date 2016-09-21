@@ -8,7 +8,7 @@
     <title>Cloud Deployment | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Cloud Deployment | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,42 +71,42 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="cloud-deployment">Cloud Deployment</h1>
+              <h1 id="cloud-deployment" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="6" sourceendlinenumber="6">Cloud Deployment</h1>
               
-<h2 id="deploying-orleans-to-windows-azure">Deploying Orleans to Windows Azure</h2>
-<p>This walkthrough shows the steps required to deploy the sample created in the  <a href="Front-Ends-for-Orleans-Services.html">Front Ends for Orleans Services</a> to Windows Azure Cloud Services.</p>
-<p>In Azure, one or more worker roles will be used to host the Orleans silos, and an Azure web role will act as the presentation layer for the application and client to the application grains running in the Orleans silos.</p>
-<p>The same grain interfaces and implementation can run on both Windows Server and Windows Azure, so no special considerations are needed in order to be able to run your application in a Windows Azure hosting environment.</p>
-<p>The  <a href="https://github.com/dotnet/orleans/tree/master/Samples/AzureWebSample">Azure Web Sample</a> sample app provides a working example of how to run a web application with supporting Orleans silo cluster backend in an Azure hosted service, and the details are described below.</p>
-<h2 id="pre-requisites">Pre-requisites</h2>
-<p>The following prerequisites are required:</p>
-<ul>
-<li>Visual Studio 2013 or 2015</li>
-<li><a href="http://azure.microsoft.com/en-us/downloads/">Windows Azure SDK v2.4 or higher</a></li>
+<h2 id="deploying-orleans-to-windows-azure" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="8" sourceendlinenumber="8">Deploying Orleans to Windows Azure</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="9" sourceendlinenumber="9">This walkthrough shows the steps required to deploy the sample created in the  <a href="Front-Ends-for-Orleans-Services.html" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="9" sourceendlinenumber="9">Front Ends for Orleans Services</a> to Windows Azure Cloud Services.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="11" sourceendlinenumber="11">In Azure, one or more worker roles will be used to host the Orleans silos, and an Azure web role will act as the presentation layer for the application and client to the application grains running in the Orleans silos.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="13" sourceendlinenumber="13">The same grain interfaces and implementation can run on both Windows Server and Windows Azure, so no special considerations are needed in order to be able to run your application in a Windows Azure hosting environment.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="15" sourceendlinenumber="15">The  <a href="https://github.com/dotnet/orleans/tree/master/Samples/AzureWebSample" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="15" sourceendlinenumber="15">Azure Web Sample</a> sample app provides a working example of how to run a web application with supporting Orleans silo cluster backend in an Azure hosted service, and the details are described below.</p>
+<h2 id="pre-requisites" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="17" sourceendlinenumber="17">Pre-requisites</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="18" sourceendlinenumber="18">The following prerequisites are required:</p>
+<ul sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="20" sourceendlinenumber="21">
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="20" sourceendlinenumber="20">Visual Studio 2013 or 2015</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="21" sourceendlinenumber="21"><a href="http://azure.microsoft.com/en-us/downloads/" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="21" sourceendlinenumber="21">Windows Azure SDK v2.4 or higher</a></li>
 </ul>
-<p>For more info on installing and working with Windows Azure in general, see the Microsoft Developer Network (MSDN) web site: (<a href="http://msdn.microsoft.com/en-us/windowsazure/">http://msdn.microsoft.com/en-us/windowsazure/</a>)</p>
-<h2 id="create-azure-worker-role-for-orleans-silos">Create Azure Worker Role for Orleans Silos</h2>
-<p>Right click on your solution, and select &#39;Add | New Project...&#39;.</p>
-<p>Choose the &#39;Windows Azure Cloud Service&#39; project template:</p>
-<p><img src="../Images/AzureTutorial1.PNG" alt=""></p>
-<p>When prompted, select a new &#39;Worker Role&#39; to add to the project.
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="23" sourceendlinenumber="23">For more info on installing and working with Windows Azure in general, see the Microsoft Developer Network (MSDN) web site: (<a href="http://msdn.microsoft.com/en-us/windowsazure/" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="23" sourceendlinenumber="23">http://msdn.microsoft.com/en-us/windowsazure/</a>)</p>
+<h2 id="create-azure-worker-role-for-orleans-silos" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="25" sourceendlinenumber="25">Create Azure Worker Role for Orleans Silos</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="26" sourceendlinenumber="26">Right click on your solution, and select &#39;Add | New Project...&#39;.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="28" sourceendlinenumber="28">Choose the &#39;Windows Azure Cloud Service&#39; project template:</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="30" sourceendlinenumber="30"><img src="../Images/AzureTutorial1.PNG" alt="" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="30" sourceendlinenumber="30"></p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="32" sourceendlinenumber="33">When prompted, select a new &#39;Worker Role&#39; to add to the project.
 This will be used to host the Orleans Silos:</p>
-<p><img src="../Images/AzureTutorial2.PNG" alt=""></p>
-<h2 id="add-project-references-for-orleans-silo-binaries">Add project references for Orleans Silo binaries</h2>
-<p>Add references to the <code>OrleansAzureSilo</code> project for the required Orleans server library files.
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="35" sourceendlinenumber="35"><img src="../Images/AzureTutorial2.PNG" alt="" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="35" sourceendlinenumber="35"></p>
+<h2 id="add-project-references-for-orleans-silo-binaries" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="37" sourceendlinenumber="37">Add project references for Orleans Silo binaries</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="38" sourceendlinenumber="39">Add references to the <code>OrleansAzureSilo</code> project for the required Orleans server library files.
 Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> folder under the Orleans SDK.</p>
-<ul>
-<li>Orleans.dll</li>
-<li>OrleansAzureUtils.dll</li>
-<li>OrleansRuntime.dll</li>
-<li>OrleansProviders.dll (Only required if you your grains use the <a href="Declarative-Persistence.html">Declarative Persistence</a> functionality.)</li>
+<ul sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="41" sourceendlinenumber="44">
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="41" sourceendlinenumber="41">Orleans.dll</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="42" sourceendlinenumber="42">OrleansAzureUtils.dll</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="43" sourceendlinenumber="43">OrleansRuntime.dll</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="44" sourceendlinenumber="44">OrleansProviders.dll (Only required if you your grains use the <a href="Declarative-Persistence.html" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="44" sourceendlinenumber="44">Declarative Persistence</a> functionality.)</li>
 </ul>
-<p>Note: All of these references MUST have <em>Copy Local = &#39;True&#39;</em> settings to ensure the necessary library DLLs get copied into the <code>OrleansAzureSilo</code> project output directory.</p>
-<p><img src="../Images/AzureTutorial3.PNG" alt=""></p>
-<h2 id="configure-azure-worker-role-for-orleans-silos">Configure Azure Worker Role for Orleans Silos</h2>
-<p>The Worker Role initialization class is a normal Azure worker role - it needs to inherit from the usual <code>Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint</code> base class.</p>
-<p>The worker role initialization class needs to create an instance of <code>Orleans.Runtime.Host.AzureSilo</code> class, and call the appropriate <code>Start</code>/<code>Run</code>/<code>Stop</code> functions in the appropriate places:</p>
-<pre><code class="lang-csharp">public class WorkerRole : RoleEntryPoint
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="46" sourceendlinenumber="46">Note: All of these references MUST have <em>Copy Local = &#39;True&#39;</em> settings to ensure the necessary library DLLs get copied into the <code>OrleansAzureSilo</code> project output directory.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="48" sourceendlinenumber="48"><img src="../Images/AzureTutorial3.PNG" alt="" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="48" sourceendlinenumber="48"></p>
+<h2 id="configure-azure-worker-role-for-orleans-silos" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="50" sourceendlinenumber="50">Configure Azure Worker Role for Orleans Silos</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="51" sourceendlinenumber="51">The Worker Role initialization class is a normal Azure worker role - it needs to inherit from the usual <code>Microsoft.WindowsAzure.ServiceRuntime.RoleEntryPoint</code> base class.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="53" sourceendlinenumber="53">The worker role initialization class needs to create an instance of <code>Orleans.Runtime.Host.AzureSilo</code> class, and call the appropriate <code>Start</code>/<code>Run</code>/<code>Stop</code> functions in the appropriate places:</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="55" sourceendlinenumber="87"><code class="lang-csharp">public class WorkerRole : RoleEntryPoint
 {
     AzureSilo silo;
 
@@ -137,14 +137,14 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
         silo.Run(); // Call will block until silo is shutdown
     }
 }
-</code></pre><p>It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.</p>
-<p>Then, in the <code>ServiceDefinition.csdef</code> file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:</p>
-<ul>
-<li>Add a <code>ConfigurationSettings</code> declaration named &#39;DataConnectionString&#39;. This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table.</li>
-<li>Add an <code>InternalEndpoint</code> declaration for a TCP endpoint named &#39;OrleansSiloEndpoint&#39;</li>
-<li>Add an <code>InternalEndpoint</code> declaration for a TCP endpoint named &#39;OrleansProxyEndpoint&#39;</li>
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="89" sourceendlinenumber="89">It is IMPORTANT to start the silo not in OnStart but in Run. Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="91" sourceendlinenumber="91">Then, in the <code>ServiceDefinition.csdef</code> file for this role, add some required configuration items used by the Orleans Azure hosting library to the WorkerRole configuration:</p>
+<ul sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="93" sourceendlinenumber="95">
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="93" sourceendlinenumber="93">Add a <code>ConfigurationSettings</code> declaration named &#39;DataConnectionString&#39;. This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table.</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="94" sourceendlinenumber="94">Add an <code>InternalEndpoint</code> declaration for a TCP endpoint named &#39;OrleansSiloEndpoint&#39;</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="95" sourceendlinenumber="95">Add an <code>InternalEndpoint</code> declaration for a TCP endpoint named &#39;OrleansProxyEndpoint&#39;</li>
 </ul>
-<pre><code class="lang-xml">&lt;ServiceDefinition ...&gt;
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="97" sourceendlinenumber="113"><code class="lang-xml">&lt;ServiceDefinition ...&gt;
     &lt;WorkerRole name=&quot;OrleansAzureSilos&quot; ...&gt;
         ...
         &lt;ConfigurationSettings&gt;
@@ -159,50 +159,50 @@ Copies of these files can be found in the <em>.\Binaries\OrleansServer</em> fold
     &lt;/WorkerRole&gt;
     ...
 &lt;/ServiceDefinition&gt;
-</code></pre><p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
-<p>Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;</p>
-<p>This will be a normal Azure storage connection – either for the development storage emulator (only valid if running locally), or a full Azure storage account connection string for cloud-storage.</p>
-<p>In general, this connection string is likely to use the same configuration values as the <code>Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString</code> diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.</p>
-<p>See the <a href="http://azure.microsoft.com/en-us/documentation/articles/storage-configure-connection-string/">Configure Azure Storage Connection Strings</a> for more information.</p>
-<p>For example, to use local Developer Storage emulator (for local testing only)</p>
-<pre><code class="lang-xml">&lt;ConfigurationSettings&gt;
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="116" sourceendlinenumber="116">In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="118" sourceendlinenumber="118">Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="120" sourceendlinenumber="120">This will be a normal Azure storage connection – either for the development storage emulator (only valid if running locally), or a full Azure storage account connection string for cloud-storage.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="122" sourceendlinenumber="122">In general, this connection string is likely to use the same configuration values as the <code>Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString</code> diagnostics connection string setting, but is not required to. Be careful to not mix up Azure storage and local storage. This can cause deployments to not work.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="124" sourceendlinenumber="124">See the <a href="http://azure.microsoft.com/en-us/documentation/articles/storage-configure-connection-string/" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="124" sourceendlinenumber="124">Configure Azure Storage Connection Strings</a> for more information.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="126" sourceendlinenumber="126">For example, to use local Developer Storage emulator (for local testing only)</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="128" sourceendlinenumber="133"><code class="lang-xml">&lt;ConfigurationSettings&gt;
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;UseDevelopmentStorage=true&quot; /&gt;
     &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;UseDevelopmentStorage=true&quot; /&gt;
 &lt;/ConfigurationSettings&gt;
-</code></pre><p>Or using an Azure cloud storage account:</p>
-<pre><code class="lang-xml">&lt;ConfigurationSettings&gt;
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="135" sourceendlinenumber="135">Or using an Azure cloud storage account:</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="137" sourceendlinenumber="142"><code class="lang-xml">&lt;ConfigurationSettings&gt;
     &lt;Setting name=&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey&quot; /&gt;
     &lt;Setting name=&quot;DataConnectionString&quot; value=&quot;DefaultEndpointsProtocol=https;AccountName=MyAccount;AccountKey=MyKey&quot; /&gt;
 &lt;/ConfigurationSettings&gt;
-</code></pre><h2 id="changing-dataconnectionstring">Changing DataConnectionString</h2>
-<p>The &quot;DataConnectionString&quot; setting in <code>ServiceDefinition.csdef</code> is the default name use by the Orleans silo for the Azure table account connection string that will be used for Orleans system tables such as <code>OrleanSiloInstances</code>.</p>
-<p>If you wish to use a different setting name for this value, then in the silo role initialization code set the property <code>OrleansAzureSilo.DataConnectionConfigurationSettingName</code> before the call to <code>OrleansAzureSilo.Start(...)</code></p>
-<h2 id="add-your-grain-binaries-to-azure-worker-role-for-orleans-silos">Add your grain binaries to Azure Worker Role for Orleans Silos</h2>
-<p>Add the grain interfaces DLL and implementation classes DLL for the grains to be hosted in the Azure silo into the <code>OrleansAzureSilo</code> project, along with any supporting libraries those grains need.</p>
-<p>Note: You MUST ensure that all the referenced binaries are copied into the <code>OrleansAzureSilo</code> project output directory, to ensure they get picked up by the Azure packaging tools.</p>
-<h2 id="running-orleans-client-as-azure-web-role">Running Orleans Client as Azure Web Role</h2>
-<p>The user interface / presentation layer for your application will usually run as a Web Role in Azure.</p>
-<p>The <code>Orleans.Runtime.Host.AzureClient</code> utility class is the main mechanism for bootstrapping connection to the Orleans silo worker roles from an Azure Web Role.
+</code></pre><h2 id="changing-dataconnectionstring" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="144" sourceendlinenumber="144">Changing DataConnectionString</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="145" sourceendlinenumber="145">The &quot;DataConnectionString&quot; setting in <code>ServiceDefinition.csdef</code> is the default name use by the Orleans silo for the Azure table account connection string that will be used for Orleans system tables such as <code>OrleanSiloInstances</code>.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="147" sourceendlinenumber="147">If you wish to use a different setting name for this value, then in the silo role initialization code set the property <code>OrleansAzureSilo.DataConnectionConfigurationSettingName</code> before the call to <code>OrleansAzureSilo.Start(...)</code></p>
+<h2 id="add-your-grain-binaries-to-azure-worker-role-for-orleans-silos" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="149" sourceendlinenumber="149">Add your grain binaries to Azure Worker Role for Orleans Silos</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="150" sourceendlinenumber="150">Add the grain interfaces DLL and implementation classes DLL for the grains to be hosted in the Azure silo into the <code>OrleansAzureSilo</code> project, along with any supporting libraries those grains need.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="153" sourceendlinenumber="153">Note: You MUST ensure that all the referenced binaries are copied into the <code>OrleansAzureSilo</code> project output directory, to ensure they get picked up by the Azure packaging tools.</p>
+<h2 id="running-orleans-client-as-azure-web-role" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="156" sourceendlinenumber="156">Running Orleans Client as Azure Web Role</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="157" sourceendlinenumber="157">The user interface / presentation layer for your application will usually run as a Web Role in Azure.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="159" sourceendlinenumber="160">The <code>Orleans.Runtime.Host.AzureClient</code> utility class is the main mechanism for bootstrapping connection to the Orleans silo worker roles from an Azure Web Role.
 A few additional configuration steps are needed to make the <code>AzureClient</code> utility class work – see below for details.</p>
-<h3 id="create-azure-web-role-for-orleans-client">Create Azure Web Role for Orleans Client</h3>
-<p>Any type of web role can be used as an Orleans client, and there are no specific naming requirements or conventions for this project.</p>
-<p>Add a web role to the solution using the existing web application project that we created in the Front Ends for Orleans Services tutorial.</p>
-<p>Add project references for Orleans Client binaries.
+<h3 id="create-azure-web-role-for-orleans-client" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="162" sourceendlinenumber="162">Create Azure Web Role for Orleans Client</h3>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="164" sourceendlinenumber="164">Any type of web role can be used as an Orleans client, and there are no specific naming requirements or conventions for this project.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="166" sourceendlinenumber="166">Add a web role to the solution using the existing web application project that we created in the Front Ends for Orleans Services tutorial.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="168" sourceendlinenumber="170">Add project references for Orleans Client binaries.
 Add references to the web role project for the required Orleans client library files.
 Copies of these files can be found in either  <em>SDK-ROOT\Samples\References</em> or  <em>SDK-ROOT\Binaries\OrleansClient</em> directories.</p>
-<ul>
-<li>Orleans.dll</li>
-<li>OrleansAzureUtils.dll</li>
+<ul sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="172" sourceendlinenumber="173">
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="172" sourceendlinenumber="172">Orleans.dll</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="173" sourceendlinenumber="173">OrleansAzureUtils.dll</li>
 </ul>
-<p>Note: All of these references MUST have <em>Copy Local = &#39;True&#39;</em> settings to ensure the necessary library DLLs get copied into the web role project output directory.</p>
-<h3 id="configure-azure-web-role-to-be-an-orleans-client">Configure Azure Web Role to be an Orleans Client</h3>
-<p>In the <code>ServiceDefinition.csdef</code> file for this web role, add some required configuration items used by the Orleans Azure hosting library:</p>
-<ul>
-<li>Add a <code>ConfigurationSettings</code> declaration named &#39;DataConnectionString&#39;.
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="176" sourceendlinenumber="176">Note: All of these references MUST have <em>Copy Local = &#39;True&#39;</em> settings to ensure the necessary library DLLs get copied into the web role project output directory.</p>
+<h3 id="configure-azure-web-role-to-be-an-orleans-client" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="179" sourceendlinenumber="179">Configure Azure Web Role to be an Orleans Client</h3>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="180" sourceendlinenumber="180">In the <code>ServiceDefinition.csdef</code> file for this web role, add some required configuration items used by the Orleans Azure hosting library:</p>
+<ul sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="182" sourceendlinenumber="184">
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="182" sourceendlinenumber="183">Add a <code>ConfigurationSettings</code> declaration named &#39;DataConnectionString&#39;.
 This is the Azure storage location where Orleans Azure hosting library will place / look for its silo instance table.</li>
-<li>In addition, a http/s <code>InputEndpoint</code> will also need to be declared, just as for any other Azure web role config.</li>
+<li sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="184" sourceendlinenumber="184">In addition, a http/s <code>InputEndpoint</code> will also need to be declared, just as for any other Azure web role config.</li>
 </ul>
-<pre><code class="lang-xml">&lt;ServiceDefinition ...&gt;
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="186" sourceendlinenumber="208"><code class="lang-xml">&lt;ServiceDefinition ...&gt;
 &lt;WebRole name=&quot;MyWebRole&quot; ...&gt;
     ...
     &lt;Sites&gt;
@@ -223,12 +223,12 @@ This is the Azure storage location where Orleans Azure hosting library will plac
 &lt;/WebRole&gt;
 ...
 &lt;/ServiceDefinition&gt;
-</code></pre><p>In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
-<p>Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;.
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="210" sourceendlinenumber="210">In the <em>ServiceConfiguration.cscfg</em> file for this role, add some required configuration items used by the Orleans Azure hosting library:</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="212" sourceendlinenumber="213">Add a <code>ConfigurationSettings</code> definition for &#39;DataConnectionString&#39;.
 This will be a normal Azure storage connection – either for the development storage emulator (if running locally), or a full Azure storage account connection string for cloud-storage.</p>
-<p>This setting MUST match the <code>DataConnectionString</code> value used by the <code>OrleansSiloWorker</code> role in order for the client to discover and bootstrap the connection to the Orleans silos.</p>
-<p>For example, to use local Developer Storage emulator (for local testing only)</p>
-<pre><code class="lang-xml">&lt;ServiceConfiguration ...&gt;
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="215" sourceendlinenumber="215">This setting MUST match the <code>DataConnectionString</code> value used by the <code>OrleansSiloWorker</code> role in order for the client to discover and bootstrap the connection to the Orleans silos.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="217" sourceendlinenumber="217">For example, to use local Developer Storage emulator (for local testing only)</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="219" sourceendlinenumber="231"><code class="lang-xml">&lt;ServiceConfiguration ...&gt;
 &lt;Role name=&quot;OrleansWebClient&quot; ...&gt;
     ...
     &lt;ConfigurationSettings&gt;
@@ -239,8 +239,8 @@ This will be a normal Azure storage connection – either for the development st
 &lt;/Role&gt;
 ...
 &lt;/ServiceConfiguration&gt;
-</code></pre><p>Or using an Azure cloud storage account:</p>
-<pre><code class="lang-xml">&lt;ServiceConfiguration ...&gt;
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="233" sourceendlinenumber="233">Or using an Azure cloud storage account:</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="235" sourceendlinenumber="247"><code class="lang-xml">&lt;ServiceConfiguration ...&gt;
 &lt;Role name=&quot;OrleansWebClient&quot; ...&gt;
     ...
     &lt;ConfigurationSettings&gt;
@@ -251,15 +251,15 @@ This will be a normal Azure storage connection – either for the development st
 &lt;/Role&gt;
 ...
 &lt;/ServiceConfiguration&gt;
-</code></pre><h3 id="add-your-grain-interface-binaries-to-azure-web-role-for-orleans-client">Add your grain interface binaries to Azure Web Role for Orleans Client</h3>
-<p>Add the grain interfaces DLL for the application grains into this web role project.</p>
-<p>Access to the DLL containing the grain implementation classes should not be required by the client web role.</p>
-<p>Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.</p>
-<p>The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.</p>
-<h2 id="initialize-client-connection-to-orleans-silos">Initialize Client Connection to Orleans Silos</h2>
-<p>It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use in the <em>Global.asax</em> initialization methods.</p>
-<p>Edit the configuration of the client in the <em>Global.asax.cs</em> file to use <code>AzureClient</code>.</p>
-<pre><code class="lang-csharp">namespace WebApplication1
+</code></pre><h3 id="add-your-grain-interface-binaries-to-azure-web-role-for-orleans-client" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="250" sourceendlinenumber="250">Add your grain interface binaries to Azure Web Role for Orleans Client</h3>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="251" sourceendlinenumber="251">Add the grain interfaces DLL for the application grains into this web role project.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="253" sourceendlinenumber="253">Access to the DLL containing the grain implementation classes should not be required by the client web role.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="255" sourceendlinenumber="255">Note: You MUST ensure that all the referenced binaries for grain interfaces and the generated proxy / factory libraries are copied into the web role project output directory, to ensure they get picked up by the Azure packaging tools.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="257" sourceendlinenumber="257">The grain implementation DLLs should not be required by the client and so should not be referenced by the web role.</p>
+<h2 id="initialize-client-connection-to-orleans-silos" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="259" sourceendlinenumber="259">Initialize Client Connection to Orleans Silos</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="260" sourceendlinenumber="260">It is recommended to bootstrap and initialize the client connection to the Orleans silo worker roles, to ensure a connection is set up before use in the <em>Global.asax</em> initialization methods.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="262" sourceendlinenumber="262">Edit the configuration of the client in the <em>Global.asax.cs</em> file to use <code>AzureClient</code>.</p>
+<pre sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="264" sourceendlinenumber="297"><code class="lang-csharp">namespace WebApplication1
 {
     public class WebApiApplication : System.Web.HttpApplication
     {
@@ -291,16 +291,16 @@ This will be a normal Azure storage connection – either for the development st
                 }
             }
               ...
-</code></pre><p>Repeated calls to <code>AzureClient.Initialize()</code>  will return and do nothing if the Orleans client connection is already set up.</p>
-<p>An additional variant of <code>AzureClient.Initialize(System.IO.FileInfo)</code> allows a base client config file location to be specified explicitly.
+</code></pre><p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="299" sourceendlinenumber="299">Repeated calls to <code>AzureClient.Initialize()</code>  will return and do nothing if the Orleans client connection is already set up.</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="301" sourceendlinenumber="302">An additional variant of <code>AzureClient.Initialize(System.IO.FileInfo)</code> allows a base client config file location to be specified explicitly.
 The internal endpoint addresses of the Orleans silo nodes will still be determined dynamically from the Orleans Silo instance table each silo node registers with.</p>
 <!--TODO: Create link to Orleans API when the link is created/found-->
-<p>See the Orleans API docs for details of the various <code>Initialize</code> methods available.</p>
-<h2 id="deploying-to-azure">Deploying to Azure</h2>
-<p>The normal Azure deployment tools are used to deploy the application to Windows Azure – either into the local Azure Compute Emulator for local development / test (Press F5 to run), or into the Azure cloud hosting environment right click on the Cloud project and select &#39;Publish&#39;:</p>
-<h2 id="next">Next</h2>
-<p>We&#39;ll write our own storage provider, to save grain state to alternative to file instead of Microsoft Azure:</p>
-<p><a href="Custom-Storage-Providers.html">Custom Storage Providers</a></p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="305" sourceendlinenumber="305">See the Orleans API docs for details of the various <code>Initialize</code> methods available.</p>
+<h2 id="deploying-to-azure" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="307" sourceendlinenumber="307">Deploying to Azure</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="308" sourceendlinenumber="308">The normal Azure deployment tools are used to deploy the application to Windows Azure – either into the local Azure Compute Emulator for local development / test (Press F5 to run), or into the Azure cloud hosting environment right click on the Cloud project and select &#39;Publish&#39;:</p>
+<h2 id="next" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="310" sourceendlinenumber="310">Next</h2>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="312" sourceendlinenumber="312">We&#39;ll write our own storage provider, to save grain state to alternative to file instead of Microsoft Azure:</p>
+<p sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="314" sourceendlinenumber="314"><a href="Custom-Storage-Providers.html" sourcefile="Tutorials/Cloud-Deployment.md" sourcestartlinenumber="314" sourceendlinenumber="314">Custom Storage Providers</a></p>
 
             </article>
           </div>
@@ -337,8 +337,8 @@ The internal endpoint addresses of the Orleans silo nodes will still be determin
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Microsoft Orleans | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Microsoft Orleans | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="favicon.ico">
     <link rel="stylesheet" href="styles/docfx.vendor.css">
@@ -100,27 +100,27 @@
 </div>
 
 <hr>
-<p>In Orleans, actors are called &#39;grains&#39;, and are described using an interface. Async methods are used to indicate which messages the actor can receive:</p>
-<pre><code class="lang-csharp">public interface IMyGrain : IGrainWithStringKey
+<p sourcefile="index.md" sourcestartlinenumber="63" sourceendlinenumber="63">In Orleans, actors are called &#39;grains&#39;, and are described using an interface. Async methods are used to indicate which messages the actor can receive:</p>
+<pre sourcefile="index.md" sourcestartlinenumber="65" sourceendlinenumber="70"><code class="lang-csharp">public interface IMyGrain : IGrainWithStringKey
 {
     Task&lt;string&gt; SayHello(string name);
 }
-</code></pre><p>The implementation is executed inside the Orleans framework:</p>
-<pre><code class="lang-csharp">public class MyGrain : IMyGrain
+</code></pre><p sourcefile="index.md" sourcestartlinenumber="72" sourceendlinenumber="72">The implementation is executed inside the Orleans framework:</p>
+<pre sourcefile="index.md" sourcestartlinenumber="74" sourceendlinenumber="82"><code class="lang-csharp">public class MyGrain : IMyGrain
 {
     public async Task&lt;string&gt; SayHello(string name)
     {
         return &quot;Hello &quot; + name;
     }
 }
-</code></pre><p>You can then send messages to the grain by creating a proxy object, and calling the methods:</p>
-<pre><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IMyGrain&gt;(&quot;grain1&quot;);
+</code></pre><p sourcefile="index.md" sourcestartlinenumber="84" sourceendlinenumber="84">You can then send messages to the grain by creating a proxy object, and calling the methods:</p>
+<pre sourcefile="index.md" sourcestartlinenumber="86" sourceendlinenumber="89"><code class="lang-csharp">var grain = GrainClient.GrainFactory.GetGrain&lt;IMyGrain&gt;(&quot;grain1&quot;);
 await grain.SayHello(&quot;World&quot;);
-</code></pre><h2 id="where-next">Where Next?</h2>
-<p>To learn more about the concepts in Orleans, read the <a href="Documentation/Introduction.html">introduction</a>.</p>
-<p>There are a number of <a href="Tutorials/index.html">step-by-step tutorials</a>.</p>
-<p>Discuss your Orleans questions on the <a href="https://gitter.im/dotnet/orleans">gitter chat room</a>.</p>
-<p>Fork the code on the <a href="https://github.com/dotnet/orleans">GitHub Respository</a>.</p>
+</code></pre><h2 id="where-next" sourcefile="index.md" sourcestartlinenumber="91" sourceendlinenumber="91">Where Next?</h2>
+<p sourcefile="index.md" sourcestartlinenumber="93" sourceendlinenumber="93">To learn more about the concepts in Orleans, read the <a href="Documentation/Introduction.html" sourcefile="index.md" sourcestartlinenumber="93" sourceendlinenumber="93">introduction</a>.</p>
+<p sourcefile="index.md" sourcestartlinenumber="95" sourceendlinenumber="95">There are a number of <a href="Tutorials/index.html" sourcefile="index.md" sourcestartlinenumber="95" sourceendlinenumber="95">step-by-step tutorials</a>.</p>
+<p sourcefile="index.md" sourcestartlinenumber="97" sourceendlinenumber="97">Discuss your Orleans questions on the <a href="https://gitter.im/dotnet/orleans" sourcefile="index.md" sourcestartlinenumber="97" sourceendlinenumber="97">gitter chat room</a>.</p>
+<p sourcefile="index.md" sourcestartlinenumber="99" sourceendlinenumber="99">Fork the code on the <a href="https://github.com/dotnet/orleans" sourcefile="index.md" sourcestartlinenumber="99" sourceendlinenumber="99">GitHub Respository</a>.</p>
 
       </div>
       
@@ -139,8 +139,8 @@ await grain.SayHello(&quot;World&quot;);
     </div>
     
     <script type="text/javascript" src="styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="styles/docfx.js"></script>
     <script type="text/javascript" src="styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

@@ -8,7 +8,7 @@
     <title>Messaging Delivery Guarantees | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Messaging Delivery Guarantees | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,25 +71,25 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="messaging-delivery-guarantees">Messaging Delivery Guarantees</h1>
+              <h1 id="messaging-delivery-guarantees" sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="6" sourceendlinenumber="6">Messaging Delivery Guarantees</h1>
               
-<p>Orleans messaging delivery guarantees are <strong>at-most-once</strong>, by default.
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="8" sourceendlinenumber="9">Orleans messaging delivery guarantees are <strong>at-most-once</strong>, by default.
 Optionally, if configured to do retries upon timeout, Orleans provides at-least-once deliv­ery instead.</p>
-<p>In more details:</p>
-<ul>
-<li><p>Every message in Orleans has automatic timeout (the exact timeout can be configured). If the reply does not arrive on time the return Task is broken with timeout exception.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="11" sourceendlinenumber="11">In more details:</p>
+<ul sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="13" sourceendlinenumber="17">
+<li sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="13" sourceendlinenumber="13"><p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="13" sourceendlinenumber="13">Every message in Orleans has automatic timeout (the exact timeout can be configured). If the reply does not arrive on time the return Task is broken with timeout exception.</p>
 </li>
-<li><p>Orleans can be configured to do automatic retries upon timeout. By default we do NOT do automatic retries.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="15" sourceendlinenumber="15"><p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="15" sourceendlinenumber="15">Orleans can be configured to do automatic retries upon timeout. By default we do NOT do automatic retries.</p>
 </li>
-<li><p>Application code of course can also pick to do retries upon timeout.</p>
+<li sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="17" sourceendlinenumber="17"><p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="17" sourceendlinenumber="17">Application code of course can also pick to do retries upon timeout.</p>
 </li>
 </ul>
-<p>If the Orleans system is configured not to do automatic retries (default setting) and application is not resending – <strong>Orleans provides at most once message delivery</strong>. A message will either be delivered once or not at all. <strong>It will never be delivered twice.</strong></p>
-<p>In the system with retries (either by the runtime or by the application) the message may arrive multiple times. Orleans currently does nothing to durably store which messages already arrived and suppress the second delivery (we believe this would be pretty costly). So in the system with retries Orleans does NOT guarantee at most once delivery.</p>
-<p><strong>If you keep retrying potentially indefinitely</strong>, <strong>the message will eventually arrive</strong>, thus providing at least once delivery guarantee. Notice that “will eventually arrive” is something that the runtime needs to guarantee. It does not come for free just by itself even if you keep retrying. Orleans provides eventually delivery since grains never go into any permanent failure state and a failed grain will for sure eventually be re-activated on another silo.</p>
-<p><strong>So to summarize</strong>: in the system without retries Orleans guarantees at most once message delivery. In the system with infinite retries Orleans guarantee at least once (and does NOT guarantee at most once).</p>
-<p><strong>Note</strong>:
-In the <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf">Orleans technical report</a> we accidentally only mentioned the 2nd option with automatic retries and forgot to mention that by default with no retries, Orleans provides at most once delivery.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="19" sourceendlinenumber="19">If the Orleans system is configured not to do automatic retries (default setting) and application is not resending – <strong>Orleans provides at most once message delivery</strong>. A message will either be delivered once or not at all. <strong>It will never be delivered twice.</strong></p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="21" sourceendlinenumber="21">In the system with retries (either by the runtime or by the application) the message may arrive multiple times. Orleans currently does nothing to durably store which messages already arrived and suppress the second delivery (we believe this would be pretty costly). So in the system with retries Orleans does NOT guarantee at most once delivery.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="23" sourceendlinenumber="23"><strong>If you keep retrying potentially indefinitely</strong>, <strong>the message will eventually arrive</strong>, thus providing at least once delivery guarantee. Notice that “will eventually arrive” is something that the runtime needs to guarantee. It does not come for free just by itself even if you keep retrying. Orleans provides eventually delivery since grains never go into any permanent failure state and a failed grain will for sure eventually be re-activated on another silo.</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="25" sourceendlinenumber="25"><strong>So to summarize</strong>: in the system without retries Orleans guarantees at most once message delivery. In the system with infinite retries Orleans guarantee at least once (and does NOT guarantee at most once).</p>
+<p sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="28" sourceendlinenumber="29"><strong>Note</strong>:
+In the <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf" sourcefile="Documentation/Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md" sourcestartlinenumber="29" sourceendlinenumber="29">Orleans technical report</a> we accidentally only mentioned the 2nd option with automatic retries and forgot to mention that by default with no retries, Orleans provides at most once delivery.</p>
 
             </article>
           </div>
@@ -126,8 +126,8 @@ In the <a href="http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

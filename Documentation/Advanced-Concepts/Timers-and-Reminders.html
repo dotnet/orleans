@@ -8,7 +8,7 @@
     <title>Timers and Reminders | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Timers and Reminders | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,80 +71,80 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="timers-and-reminders">Timers and Reminders</h1>
+              <h1 id="timers-and-reminders" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="6" sourceendlinenumber="6">Timers and Reminders</h1>
               
-<p>The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
-<h1 id="timers">Timers</h1>
-<h2 id="description">Description</h2>
-<p><strong>Timers</strong> are used to create periodic grain behavior that isn&#39;t required to span multiple activations (instantiations of the grain). It is essentially identical to the standard .<strong>NET System.Threading.Timer</strong> class. In addition, it is subject to single threaded execution guarantees within the grain activation that it operates.</p>
-<p> Each activation may have zero or more timers associated with it. The runtime executes each timer routine within the runtime context of the activation that it is associated with.</p>
-<h2 id="usage">Usage</h2>
-<p>To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
-<pre><code class="lang-csharp">protected IDisposable RegisterTimer(Func&lt;object, Task&gt; asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
-</code></pre><ul>
-<li>asyncCallback is the function to be invoked when the timer ticks.</li>
-<li>state is an object that will be passed to asyncCallback when the timer ticks.</li>
-<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
-<li><p>period specifies the period of the timer.</p>
-<p>Cancel the timer by disposing it.</p>
-<p>A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.</p>
-<p>Important Considerations</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="8" sourceendlinenumber="8">The Orleans runtime provides two mechanisms, called timers and reminders, that enable the developer to specify periodic behavior for grains.</p>
+<h1 id="timers" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="10" sourceendlinenumber="10">Timers</h1>
+<h2 id="description" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="12" sourceendlinenumber="12">Description</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="13" sourceendlinenumber="13"><strong>Timers</strong> are used to create periodic grain behavior that isn&#39;t required to span multiple activations (instantiations of the grain). It is essentially identical to the standard .<strong>NET System.Threading.Timer</strong> class. In addition, it is subject to single threaded execution guarantees within the grain activation that it operates.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="15" sourceendlinenumber="15"> Each activation may have zero or more timers associated with it. The runtime executes each timer routine within the runtime context of the activation that it is associated with.</p>
+<h2 id="usage" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="17" sourceendlinenumber="17">Usage</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="18" sourceendlinenumber="18">To start a timer, use the <strong>Grain.RegisterTimer</strong> method, which returns an  <strong>IDisposable</strong> reference:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="20" sourceendlinenumber="22"><code class="lang-csharp">protected IDisposable RegisterTimer(Func&lt;object, Task&gt; asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+</code></pre><ul sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="24" sourceendlinenumber="37">
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="24" sourceendlinenumber="24">asyncCallback is the function to be invoked when the timer ticks.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="25" sourceendlinenumber="25">state is an object that will be passed to asyncCallback when the timer ticks.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="26" sourceendlinenumber="26">dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="27" sourceendlinenumber="33"><p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="27" sourceendlinenumber="27">period specifies the period of the timer.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="27" sourceendlinenumber="27">Cancel the timer by disposing it.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="27" sourceendlinenumber="27">A timer will cease to trigger if the activation is deactivated or when a fault occurs and its silo crashes.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="27" sourceendlinenumber="27">Important Considerations</p>
 </li>
-<li><p>When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</p>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="35" sourceendlinenumber="35"><p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="35" sourceendlinenumber="35">When activation collection is enabled, the execution of a timer callback does not change the activation&#39;s state from idle to in use. This means that a timer cannot be used to postpone deactivation of otherwise idle activations.</p>
 </li>
-<li>The period passed to <strong>Grain.RegisterTimer</strong> is the amount of time that passes from the moment the Task returned by <strong>asyncCallback</strong> is resolved to the moment that the next invocation of <strong>asyncCallback</strong> should occur. This not only makes it impossible for successive calls to <strong>asyncCallback</strong> to overlap but also makes it so that the length of time <strong>asyncCallback</strong> takes to complete affects the frequency at which <strong>asyncCallback</strong> is invoked. This is an important deviation from the semantics of <strong>System.Threading.Timer</strong>.</li>
-<li>Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered to behave as if running on a reentrant grain with respect to other messages to that grain.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="36" sourceendlinenumber="36">The period passed to <strong>Grain.RegisterTimer</strong> is the amount of time that passes from the moment the Task returned by <strong>asyncCallback</strong> is resolved to the moment that the next invocation of <strong>asyncCallback</strong> should occur. This not only makes it impossible for successive calls to <strong>asyncCallback</strong> to overlap but also makes it so that the length of time <strong>asyncCallback</strong> takes to complete affects the frequency at which <strong>asyncCallback</strong> is invoked. This is an important deviation from the semantics of <strong>System.Threading.Timer</strong>.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="37" sourceendlinenumber="37">Each invocation of <strong>asyncCallback</strong> is delivered to an activation on a separate turn and will never run concurrently with other turns on the same activation. Note however, <strong>asyncCallback</strong> invocations are not delivered as messages and are thus not subject to message interleaving semantics. This means that invocations of <strong>asyncCallback</strong> should be considered to behave as if running on a reentrant grain with respect to other messages to that grain.</li>
 </ul>
-<h1 id="reminders">Reminders</h1>
-<h2 id="description-1">Description</h2>
-<p>Reminders are similar to timers with a few important differences:</p>
-<ul>
-<li>Reminders are persistent and will continue to trigger in all situations (including partial or full cluster restarts) unless explicitly cancelled.</li>
-<li>Reminders are associated with a grain, not any specific activation.</li>
-<li>If a grain has no activation associated with it and a reminder ticks, one will be created. e.g.: If an activation becomes idle and is deactivated, a reminder associated with the same grain will reactivate the grain when it ticks next.</li>
-<li>Reminders are delivered by message and are subject to the same interleaving semantics as all other grain methods.</li>
-<li>Reminders should not be used for high-frequency timers-- their period should be measured in minutes, hours, or days.</li>
+<h1 id="reminders" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="39" sourceendlinenumber="39">Reminders</h1>
+<h2 id="description-1" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="41" sourceendlinenumber="41">Description</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="43" sourceendlinenumber="43">Reminders are similar to timers with a few important differences:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="45" sourceendlinenumber="49">
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="45" sourceendlinenumber="45">Reminders are persistent and will continue to trigger in all situations (including partial or full cluster restarts) unless explicitly cancelled.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="46" sourceendlinenumber="46">Reminders are associated with a grain, not any specific activation.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="47" sourceendlinenumber="47">If a grain has no activation associated with it and a reminder ticks, one will be created. e.g.: If an activation becomes idle and is deactivated, a reminder associated with the same grain will reactivate the grain when it ticks next.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="48" sourceendlinenumber="48">Reminders are delivered by message and are subject to the same interleaving semantics as all other grain methods.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="49" sourceendlinenumber="49">Reminders should not be used for high-frequency timers-- their period should be measured in minutes, hours, or days.</li>
 </ul>
-<h2 id="configuration">Configuration</h2>
-<p>Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.</p>
-<pre><code class="lang-xml">&lt;SystemStore SystemStoreType=&quot;AzureTable&quot; /&gt; OR
+<h2 id="configuration" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="51" sourceendlinenumber="51">Configuration</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="52" sourceendlinenumber="52">Reminders, being persistent, rely upon storage to function. You must specify which storage backing to use before the reminder subsystem will function. The reminder functionality is controlled by the SystemStore element in the server-side configuration. It works with either Azure Table or SQL Server as the store.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="54" sourceendlinenumber="57"><code class="lang-xml">&lt;SystemStore SystemStoreType=&quot;AzureTable&quot; /&gt; OR
 &lt;SystemStore SystemStoreType=&quot;SqlServer&quot; /&gt;
-</code></pre><p> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
-<pre><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
-</code></pre><h2 id="usage-1">Usage</h2>
-<p>A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
-<pre><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="59" sourceendlinenumber="59"> If you just want a placeholder implementation of reminders to work with without needing to set up an Azure account or SQL database, then adding this element to the configuration file (under &#39;Globals&#39;) will give you a development-only implementation of the reminder system:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="61" sourceendlinenumber="63"><code class="lang-xml">&lt;ReminderService ReminderServiceType=&quot;ReminderTableGrain&quot;/&gt;
+</code></pre><h2 id="usage-1" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="65" sourceendlinenumber="65">Usage</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="66" sourceendlinenumber="66">A grain that uses reminders must implement the <strong>IRemindable.RecieveReminder</strong> method.</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="68" sourceendlinenumber="74"><code class="lang-csharp">Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
 {
     Console.WriteLine(&quot;Thanks for reminding me-- I almost forgot!&quot;);
     return TaskDone.Done;
 }
-</code></pre><p> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IOrleansReminder</strong> object:</p>
-<pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-</code></pre><ul>
-<li>reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.</li>
-<li>dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
-<li>period specifies the period of the timer.</li>
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="76" sourceendlinenumber="76"> To start a reminder, use the <strong>Grain.RegisterOrUpdateReminder</strong> method, which returns an <strong>IOrleansReminder</strong> object:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="78" sourceendlinenumber="80"><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+</code></pre><ul sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="82" sourceendlinenumber="84">
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="82" sourceendlinenumber="82">reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="83" sourceendlinenumber="83">dueTime specifies a quantity of time to wait before issuing the first timer tick.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="84" sourceendlinenumber="84">period specifies the period of the timer.</li>
 </ul>
-<p>Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling <strong>Grain.UnregisterReminder</strong>:</p>
-<pre><code class="lang-csharp">protected Task UnregisterReminder(IOrleansReminder reminder)
-</code></pre><p>reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
-<p> Instances of <strong>IOrleansReminder</strong> aren&#39;t guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder&#39;s name.</p>
-<p> If you only have the reminder&#39;s name and need the corresponding instance of  <strong>IOrleansReminder</strong>, call the <strong>Grain.GetReminder</strong> method:</p>
-<pre><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; GetReminder(string reminderName)
-</code></pre><h2 id="which-should-i-use">Which Should I Use?</h2>
-<p>We recommend that you use timers in the following circumstances:</p>
-<ul>
-<li>It doesn&#39;t matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.</li>
-<li>If the resolution of the timer is small (e.g. reasonably expressible in seconds or minutes).</li>
-<li>The timer callback can be started from <code>Grain.OnActivateAsync</code> or when a grain method is invoked.</li>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="86" sourceendlinenumber="86">Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling <strong>Grain.UnregisterReminder</strong>:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="88" sourceendlinenumber="90"><code class="lang-csharp">protected Task UnregisterReminder(IOrleansReminder reminder)
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="92" sourceendlinenumber="92">reminder is the handle object returned by <strong>Grain.RegisterOrUpdateReminder</strong>.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="94" sourceendlinenumber="94"> Instances of <strong>IOrleansReminder</strong> aren&#39;t guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder&#39;s name.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="96" sourceendlinenumber="96"> If you only have the reminder&#39;s name and need the corresponding instance of  <strong>IOrleansReminder</strong>, call the <strong>Grain.GetReminder</strong> method:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="98" sourceendlinenumber="100"><code class="lang-csharp">protected Task&lt;IOrleansReminder&gt; GetReminder(string reminderName)
+</code></pre><h2 id="which-should-i-use" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="102" sourceendlinenumber="102">Which Should I Use?</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="103" sourceendlinenumber="103">We recommend that you use timers in the following circumstances:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="105" sourceendlinenumber="107">
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="105" sourceendlinenumber="105">It doesn&#39;t matter (or is desirable) that the timer ceases to function if the activation is deactivated or failures occur.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="106" sourceendlinenumber="106">If the resolution of the timer is small (e.g. reasonably expressible in seconds or minutes).</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="107" sourceendlinenumber="107">The timer callback can be started from <code>Grain.OnActivateAsync</code> or when a grain method is invoked.</li>
 </ul>
-<p>We recommend that you use reminders in the following circumstances:</p>
-<ul>
-<li>When the periodic behavior needs to survive the activation and any failures.</li>
-<li>To perform infrequent tasks (e.g. reasonably expressible in minutes, hours, or days).</li>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="109" sourceendlinenumber="109">We recommend that you use reminders in the following circumstances:</p>
+<ul sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="111" sourceendlinenumber="112">
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="111" sourceendlinenumber="111">When the periodic behavior needs to survive the activation and any failures.</li>
+<li sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="112" sourceendlinenumber="112">To perform infrequent tasks (e.g. reasonably expressible in minutes, hours, or days).</li>
 </ul>
-<h2 id="combining-timers-and-reminders">Combining Timers and Reminders</h2>
-<p>You might consider using a combination of reminders and timers to accomplish your goal. For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.</p>
+<h2 id="combining-timers-and-reminders" sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="114" sourceendlinenumber="114">Combining Timers and Reminders</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Timers-and-Reminders.md" sourcestartlinenumber="116" sourceendlinenumber="116">You might consider using a combination of reminders and timers to accomplish your goal. For example, if you need a timer with a small resolution that needs to survive across activations, you can use a reminder that runs every five minutes, whose purpose is to wake up a grain that restarts a local timer that may have been lost due to a deactivation.</p>
 
             </article>
           </div>
@@ -181,8 +181,8 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

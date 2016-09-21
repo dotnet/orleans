@@ -8,7 +8,7 @@
     <title>Concurrency | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Concurrency | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,24 +71,24 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="concurrency">Concurrency</h1>
+              <h1 id="concurrency" sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="6" sourceendlinenumber="6">Concurrency</h1>
               
-<p>Please read about <a href="../Documentation/Getting-Started-With-Orleans/Grains.html">Grains</a> before following this tutorial.</p>
-<p>Let&#39;s go back to the code that was established in the tutorial on collections of actors and modify it to demonstrate how things can go bad by creating a trivial cycle in the messaging graph: when an employee receives a greeting, he sends another greeting back to the sender and waits for the acknowledgment.
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="8" sourceendlinenumber="8">Please read about <a href="../Documentation/Getting-Started-With-Orleans/Grains.html" sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="8" sourceendlinenumber="8">Grains</a> before following this tutorial.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="10" sourceendlinenumber="11">Let&#39;s go back to the code that was established in the tutorial on collections of actors and modify it to demonstrate how things can go bad by creating a trivial cycle in the messaging graph: when an employee receives a greeting, he sends another greeting back to the sender and waits for the acknowledgment.
 This will send a back-and-forth series of messages, until we get to 3.</p>
-<p>First create a class in the interface project which we&#39;ll use to send the greetings around:</p>
-<pre><code class="lang-csharp">public class GreetingData
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="13" sourceendlinenumber="13">First create a class in the interface project which we&#39;ll use to send the greetings around:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="15" sourceendlinenumber="22"><code class="lang-csharp">public class GreetingData
 {
     public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }
-</code></pre><p><code>From</code> will be the sender of the message (the ID of the grain), <code>Message</code> will be the message text, and <code>Count</code> will be the number of times the message has been sent back and forth.
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="24" sourceendlinenumber="25"><code>From</code> will be the sender of the message (the ID of the grain), <code>Message</code> will be the message text, and <code>Count</code> will be the number of times the message has been sent back and forth.
 This stops us from getting a stack overflow.</p>
-<p>We need to modify the arguments of <code>Greeting</code> on the <code>IEmployee</code> interface to :</p>
-<pre><code class="lang-csharp">Task Greeting(GreetingData data);
-</code></pre><p> We need to update the implementation accordingly:</p>
-<pre><code class="lang-csharp">public async Task Greeting(GreetingData data)
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="27" sourceendlinenumber="27">We need to modify the arguments of <code>Greeting</code> on the <code>IEmployee</code> interface to :</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="30" sourceendlinenumber="32"><code class="lang-csharp">Task Greeting(GreetingData data);
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="34" sourceendlinenumber="34"> We need to update the implementation accordingly:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="36" sourceendlinenumber="51"><code class="lang-csharp">public async Task Greeting(GreetingData data)
 {
     Console.WriteLine(&quot;{0} said: {1}&quot;, data.From, data.Message);
 
@@ -102,8 +102,8 @@ This stops us from getting a stack overflow.</p>
         Message = &quot;Thanks!&quot;,
         Count = data.Count + 1 });
 }
-</code></pre><p> We&#39;ll also update the <code>Manager</code> class, so it send the new message object:</p>
-<pre><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="53" sourceendlinenumber="53"> We&#39;ll also update the <code>Manager</code> class, so it send the new message object:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="55" sourceendlinenumber="64"><code class="lang-csharp">public async Task AddDirectReport(IEmployee employee)
 {
     _reports.Add(employee);
     await employee.SetManager(this);
@@ -111,14 +111,14 @@ This stops us from getting a stack overflow.</p>
         From = this.GetPrimaryKey(),
         Message = &quot;Welcome to my team!&quot; });
 }
-</code></pre><p>Now the Employee sends a message back to the manager, saying &quot;Thanks!&quot;.</p>
-<p>Let&#39;s add some simple client code to add a direct report to a manager:</p>
-<pre><code class="lang-csharp">var e0 = GrainClient.GrainFactory.GetGrain&lt;IEmployee&gt;(Guid.NewGuid());
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="66" sourceendlinenumber="66">Now the Employee sends a message back to the manager, saying &quot;Thanks!&quot;.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="68" sourceendlinenumber="68">Let&#39;s add some simple client code to add a direct report to a manager:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="71" sourceendlinenumber="75"><code class="lang-csharp">var e0 = GrainClient.GrainFactory.GetGrain&lt;IEmployee&gt;(Guid.NewGuid());
 var m1 = GrainClient.GrainFactory.GetGrain&lt;IManager&gt;(Guid.NewGuid());
 m1.AddDirectReport(e0).Wait();
-</code></pre><p>When we run this code, the first &quot;Thanks!&quot; greeting is received.
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="77" sourceendlinenumber="78">When we run this code, the first &quot;Thanks!&quot; greeting is received.
 However, when this message is responded to this we get a 30 second pause (or 10 minutes when the debugger is attached), then warnings appear in the log and we&#39;re told the grain is about to break it&#39;s promise.</p>
-<pre><code>    7b66f830-8d81-49fc-b8fc-279af6924bd3 said: Welcome to my team!
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="80" sourceendlinenumber="89"><code>    7b66f830-8d81-49fc-b8fc-279af6924bd3 said: Welcome to my team!
     ce14310a-8500-4b2f-a21b-b4b23eb48d0d said: Thanks!    
 [2014-03-12 15:25:37.398 GMT    31      WARNING 100157  CallbackData    127.0.0.1:11111]        Response did
 not arrive on time in 00:00:30 for message: Request
@@ -126,45 +126,45 @@ S127.0.0.1:11111:132333898*grn/906ECA4C/00000001@68e2b3ab-&gt;S127.0.0.1:11111:1
  About to break its promise.
  [2014-03-12 15:25:37.398 GMT    27      WARNING 100157  CallbackData    127.0.0.1:11111]        Response did not arrive on time in 00:00:30 for message: Request S127.0.0.1:11111:132333898*grn/D9BB797F/00000000@c24c4187-&gt;S127.0.0.1:11111:132333898*grn/D9BB797F/00000001@afc70cb4 #14: MyGrainInterfaces1.IEmployee:Greeting(). Target History is: &lt;S127.0.0.1:11111:132333898:*grn/D9BB797F/00000001:@afc70cb4&gt;. About to break its promise.
 [2014-03-12 15:25:37.407 GMT    28      WARNING 100157  CallbackData    127.0.0.1:11111]        Response did  not arrive on time in 00:00:30 for message: Request S127.0.0.1:11111:132333898*grn/D9BB797F/00000001@afc70cb4-&gt;S127.0.0.1:11111:132333898*grn/D9BB797F/00000000@c24c4187 #15: MyGrainInterfaces1.IEmployee:Greeting(). Target History is: &lt;S127.0.0.1:11111:132333898:*grn/D9BB797F/00000000:@c24c4187&gt;. About to break its promise.
-</code></pre><p>An exception is then thrown in the client code.</p>
-<p>We&#39;ve created a deadlock.
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="91" sourceendlinenumber="91">An exception is then thrown in the client code.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="93" sourceendlinenumber="98">We&#39;ve created a deadlock.
 Grain 0 sends a message to grain 1.
 In that call grain 1 sends a message back to grain 0.
 However, grain 0 can&#39;t process it because it&#39;s awaiting the first message, so it gets queued.
 The await can&#39;t complete until the second message is returned, so we&#39;ve entered a state that we can&#39;t escape from.
 Orleans waits for 30 seconds (10 minutes with the debugger), then kills the request.</p>
-<p>Orleans offers us a way to deal with this, by marking the grain <code>[Reentrant]</code>, which means that additional calls may be made while the grain is waiting for a task to complete, resulting in interleaved execution.</p>
-<pre><code class="lang-csharp">[Reentrant]
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="100" sourceendlinenumber="100">Orleans offers us a way to deal with this, by marking the grain <code>[Reentrant]</code>, which means that additional calls may be made while the grain is waiting for a task to complete, resulting in interleaved execution.</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="103" sourceendlinenumber="109"><code class="lang-csharp">[Reentrant]
 public class Employee : Grain, IEmployee
 {
     ...
 }
-</code></pre><p>We see that the sample works, and Orleans is able to interleave the grain calls:</p>
-<pre><code> aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Welcome to my team!
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="111" sourceendlinenumber="111">We see that the sample works, and Orleans is able to interleave the grain calls:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="113" sourceendlinenumber="118"><code> aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Welcome to my team!
  63e4d07c-ac50-4012-ba50-5b5cf54e4e45 said: Thanks!
  aaadb551-7dde-4dbe-82ce-1a5f2547babe said: Thanks!
  63e4d07c-ac50-4012-ba50-5b5cf54e4e45 said: Thanks!
-</code></pre><h2 id="messages">Messages</h2>
-<p>Messages are simply data passed from one actor to another, we just created the <code>GreetingData</code> class to do just this.</p>
-<p>In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn&#39;t work well with concurrency, and definitely not with distribution.</p>
-<p>When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain.
+</code></pre><h2 id="messages" sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="120" sourceendlinenumber="120">Messages</h2>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="122" sourceendlinenumber="122">Messages are simply data passed from one actor to another, we just created the <code>GreetingData</code> class to do just this.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="124" sourceendlinenumber="124">In .NET, most objects are created from a class of some sort and are passed around by reference, something that doesn&#39;t work well with concurrency, and definitely not with distribution.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="126" sourceendlinenumber="127">When Orleans sends a message from one grain to another, it creates a deep copy of the object, and provides the copy to the second grain, and not the object stored in the first grain.
 This prohibits the mutation of state from one grain to another, one of the main tenets in the actor model is that state shouldn&#39;t be shared, and message passing is the only mechanism for exchanging data.</p>
-<p>When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.</p>
-<p>However, this deep copy process is expensive, and if you promise not to modify the message, then for communication with grains within a silo, it&#39;s unnecessary.</p>
-<p>If you indicate to Orleans that you are not going to modify the object (i.e. it&#39;s immutable) then it can skip the deep copy step, and it will pass the object by reference.
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="129" sourceendlinenumber="129">When the grains are in different silos, the object model is serialized to a binary format, and sent over the wire.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="131" sourceendlinenumber="131">However, this deep copy process is expensive, and if you promise not to modify the message, then for communication with grains within a silo, it&#39;s unnecessary.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="133" sourceendlinenumber="134">If you indicate to Orleans that you are not going to modify the object (i.e. it&#39;s immutable) then it can skip the deep copy step, and it will pass the object by reference.
 There&#39;s no way Orleans or C# can stop you from modifying the state, you have to be disciplined.</p>
-<p>Immutability is indicated with a the <code>[Immutable]</code> attribute on the class:</p>
-<pre><code class="lang-csharp">[Immutable]
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="136" sourceendlinenumber="136">Immutability is indicated with a the <code>[Immutable]</code> attribute on the class:</p>
+<pre sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="138" sourceendlinenumber="146"><code class="lang-csharp">[Immutable]
 public class GreetingData
 {
     public Guid From { get; set; }
     public string Message { get; set; }
     public int Count { get; set; }
 }
-</code></pre><p>No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.</p>
-<h2 id="next">Next</h2>
-<p>Next, we&#39;ll see how we can interact with external services from inside our grain.</p>
-<p><a href="Interaction-with-Libraries-and-Services.html">Interaction with Libraries and Services</a></p>
+</code></pre><p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="148" sourceendlinenumber="148">No other code change is required, this is just a signal to give to Orleans to tell it your not going to modify this object.</p>
+<h2 id="next" sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="150" sourceendlinenumber="150">Next</h2>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="152" sourceendlinenumber="152">Next, we&#39;ll see how we can interact with external services from inside our grain.</p>
+<p sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="154" sourceendlinenumber="154"><a href="Interaction-with-Libraries-and-Services.html" sourcefile="Tutorials/Concurrency.md" sourcestartlinenumber="154" sourceendlinenumber="154">Interaction with Libraries and Services</a></p>
 
             </article>
           </div>
@@ -201,8 +201,8 @@ public class GreetingData
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>

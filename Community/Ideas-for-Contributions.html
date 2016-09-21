@@ -8,7 +8,7 @@
     <title>Ideas for Contributions | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Ideas for Contributions | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.4.0.0">
+    <meta name="generator" content="docfx 2.5.3.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -71,39 +71,39 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="ideas-for-contributions">Ideas for Contributions</h1>
+              <h1 id="ideas-for-contributions" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="6" sourceendlinenumber="6">Ideas for Contributions</h1>
               
-<p>These are some of the ideas for contributing to Orleans. Just an initial list for consideration, meant to be a live document. If you are interested in any of these or one that is not listed, create an issue to discuss it.</p>
-<p>We roughly put them into 3 size categories based on our gut feel, which may be wrong:</p>
-<ul>
-<li>Small - hours of work</li>
-<li>Medium - couple of days of work</li>
-<li>Large - big projects, multiple days up to weeks of work</li>
+<p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="8" sourceendlinenumber="8">These are some of the ideas for contributing to Orleans. Just an initial list for consideration, meant to be a live document. If you are interested in any of these or one that is not listed, create an issue to discuss it.</p>
+<p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="10" sourceendlinenumber="10">We roughly put them into 3 size categories based on our gut feel, which may be wrong:</p>
+<ul sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="11" sourceendlinenumber="13">
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="11" sourceendlinenumber="11">Small - hours of work</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="12" sourceendlinenumber="12">Medium - couple of days of work</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="13" sourceendlinenumber="13">Large - big projects, multiple days up to weeks of work</li>
 </ul>
-<ol>
-<li><p><strong>Project template/wizard for Azure deployment</strong> [Medium/Large]</p>
-<ul>
-<li>Worker role for silos (in our experience it is better to star a silo as a standalone process and wait on the process handle in the worker roles code)</li>
-<li>Worker/web role for frontend clients</li>
-<li>Configuration of diagnostics, ETW tracing, etc.</li>
-<li>Try Azure SDK plug-in as suggested <a href="http://richorama.github.io/2015/01/13/thoughts-on-deploying-orleans/">here</a> by @richorama.</li>
-</ul>
-</li>
-<li><p><strong>Cluster monitoring dashboard</strong> [Medium]</p>
-<ul>
-<li><a href="https://github.com/OrleansContrib/OrleansMonitor">https://github.com/OrleansContrib/OrleansMonitor</a> may be a good start</li>
+<ol sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="15" sourceendlinenumber="32">
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="15" sourceendlinenumber="19"><p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="15" sourceendlinenumber="15"><strong>Project template/wizard for Azure deployment</strong> [Medium/Large]</p>
+<ul sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="16" sourceendlinenumber="19">
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="16" sourceendlinenumber="16">Worker role for silos (in our experience it is better to star a silo as a standalone process and wait on the process handle in the worker roles code)</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="17" sourceendlinenumber="17">Worker/web role for frontend clients</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="18" sourceendlinenumber="18">Configuration of diagnostics, ETW tracing, etc.</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="19" sourceendlinenumber="19">Try Azure SDK plug-in as suggested <a href="http://richorama.github.io/2015/01/13/thoughts-on-deploying-orleans/" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="19" sourceendlinenumber="19">here</a> by @richorama.</li>
 </ul>
 </li>
-<li><p><strong>Proper support for F#</strong> [Medium/Large]
-See <a href="https://github.com/dotnet/orleans/issues/38">Issue #38</a></p>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="21" sourceendlinenumber="22"><p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="21" sourceendlinenumber="21"><strong>Cluster monitoring dashboard</strong> [Medium]</p>
+<ul sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="22" sourceendlinenumber="22">
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="22" sourceendlinenumber="22"><a href="https://github.com/OrleansContrib/OrleansMonitor" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="22" sourceendlinenumber="22">https://github.com/OrleansContrib/OrleansMonitor</a> may be a good start</li>
+</ul>
 </li>
-<li><p><strong>Orleans backplane for SignalR</strong> [Medium]
-See <a href="https://github.com/dotnet/orleans/issues/73">Issue #73</a></p>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="24" sourceendlinenumber="25"><p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="24" sourceendlinenumber="25"><strong>Proper support for F#</strong> [Medium/Large]
+See <a href="https://github.com/dotnet/orleans/issues/38" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="25" sourceendlinenumber="25">Issue #38</a></p>
 </li>
-<li><p><strong>Port Orleans to <a href="https://github.com/dotnet/coreclr">coreclr</a></strong> [Medium]
-See <a href="https://github.com/dotnet/orleans/issues/368">Issue #368</a></p>
-<ul>
-<li>Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn&#39;t be too big. This will allow to run Orleans efficiently cross platform.</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="27" sourceendlinenumber="28"><p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="27" sourceendlinenumber="28"><strong>Orleans backplane for SignalR</strong> [Medium]
+See <a href="https://github.com/dotnet/orleans/issues/73" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="28" sourceendlinenumber="28">Issue #73</a></p>
+</li>
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="30" sourceendlinenumber="32"><p sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="30" sourceendlinenumber="31"><strong>Port Orleans to <a href="https://github.com/dotnet/coreclr" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="30" sourceendlinenumber="30">coreclr</a></strong> [Medium]
+See <a href="https://github.com/dotnet/orleans/issues/368" sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="31" sourceendlinenumber="31">Issue #368</a></p>
+<ul sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="32" sourceendlinenumber="32">
+<li sourcefile="Community/Ideas-for-Contributions.md" sourcestartlinenumber="32" sourceendlinenumber="32">Some APIs from the full .NET got deprecated in coreclr, mainly around files and reflection, but at large the porting effort shouldn&#39;t be too big. This will allow to run Orleans efficiently cross platform.</li>
 </ul>
 </li>
 </ol>
@@ -143,8 +143,8 @@ See <a href="https://github.com/dotnet/orleans/issues/368">Issue #368</a></p>
     </div>
     
     <script type="text/javascript" src="../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../styles/docfx.js"></script>
     <script type="text/javascript" src="../styles/main.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
   </body>
 </html>
