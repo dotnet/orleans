@@ -23,6 +23,8 @@ namespace OrleansAWSUtils.Storage
         private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
 
         private string accessKey;
+
+        /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
         private string service;
         private int readCapacityUnits = 10;
