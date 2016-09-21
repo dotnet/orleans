@@ -166,43 +166,43 @@ namespace OrleansTelemetryConsumers.Counters
         /// <summary>
         /// Increment metric.
         /// </summary>
-        /// <param name="name"></param>
+        /// <param name="name">metric name</param>
         public void IncrementMetric(string name) => WriteMetric(name, UpdateMode.Increment);
 
         /// <summary>
         /// Increment metric by value.
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
         public void IncrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Increment, value);
 
         /// <summary>
         /// Track metric value
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
-        /// <param name="properties"></param>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
+        /// <param name="properties">related properties</param>
         public void TrackMetric(string name, double value, IDictionary<string, string> properties = null) => WriteMetric(name, UpdateMode.Set, value);
 
         /// <summary>
         /// Track metric value
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
-        /// <param name="properties"></param>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
+        /// <param name="properties">related properties</param>
         public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null) => WriteMetric(name, UpdateMode.Set, value.Ticks);
 
         /// <summary>
         /// Decrement metric
         /// </summary>
-        /// <param name="name"></param>
+        /// <param name="name">metric name</param>
         public void DecrementMetric(string name) => WriteMetric(name, UpdateMode.Decrement);
 
         /// <summary>
         /// Decrement metric by value
         /// </summary>
-        /// <param name="name"></param>
-        /// <param name="value"></param>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
         public void DecrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Decrement, value);
 
         /// <summary>
