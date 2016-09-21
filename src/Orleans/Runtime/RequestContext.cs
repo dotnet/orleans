@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 #if !NETSTANDARD_TODO
 using System.Runtime.Remoting.Messaging;
 #endif
@@ -30,8 +31,6 @@ namespace Orleans.Runtime
     /// </remarks>
     public static class RequestContext
     {
-        // TODO: We can potentially use AsyncLocal<T> instead of the logical call context, which is supported in .NET Standard
-
         /// <summary>
         /// Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
         /// </summary>
@@ -41,6 +40,11 @@ namespace Orleans.Runtime
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
+
+#if NETSTANDARD_TODO
+        private static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
+        private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
+#endif
 
         /// <summary>
         /// Retrieve a value from the RequestContext key-value bag.
@@ -111,6 +115,13 @@ namespace Orleans.Runtime
                 {
                     activityIdObj = Guid.Empty;
                 }
+                else
+                {
+#if NETSTANDARD_TODO
+                    ActivityId.Value = (Guid) activityIdObj;
+#endif
+                }
+
 #if !NETSTANDARD_TODO
                 Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
 #endif
@@ -133,10 +144,13 @@ namespace Orleans.Runtime
         {
             Dictionary<string, object> values = GetContextData();
 
-#if !NETSTANDARD_TODO
             if (PropagateActivityId)
             {
-                Guid activityId = Trace.CorrelationManager.ActivityId;
+#if !NETSTANDARD_TODO
+                var activityId = Trace.CorrelationManager.ActivityId;
+#else
+                var activityId = ActivityId.Value;
+#endif
                 if (activityId != Guid.Empty)
                 {
                     values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
@@ -145,7 +159,6 @@ namespace Orleans.Runtime
                     SetContextData(values);
                 }
             }
-#endif
             if (values != null && values.Count != 0)
                 return values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
             return null;
@@ -156,6 +169,8 @@ namespace Orleans.Runtime
             // Remove the key to prevent passing of its value from this point on
 #if !NETSTANDARD_TODO
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
+#else
+            CallContextData.Value = null;
 #endif
         }
 
@@ -163,6 +178,8 @@ namespace Orleans.Runtime
         {
 #if !NETSTANDARD_TODO
             CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
+#else
+            CallContextData.Value = values;
 #endif
         }
 
@@ -171,7 +188,7 @@ namespace Orleans.Runtime
 #if !NETSTANDARD_TODO
             return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
 #else
-            return null;
+            return CallContextData.Value;
 #endif
         }
     }
