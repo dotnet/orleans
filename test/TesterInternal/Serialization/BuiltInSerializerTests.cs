@@ -68,6 +68,17 @@ namespace UnitTests.Serialization
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.Default)]
         [InlineData(SerializerToUse.Fallback)]
+        public void Serialize_Type(SerializerToUse serializerToUse)
+        {
+            InitializeSerializer(serializerToUse);
+            var expected = new List<string>().GetType();
+            var actual = (Type)OrleansSerializationLoop(typeof(List<string>));
+            Assert.Equal(expected.TypeHandle, actual.TypeHandle);
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+        [InlineData(SerializerToUse.Default)]
+        [InlineData(SerializerToUse.Fallback)]
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
