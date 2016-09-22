@@ -1,9 +1,10 @@
 ﻿using System.Threading.Tasks;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace Tester.TestingHost
+namespace UnitTests.TestingHost
 {
     public class TestingSiloHostTests
     {

@@ -218,6 +218,7 @@
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestConstants.cs" />
+    <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
