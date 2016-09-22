@@ -19,7 +19,7 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Newtonsoft.Json" version="7.0.1" />
-      <dependency id="System.Collections.Immutable" version="1.1.36" />
+      <dependency id="System.Collections.Immutable" version="1.1.37" />
     </dependencies>
   </metadata>
   <files>
