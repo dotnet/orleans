@@ -143,7 +143,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, bool useJsonFallbackSerializer = false)
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null)
         {
             try
             {
@@ -151,7 +151,7 @@ namespace Orleans.Serialization
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
                 AssemblyProcessor.Initialize();
-                fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+                fallbackSerializer = GetFallbackSerializer();
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -159,20 +159,14 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static void Initialize(List<TypeInfo> serializationProviders, bool useJsonFallbackSerializer)
+        internal static void Initialize(List<TypeInfo> serializationProviders)
         {
             RegisterBuiltInSerializers();
-
 #if NETSTANDARD
-            if (!useJsonFallbackSerializer)
-            {
-                logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
-                    "Cann't use binary formatter as fallback serializer while running on .Net Core, will use Json.Net instead");
-            }
-
-            useJsonFallbackSerializer = true;
+            logger.Warn(ErrorCode.SerMgr_UnavailableSerializer,
+                "Cann't use binary formatter as fallback serializer while running on .Net Core, will use Json.Net instead");
 #endif
-            fallbackSerializer = GetFallbackSerializer(useJsonFallbackSerializer);
+            fallbackSerializer = GetFallbackSerializer();
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -1872,22 +1866,13 @@ namespace Orleans.Serialization
             return retVal;
         }
 
-        private static IExternalSerializer GetFallbackSerializer(bool useJsonSerializer)
+        private static IExternalSerializer GetFallbackSerializer()
         {
-            IExternalSerializer serializer;
-            if (useJsonSerializer)
-            {
-                serializer = new OrleansJsonSerializer();
-            }
-            else
-            {
 #if NETSTANDARD
                 throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
 #else
-                serializer = new BinaryFormatterSerializer();
+            var serializer = new BinaryFormatterSerializer();
 #endif
-            }
-
             serializer.Initialize(logger);
             return serializer;
         }

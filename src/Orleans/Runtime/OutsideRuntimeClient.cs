@@ -132,7 +132,7 @@ namespace Orleans
 
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
             StatisticsCollector.Initialize(config);
-            SerializationManager.Initialize(cfg.SerializationProviders, config.UseJsonFallbackSerializer);
+            SerializationManager.Initialize(cfg.SerializationProviders);
             logger = LogManager.GetLogger("OutsideRuntimeClient", LoggerType.Runtime);
             appLogger = LogManager.GetLogger("Application", LoggerType.Application);
 

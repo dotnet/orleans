@@ -15,7 +15,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsJsonTypes()
         {
-            SerializationManager.InitializeForTesting(useJsonFallbackSerializer: true);
+            SerializationManager.InitializeForTesting();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
