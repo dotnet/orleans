@@ -47,8 +47,8 @@ namespace Orleans.Runtime.Configuration
 
             if (useJsonFormat)
             {
-                properties.Add(SerializationManager.UseFullAssemblyNamesProperty, useFullAssemblyNames.ToString());
-                properties.Add(SerializationManager.IndentJsonProperty, indentJson.ToString());
+                properties.Add(OrleansJsonSerializer.UseFullAssemblyNamesProperty, useFullAssemblyNames.ToString());
+                properties.Add(OrleansJsonSerializer.IndentJsonProperty, indentJson.ToString());
             }
 
             config.Globals.RegisterStorageProvider<AzureTableStorage>(providerName, properties);
@@ -78,8 +78,8 @@ namespace Orleans.Runtime.Configuration
             {
                 { AzureBlobStorage.DataConnectionStringPropertyName, connectionString },
                 { AzureBlobStorage.ContainerNamePropertyName, containerName },
-                { SerializationManager.UseFullAssemblyNamesProperty, useFullAssemblyNames.ToString() },
-                { SerializationManager.IndentJsonProperty, indentJson.ToString() },
+                { OrleansJsonSerializer.UseFullAssemblyNamesProperty, useFullAssemblyNames.ToString() },
+                { OrleansJsonSerializer.IndentJsonProperty, indentJson.ToString() },
             };
 
             config.Globals.RegisterStorageProvider<AzureBlobStorage>(providerName, properties);
