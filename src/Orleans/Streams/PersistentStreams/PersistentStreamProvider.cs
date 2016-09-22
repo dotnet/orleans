@@ -50,7 +50,7 @@ namespace Orleans.Providers.Streams.Common
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
-        // this is a workaround until we address "Dependency Injection: register IGrainFactory #988"
+        // this is a workaround until an IServiceProvider instance is used in the Orleans client
         private class GrainFactoryServiceProvider : IServiceProvider
         {
             private IStreamProviderRuntime providerRuntime;
@@ -60,11 +60,18 @@ namespace Orleans.Providers.Streams.Common
             }
             public object GetService(Type serviceType)
             {
-                if (serviceType == typeof (GrainFactory))
+                var service = providerRuntime.ServiceProvider?.GetService(serviceType);
+                if (service != null)
+                {
+                    return service;
+                }
+
+                if (serviceType == typeof(IGrainFactory))
                 {
                     return providerRuntime.GrainFactory;
                 }
-                return providerRuntime == null ? null:providerRuntime.ServiceProvider.GetService(serviceType);
+
+                return null;
             }
         }
 

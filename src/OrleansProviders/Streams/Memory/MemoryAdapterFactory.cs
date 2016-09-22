@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.Memory
             this.providerName = providerName;
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             this.adapterConfig = new MemoryAdapterConfig(providerName);
-            grainFactory = (GrainFactory)serviceProvider.GetService(typeof(GrainFactory));
+            grainFactory = (IGrainFactory)serviceProvider.GetService(typeof(IGrainFactory));
             adapterConfig.PopulateFromProviderConfig(providerConfig);
             this.streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName);
 
