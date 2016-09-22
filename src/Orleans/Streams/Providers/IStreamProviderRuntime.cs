@@ -61,11 +61,6 @@ namespace Orleans.Streams
     internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
     {
         /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
-        /// <param name="streamProviderName"></param>
-        /// <param name="adapterFactory"></param>
-        /// <param name="queueAdapter"></param>
-        /// <param name="config"></param>
-        /// <returns></returns>
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,

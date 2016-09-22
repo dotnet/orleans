@@ -88,7 +88,6 @@ namespace Orleans.Streams
         /// Check that the user-supplied stream predicate function is valid.
         /// Stream predicate functions must be static and not abstract.
         /// </summary>
-        /// <param name="predicate"></param>
         private static void CheckFilterPredicateFunc(StreamFilterPredicate predicate)
         {
             if (predicate == null)
