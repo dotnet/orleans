@@ -1,15 +1,16 @@
-using System;
-using Orleans.Runtime.Configuration;
-
-namespace Microsoft.Orleans.ServiceFabric
+namespace Microsoft.Orleans.ServiceFabric.Utilities
 {
+    using System;
+
+    using global::Orleans.Runtime.Configuration;
+
     /// <summary>
     /// Abstraction for silo hosts.
     /// </summary>
     internal interface ISiloHost : IDisposable
     {
         /// <summary>
-        /// Get the silo's node configuration.
+        /// Gets the silo's node configuration.
         /// </summary>
         NodeConfiguration NodeConfig { get; }
 

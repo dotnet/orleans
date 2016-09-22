@@ -1098,6 +1098,10 @@ namespace Orleans
 
         TypeManagerBase = Runtime + 4200,
         TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
+
+        // Note: individual Service Fabric error codes are defined in
+        // Microsoft.Orleans.ServiceFabric.Utilities.ErrorCode.
+        ServiceFabricBase = Runtime + 4300,
     }
 }
 // ReSharper restore InconsistentNaming

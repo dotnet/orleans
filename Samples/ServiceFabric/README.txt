@@ -15,5 +15,3 @@ Two endpoints are added to PackageRoot\ServiceManifest.xml:
       <Endpoint Name="OrleansProxyEndpoint" Protocol="tcp"/>
 
 With those endpoints and the ServiceInstanceListener present, all that's left to do is write some grain code, reference it in the StatelessCalculatorService project, and hit F5.
-
-Note that the service shows the minimum integration to host an Orleans cluster on Service Fabric. The hosted cluster uses the Azure Table Storage membership provider.
