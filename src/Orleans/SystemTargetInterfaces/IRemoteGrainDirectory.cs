@@ -47,7 +47,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainAndETagList">list of grains and generation (version) numbers. The latter denote the versions of 
         /// the lists of activations currently held by the invoker of this method.</param>
-        /// <param name="retries">Number of retries to execute the method in case the virtual ring (servers) changes.</param>
         /// <returns>list of tuples holding a grain, generation number of the list of activations, and the list of activations. 
         /// If the generation number of the invoker matches the number of the destination, the list is null. If the destination does not
         /// hold the information on the grain, generation counter -1 is returned (and the list of activations is null)</returns>

@@ -56,10 +56,11 @@ namespace Orleans.Runtime
 
         #region Constructors
 
-        /// <summary>
-        /// Constructs a reference to the grain with the specified Id.
-        /// </summary>
+        /// <summary>Constructs a reference to the grain with the specified Id.</summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
+        /// <param name="genericArgument">Type arguments in case of a generic grain.</param>
+        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
+        /// <param name="observerId">Observer ID in case of an observer reference.</param>
         private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
@@ -121,10 +122,10 @@ namespace Orleans.Runtime
 
         #region Instance creator factory functions
 
-        /// <summary>
-        /// Constructs a reference to the grain with the specified ID.
-        /// </summary>
+        /// <summary>Constructs a reference to the grain with the specified ID.</summary>
         /// <param name="grainId">The ID of the grain to refer to.</param>
+        /// <param name="genericArguments">Type arguments in case of a generic grain.</param>
+        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
         internal static GrainReference FromGrainId(GrainId grainId, string genericArguments = null, SiloAddress systemTargetSilo = null)
         {
             return new GrainReference(grainId, genericArguments, systemTargetSilo, null);

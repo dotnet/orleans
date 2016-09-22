@@ -56,6 +56,7 @@ namespace Orleans.Runtime
         /// Info is suitable for information that does not indicate an error but that should usually be logged in production.
         /// Info is lower than Warning.
         /// </summary>
+        /// <param name="logger">Target logger.</param>
         /// <param name="format">A standard format string, suitable for String.Format.</param>
         /// <param name="args">Any arguments to the format string.</param>
         public static void Info(this Logger logger, string format, params object[] args)

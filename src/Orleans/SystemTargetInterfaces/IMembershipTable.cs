@@ -32,7 +32,7 @@ namespace Orleans
         /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
         /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
         /// </summary>
-        /// <param name="entry">The address of the silo whose membership information needs to be read.</param>
+        /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
         Task<MembershipTableData> ReadRow(SiloAddress key);

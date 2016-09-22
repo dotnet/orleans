@@ -16,7 +16,6 @@ namespace Orleans.Streams
         /// Retrieves the opaque identity of currently executing grain or client object. 
         /// Just for logging purposes.
         /// </summary>
-        /// <param name="handler"></param>
         string ExecutingEntityIdentity();
 
         SiloAddress ExecutingSiloAddress { get; }
@@ -44,9 +43,8 @@ namespace Orleans.Streams
         /// <returns></returns>
         IStreamPubSub PubSub(StreamPubSubType pubSubType);
 
-        /// <summary>
-        /// A consistent ring interface.
-        /// </summary>
+        /// <summary>A consistent ring interface.</summary>
+        /// <param name="mySubRangeIndex">Index of the silo in the ring.</param>
         /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
         /// <returns></returns>
         IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
@@ -62,17 +60,7 @@ namespace Orleans.Streams
     /// </summary>
     internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
     {
-        /// <summary>
-        /// Start the pulling agents for a given persistent stream provider.
-        /// </summary>
-        /// <param name="streamProviderName"></param>
-        /// <param name="balancerType"></param>
-        /// <param name="pubSubType"></param>
-        /// <param name="adapterFactory"></param>
-        /// <param name="queueAdapter"></param>
-        /// <param name="getQueueMsgsTimerPeriod"></param>
-        /// <param name="initQueueTimeout"></param>
-        /// <returns></returns>
+        /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,

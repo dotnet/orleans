@@ -6,10 +6,8 @@ namespace Orleans.Runtime
 {
     internal interface IMultiClusterGossipService : ISystemTarget
     {
-        /// <summary>
-        /// One-way small-scale gossip: send partial data to recipient
-        /// </summary>
-        /// <param name="data">The gossip data</param>
+        /// <summary>One-way small-scale gossip: send partial data to recipient</summary>
+        /// <param name="gossipData">The gossip data</param>
         /// <param name="forwardLocally">Whether to forward the changes to local silos</param>
         /// <returns></returns>
         Task Publish(IMultiClusterGossipData gossipData, bool forwardLocally);
