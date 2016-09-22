@@ -1,2 +1,2 @@
-"%~dp0src\Build.cmd"
-"%~dp0vNext\src\Build.cmd"
+cmd /c "%~dp0src\Build.cmd"
+cmd /c "%~dp0vNext\src\Build.cmd"
