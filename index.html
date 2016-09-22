@@ -108,9 +108,9 @@
 </code></pre><p sourcefile="index.md" sourcestartlinenumber="72" sourceendlinenumber="72">The implementation is executed inside the Orleans framework:</p>
 <pre sourcefile="index.md" sourcestartlinenumber="74" sourceendlinenumber="82"><code class="lang-csharp">public class MyGrain : IMyGrain
 {
-    public async Task&lt;string&gt; SayHello(string name)
+    public Task&lt;string&gt; SayHello(string name)
     {
-        return &quot;Hello &quot; + name;
+        return Task.FromResult($&quot;Hello {name}&quot;);
     }
 }
 </code></pre><p sourcefile="index.md" sourcestartlinenumber="84" sourceendlinenumber="84">You can then send messages to the grain by creating a proxy object, and calling the methods:</p>
