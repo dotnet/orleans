@@ -1869,12 +1869,12 @@ namespace Orleans.Serialization
         private static IExternalSerializer GetFallbackSerializer()
         {
 #if NETSTANDARD
-                throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
+            throw new OrleansException("Can't use binary formatter as fallback serializer while running on .Net Core");
 #else
             var serializer = new BinaryFormatterSerializer();
-#endif
             serializer.Initialize(logger);
             return serializer;
+#endif
         }
 
 #if !NETSTANDARD_TODO
