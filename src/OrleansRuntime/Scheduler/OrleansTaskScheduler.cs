@@ -355,24 +355,6 @@ namespace Orleans.Runtime.Scheduler
             return Pool.DoHealthCheck();
         }
 
-        /// <summary>
-        /// Action to be invoked when there is no more work for this scheduler
-        /// </summary>
-        internal Action OnIdle { get; set; }
-
-        /// <summary>
-        /// Invoked by WorkerPool when all threads go idle
-        /// </summary>
-        internal void OnAllWorkerThreadsIdle()
-        {
-            if (OnIdle == null || RunQueueLength != 0) return;
-
-#if DEBUG
-            if (logger.IsVerbose2) logger.Verbose2("OnIdle");
-#endif
-            OnIdle();
-        }
-
         internal void PrintStatistics()
         {
             if (!logger.IsInfo) return;
