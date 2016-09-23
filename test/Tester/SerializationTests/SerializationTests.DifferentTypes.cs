@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Serialization;
-using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -123,6 +122,7 @@ namespace UnitTests.Serialization
             }
         }
 
+#if !NETSTANDARD_TODO
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_RecursiveSerialization()
         {
@@ -130,9 +130,10 @@ namespace UnitTests.Serialization
             input.Collection = new HashSet<TestTypeA>();
             input.Collection.Add(input);
 
-            TestTypeA output1 = TestingUtils.RoundTripDotNetSerializer(input);
+            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input);
 
             TestTypeA output2 = SerializationManager.RoundTripSerializationForTesting(input);
         }
+#endif
     }
 }
