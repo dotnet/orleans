@@ -99,7 +99,7 @@ namespace UnitTests.CancellationTests
             Assert.Equal(true, result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksThrow_ExceptionShouldBePropagated()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
