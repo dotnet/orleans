@@ -11,12 +11,9 @@ using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters;
 using System.Text;
-using Newtonsoft.Json;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -27,9 +24,6 @@ namespace Orleans.Serialization
     /// </summary>
     public static class SerializationManager
     {
-        internal const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
-        internal const string IndentJsonProperty = "IndentJSON";
-
         /// <summary>
         /// Deep copier function.
         /// </summary>
@@ -2194,41 +2188,6 @@ namespace Orleans.Serialization
             public DeepCopier DeepCopy { get; private set; }
             public Serializer Serialize { get; private set; }
             public Deserializer Deserialize { get; private set; }
-        }
-
-        public static JsonSerializerSettings GetDefaultJsonSerializerSettings()
-        {
-            return OrleansJsonSerializer.GetDefaultSerializerSettings();
-        }
-
-        /// <summary>
-        /// Customises the given serializer settings
-        /// using provider configuration.
-        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
-        /// </summary>
-        /// <param name="settings"></param>
-        /// <param name="config"></param>
-        /// <returns><see cref="JsonSerializerSettings" /></returns>
-        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
-        {
-            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
-            {
-                bool useFullAssemblyNames;
-                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
-                {
-                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
-                }
-            }
-
-            if (config.Properties.ContainsKey(IndentJsonProperty))
-            {
-                bool indentJSON;
-                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJSON) && indentJSON)
-                {
-                    settings.Formatting = Formatting.Indented;
-                }
-            }
-            return settings;
         }
     }
 }

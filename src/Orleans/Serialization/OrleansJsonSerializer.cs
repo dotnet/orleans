@@ -7,16 +7,25 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
+    using Orleans.Providers;
+
+    public class OrleansJsonSerializer : IExternalSerializer
     {
+        public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+        public const string IndentJsonProperty = "IndentJSON";
         private static JsonSerializerSettings defaultSettings;
         private Logger logger;
 
+        static OrleansJsonSerializer()
+        {
+            defaultSettings = GetDefaultSerializerSettings();
+        }
+
         /// <summary>
-        /// Returns a configured <see cref="JsonSerializerSettings"/> 
+        /// Returns the default serializer settings.
         /// </summary>
-        /// <returns></returns>
-        internal static JsonSerializerSettings GetDefaultSerializerSettings()
+        /// <returns>The default serializer settings.</returns>
+        public static JsonSerializerSettings GetDefaultSerializerSettings()
         {
             var settings = new JsonSerializerSettings
             {
@@ -40,9 +49,33 @@ namespace Orleans.Serialization
             return settings;
         }
 
-        static OrleansJsonSerializer()
+        /// <summary>
+        /// Customises the given serializer settings using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="settings">The settings to update.</param>
+        /// <param name="config">The provider config.</param>
+        /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
         {
-            defaultSettings = GetDefaultSerializerSettings();
+            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
+            {
+                bool useFullAssemblyNames;
+                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
+                {
+                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+                }
+            }
+
+            if (config.Properties.ContainsKey(IndentJsonProperty))
+            {
+                bool indentJson;
+                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
+                {
+                    settings.Formatting = Formatting.Indented;
+                }
+            }
+            return settings;
         }
 
         /// <summary>
