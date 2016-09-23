@@ -228,23 +228,8 @@ namespace Orleans.CodeGenerator
                         grainArgument,
                         SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                     SF.ThrowStatement(argumentNullException));
-
-            // Wrap everything in a try-catch block.
-            var faulted = (Expression<Func<Task<object>>>)(() => TaskUtility.Faulted(null));
-            const string Exception = "exception";
-            var exception = SF.Identifier(Exception);
-            var body =
-                SF.TryStatement()
-                    .AddBlockStatements(grainArgumentCheck, interfaceIdSwitch)
-                    .AddCatches(
-                        SF.CatchClause()
-                            .WithDeclaration(
-                                SF.CatchDeclaration(typeof(Exception).GetTypeSyntax()).WithIdentifier(exception))
-                            .AddBlockStatements(
-                                SF.ReturnStatement(
-                                    faulted.Invoke().AddArgumentListArguments(SF.Argument(SF.IdentifierName(Exception))))));
-
-            return methodDeclaration.AddBodyStatements(body);
+            
+            return methodDeclaration.AddBodyStatements(grainArgumentCheck, interfaceIdSwitch);
         }
 
         /// <summary>
