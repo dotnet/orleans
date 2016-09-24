@@ -5,8 +5,8 @@ using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.AzureUtils;
-using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
 using Xunit;
 
 namespace UnitTests.StorageTests
@@ -26,7 +26,7 @@ namespace UnitTests.StorageTests
         {
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager(StorageTestConstants.DataConnectionString);
+            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString);
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 

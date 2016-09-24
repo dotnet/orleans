@@ -41,7 +41,7 @@ namespace Tester.StreamingTests
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
             AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AQStreamProviderName, deploymentId,
-                StorageTestConstants.DataConnectionString).Wait();
+                TestDefaultConfiguration.DataConnectionString).Wait();
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 

@@ -1,33 +1,39 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Serialization;
 using Orleans.TestingHost;
 
 namespace Tester
 {
-    public abstract class BaseTestClusterFixture : IDisposable
+    public class TestDefaultConfiguration
     {
-        private static int defaultsAreInitialized = 0;
+        private static object lockObject = new object();
+        private static IConfiguration defaultConfiguration;
 
-        static BaseTestClusterFixture()
+        static TestDefaultConfiguration()
         {
             InitializeDefaults();
         }
 
         public static void InitializeDefaults()
         {
-            if (Interlocked.CompareExchange(ref defaultsAreInitialized, 1, 0) == 0)
+            lock (lockObject)
             {
-                TestClusterOptions.DefaultExtendedConfiguration = DefaultConfiguration();
+                TestClusterOptions.DefaultExtendedConfiguration = defaultConfiguration = BuildDefaultConfiguration();
             }
         }
 
-        private static IConfiguration DefaultConfiguration()
+        public static string DataConnectionString => TestClusterOptions.GetDataConnectionString(defaultConfiguration);
+        public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
+        public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+
+        private static IConfiguration BuildDefaultConfiguration()
         {
             var builder = TestClusterOptions.DefaultConfigurationBuilder();
+            builder.AddInMemoryCollection(new Dictionary<string, string>
+            {
+                { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },
+            });
             builder.AddEnvironmentVariables("Orleans");
 
             AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
@@ -52,27 +58,6 @@ namespace Tester
 
                 currentDir = currentDir.Parent;
             }
-        }
-
-        protected BaseTestClusterFixture()
-        {
-            GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
-            var testCluster = CreateTestCluster();
-            if (testCluster.Primary == null)
-            {
-                testCluster.Deploy();
-            }
-            this.HostedCluster = testCluster;
-        }
-
-        protected abstract TestCluster CreateTestCluster();
-
-        public TestCluster HostedCluster { get; private set; }
-
-        public virtual void Dispose()
-        {
-            this.HostedCluster.StopAllSilos();
         }
     }
 }

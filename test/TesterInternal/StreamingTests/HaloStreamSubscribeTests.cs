@@ -6,6 +6,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
@@ -33,7 +34,7 @@ namespace UnitTests.HaloTests.Streaming
             {
                 var deploymentId = this.HostedCluster.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
@@ -56,7 +57,7 @@ namespace UnitTests.HaloTests.Streaming
             var deploymentId = this.HostedCluster.DeploymentId;
             if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 

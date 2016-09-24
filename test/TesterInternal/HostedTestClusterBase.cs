@@ -2,6 +2,7 @@
 using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.Tester;
 
 namespace UnitTests
@@ -10,6 +11,7 @@ namespace UnitTests
     {
         protected BaseClusterFixture()
         {
+            BaseTestClusterFixture.InitializeDefaults();
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
             var hostedCluster = CreateClusterHost();
@@ -32,6 +34,8 @@ namespace UnitTests
 
         public HostedTestClusterPerTest()
         {
+            BaseTestClusterFixture.InitializeDefaults();
+
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
             this.HostedCluster = this.CreateSiloHost();

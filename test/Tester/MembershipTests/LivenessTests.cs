@@ -240,7 +240,7 @@ namespace UnitTests.MembershipTests
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
+            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -369,7 +369,7 @@ namespace UnitTests.MembershipTests
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
+            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();

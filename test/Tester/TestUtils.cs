@@ -22,7 +22,7 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            bool usingLocalWAS = StorageTestConstants.UsingAzureLocalStorageEmulator;
+            bool usingLocalWAS = string.Equals(TestDefaultConfiguration.DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
 
             if (!usingLocalWAS)
             {
