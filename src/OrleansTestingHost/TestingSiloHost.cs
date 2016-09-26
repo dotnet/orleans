@@ -460,7 +460,7 @@ namespace Orleans.TestingHost
                 options.AdjustConfig(config);
             }
 
-            config.AdjustForTestEnvironment(StorageTestConstants.DataConnectionString);
+            config.AdjustForTestEnvironment(TestClusterOptions.GetDataConnectionString(TestClusterOptions.DefaultExtendedConfiguration));
         }
 
         /// <summary> Modify the ClientConfiguration to the test environment </summary>
@@ -472,7 +472,7 @@ namespace Orleans.TestingHost
                 options.AdjustConfig(config);
             }
 
-            config.AdjustForTestEnvironment(StorageTestConstants.DataConnectionString);
+            config.AdjustForTestEnvironment(TestClusterOptions.GetDataConnectionString(TestClusterOptions.DefaultExtendedConfiguration));
         }
 
         #region Private methods
