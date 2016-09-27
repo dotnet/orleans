@@ -19,17 +19,17 @@ namespace Tester
         {
             lock (lockObject)
             {
-                TestClusterOptions.DefaultExtendedConfiguration = defaultConfiguration = BuildDefaultConfiguration();
+                TestClusterOptions.FallbackOptions.DefaultExtendedConfiguration = defaultConfiguration = BuildDefaultConfiguration();
             }
         }
 
-        public static string DataConnectionString => TestClusterOptions.GetDataConnectionString(defaultConfiguration);
+        public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
 
         private static IConfiguration BuildDefaultConfiguration()
         {
-            var builder = TestClusterOptions.DefaultConfigurationBuilder();
+            var builder = TestClusterOptions.FallbackOptions.DefaultConfigurationBuilder();
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },

@@ -14,44 +14,7 @@ namespace Tester
 
         static BaseTestClusterFixture()
         {
-            InitializeDefaults();
-        }
-
-        public static void InitializeDefaults()
-        {
-            if (Interlocked.CompareExchange(ref defaultsAreInitialized, 1, 0) == 0)
-            {
-                TestClusterOptions.DefaultExtendedConfiguration = DefaultConfiguration();
-            }
-        }
-
-        private static IConfiguration DefaultConfiguration()
-        {
-            var builder = TestClusterOptions.DefaultConfigurationBuilder();
-            builder.AddEnvironmentVariables("Orleans");
-
-            AddJsonFileInAncestorFolder(builder, "OrleansTestSecrets.json");
-
-            var config = builder.Build();
-            return config;
-        }
-
-        /// <summary>Try to find a file with specified name up the folder hierarchy, as some of our CI environments are configured this way.</summary>
-        private static void AddJsonFileInAncestorFolder(ConfigurationBuilder builder, string fileName)
-        {
-            // There might be some other out-of-the-box way of doing this though.
-            var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
-            while (currentDir != null && currentDir.Exists)
-            {
-                string filePath = Path.Combine(currentDir.FullName, fileName);
-                if (File.Exists(filePath))
-                {
-                    builder.AddJsonFile(filePath);
-                    return;
-                }
-
-                currentDir = currentDir.Parent;
-            }
+            TestDefaultConfiguration.InitializeDefaults();
         }
 
         protected BaseTestClusterFixture()

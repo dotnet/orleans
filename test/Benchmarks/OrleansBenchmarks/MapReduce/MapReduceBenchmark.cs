@@ -26,7 +26,7 @@ namespace OrleansBenchmarks.MapReduce
         public void BenchmarkSetup()
         {
             var options = new TestClusterOptions(1);
-            options.ExtendedConfiguration[nameof(TestClusterOptions.ExtendedConfigurationOptions.TraceToConsole)] = "false";
+            options.ExtendedFallbackOptions.TraceToConsole = false;
             options.ClusterConfiguration.ApplyToAllNodes(c => c.DefaultTraceLevel = Severity.Warning);
             _host = new TestCluster(options);
             _host.Deploy();

@@ -11,7 +11,7 @@ namespace UnitTests
     {
         protected BaseClusterFixture()
         {
-            BaseTestClusterFixture.InitializeDefaults();
+            TestDefaultConfiguration.InitializeDefaults();
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
             var hostedCluster = CreateClusterHost();
@@ -34,7 +34,7 @@ namespace UnitTests
 
         public HostedTestClusterPerTest()
         {
-            BaseTestClusterFixture.InitializeDefaults();
+            TestDefaultConfiguration.InitializeDefaults();
 
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();

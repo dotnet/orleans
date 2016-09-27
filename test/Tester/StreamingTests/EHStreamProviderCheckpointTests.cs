@@ -13,6 +13,7 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
@@ -33,11 +34,11 @@ namespace UnitTests.StreamingTests
 
         private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
             new EventHubSettings(
-                TestClusterOptions.DefaultExtendedConfiguration["EventHubConnectionString"],
+                TestDefaultConfiguration.EventHubConnectionString,
                 EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestClusterOptions.GetDataConnectionString(TestClusterOptions.DefaultExtendedConfiguration),
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.EventHubConnectionString,
                 EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =

@@ -19,22 +19,62 @@ namespace Orleans.TestingHost
     [Serializable]
     public class TestClusterOptions
     {
-        public enum ExtendedConfigurationOptions
+        /// <summary>
+        /// Extended options to be used as fallbacks in the case that explicit options are not provided by the user.
+        /// </summary>
+        public class FallbackOptions
         {
-            DataConnectionString,
-            TraceToConsole,
-            InitialSilosCount,
-            LogsFolder,
+            /// <summary>
+            /// Is set to true, by default the cluster will output traces in the console
+            /// </summary>
+            public bool? TraceToConsole { get; set; }
+
+            /// <summary>
+            /// Default subfolder the the logs
+            /// </summary>
+            public string LogsFolder { get; set; }
+
+            /// <summary>
+            /// Default data connection string to use in tests
+            /// </summary>
+            public string DataConnectionString { get; set; }
+
+            /// <summary>
+            /// Default initial silo count
+            /// </summary>
+            public short InitialSilosCount { get; set; }
+
+            /// <summary>
+            /// Creates a default configuration builder with some defaults.
+            /// </summary>
+            /// <returns></returns>
+            public static ConfigurationBuilder DefaultConfigurationBuilder()
+            {
+                var builder = new ConfigurationBuilder();
+                builder.AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    { nameof(DataConnectionString), "UseDevelopmentStorage=true" },
+                    { nameof(LogsFolder), "logs" },
+                    { nameof(TraceToConsole), "true" },
+                    { nameof(InitialSilosCount), "2" },
+                });
+                return builder;
+            }
+
+            /// <summary>
+            /// Configure defaults for building the configurations
+            /// </summary>
+            public static IConfiguration DefaultExtendedConfiguration { get; set; } = DefaultConfigurationBuilder().Build();
         }
 
         private ClusterConfiguration _clusterConfiguration;
         private ClientConfiguration _clientConfiguration;
 
         /// <summary>
-        /// Create a new TestClusterOptions with the default initial silo count. See <see cref="ExtendedConfiguration"/>.
+        /// Create a new TestClusterOptions with the default initial silo count. See <see cref="ExtendedFallbackOptions"/>.
         /// </summary>
         public TestClusterOptions()
-            : this(GetInitialSilosCount(DefaultExtendedConfiguration))
+            : this(FallbackOptions.DefaultExtendedConfiguration)
         {
         }
 
@@ -43,63 +83,41 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="initialSilosCount">The number of initial silos to deploy.</param>
         public TestClusterOptions(short initialSilosCount)
+            : this(FallbackOptions.DefaultExtendedConfiguration)
         {
-            this.InitialSilosCount = initialSilosCount;
+            this.ExtendedFallbackOptions.InitialSilosCount = initialSilosCount;
+        }
+
+
+        /// <summary>
+        /// Create a new TestClusterOptions
+        /// </summary>
+        public TestClusterOptions(IConfiguration extendedConfiguration)
+            : this(BindExtendedOptions(extendedConfiguration))
+        {
+        }
+
+        /// <summary>
+        /// Create a new TestClusterOptions
+        /// </summary>
+        public TestClusterOptions(FallbackOptions extendedFallbackOptions)
+        {
             this.BaseSiloPort = ThreadSafeRandom.Next(22300, 30000);
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
+            this.ExtendedFallbackOptions = extendedFallbackOptions;
         }
 
-        public static ConfigurationBuilder DefaultConfigurationBuilder()
+        private static FallbackOptions BindExtendedOptions(IConfiguration extendedConfiguration)
         {
-            var builder = new ConfigurationBuilder();
-            builder.AddInMemoryCollection(new Dictionary<string, string>
-            {
-                { nameof(ExtendedConfigurationOptions.DataConnectionString), "UseDevelopmentStorage=true" },
-                { nameof(ExtendedConfigurationOptions.LogsFolder), "logs" },
-                { nameof(ExtendedConfigurationOptions.TraceToConsole), "true" },
-                { nameof(ExtendedConfigurationOptions.InitialSilosCount), "2" }
-            });
-            return builder;
+            var fallbackOptions = new FallbackOptions();
+            extendedConfiguration.Bind(fallbackOptions);
+            return fallbackOptions;
         }
 
         /// <summary>
-        /// The default initial silos count. See <see cref="TestClusterOptions"/>.
+        /// Gets or sets fallback options in the case that some configuration settings are not explicitly provided by the user, such as the <see cref="GlobalConfiguration.DataConnectionString"/>
         /// </summary>
-        public static short GetInitialSilosCount(IConfiguration configuration)
-        {
-                short defaultValue;
-                return short.TryParse(configuration[nameof(ExtendedConfigurationOptions.InitialSilosCount)], out defaultValue)
-                        ? defaultValue
-                        : (short)2;
-        }
-
-        /// <summary>
-        /// Is set to true, by default the cluster will output traces in the console
-        /// </summary>
-        public static bool GetTraceToConsole(IConfiguration configuration)
-        {
-                bool defaultValue;
-                return bool.TryParse(configuration[nameof(ExtendedConfigurationOptions.TraceToConsole)], out defaultValue)
-                        ? defaultValue
-                        : true;
-        }
-
-        /// <summary>
-        /// Default subfolder the the logs
-        /// </summary>
-        public static string GetLogsFolder(IConfiguration configuration) => configuration[nameof(ExtendedConfigurationOptions.LogsFolder)];
-
-        /// <summary>
-        /// Default data connection string
-        /// </summary>
-        public static string GetDataConnectionString(IConfiguration configuration) => configuration[nameof(ExtendedConfigurationOptions.DataConnectionString)];
-
-        /// <summary>
-        /// Configure defaults for building the configurations
-        /// </summary>
-        public static IConfiguration DefaultExtendedConfiguration { get; set; } = DefaultConfigurationBuilder().Build();
-
-        public IConfiguration ExtendedConfiguration { get; set; } = DefaultExtendedConfiguration;
+        public FallbackOptions ExtendedFallbackOptions { get; set; }
 
         /// <summary>
         /// Base port number to use for silo's gateways
@@ -110,11 +128,6 @@ namespace Orleans.TestingHost
         /// Base port number to use for silos
         /// </summary>
         public int BaseSiloPort { get; set; }
-
-        /// <summary>
-        /// The number of initial silos to deploy.
-        /// </summary>
-        public short InitialSilosCount { get; set; }
 
         /// <summary>
         /// The cluster configuration. If no value set, build a new one with <see cref="BuildClusterConfiguration()"/>
@@ -138,16 +151,16 @@ namespace Orleans.TestingHost
 
         private ClusterConfiguration BuildClusterConfiguration()
         {
-            if (this.InitialSilosCount < 1)
+            int silosCount = this.ExtendedFallbackOptions.InitialSilosCount;
+            if (silosCount < 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(InitialSilosCount), this.InitialSilosCount, "value must be greater than 0.");
+                throw new InvalidOperationException($"{nameof(ExtendedFallbackOptions)}.{nameof(FallbackOptions.InitialSilosCount)} must be greater than 0. Current value is {silosCount}");
             }
 
-            int silosCount = this.InitialSilosCount;
             int baseSiloPort = this.BaseSiloPort;
             int baseGatewayPort = this.BaseGatewayPort;
 
-            return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount, this.ExtendedConfiguration);
+            return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount, this.ExtendedFallbackOptions);
         }
 
         /// <summary>
@@ -156,14 +169,18 @@ namespace Orleans.TestingHost
         /// <param name="baseSiloPort">Base port number to use for silos</param>
         /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>
         /// <param name="silosCount">The number of initial silos to deploy.</param>
+        /// <param name="extendedOptions">The extended fallback options.</param>
         /// <returns>The builded cluster configuration</returns>
-        public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount, IConfiguration extendedConfiguration)
+        public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount, FallbackOptions extendedOptions)
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
             config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
-            config.Defaults.TraceToConsole = GetTraceToConsole(extendedConfiguration);
+            if (extendedOptions.TraceToConsole.HasValue)
+            {
+                config.Defaults.TraceToConsole = extendedOptions.TraceToConsole.Value;
+            }
 
-            var defaultLogsFolder = GetLogsFolder(extendedConfiguration);
+            var defaultLogsFolder = extendedOptions.LogsFolder;
             if (!string.IsNullOrWhiteSpace(defaultLogsFolder))
             {
                 if (!Directory.Exists(defaultLogsFolder))
@@ -182,7 +199,7 @@ namespace Orleans.TestingHost
 
             config.Globals.ExpectedClusterSize = silosCount;
 
-            config.AdjustForTestEnvironment(extendedConfiguration["DataConnectionString"]);
+            config.AdjustForTestEnvironment(extendedOptions.DataConnectionString);
             return config;
         }
 

@@ -28,7 +28,7 @@ namespace UnitTests.Tester
     {
         static TestClusterPerTest()
         {
-            BaseTestClusterFixture.InitializeDefaults();
+            TestDefaultConfiguration.InitializeDefaults();
         }
 
         protected TestCluster HostedCluster { get; private set; }
