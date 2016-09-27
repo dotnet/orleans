@@ -9,111 +9,71 @@ The idea is to track end-user facing changes as they occur.*
 - Several major performance improvements
 ### [v1.3.0-beta2]
 - Support for geo-distributed multi-cluster deployments #1108 #1109 #1800
-- Reworked documentation to use DocFX #1970
 - Providers
-  - Support for PostgreSql #2113
   - Remove confusing parameter from AzureSilo.Start #2109
   - Minimal Service Fabric integration #2120
+  - Update blob storage provider to throw on storage exceptions #1902
   - Decode protobuf using MessageParser, not dynamic #2136
-  - Updated Google.Protobuf dependency #2096 
   - Service Provider is no longer required by EventHubAdapter #2044
   - Preliminary relational persistence queries #1682
   - Add a function that checks the connection string for use during initialization #1987
-  - Updated Azure Storage dependency to 7.0.0 #1968
   - Added new Amazon AWS basic Orleans providers [#2006](https://github.com/dotnet/orleans/issues/2006)
   - A new ADO.NET storage provider that is significantly easier to setup, which replaces the the previous one. This change is not backwards compatible and does not support sharding
   (likely be replaced later with Orleans sharding provider). The most straightforward migration plan is likely to persist the state classes from Orleans application code.
   More information in [#1682](https://github.com/dotnet/orleans/pull/1682) and in [#1682 (comment)](https://github.com/dotnet/orleans/pull/1682#issuecomment-234371701).
-  - Update ZooKeeperNetEx to 3.4.8.5 #1927
+  - Support for PostgreSql #2113
   - Memory Storage eTag enforcement less strict. #1885
-  - Relational Storage: Added SiloName to Membership table #1787
   - Added option to perform provider commands quietly #1762
-  - Fix for strange bug in BondSerializer #1790
   - CreateOrleansTables_SqlServer.sql: Removed support for SQL Server 2000 and 2005 #1779
-  - Added support for using Consul 0.6.0 as a Membership Provider #1267
-  - Allow for extraneous keys in OrleanQuery table #1752
 - Streaming
-  - EventHub receiver metrics reporting abstraction #2146
+  - EventHub stream provider made more extensible #1861 1714
+  - EventHub stream provider with improved monitoring logging #1857 #2146
   - EventHub stream provider time based message purge #2093
-  - Upgrade to ServiceBus 3.3.2 and related changes. #2087
   - Add Memory Stream Provider #2063
   - Persistent stream pulling agent now uses exponential backoff #2078
   - Add dynamic adding / removing stream providers functionality. #1966
-  - EventHub stream provider logging/monitoring #1857
-  - Updating EventHubAdapterFactory for extensibility. #1861
   - Consistent implicit subscription Id generation. #1828
-  - ServiceBus upgrade to 3.2.2 #1813
   - Event hub stream provider EventData to cached data mapping #1727
-  - Refactor of EventHubStreamProvider to better support plugable CacheDataAdapter #1714
 - Bug fixes
-  - Fix SerializationManager.GetFallbackSerializer() in .NET Standard #2211
-  - Fix bug in GrainFactoryServiceProvider #2201
   - CodeGen: fix generated DeepCopy method to call RecordObject earlier #2135
   - Fix support for serializing SByte[] #2140
   - Fix synchronization bug in Orleans/Async/BatchWorker #2133
   - Fix #2119 by allowing full uninitialization in SiloHost #2127
   - Persistent Stream Provider initialization timeout fix. #2065
   - Fix null reference in StreamPubSub grain. #2040
-  - Fix for Comment in configuration XML causes exception to be thrown #1994
+  - Some EventHub stream provider bug fixes #1760 #1935 #1921 #1922
+  - Allow comments in configuration XML #1994
   - Fixed null MethodInfo in Interceptors #1938
   - Object Pools not pooling fix. #1937 
-  - Fixed EventHub stream provider flow control. #1935
   - Harden explicit subscription pubsub system #1884
-  - Retry EventHub receiver initialization on failure. #1922
-  - Begin reading from most recent EventHub data using latest offset #1921
   - Fix #1869. Grain Extensions + method interception should function correctly #1874
   - Fix bug with generic state parameter caused by inconsistent use of grainClassName / genericArgument / genericInterface #1897
-  - Fixes to the default ServiceProvider and back compat with grain creation #1911
-  - update blob storage provider to throw on storage exceptions #1902
-  - Fix several incorrect usages of Type and TypeInfo #1894
-  - Stacktrace preservation when sending exception to a remote process. #1879
-  - Cancellation code improvements and bug fixes #1850
   - Throw meaningful exception if grain timer is created outside grain context #1858
   - Do not deactivate Stateless Workers upon grain directory partition shutdown. #1838
-  - Fixed a NullRefExc bug in ClientObserverRegistrar. #1823
-  - EventHub stream provider partition checkpoint corruption fix #1760
-  - Fixed a bug of using 11204 instead of 1024 in RuntimeStatisticsGroup. #1805 
-  - Refactored grain props slightly, fixing null ServiceProvider problem #1761
+  - Fixed a NullReferenceException bug in ClientObserverRegistrar. #1823
 - Test
-  - Add test project for non-Silo tests in .NET Standard #2216
-  - Add powershell script to run tests in parallel in build #2203
-  - Add serialization benchmarks #2003
-  - Switched TestInternalGrains, TestInternal, and Tester, to XUnit #1949
-  - Migrated to Xunit #1821
   - Allow liveness config in TestCluster #1818
-  - Test Helpers - Stateful Grains #1802
-  - Test helpers #1792
-  - Fix liveness tests for Sql Server, MySql and ZK #1737
-  - Starts Azure storage emulator on local persistence tests #1723
+  - Fix for strange bug in BondSerializer #1790
+  - Some improvements for unit testing #1792 #1802
 - Other
   - Move JSON serialization methods into OrleansJsonSerializer #2206
-  - Update codegen related dependency NuGets #2205
-  - Remove UseJsonFallbackSerializer #2204
+  - Updated package dependencies for Azure Storage, ServiceBus, ZooKeeperNetEx, Protobuf and codegen related
+  - Remove UseStandardSerializer and UseJsonFallbackSerializer options #2193 #2204
   - Make IGrainFactory injectable #2192
-  - Remove UseStandardSerializer option #2193
   - Recover types from ReflectionTypeLoadException #2164
-  - Remove WorkingStorageDirectory property #2176 
   - Moved Orleans Performance Counters into its own Telemetry Consumer. Now you need to explicitly register the `OrleansPerfCounterTelemetryConsumer` either by code or XML. More information in [#2122](https://github.com/dotnet/orleans/pull/2122) and docs will come later. `Microsoft.Orleans.CounterControl` can still be used to install the performance counters or you can use `InstallUtil.exe OrleansTelemetryConsumers.Counters.dll` to install it without depending on `OrleansCounterControl.exe`
-  - Use the ISerializable subset available in .NET Standard
-  - PowerShell Client Module #1990
-  - Migrate from packages.config to project.json #1768
+  - New PowerShell client Module #1990
   - Expose property IsLongKey for IAddressable #1939
   - Removed OrleansDependencyInjection package and instead Orleans references Microsoft.Extensions.DepedencyInjection #1911 #1901 #1878
   - Now using Microsoft.Extensions.DepedencyInjection.ServiceProvider as the default service provider if the user does not override it. Grains are still not being injected automatically unless the user opts in by specifying his own Startup configuration that returns a service provider.
-  - Improve codegen attributes KnownType, GenerateSerializer, KnownAssembly #1888
   - Do not require explicitly registering grains in ServiceCollection #1901
-  - Log special error msg when silo fails to join due to initial connectivity problems. #1866
-  - GenerateSerializerAttribute #1864
-  - Allow multiple usages of KnownAssembly and KnownType attributes #1855
   - Support cancellation tokens in grain method signatures #1599
   - ClusterConfiguration extension for setting Startup class #1842
   - Log more runtime statistics on the client. #1778
   - Added ManagementGrain.GetDetailedHosts() #1794
-  - Getting a list of active grains in Orleans for monitoring #1772 
-  - Change StaticGatewayListProvider to be Updatable. #1770
+  - Can get a list of active grains in Orleans for monitoring #1772 
   - Rename InstanceName to SiloName. #1740
-  - Removed Queued task scheduler #1724
-
+  - Reworked documentation to use DocFX #1970
 ### [v1.2.3]
 - Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
 - Troubleshooting improvements:
