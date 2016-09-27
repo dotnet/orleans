@@ -107,6 +107,20 @@
       href: Orleans-Streams/Streams-Implementation.md
     - name: Streams Extensibility
       href: Orleans-Streams/Streams-Extensibility.md
+      
+- name: Multi-Cluster Support
+  href: Multi-Cluster/Overview.md
+  homepage: Multi-Cluster/Overview.md
+  items:
+    - name: Multi-Cluster Configuration
+      href: Multi-Cluster/MultiClusterConfiguration.md
+    - name: Gossip Channels
+      href: Multi-Cluster/GossipChannels.md
+    - name: Silo Configuration
+      href: Multi-Cluster/SiloConfiguration.md
+    - name: Global-Single-Instance Grains
+      href: Multi-Cluster/GlobalSingleInstance.md
+
 - name: Configuration Guide
   homepage: Orleans-Configuration-Guide/index.md
   href: Orleans-Configuration-Guide/index.md
