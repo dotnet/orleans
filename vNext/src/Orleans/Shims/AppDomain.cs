@@ -38,7 +38,6 @@ namespace Orleans
             {
                 typeof(Exception).GetTypeInfo().Assembly,
                 typeof(AssemblyProcessor).GetTypeInfo().Assembly,
-                Assembly.GetEntryAssembly(),
             };
             return assemblies;
         }
