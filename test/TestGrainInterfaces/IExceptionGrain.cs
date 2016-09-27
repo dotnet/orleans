@@ -22,6 +22,8 @@ namespace UnitTests.GrainInterfaces
 
         Task ThrowsSynchronousInvalidOperationException();
 
+        Task<object> ThrowsSynchronousExceptionObjectTask();
+
         Task ThrowsMultipleExceptionsAggregatedInFaultedTask();
 
         Task ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
