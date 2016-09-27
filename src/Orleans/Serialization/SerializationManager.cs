@@ -145,7 +145,10 @@ namespace Orleans.Serialization
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
                 AssemblyProcessor.Initialize();
+#if !NETSTANDARD_TODO
+                 //blocked by Cannot use binary formatter as fallback serializer while running on .Net Core
                 fallbackSerializer = GetFallbackSerializer();
+#endif
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -327,9 +330,9 @@ namespace Orleans.Serialization
             Register(typeof(Message.ResponseTypes));
         }
 
-        #endregion
+#endregion
 
-        #region Serialization info registration
+#region Serialization info registration
 
         /// <summary>
         /// Register a Type with the serialization system to use the specified DeepCopier, Serializer and Deserializer functions.

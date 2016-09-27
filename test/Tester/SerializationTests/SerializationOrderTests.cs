@@ -52,7 +52,6 @@ namespace UnitTests.Serialization
             Assert.True(FakeTypeToSerialize.DeserializeWasCalled, "FakeTypeToSerialize.Deserialize should have been called");
         }
 
-
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationOrder_VerifyExternalSerializersInvokedInOrder()
         {
