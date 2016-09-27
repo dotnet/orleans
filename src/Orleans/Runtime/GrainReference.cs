@@ -433,56 +433,9 @@ namespace Orleans.Runtime
 
             return RuntimeClient.Current.GrainTypeResolver != null && RuntimeClient.Current.GrainTypeResolver.IsUnordered(GrainId.GetTypeCode());
         }
-        
+
         #endregion
-
-        /// <summary>
-        /// Internal implementation of Cast operation for grain references
-        /// Called from generated code.
-        /// </summary>
-        /// <param name="targetReferenceType">Type that this grain reference should be cast to</param>
-        /// <param name="grainRefCreatorFunc">Delegate function to create grain references of the target type</param>
-        /// <param name="grainRef">Grain reference to cast from</param>
-        /// <param name="interfaceId">Interface id value for the target cast type</param>
-        /// <returns>GrainReference that is usable as the target type</returns>
-        /// <exception cref="System.InvalidCastException">if the grain cannot be cast to the target type</exception>
-        protected internal static IAddressable CastInternal(
-            Type targetReferenceType,
-            Func<GrainReference, IAddressable> grainRefCreatorFunc,
-            IAddressable grainRef,
-            int interfaceId)
-        {
-            if (grainRef == null) throw new ArgumentNullException("grainRef");
-
-            Type sourceType = grainRef.GetType();
-
-            if (!typeof(IAddressable).IsAssignableFrom(targetReferenceType))
-            {
-                throw new InvalidCastException(String.Format("Target type must be derived from Orleans.IAddressable - cannot handle {0}", targetReferenceType));
-            }
-            else if (typeof(Grain).IsAssignableFrom(sourceType))
-            {
-                Grain grainClassRef = (Grain)grainRef;
-                GrainReference g = FromGrainId(grainClassRef.Data.Identity);
-                grainRef = g;
-            }
-            else if (!typeof(GrainReference).IsAssignableFrom(sourceType))
-            {
-                throw new InvalidCastException(String.Format("Grain reference object must an Orleans.GrainReference - cannot handle {0}", sourceType));
-            }
-
-            if (targetReferenceType.IsAssignableFrom(sourceType))
-            {
-                // Already compatible - no conversion or wrapping necessary
-                return grainRef;
-            }
-
-            // We have an untyped grain reference that may resolve eventually successfully -- need to enclose in an apprroately typed wrapper class
-            var grainReference = (GrainReference) grainRef;
-            var grainWrapper = (GrainReference) grainRefCreatorFunc(grainReference);
-            return grainWrapper;
-        }
-
+        
         private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
         {
             // String concatenation is approx 35% faster than string.Format here

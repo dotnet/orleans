@@ -812,7 +812,7 @@ namespace Orleans.Serialization
                 ".ctor_" + type.Name,
                 typeof(GrainReference),
                 new[] { typeof(GrainReference) },
-                typeof(SerializationManager).Module,
+                typeof(SerializationManager).GetTypeInfo().Module,
                 true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
