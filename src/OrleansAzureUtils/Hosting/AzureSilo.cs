@@ -201,7 +201,9 @@ namespace Orleans.Runtime.Host
             // If deploymentId was not direclty provided, take the value in the config. If it is not 
             // in the config too, just take the DeploymentId from Azure
             if (deploymentId == null)
-                deploymentId = host.Config.Globals.DeploymentId ?? serviceRuntimeWrapper.DeploymentId;
+                deploymentId = string.IsNullOrWhiteSpace(host.Config.Globals.DeploymentId)
+                    ? serviceRuntimeWrapper.DeploymentId
+                    : host.Config.Globals.DeploymentId;
 
             myEntry = new SiloInstanceTableEntry
             {
