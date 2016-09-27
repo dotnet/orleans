@@ -53,6 +53,11 @@ namespace UnitTests.Grains
             throw new InvalidOperationException("Test exception");
         }
 
+        public Task<object> ThrowsSynchronousExceptionObjectTask()
+        {
+            throw new InvalidOperationException("Test exception");
+        }
+
         public Task ThrowsMultipleExceptionsAggregatedInFaultedTask()
         {
             var tcs = new TaskCompletionSource<object>();
