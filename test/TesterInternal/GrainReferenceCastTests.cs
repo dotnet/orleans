@@ -36,7 +36,7 @@ namespace UnitTests
             Assert.IsAssignableFrom<IMultifacetWriter>(cast);
             Assert.IsAssignableFrom<IMultifacetReader>(grain);
 
-            IAddressable cast2 = grain.AsReference<IMultifacetReader>();
+            IAddressable cast2 = grain.AsReference<IMultifacetWriter>();
             Assert.IsAssignableFrom(grain.GetType(), cast2);
             Assert.IsAssignableFrom<IMultifacetReader>(cast2);
             Assert.IsAssignableFrom<IMultifacetWriter>(grain);
@@ -140,16 +140,12 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public void CastFailInternalCastFromBadType()
         {
-            Assert.Throws<InvalidCastException>(() => { 
-            Type t = typeof(ISimpleGrain);
-            GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            IAddressable cast = GrainReference.CastInternal(
-                typeof(Boolean),
-                null,
-                grain,
-                GrainInterfaceUtils.GetGrainInterfaceId(t));
-            Assert.True(false, "Exception should have been raised");
-            });
+            var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(
+                random.Next(),
+                SimpleGrain.SimpleGrainNamePrefix);
+
+            // Attempting to cast a grain to a non-grain type should fail.
+            Assert.Throws<InvalidCastException>(() => GrainClient.InternalGrainFactory.Cast(grain, typeof(bool)));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
@@ -158,12 +154,10 @@ namespace UnitTests
             var serviceName = typeof(SimpleGrain).FullName;
             GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
             
-            IAddressable cast = GrainReference.CastInternal(
-                typeof(ISimpleGrain),
-                (GrainReference gr) => { throw new InvalidOperationException("Should not need to create a new GrainReference wrapper"); },
-                grain,
-                Utils.CalculateIdHash(serviceName));
+            // This cast should be a no-op, since the interface matches the initial reference's exactly.
+            IAddressable cast = grain.Cast<ISimpleGrain>();
 
+            Assert.Same(grain, cast);
             Assert.IsAssignableFrom<ISimpleGrain>(cast);
         }
 
@@ -171,15 +165,12 @@ namespace UnitTests
         public void CastInternalCastUpFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference) GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             
-            var serviceName = typeof(GeneratorTestGrain).FullName;
-            IAddressable cast = GrainReference.CastInternal(
-                typeof(IGeneratorTestGrain),
-                (GrainReference gr) => { throw new InvalidOperationException("Should not need to create a new GrainReference wrapper"); },
-                grain,
-                Utils.CalculateIdHash(serviceName));
+            // This cast should be a no-op, since the interface is implemented by the initial reference's interface.
+            IAddressable cast = grain.Cast<IGeneratorTestGrain>();
 
+            Assert.Same(grain, cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
         }
 
@@ -200,25 +191,25 @@ namespace UnitTests
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
             IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             Assert.True(grain.StringIsNullOrEmpty().Result);
+
             // Fails the next line as grain reference is already resolved
             IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-
-            await Assert.ThrowsAsync<InvalidCastException>(() =>
-                cast.StringConcat("a", "b", "c"));
+            
+            await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
-        public void FailOperationAfterSideCast()
+        public async Task FailOperationAfterSideCast()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
             IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+
             // Cast works optimistically when the grain reference is not already resolved
             IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-            // Operation fails when grain reference is completely resolved
 
-            Assert.ThrowsAsync<InvalidCastException>(() =>
-                cast.StringConcat("a", "b", "c"));
+            // Operation fails when grain reference is completely resolved
+            await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
         }
 
 

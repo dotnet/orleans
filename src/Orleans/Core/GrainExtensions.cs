@@ -11,27 +11,29 @@ namespace Orleans
     {
         private const string WRONG_GRAIN_ERROR_MSG = "Passing a half baked grain as an argument. It is possible that you instantiated a grain class explicitely, as a regular object and not via Orleans runtime or via proper test mocking";
 
-        private static GrainReference AsWeaklyTypedReference(this IAddressable grain)
+        internal static GrainReference AsWeaklyTypedReference(this IAddressable grain)
         {
-            var reference = grain as GrainReference;
             // When called against an instance of a grain reference class, do nothing
+            var reference = grain as GrainReference;
             if (reference != null) return reference;
 
             var grainBase = grain as Grain;
             if (grainBase != null)
             {
-                if (grainBase.Data == null || grainBase.Data.GrainReference == null)
+                if (grainBase.Data?.GrainReference == null)
                 {
-                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, nameof(grain));
                 }
+
                 return grainBase.Data.GrainReference;
             }
 
             var systemTarget = grain as ISystemTargetBase;
-            if (systemTarget != null)
-                return GrainReference.FromGrainId(systemTarget.GrainId, null, systemTarget.Silo);
+            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, null, systemTarget.Silo);
 
-            throw new ArgumentException(String.Format("AsWeaklyTypedReference has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
+            throw new ArgumentException(
+                $"AsWeaklyTypedReference has been called on an unexpected type: {grain.GetType().FullName}.",
+                nameof(grain));
         }
 
         /// <summary>
