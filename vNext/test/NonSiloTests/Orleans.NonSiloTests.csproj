@@ -35,8 +35,20 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\SerializationProviderTests.cs">
+      <Link>SerializationTests\ConfigurationTests\SerializationProviderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\ExternalSerializerTest.cs">
+      <Link>SerializationTests\ExternalSerializerTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationOrderTests.cs">
+      <Link>SerializationTests\SerializationOrderTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTests.DifferentTypes.cs">
       <Link>SerializationTests\SerializationTests.DifferentTypes.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTests.ImmutableCollections.cs">
+      <Link>SerializationTests\SerializationTests.ImmutableCollections.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
@@ -61,6 +73,32 @@
   </ItemGroup>
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml</Link>
+    </Content>
+    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
