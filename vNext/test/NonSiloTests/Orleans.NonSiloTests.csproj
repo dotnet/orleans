@@ -64,6 +64,10 @@
       <Project>{afd242b4-eda9-42cd-ba39-e410b98add2a}</Project>
       <Name>TestExtensions</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{a972213f-189b-41d4-90fe-38d513c1106a}</Project>
+      <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
