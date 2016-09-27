@@ -291,7 +291,8 @@ namespace Orleans.CodeGenerator
             var grainMethodCall =
                 SF.InvocationExpression(castGrain.Member(method.Name))
                     .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
-
+            
+            // For void methods, invoke the method and return a completed task.
             if (method.ReturnType == typeof(void))
             {
                 var completed = (Expression<Func<Task<object>>>)(() => TaskUtility.Completed());
@@ -299,6 +300,12 @@ namespace Orleans.CodeGenerator
                 {
                     SF.ExpressionStatement(grainMethodCall), SF.ReturnStatement(completed.Invoke())
                 };
+            }
+
+            // For methods which return the expected type, Task<object>, simply return that.
+            if (method.ReturnType == typeof(Task<object>))
+            {
+                return new StatementSyntax[] { SF.ReturnStatement(grainMethodCall) };
             }
 
             // The invoke method expects a Task<object>, so we need to upcast the returned value.
