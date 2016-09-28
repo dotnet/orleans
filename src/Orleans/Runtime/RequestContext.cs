@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
 using System.Runtime.Remoting.Messaging;
 #endif
 using Orleans.Serialization;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-#if NETSTANDARD_TODO
+#if NETSTANDARD
         private static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
         private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
 #endif
@@ -117,12 +117,12 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-#if NETSTANDARD_TODO
+#if NETSTANDARD
                     ActivityId.Value = (Guid) activityIdObj;
 #endif
                 }
 
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
                 Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
 #endif
             }
@@ -146,7 +146,7 @@ namespace Orleans.Runtime
 
             if (PropagateActivityId)
             {
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
                 var activityId = Trace.CorrelationManager.ActivityId;
 #else
                 var activityId = ActivityId.Value;
@@ -167,7 +167,7 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
 #else
             CallContextData.Value = null;
@@ -176,7 +176,7 @@ namespace Orleans.Runtime
 
         private static void SetContextData(Dictionary<string, object> values)
         {
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
             CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
 #else
             CallContextData.Value = values;
@@ -185,7 +185,7 @@ namespace Orleans.Runtime
 
         private static Dictionary<string, object> GetContextData()
         {
-#if !NETSTANDARD_TODO
+#if !NETSTANDARD
             return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
 #else
             return CallContextData.Value;
