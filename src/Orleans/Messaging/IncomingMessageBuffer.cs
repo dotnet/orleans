@@ -23,16 +23,22 @@ namespace Orleans.Runtime
         private int decodeOffset;
 
         private readonly bool supportForwarding;
+        private bool wtf = false;
         private Logger Log;
 
-        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        public IncomingMessageBuffer(Logger logger, 
+            bool supportForwarding = false,
+            int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
+            int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE,
+            IList<ArraySegment<byte>> readBuf = null)
         {
             Log = logger;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-            readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
+            wtf = readBuf is List<ArraySegment<byte>>;
+            readBuffer = readBuf as List<ArraySegment<byte>> ?? BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
             receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
@@ -143,6 +149,8 @@ namespace Orleans.Runtime
         /// </summary>
         private void AdjustBuffer()
         {
+            if(wtf) return;
+            
             // drop buffers consumed by messages and adjust offsets
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
