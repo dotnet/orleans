@@ -92,15 +92,15 @@
 <p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="28" sourceendlinenumber="28">These restrictions ensure that protocols such as the single-instance-protocol can correctly maintain mutual exclusion of activations even under configuration changes.</p>
 <h4 id="via-management-grain" sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="30" sourceendlinenumber="30">Via Management Grain</h4>
 <p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="32" sourceendlinenumber="33">Multi-cluster configurations can be injected on any node in any cluster, using the Orleans Management Grain.
-For example, to inject a multi-cluster configuration that consists of the three clusters { A, B, C }, we can pass a string enumerable to the management grain:</p>
-<pre sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="35" sourceendlinenumber="39"><code class="lang-csharp">   var clusterlist = &quot;A,B,C&quot;.Split(&#39;,&#39;);
+For example, to inject a multi-cluster configuration that consists of the three clusters { us1, eu1, us2 }, we can pass a string enumerable to the management grain:</p>
+<pre sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="35" sourceendlinenumber="39"><code class="lang-csharp">   var clusterlist = &quot;us1,eu1,us2&quot;.Split(&#39;,&#39;);
    var mgtGrain = GrainClient.GrainFactory.GetGrain&lt;IManagementGrain&gt;(0);    
    mgtGrain.InjectMultiClusterConfiguration(clusterlist, &quot;my comment here&quot;));
 </code></pre><p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="41" sourceendlinenumber="41">The first argument to <code>InjectMultiClusterConfiguration</code> is an enumerable of cluster ids, which is going to define the new multi-cluster configuration. The second argument is an (optional) comment string that can be used to tag configurations with arbitrary information, such as who injected them why. </p>
 <p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="43" sourceendlinenumber="43">There is an optional third argument, a boolean called <code>checkForLaggingSilosFirst</code>, which defaults to true. It means that the system performs a best-effort check to see if there are any silos anywhere that have not caught up to the current configuration yet, and rejects the change if it finds such a silo. This helps to detect violations of the restriction that only one configuration change should be pending at a time (though it cannot guarantee it under all circumstances).</p>
 <h4 id="via-default-configuration" sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="45" sourceendlinenumber="45">Via Default Configuration</h4>
 <p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="47" sourceendlinenumber="47">In situations where the multi-cluster configuration is known in advance and the deployment is fresh every time (e.g.  for testing), we may want to supply a default configuration. The global configuration supports an optional attribute <code>DefaultMultiCluster</code> which takes a comma-separated list of cluster ids:</p>
-<pre sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="49" sourceendlinenumber="51"><code class="lang-html">   &lt;MultiClusterNetwork ... DefaultMulticluster=&quot;A,B,C&quot; ...&gt;
+<pre sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="49" sourceendlinenumber="51"><code class="lang-html">   &lt;MultiClusterNetwork ... DefaultMulticluster=&quot;us1,eu1,us2&quot; ...&gt;
 </code></pre><p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="53" sourceendlinenumber="53">After a silo is started with this setting, it checks to see if the current multi-cluster configuration is null, and if so, injects the given configuration with the current UTC timestamp. </p>
 <p sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="55" sourceendlinenumber="55">WARNING. Persistent multi-cluster gossip channels (e.g. based on AzureTable) retain the last injected configuration unless they are deleted explicitly. In that case, specifying a DefaultMulticluster has no effect when re-deploying a cluster because the configuration stored in the gossip channels is not null.&gt;</p>
 <h4 id="via-gossip-channel" sourcefile="Documentation/Multi-Cluster/MultiClusterConfiguration.md" sourcestartlinenumber="57" sourceendlinenumber="57">Via Gossip Channel</h4>
@@ -128,7 +128,7 @@ For example, to inject a multi-cluster configuration that consists of the three 
 <tr>
 <td>Clusters</td>
 <td>String</td>
-<td>comma-separated list of cluster IDs, e.g. &quot;A,B,C&quot;</td>
+<td>comma-separated list of cluster IDs, e.g. &quot;us1,eu1,us2&quot;</td>
 </tr>
 <tr>
 <td>Comment</td>

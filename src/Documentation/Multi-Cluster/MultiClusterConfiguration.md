@@ -30,10 +30,10 @@ These restrictions ensure that protocols such as the single-instance-protocol ca
 #### Via Management Grain
 
 Multi-cluster configurations can be injected on any node in any cluster, using the Orleans Management Grain.
-For example, to inject a multi-cluster configuration that consists of the three clusters { A, B, C }, we can pass a string enumerable to the management grain:
+For example, to inject a multi-cluster configuration that consists of the three clusters { us1, eu1, us2 }, we can pass a string enumerable to the management grain:
 
 ```csharp
-   var clusterlist = "A,B,C".Split(',');
+   var clusterlist = "us1,eu1,us2".Split(',');
    var mgtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);	
    mgtGrain.InjectMultiClusterConfiguration(clusterlist, "my comment here"));
 ```
@@ -47,7 +47,7 @@ There is an optional third argument, a boolean called `checkForLaggingSilosFirst
 In situations where the multi-cluster configuration is known in advance and the deployment is fresh every time (e.g.  for testing), we may want to supply a default configuration. The global configuration supports an optional attribute `DefaultMultiCluster` which takes a comma-separated list of cluster ids:
 
 ```html
-   <MultiClusterNetwork ... DefaultMulticluster="A,B,C" ...>
+   <MultiClusterNetwork ... DefaultMulticluster="us1,eu1,us2" ...>
 ```
 
 After a silo is started with this setting, it checks to see if the current multi-cluster configuration is null, and if so, injects the given configuration with the current UTC timestamp. 
@@ -65,7 +65,7 @@ If using the Azure Table-Based Gossip Channel, operators can inject a new config
 |-------------      |--------  |----------|
 |PartitionKey       | String   | the ServiceId GUID |
 |RowKey             | String   | "CONFIG" |
-|Clusters           | String   | comma-separated list of cluster IDs, e.g. "A,B,C" |
+|Clusters           | String   | comma-separated list of cluster IDs, e.g. "us1,eu1,us2" |
 |Comment            | String   | optional comment |
 |GossipTimestamp    | DateTime    | UTC timestamp for the configuration |
 

@@ -79,11 +79,11 @@
   &lt;Globals&gt;
     &lt;MultiClusterNetwork
       ClusterId=&quot;clusterid&quot;
-      DefaultMultiCluster=&quot;A,B,C&quot;
+      DefaultMultiCluster=&quot;uswest,europewest,useast&quot;
       BackgroundGossipInterval=&quot;30s&quot;
       UseGlobalSingleInstanceByDefault=&quot;false&quot;
-      GlobalSingleInstanceRetryInterval=&quot;&quot;
-      GlobalSingleInstanceNumberRetries=&quot;&quot;
+      GlobalSingleInstanceRetryInterval=&quot;30s&quot;
+      GlobalSingleInstanceNumberRetries=&quot;3&quot;
       MaxMultiClusterGateways=&quot;10&quot;&gt;
          &lt;GossipChannel  Type=&quot;...&quot;  ConnectionString=&quot;...&quot;/&gt;      
          &lt;GossipChannel  Type=&quot;...&quot;  ConnectionString=&quot;...&quot;/&gt;      

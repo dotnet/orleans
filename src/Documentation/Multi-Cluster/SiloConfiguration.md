@@ -13,11 +13,11 @@ To get a quick overview, we show all relevant configuration parameters (includin
   <Globals>
     <MultiClusterNetwork
       ClusterId="clusterid"
-      DefaultMultiCluster="A,B,C"
+      DefaultMultiCluster="uswest,europewest,useast"
       BackgroundGossipInterval="30s"
       UseGlobalSingleInstanceByDefault="false"
-      GlobalSingleInstanceRetryInterval=""
-      GlobalSingleInstanceNumberRetries=""
+      GlobalSingleInstanceRetryInterval="30s"
+      GlobalSingleInstanceNumberRetries="3"
       MaxMultiClusterGateways="10">
          <GossipChannel  Type="..."  ConnectionString="..."/>      
          <GossipChannel  Type="..."  ConnectionString="..."/>      

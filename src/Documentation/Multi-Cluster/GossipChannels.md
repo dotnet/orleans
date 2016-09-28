@@ -13,8 +13,10 @@ For example, on Windows Azure, we can use  VNETs to connect muliple deployments 
 
 Each cluster has its own unique cluster id. The cluster id must be specified in the global configuration. 
 
-We recommend using very short strings for the cluster ids. Also, cluster ids may not be empty, nor may they contain commas. Finally, if using Azure Table Storage, cluster ids may not contain the characters forbidden for row keys 
+Cluster ids may not be empty, nor may they contain commas. Also, if using Azure Table Storage, cluster ids may not contain the characters forbidden for row keys 
 (/, \, #, ?).
+
+We recommend using very short strings for the cluster ids, because cluster ids are transmitted frequently and may be stored in storage by some log-view providers.
 
 ### Cluster Gateways
 
