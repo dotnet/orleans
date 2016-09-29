@@ -13,7 +13,7 @@ namespace Tester
         /// <summary>
         /// Tests that a silo host can be successfully started after a prior initialization failure.
         /// </summary>
-        [Fact]
+        [Fact, TestCategory("Functional")]
         public void SiloInitializationIsRetryableTest()
         {
             var appDomain = CreateAppDomain();
