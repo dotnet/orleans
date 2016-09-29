@@ -49,7 +49,7 @@ namespace UnitTests.MembershipTests
             }
             Assert.Equal(3, statuses.Count);
 
-            IPEndPoint address = silo3.Endpoint;
+            IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
             this.HostedCluster.StopSilo(silo3);
 
@@ -92,7 +92,7 @@ namespace UnitTests.MembershipTests
             else
                 silo2KillHandle = this.HostedCluster.SecondarySilos[silo2Kill - 1];
 
-            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.Endpoint);
+            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
                 this.HostedCluster.RestartSilo(silo2KillHandle);
@@ -118,7 +118,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            List<SiloHandle> moreSilos = this.HostedCluster.StartAdditionalSilos(1);
+            var moreSilos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();

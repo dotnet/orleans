@@ -197,7 +197,7 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.Silo.LocalConfig;
+                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
                 Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -207,11 +207,11 @@ namespace UnitTests.General
             IPEndPoint targetSilo;
             if (value == "Primary")
             {
-                targetSilo = HostedCluster.Primary.Endpoint;
+                targetSilo = HostedCluster.Primary.SiloAddress.Endpoint;
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.Endpoint;
+                targetSilo = HostedCluster.Secondary.SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -231,7 +231,7 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.Endpoint.Equals(expected));
+            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
             HostedCluster.StopSilo(siloToKill);
 
@@ -252,7 +252,7 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.Silo.LocalConfig;
+                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
                 Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -262,11 +262,11 @@ namespace UnitTests.General
             IPEndPoint targetSilo;
             if (value == "Primary")
             {
-                targetSilo = HostedCluster.Primary.Endpoint;
+                targetSilo = HostedCluster.Primary.SiloAddress.Endpoint;
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.Endpoint;
+                targetSilo = HostedCluster.Secondary.SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -286,7 +286,7 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.Endpoint.Equals(expected));
+            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing other silo {0} not hosting locally placed grain", siloToKill);
             HostedCluster.StopSilo(siloToKill);
 

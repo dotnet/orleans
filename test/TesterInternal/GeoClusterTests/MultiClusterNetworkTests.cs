@@ -60,7 +60,7 @@ namespace Tests.GeoClusterTests
             // create cluster A and clientA
             var clusterA = "A";
             NewGeoCluster(globalserviceid, clusterA, 1);
-            var siloA = Clusters[clusterA].Silos[0].Silo.SiloAddress.Endpoint;
+            var siloA = Clusters[clusterA].Silos[0].SiloAddress.Endpoint;
             var clientA = NewClient<ClientWrapper>(clusterA, 0);
 
             var cur = clientA.GetMultiClusterConfiguration();
@@ -80,7 +80,7 @@ namespace Tests.GeoClusterTests
             // create cluster B and clientB
             var clusterB = "B";
             NewGeoCluster(globalserviceid, clusterB, 1);
-            var siloB = Clusters[clusterB].Silos[0].Silo.SiloAddress.Endpoint;
+            var siloB = Clusters[clusterB].Silos[0].SiloAddress.Endpoint;
             var clientB = NewClient<ClientWrapper>(clusterB, 0);
 
             cur = clientB.GetMultiClusterConfiguration();
@@ -166,16 +166,16 @@ namespace Tests.GeoClusterTests
             // create cluster A and clientA
             NewGeoCluster(globalserviceid, clusterA, 3, configcustomizer);
             var clientA = NewClient<ClientWrapper>(clusterA, 0);
-            var portA0 = Clusters[clusterA].Silos[0].Endpoint.Port;
-            var portA1 = Clusters[clusterA].Silos[1].Endpoint.Port;
-            var portA2 = Clusters[clusterA].Silos[2].Endpoint.Port;
+            var portA0 = Clusters[clusterA].Silos[0].SiloAddress.Endpoint.Port;
+            var portA1 = Clusters[clusterA].Silos[1].SiloAddress.Endpoint.Port;
+            var portA2 = Clusters[clusterA].Silos[2].SiloAddress.Endpoint.Port;
 
             // create cluster B and clientB
             NewGeoCluster(globalserviceid, clusterB, 3, configcustomizer);
             var clientB = NewClient<ClientWrapper>(clusterB, 0);
-            var portB0 = Clusters[clusterB].Silos[0].Endpoint.Port;
-            var portB1 = Clusters[clusterB].Silos[1].Endpoint.Port;
-            var portB2 = Clusters[clusterB].Silos[2].Endpoint.Port;
+            var portB0 = Clusters[clusterB].Silos[0].SiloAddress.Endpoint.Port;
+            var portB1 = Clusters[clusterB].Silos[1].SiloAddress.Endpoint.Port;
+            var portB2 = Clusters[clusterB].Silos[2].SiloAddress.Endpoint.Port;
 
             // wait for membership to stabilize
             await WaitForLivenessToStabilizeAsync();
@@ -196,7 +196,7 @@ namespace Tests.GeoClusterTests
             var activegatewaysB = clientB.GetMultiClusterGateways().Where(g => g.Status == GatewayStatus.Active).ToList();
  
             // shut down one of the gateways in cluster B gracefully
-            var target = Clusters[clusterB].Silos.Where(h => h.Endpoint.Port == portB1).FirstOrDefault();
+            var target = Clusters[clusterB].Silos.Where(h => h.SiloAddress.Endpoint.Port == portB1).FirstOrDefault();
             Assert.NotNull(target);
             StopSilo(target);
             await WaitForLivenessToStabilizeAsync();
@@ -212,7 +212,7 @@ namespace Tests.GeoClusterTests
      
 
             // kill one of the gateways in cluster A
-            target = Clusters[clusterA].Silos.Where(h => h.Endpoint.Port == portA1).FirstOrDefault();
+            target = Clusters[clusterA].Silos.Where(h => h.SiloAddress.Endpoint.Port == portA1).FirstOrDefault();
             Assert.NotNull(target);
             KillSilo(target);
             await WaitForLivenessToStabilizeAsync();

@@ -356,7 +356,7 @@ namespace UnitTests.StorageTests
             foreach (var silo in silos)
             {
                 string provider = providerType.FullName;
-                List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
+                List<string> providers = silo.TestHook.GetStorageProviderNames().ToList();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }

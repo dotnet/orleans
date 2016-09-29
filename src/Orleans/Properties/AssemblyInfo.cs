@@ -27,6 +27,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("OrleansAWSUtils")]
 [assembly: InternalsVisibleTo("OrleansManager")]
+[assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]

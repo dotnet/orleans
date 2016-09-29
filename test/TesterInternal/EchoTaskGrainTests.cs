@@ -208,8 +208,8 @@ namespace UnitTests.General
             grain = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             logger.Info("{0} took {1}", what, clock.Elapsed);
 
-            SiloAddress silo1 = HostedCluster.Primary.Silo.SiloAddress;
-            SiloAddress silo2 = HostedCluster.SecondarySilos[0].Silo.SiloAddress;
+            SiloAddress silo1 = HostedCluster.Primary.SiloAddress;
+            SiloAddress silo2 = HostedCluster.SecondarySilos[0].SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
