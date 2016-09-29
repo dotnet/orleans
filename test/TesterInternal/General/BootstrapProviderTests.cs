@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -96,15 +95,12 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in silos)
             {
-                IList<IBootstrapProvider> providers = silo.Silo.BootstrapProviders;
-                output.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
-                    providers.Count, silo.Name, Utils.EnumerableToString(
-                        providers.Select(pr => pr.Name + "=" + pr.GetType().FullName)));
+                var providers = silo.TestHook.GetAllSiloProviderNames().ToList();
 
-                Assert.Equal(4, providers.Count); // Found correct number of bootstrap providers
-                
-                Assert.True(providers.Any(bp => bp.Name.Equals(controllerName)), "Name found");
-                Assert.True(providers.Any(bp => bp.GetType().FullName.Equals(controllerType)), "Typefound");
+                Assert.Contains("bootstrap1", providers);
+                Assert.Contains("bootstrap2", providers);
+                Assert.Contains("bootstrap3", providers);
+                Assert.Contains("bootstrap4", providers);
             }
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
@@ -112,14 +108,14 @@ namespace UnitTests.General
             object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
 
             command += 1;
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
         }
 
@@ -129,7 +125,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHook.GetBootstrapProvider(providerName);
+                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.TestHook.GetBootstrapProvider(providerName);
                 Assert.NotNull(provider);
                 providerInUse = provider;
             }

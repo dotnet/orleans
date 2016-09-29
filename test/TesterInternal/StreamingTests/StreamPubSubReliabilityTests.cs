@@ -116,7 +116,7 @@ namespace UnitTests.StreamingTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.TestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }

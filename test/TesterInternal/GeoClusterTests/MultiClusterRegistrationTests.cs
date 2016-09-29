@@ -339,7 +339,7 @@ namespace UnitTests.GeoClusterTests
             var id = Clients[0][0].GetRuntimeId(x);
 
             WriteLog("Grain {0} at {1}", gref, id);
-            Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == id));
+            Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.SiloAddress.ToString() == id));
 
             // ensure presence in all caches
             var list = EnumerateClients().ToList();
@@ -363,7 +363,7 @@ namespace UnitTests.GeoClusterTests
             AssertEqual(1, val, gref);
             var newid = Clients[1][0].GetRuntimeId(x);
             WriteLog("{2} sees Grain {0} at {1}", gref, newid, ClusterNames[1]);
-            Assert.True(Clusters[ClusterNames[1]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == newid));
+            Assert.True(Clusters[ClusterNames[1]].Silos.Any(silo => silo.SiloAddress.ToString() == newid));
 
             WriteLog("Grain {0} Check that other clusters find new activation.", gref);
             for (int i = 2; i < Clusters.Count; i++)
@@ -475,7 +475,7 @@ namespace UnitTests.GeoClusterTests
                 var id = Clients[0][0].GetRuntimeId(x);
 
                 WriteLog("Grain {0} at {1}", gref, id);
-                Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.Silo.SiloAddress.ToString() == id));
+                Assert.True(Clusters[ClusterNames[0]].Silos.Any(silo => silo.SiloAddress.ToString() == id));
 
                 var id2 = Clients[1][0].GetRuntimeId(x);
                 AssertEqual(id2, id, gref);
@@ -496,7 +496,7 @@ namespace UnitTests.GeoClusterTests
                 AssertEqual(1, val, gref);
                 var newid = Clients[1][0].GetRuntimeId(x);
                 WriteLog("{2} sees Grain {0} at {1}", gref, newid, ClusterNames[1]);
-                Assert.True(Clusters[ClusterNames[1]].Silos[0].Silo.SiloAddress.ToString() == newid);
+                Assert.True(Clusters[ClusterNames[1]].Silos[0].SiloAddress.ToString() == newid);
             });
         }
     }

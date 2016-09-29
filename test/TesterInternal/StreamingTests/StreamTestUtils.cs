@@ -15,8 +15,8 @@ namespace UnitTests.StreamingTests
 
         internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestingSiloHost siloHost)
         {
-            SiloAddress primSilo = siloHost.Primary.Silo.SiloAddress;
-            SiloAddress secSilo = siloHost.Secondary?.Silo.SiloAddress;
+            SiloAddress primSilo = siloHost.Primary.SiloAddress;
+            SiloAddress secSilo = siloHost.Secondary?.SiloAddress;
             logger.Info("\n\n**START********************** {0} ********************************* \n\n"
                         + "Running with initial silos Primary={1} Secondary={2} StreamId={3} StreamType={4} \n\n",
                 testName, primSilo, secSilo, streamId, streamProviderName);

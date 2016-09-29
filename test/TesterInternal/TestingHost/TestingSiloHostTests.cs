@@ -15,13 +15,13 @@ namespace UnitTests.TestingHost
             {
                 var host = new TestingSiloHost(startFreshOrleans: true);
                 var initialDeploymentId = host.DeploymentId;
-                var initialSilo = host.Primary.Silo;
+                var initialSilo = ((AppDomainSiloHandle)host.Primary).SiloHost;
                 var grain = host.GrainFactory.GetGrain<ISimpleGrain>(TestUtils.GetRandomGrainId());
                 await grain.GetA();
 
                 host = new TestingSiloHost(startFreshOrleans: false);
                 Assert.Equal(initialDeploymentId, host.DeploymentId);
-                Assert.Same(initialSilo, host.Primary.Silo);
+                Assert.Same(initialSilo, ((AppDomainSiloHandle)host.Primary).SiloHost);
                 grain = host.GrainFactory.GetGrain<ISimpleGrain>(TestUtils.GetRandomGrainId());
                 await grain.GetA();
             }
