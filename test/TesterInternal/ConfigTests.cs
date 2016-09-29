@@ -629,8 +629,7 @@ namespace UnitTests
             Assert.True(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);
         }
-#if !NETSTANDARD_TODO
-        //blocked by cannot update System.Xml.XmlDocument to 4.0.1 which is compatible with .net framework 4.6
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProvider_Azure1()
         {
@@ -709,7 +708,6 @@ namespace UnitTests
                 }
             }
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AdditionalAssemblyPaths_Config()

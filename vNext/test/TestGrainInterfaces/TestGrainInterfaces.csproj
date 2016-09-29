@@ -47,6 +47,9 @@
     <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
       <Link>IPersistenceTestGrains.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ISerializationGeneratorTests.cs">
+      <Link>ISerializationGeneratorTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
       <Link>IStreamLifecycleTestGrains.cs</Link>
     </Compile>

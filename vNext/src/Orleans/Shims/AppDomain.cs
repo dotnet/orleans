@@ -2,8 +2,6 @@
 using System;
 using System.Reflection;
 using Orleans.Runtime;
-using UnitTests.CustomSerializerTestClasses;
-using UnitTests.GrainInterfaces;
 
 namespace Orleans
 {
@@ -41,16 +39,9 @@ namespace Orleans
                 typeof(Exception).GetTypeInfo().Assembly,
                 typeof(AssemblyProcessor).GetTypeInfo().Assembly,
                 // load up classes for testing, until Assembly scanning is supported in vNext
-                typeof(ClassWithCustomCopier).GetTypeInfo().Assembly,
-                typeof(ClassWithCustomSerializer).GetTypeInfo().Assembly,
-                typeof(SerializerTestClass1).GetTypeInfo().Assembly,
-                typeof(SerializerTestClass2).GetTypeInfo().Assembly,
-                typeof(SerializerTestClass3).GetTypeInfo().Assembly,
-                typeof(SerializerTestClass4).GetTypeInfo().Assembly,
-                typeof(SerializerTestClass5).GetTypeInfo().Assembly,
-                typeof(AsyncObserverArg).GetTypeInfo().Assembly,
-                typeof(StreamSubscriptionHandleArg).GetTypeInfo().Assembly,
-                typeof(GenericArg).GetTypeInfo().Assembly
+                Assembly.Load(new AssemblyName("Orleans.NonSiloTests")),
+                Assembly.Load(new AssemblyName("TestInternalGrains")),
+                Assembly.Load(new AssemblyName("TestGrainInterfaces")) 
             };
             return assemblies;
         }

@@ -14,7 +14,6 @@ namespace UnitTests.Serialization
             SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
         }
 
-
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_CustomSerializerInitialized()
         {
