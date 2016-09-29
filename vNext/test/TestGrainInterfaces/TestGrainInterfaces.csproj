@@ -5,7 +5,7 @@
     <Platform>AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{a972213F-189B-41D4-90FE-38D513C1106a}</ProjectGuid>
+    <ProjectGuid>{A972213F-189B-41D4-90FE-38D513C1106A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
@@ -41,8 +41,14 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IActivateDeactivateWatcherGrain.cs">
+      <Link>IActivateDeactivateWatcherGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
       <Link>IPersistenceTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
+      <Link>IStreamLifecycleTestGrains.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

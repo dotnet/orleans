@@ -724,8 +724,6 @@ namespace UnitTests
 
         }
 
-#if !NETSTANDARD_TODO
-        //blocked by cannot update System.Xml.XmlDocument to 4.0.1 which is compatible with .net framework 4.6
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_StorageProviders_AzureTable_Default()
         {
@@ -739,7 +737,6 @@ namespace UnitTests
             Assert.Equal(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.Globals.LivenessType); // LivenessType
             Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, config.Globals.ReminderServiceType); // ReminderServiceType
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Gateway")]
         public void ClientConfig_Default()
@@ -838,8 +835,7 @@ namespace UnitTests
 
             Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // OrleansConfiguration.SourceFile
         }
-#if !NETSTANDARD_TODO
-        //blocked by cannot update System.Xml.XmlDocument to 4.0.1 which is compatible with .net framework 4.6
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
         public void ClientConfig_SqlServer()
         {
@@ -922,7 +918,6 @@ namespace UnitTests
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
             Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
-#endif
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_Azure_Default()
@@ -996,8 +991,7 @@ namespace UnitTests
 
             config.CheckGatewayProviderSettings();
         }
-#if !NETSTANDARD_TODO
-        //blocked by cannot update System.Xml.XmlDocument to 4.0.1 which is compatible with .net framework 4.6
+
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_Different_Membership_And_Reminders()
         {
@@ -1012,7 +1006,7 @@ namespace UnitTests
             Assert.True(config.Globals.DataConnectionString == "MembershipConnectionString");
             Assert.True(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
         }
-#endif
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_Azure_SystemStore()
         {

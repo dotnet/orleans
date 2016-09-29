@@ -11,6 +11,7 @@
     <AssemblyName>Orleans.NonSiloTests</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -37,6 +38,9 @@
   <ItemGroup>
     <Compile Include="..\..\..\test\TesterInternal\ConfigTests.cs">
       <Link>ConfigTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\SerializerTests\CustomSerializerTests.cs">
+      <Link>SerializerTests\CustomSerializerTests.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TesterInternal\StorageTests\MockStorageProvider.cs">
       <Link>StorageTests\MockStorageProvider.cs</Link>
@@ -102,6 +106,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>

@@ -1806,7 +1806,7 @@ namespace Orleans.Serialization
             {
                 return serializer != null;
             }
-
+                      
             serializer = externalSerializers.FirstOrDefault(s => s.IsSupportedType(t));
 
             // add the serializer to the dictionary, even if it's null to signify that we already performed

@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ClientConfiguration xmlns="urn:orleans">
   <SystemStore SystemStoreType="SqlServer"
-               DataConnectionString="connection string"/>
+               DataConnectionString="connection string"
+               DeploymentId="deployment id"/>
   <StatisticsProviders>
     <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="connection string" />
   </StatisticsProviders>

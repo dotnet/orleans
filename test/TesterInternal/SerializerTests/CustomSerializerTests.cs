@@ -1,14 +1,18 @@
 ﻿using System;
+using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using UnitTests.CustomSerializerTestClasses;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 
 namespace UnitTests.SerializerTests
 {
+#if !NETSTANDARD_TODO
+    // these two class has been moved to CustomeSerializerTestClass.cs in vNext, due to Assembly scanning not complete there
     [Serializable]
     public class ClassWithCustomCopier
     {
@@ -27,7 +31,7 @@ namespace UnitTests.SerializerTests
         {
             CopyCounter++;
             var obj = input as ClassWithCustomCopier;
-            return new ClassWithCustomCopier() {IntProperty = obj.IntProperty, StringProperty = obj.StringProperty};
+            return new ClassWithCustomCopier() { IntProperty = obj.IntProperty, StringProperty = obj.StringProperty };
         }
     }
 
@@ -65,13 +69,13 @@ namespace UnitTests.SerializerTests
             return result;
         }
     }
-    
+#endif
+
     public class CustomSerializerTests
     {
         public CustomSerializerTests()
         {
             LogManager.Initialize(new NodeConfiguration());
-
             SerializationManager.InitializeForTesting();
         }
 
