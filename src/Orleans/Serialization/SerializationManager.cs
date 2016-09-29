@@ -19,6 +19,8 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
+    using System.Runtime.InteropServices;
+
     /// <summary>
     /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
@@ -1145,7 +1147,8 @@ namespace Orleans.Serialization
             if (typeInfo.IsEnum)
             {
                 stream.WriteTypeHeader(t, expected);
-                stream.Write(Convert.ToInt32(obj));
+                WriteEnum(obj, stream, t);
+
                 return;
             }
 
@@ -1229,6 +1232,49 @@ namespace Orleans.Serialization
 
             throw new ArgumentException("No serializer found for object of type " + t.OrleansTypeName()
                  + ". Perhaps you need to mark it [Serializable] or define a custom serializer for it?");
+        }
+
+        private static void WriteEnum(object obj, BinaryTokenStreamWriter stream, Type type)
+        {
+            var underlyingType = Enum.GetUnderlyingType(type);
+            var size = Marshal.SizeOf(underlyingType);
+            switch (size)
+            {
+                case 1:
+                    stream.Write(Convert.ToByte(obj));
+                    break;
+                case 2:
+                    stream.Write(Convert.ToInt16(obj));
+                    break;
+                case 4:
+                    stream.Write(Convert.ToInt32(obj));
+                    break;
+                case 8:
+                    stream.Write(Convert.ToInt64(obj));
+                    break;
+                default:
+                    throw new NotSupportedException($"Serialization of type {type.GetParseableName()} is not supported.");
+            }
+        }
+
+        private static object ReadEnum(BinaryTokenStreamReader stream, Type type)
+        {
+            var underlyingType = Enum.GetUnderlyingType(type);
+            var size = Marshal.SizeOf(underlyingType);
+            switch (size)
+            {
+                case 1:
+                    return Enum.ToObject(type, stream.ReadByte());
+                case 2:
+                    return Enum.ToObject(type, stream.ReadShort());
+                case 4:
+                    return Enum.ToObject(type, stream.ReadInt());
+                case 8:
+                    return Enum.ToObject(type, stream.ReadLong());
+                default:
+                    throw new NotSupportedException(
+                        $"Deserialization of type {type.GetParseableName()} is not supported.");
+            }
         }
 
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
@@ -1532,7 +1578,7 @@ namespace Orleans.Serialization
                 // Handle enums
                 if (resultTypeInfo.IsEnum)
                 {
-                    result = Enum.ToObject(resultType, stream.ReadInt());
+                    result = ReadEnum(stream, resultType);
                     return result;
                 }
 
