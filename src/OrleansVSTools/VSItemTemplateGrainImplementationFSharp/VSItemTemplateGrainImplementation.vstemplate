@@ -8,7 +8,7 @@
     <!--<TemplateGroupID>Orleans</TemplateGroupID>-->
     <ShowByDefault>true</ShowByDefault>
     <ProjectType>FSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <DefaultName>Grain.fs</DefaultName>
   </TemplateData>

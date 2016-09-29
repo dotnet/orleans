@@ -1,40 +1,20 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Async;
 using Orleans.Runtime;
 
 namespace Orleans
 {
-    using System.Diagnostics.CodeAnalysis;
-
     /// <summary>
-    /// Utility functions for dealing with Task's.
+    /// Utility functions for dealing with Tasks.
     /// </summary>
-    public static class PublicOrleansTaskExtentions
+    public static class PublicOrleansTaskExtensions
     {
+        internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
+        internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
+
         /// <summary>
         /// Observes and ignores a potential exception on a given Task.
         /// If a Task fails and throws an exception which is never observed, it will be caught by the .NET finalizer thread.
@@ -43,43 +23,38 @@ namespace Orleans
         /// </summary>
         /// <param name="task">The task to be ignored.</param>
         [SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "ignored")]
-        public static async void Ignore(this Task task)
+        public static void Ignore(this Task task)
         {
-            try
+            if (task.IsCompleted)
             {
-                await task;
+                var ignored = task.Exception;
             }
-            catch (Exception)
+            else
             {
-                var ignored = task.Exception; // Observe exception
+                task.ContinueWith(
+                    t => { var ignored = t.Exception; },
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
             }
         }
 
         /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task"/>.
         /// </summary>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <param name="task">The task.</param>
         public static Task<object> Box(this Task task)
         {
             switch (task.Status)
             {
                 case TaskStatus.RanToCompletion:
-                    return Task.FromResult(default(object));
+                    return CompletedTask;
 
                 case TaskStatus.Faulted:
-                    {
-                        return TaskFromFaulted(task);
-                    }
+                    return TaskFromFaulted(task);
 
                 case TaskStatus.Canceled:
-                    {
-                        return CancelledTask;
-                    }
+                    return CanceledTask;
 
                 default:
                     return BoxAwait(task);
@@ -89,31 +64,23 @@ namespace Orleans
         /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
         /// </summary>
-        /// <typeparam name="T">
-        /// The underlying type of <paramref name="task"/>.
-        /// </typeparam>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
+        /// <param name="task">The task.</param>
         public static Task<object> Box<T>(this Task<T> task)
         {
+            if (typeof(T) == typeof(object))
+                return task as Task<object>;
+
             switch (task.Status)
             {
                 case TaskStatus.RanToCompletion:
                     return Task.FromResult((object)task.GetResult());
 
                 case TaskStatus.Faulted:
-                    {
-                        return TaskFromFaulted(task);
-                    }
+                    return TaskFromFaulted(task);
 
                 case TaskStatus.Canceled:
-                    {
-                        return CancelledTask;
-                    }
+                    return CanceledTask;
 
                 default:
                     return BoxAwait(task);
@@ -121,17 +88,35 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{T}"/>.
+        /// </summary>
+        /// <typeparam name="T">The underlying type of <paramref name="task"/>.</typeparam>
+        /// <param name="task">The task.</param>
+        public static Task<T> Unbox<T>(this Task<object> task)
+        {
+            if (typeof(T) == typeof(object))
+                return task as Task<T>;
+
+            switch (task.Status)
+            {
+                case TaskStatus.RanToCompletion:
+                    return Task.FromResult((T)task.GetResult());
+
+                case TaskStatus.Faulted:
+                    return TaskFromFaulted<T>(task);
+
+                case TaskStatus.Canceled:
+                    return TaskFromCanceled<T>();
+
+                default:
+                    return UnboxContinuation<T>(task);
+            }
+        }
+
+        /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{Object}"/>.
         /// </summary>
-        /// <typeparam name="object">
-        /// The underlying type of <paramref name="task"/>.
-        /// </typeparam>
-        /// <param name="task">
-        /// The task.
-        /// </param>
-        /// <returns>
-        /// The response.
-        /// </returns>
+        /// <param name="task">The task.</param>
         public static Task<object> Box(this Task<object> task)
         {
             return task;
@@ -148,20 +133,29 @@ namespace Orleans
             return await task;
         }
 
-        private static Task<object> CancelledTask
+        private static Task<T> UnboxContinuation<T>(Task<object> task)
         {
-            get
-            {
-                var completion = new TaskCompletionSource<object>();
-                completion.SetCanceled();
-                return completion.Task;
-            }
+            return task.ContinueWith(t => t.Unbox<T>()).Unwrap();
         }
 
         private static Task<object> TaskFromFaulted(Task task)
         {
             var completion = new TaskCompletionSource<object>();
-            completion.SetException(task.Exception);
+            completion.SetException(task.Exception.InnerExceptions);
+            return completion.Task;
+        }
+
+        private static Task<T> TaskFromFaulted<T>(Task task)
+        {
+            var completion = new TaskCompletionSource<T> ();
+            completion.SetException(task.Exception.InnerExceptions);
+            return completion.Task;
+        }
+
+        private static Task<T> TaskFromCanceled<T>()
+        {
+            var completion = new TaskCompletionSource<T>();
+            completion.SetCanceled();
             return completion.Task;
         }
     }
@@ -177,7 +171,7 @@ namespace Orleans
             catch (Exception exc)
             {
                 var ignored = task.Exception; // Observe exception
-                logger.Error((int)errorCode, message, exc);
+                logger.Error(errorCode, message, exc);
                 throw;
             }
         }
@@ -264,7 +258,7 @@ namespace Orleans
         /// This will apply a timeout delay to the task, allowing us to exit early
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
-        /// <param name="timeout">Amount of time to wait before timing out</param>
+        /// <param name="timeSpan">Amount of time to wait before timing out</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
         public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan)
@@ -290,11 +284,17 @@ namespace Orleans
             throw new TimeoutException(String.Format("WithTimeout has timed out after {0}.", timeSpan));
         }
 
-        internal static Task<T> FromException<T>(Exception exception)
+        internal static Task WrapInTask(Action action)
         {
-            var tcs = new TaskCompletionSource<T>(exception);
-            tcs.TrySetException(exception);
-            return tcs.Task;
+            try
+            {
+                action();
+                return TaskDone.Done;
+            }
+            catch (Exception exc)
+            {
+                return TaskUtility.Faulted(exc);
+            }
         }
 
         internal static Task<T> ConvertTaskViaTcs<T>(Task<T> task)
@@ -309,7 +309,7 @@ namespace Orleans
             }
             else if (task.IsFaulted)
             {
-                resolver.TrySetException(task.Exception.Flatten());
+                resolver.TrySetException(task.Exception.InnerExceptions);
             }
             else if (task.IsCanceled)
             {
@@ -323,7 +323,7 @@ namespace Orleans
                 {
                     if (t.IsFaulted)
                     {
-                        resolver.TrySetException(t.Exception.Flatten());
+                        resolver.TrySetException(t.Exception.InnerExceptions);
                     }
                     else if (t.IsCanceled)
                     {
@@ -331,7 +331,7 @@ namespace Orleans
                     }
                     else
                     {
-                        resolver.TrySetResult(t.Result);
+                        resolver.TrySetResult(t.GetResult());
                     }
                 });
             }

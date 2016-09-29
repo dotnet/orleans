@@ -1,35 +1,13 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
@@ -44,9 +22,21 @@ namespace Orleans.Runtime.Providers
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
 
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+        private InvokeInterceptor invokeInterceptor;
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
+
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            this.invokeInterceptor = interceptor;
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
+
         public Guid ServiceId { get; private set; }
         public string SiloIdentity { get; private set; }
 
@@ -97,7 +87,7 @@ namespace Orleans.Runtime.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public string ExecutingEntityIdentity()
@@ -135,7 +125,7 @@ namespace Orleans.Runtime.Providers
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
-            return new EquallyDevidedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
+            return new EquallyDividedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
         }
 
         public bool InSilo { get { return true; } }
@@ -144,7 +134,6 @@ namespace Orleans.Runtime.Providers
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
         {
-            // Hookup Extension.
             TExtension extension;
             if (!TryGetExtensionHandler(out extension))
             {
@@ -170,7 +159,7 @@ namespace Orleans.Runtime.Providers
             var currentActivation = GetCurrentActivationData();
             var invoker = TryGetExtensionInvoker(handler.GetType());
             if (invoker == null)
-                throw new SystemException("Extension method invoker was not generated for an extension interface");
+                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
             
             return currentActivation.TryAddExtension(invoker, handler);
         }
@@ -213,11 +202,11 @@ namespace Orleans.Runtime.Providers
 
         private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
         {
-            var interfaces = CodeGeneration.GrainInterfaceData.GetRemoteInterfaces(handlerType).Values;
+            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if(interfaces.Count != 1)
                 throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
 
-            var interfaceId = CodeGeneration.GrainInterfaceData.ComputeInterfaceId(interfaces.First());
+            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
             var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker) invoker;
@@ -246,6 +235,11 @@ namespace Orleans.Runtime.Providers
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize(queueAdapter.AsImmutable());
             return pullingAgentManager;
+        }
+
+        public Task<object> CallInvokeInterceptor(MethodInfo method, InvokeMethodRequest request, IAddressable target, IGrainMethodInvoker invoker)
+        {
+            return this.invokeInterceptor(method, request, (IGrain)target, invoker);
         }
     }
 }

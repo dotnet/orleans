@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +13,11 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class ConsistentRingProvider : MarshalByRefObject, IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
+    internal class ConsistentRingProvider :
+#if !NETSTANDARD
+        MarshalByRefObject,
+#endif
+        IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
     {
         // internal, so that unit tests can access them
         internal SiloAddress MyAddress { get; private set; }
@@ -44,7 +25,7 @@ namespace Orleans.Runtime.ConsistentRing
         
         /// list of silo members sorted by the hash value of their address
         private readonly List<SiloAddress> membershipRingList;
-        private readonly TraceLogger log;
+        private readonly Logger log;
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners;
@@ -53,7 +34,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         public ConsistentRingProvider(SiloAddress siloAddr)
         {
-            log = TraceLogger.GetLogger(typeof(ConsistentRingProvider).Name);
+            log = LogManager.GetLogger(typeof(ConsistentRingProvider).Name);
             membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
@@ -323,7 +304,7 @@ namespace Orleans.Runtime.ConsistentRing
                 {
                     RemoveServer(updatedSilo);
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
                 {
                     AddServer(updatedSilo);
                 }

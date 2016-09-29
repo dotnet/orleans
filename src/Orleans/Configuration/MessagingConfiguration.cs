@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -81,12 +58,9 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         int ClientSenderBuckets { get; set; }
         /// <summary>
-        /// The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-        /// of the custom Orleans serializer.
-        /// This parameter is intended for use only for testing and troubleshooting.
-        /// In production, the custom Orleans serializer should always be used because it performs significantly better.
+        ///  This is the period of time a gateway will wait before dropping a disconnected client.
         /// </summary>
-        bool UseStandardSerializer { get; set; }
+        TimeSpan ClientDropTimeout { get; set; }
 
         /// <summary>
         /// The size of a buffer in the messaging buffer pool.
@@ -131,8 +105,7 @@ namespace Orleans.Runtime.Configuration
         public int SiloSenderQueues { get; set; }
         public int GatewaySenderQueues { get; set; }
         public int ClientSenderBuckets { get; set; }
-        public bool UseStandardSerializer { get; set; }
-        public bool UseJsonFallbackSerializer { get; set; }
+        public TimeSpan ClientDropTimeout { get; set; }
 
         public int BufferPoolBufferSize { get; set; }
         public int BufferPoolMaxSize { get; set; }
@@ -155,7 +128,6 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_MAX_SOCKET_AGE = TimeSpan.MaxValue;
         internal const int DEFAULT_MAX_FORWARD_COUNT = 2;
         private const bool DEFAULT_RESEND_ON_TIMEOUT = false;
-        private const bool DEFAULT_USE_STANDARD_SERIALIZER = false;
         private static readonly int DEFAULT_SILO_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_GATEWAY_SENDER_QUEUES = Environment.ProcessorCount;
         private static readonly int DEFAULT_CLIENT_SENDER_BUCKETS = (int)Math.Pow(2, 13);
@@ -183,7 +155,7 @@ namespace Orleans.Runtime.Configuration
             SiloSenderQueues = DEFAULT_SILO_SENDER_QUEUES;
             GatewaySenderQueues = DEFAULT_GATEWAY_SENDER_QUEUES;
             ClientSenderBuckets = DEFAULT_CLIENT_SENDER_BUCKETS;
-            UseStandardSerializer = DEFAULT_USE_STANDARD_SERIALIZER;
+            ClientDropTimeout = Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
 
             BufferPoolBufferSize = DEFAULT_BUFFER_POOL_BUFFER_SIZE;
             BufferPoolMaxSize = DEFAULT_BUFFER_POOL_MAX_SIZE;
@@ -220,15 +192,12 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.AppendFormat("       Silo Sender queues: {0}", SiloSenderQueues).AppendLine();
                 sb.AppendFormat("       Gateway Sender queues: {0}", GatewaySenderQueues).AppendLine();
+                sb.AppendFormat("       Client Drop Timeout: {0}", ClientDropTimeout).AppendLine();
             }
             else
             {
                 sb.AppendFormat("       Client Sender Buckets: {0}", ClientSenderBuckets).AppendLine();
             }
-            sb.AppendFormat("       Use standard (.NET) serializer: {0}", UseStandardSerializer)
-                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
-            sb.AppendFormat("       Use fallback json serializer: {0}", UseJsonFallbackSerializer)
-                .AppendLine(isSiloConfig ? "" : "   [NOTE: This *MUST* match the setting on the server or nothing will work!]");
             sb.AppendFormat("       Buffer Pool Buffer Size: {0}", BufferPoolBufferSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Max Size: {0}", BufferPoolMaxSize).AppendLine();
             sb.AppendFormat("       Buffer Pool Preallocation Size: {0}", BufferPoolPreallocationSize).AppendLine();
@@ -285,6 +254,10 @@ namespace Orleans.Runtime.Configuration
                     GatewaySenderQueues = ConfigUtilities.ParseInt(child.GetAttribute("GatewaySenderQueues"),
                                                             "Invalid integer value for the GatewaySenderQueues attribute on the Messaging element");
                 }
+                ClientDropTimeout = child.HasAttribute("ClientDropTimeout")
+                                          ? ConfigUtilities.ParseTimeSpan(child.GetAttribute("ClientDropTimeout"),
+                                                                     "Invalid ClientDropTimeout")
+                                          : Constants.DEFAULT_CLIENT_DROP_TIMEOUT;
             }
             else
             {
@@ -293,19 +266,6 @@ namespace Orleans.Runtime.Configuration
                     ClientSenderBuckets = ConfigUtilities.ParseInt(child.GetAttribute("ClientSenderBuckets"),
                                                             "Invalid integer value for the ClientSenderBuckets attribute on the Messaging element");
                 }
-            }
-            if (child.HasAttribute("UseStandardSerializer"))
-            {
-                UseStandardSerializer =
-                    ConfigUtilities.ParseBool(child.GetAttribute("UseStandardSerializer"),
-                                              "invalid boolean value for the UseStandardSerializer attribute on the Messaging element");
-            }
-
-            if (child.HasAttribute("UseJsonFallbackSerializer"))
-            {
-                UseJsonFallbackSerializer =
-                    ConfigUtilities.ParseBool(child.GetAttribute("UseJsonFallbackSerializer"),
-                                              "invalid boolean value for the UseJsonFallbackSerializer attribute on the Messaging element");
             }
             
             //--
@@ -346,10 +306,10 @@ namespace Orleans.Runtime.Configuration
 
             if (child.HasChildNodes)
             {
-                var serializerNode = child.ChildNodes.Cast<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
+                var serializerNode = child.ChildNodes.OfType<XmlElement>().FirstOrDefault(n => n.Name == "SerializationProviders");
                 if (serializerNode != null && serializerNode.HasChildNodes)
                 {
-                    var typeNames = serializerNode.ChildNodes.Cast<XmlElement>()
+                    var typeNames = serializerNode.ChildNodes.OfType<XmlElement>()
                         .Where(n => n.Name == "Provider")
                         .Select(e => e.Attributes["type"])
                         .Where(a => a != null)
@@ -357,8 +317,8 @@ namespace Orleans.Runtime.Configuration
                     var types = typeNames.Select(t => ConfigUtilities.ParseFullyQualifiedType(t, "The type specification for the 'type' attribute of the Provider element could not be loaded"));
                     foreach (var type in types)
                     {
-                        ConfigUtilities.ValidateSerializationProvider(type);
                         var typeinfo = type.GetTypeInfo();
+                        ConfigUtilities.ValidateSerializationProvider(typeinfo);
                         if (SerializationProviders.Contains(typeinfo) == false)
                         {
                             SerializationProviders.Add(typeinfo);

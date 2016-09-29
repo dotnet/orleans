@@ -1,33 +1,10 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 
 
@@ -134,12 +111,12 @@ namespace Orleans.Providers.SqlServer
         /// </summary>
         /// <param name="metricsData">Metrics data</param>
         /// <returns>Task for database operation</returns>
-        public Task ReportMetrics(IClientPerformanceMetrics metricsData)
+        public async Task ReportMetrics(IClientPerformanceMetrics metricsData)
         {
             if(logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (client) called with data: {0}.", metricsData);
             try
             {
-                return orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
+                await orleansQueries.UpsertReportClientMetricsAsync(deploymentId, clientId, clientAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -159,12 +136,12 @@ namespace Orleans.Providers.SqlServer
         /// </summary>
         /// <param name="metricsData">Metrics data</param>
         /// <returns>Task for database operation</returns>
-        public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
+        public async Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
             if (logger != null && logger.IsVerbose3) logger.Verbose3("SqlStatisticsPublisher.ReportMetrics (silo) called with data: {0}.", metricsData);
             try
             {
-                return orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
+                await orleansQueries.UpsertSiloMetricsAsync(deploymentId, siloName, gateway, siloAddress, hostName, metricsData);
             }
             catch(Exception ex)
             {
@@ -226,9 +203,9 @@ namespace Orleans.Providers.SqlServer
         /// <param name="counters">The counters to batch.</param>
         /// <param name="maxBatchSizeInclusive">The maximum size of one batch.</param>
         /// <returns>The counters batched.</returns>
-        private static List<IList<ICounter>> BatchCounters(List<ICounter> counters, int maxBatchSizeInclusive)
+        private static List<List<ICounter>> BatchCounters(List<ICounter> counters, int maxBatchSizeInclusive)
         {
-            var batches = new List<IList<ICounter>>();
+            var batches = new List<List<ICounter>>();
             for(int i = 0; i < counters.Count; i += maxBatchSizeInclusive)
             {
                 batches.Add(counters.GetRange(i, Math.Min(maxBatchSizeInclusive, counters.Count - i)));

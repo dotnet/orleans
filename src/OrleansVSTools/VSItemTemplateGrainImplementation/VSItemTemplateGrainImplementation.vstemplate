@@ -4,19 +4,18 @@
     <Name>Orleans Grain Class</Name>
     <Description>An empty Orleans grain class</Description>
     <Icon>Orleans.ico</Icon>
-    <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
-    <!--<TemplateGroupID>Orleans</TemplateGroupID>-->
-    <ShowByDefault>true</ShowByDefault>
     <ProjectType>CSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
+    <ShowByDefault>true</ShowByDefault>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
     <DefaultName>MyGrain.cs</DefaultName>
   </TemplateData>
   <TemplateContent>
-		<References>
-			<Reference>
-				<Assembly>System</Assembly>
-			</Reference>
+    <References>
+      <Reference>
+        <Assembly>System</Assembly>
+      </Reference>
       <Reference>
         <Assembly>Orleans</Assembly>
       </Reference>

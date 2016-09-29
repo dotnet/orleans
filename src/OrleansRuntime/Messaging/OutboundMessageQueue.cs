@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Linq;
 using System.Threading;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
@@ -36,7 +12,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessageSender pingSender;
         private readonly SiloMessageSender systemSender;
         private readonly MessageCenter messageCenter;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private bool stopped;
 
         public int Count
@@ -68,7 +44,7 @@ namespace Orleans.Runtime.Messaging
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
             }
-            logger = TraceLogger.GetLogger("Messaging.OutboundMessageQueue");
+            logger = LogManager.GetLogger("Messaging.OutboundMessageQueue");
             stopped = false;
         }
 
@@ -89,9 +65,9 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.ContainsMetadata(QUEUED_TIME_METADATA))
+            if (!msg.QueuedTime.HasValue)
             {
-                msg.SetMetadata(QUEUED_TIME_METADATA, DateTime.UtcNow);
+                msg.QueuedTime = DateTime.UtcNow;
             }
 
             // First check to see if it's really destined for a proxied client, instead of a local grain.
@@ -100,15 +76,12 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.ContainsHeader(Message.Header.TARGET_SILO))
+            if (msg.TargetSilo == null)
             {
-                logger.Error(ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + (new System.Diagnostics.StackTrace()));
+                logger.Error(ErrorCode.Runtime_Error_100113, "Message does not have a target silo: " + msg + " -- Call stack is: " + Utils.GetStackTrace());
                 messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo");
                 return;
             }
-
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.EnqueueOutgoing);
 
             // Shortcut messages to this silo
             if (msg.TargetSilo.Equals(messageCenter.MyAddress))
@@ -122,6 +95,14 @@ namespace Orleans.Runtime.Messaging
                 if (stopped)
                 {
                     logger.Info(ErrorCode.Runtime_Error_100115, "Message was queued for sending after outbound queue was stopped: {0}", msg);
+                    return;
+                }
+
+                // check for simulation of lost messages
+                if(Silo.CurrentSilo.TestHook.ShouldDrop(msg))
+                {
+                    logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
+                    messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
                     return;
                 }
 

@@ -1,31 +1,11 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Orleans.Concurrency;
+using Orleans.GrainDirectory;
+using Orleans.MultiCluster;
 using Orleans.Placement;
-
 
 namespace Orleans.Runtime
 {
@@ -45,10 +25,12 @@ namespace Orleans.Runtime
      
         public GrainTypeData(Type type, Type stateObjectType)
         {
+            var typeInfo = type.GetTypeInfo();
             Type = type;
-            IsReentrant = Type.GetCustomAttributes(typeof (ReentrantAttribute), true).Length > 0;
-            IsStatelessWorker = Type.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Length > 0;
-            GrainClass = TypeUtils.GetFullName(type);
+            IsReentrant = typeInfo.GetCustomAttributes(typeof (ReentrantAttribute), true).Any();
+            // TODO: shouldn't this use GrainInterfaceUtils.IsStatelessWorker?
+            IsStatelessWorker = typeInfo.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any();
+            GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
         }
@@ -68,12 +50,12 @@ namespace Orleans.Runtime
                 {
                     if (t == typeof(IAddressable)) continue;
 
-                    if (CodeGeneration.GrainInterfaceData.IsGrainInterface(t) && !interfaceTypes.Contains(t))
+                    if (CodeGeneration.GrainInterfaceUtils.IsGrainInterface(t) && !interfaceTypes.Contains(t))
                         interfaceTypes.Add(t);
                 }
 
                 // Traverse the class hierarchy
-                grainType = grainType.BaseType;
+                grainType = grainType.GetTypeInfo().BaseType;
             }
 
             return interfaceTypes;
@@ -81,9 +63,9 @@ namespace Orleans.Runtime
 
         private static bool GetPlacementStrategy<T>(
             Type grainInterface, Func<T, PlacementStrategy> extract, out PlacementStrategy placement)
-                where T : class
+                where T : Attribute
         {
-            var attribs = grainInterface.GetCustomAttributes(typeof(T), inherit: true);
+            var attribs = grainInterface.GetTypeInfo().GetCustomAttributes<T>(inherit: true).ToArray();
             switch (attribs.Length)
             {
                 case 0:
@@ -91,7 +73,7 @@ namespace Orleans.Runtime
                     return false;
 
                 case 1:
-                    placement = extract((T)attribs[0]);
+                    placement = extract(attribs[0]);
                     return placement != null;
 
                 default:
@@ -110,10 +92,7 @@ namespace Orleans.Runtime
 
             if (GetPlacementStrategy<StatelessWorkerAttribute>(
                 grainClass,
-                (StatelessWorkerAttribute attr) =>
-                {
-                    return new StatelessWorkerPlacement(attr.MaxLocalWorkers);
-                },
+                attr => new StatelessWorkerPlacement(attr.MaxLocalWorkers),
                 out placement))
             {
                 return placement;
@@ -128,6 +107,25 @@ namespace Orleans.Runtime
             }
 
             return PlacementStrategy.GetDefault();
+        }
+
+        internal static MultiClusterRegistrationStrategy GetMultiClusterRegistrationStrategy(Type grainClass)
+        {
+            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<Orleans.MultiCluster.RegistrationAttribute>(inherit: true).ToArray();
+
+            switch (attribs.Length)
+            {
+                case 0:
+                    return MultiClusterRegistrationStrategy.GetDefault(); // no strategy is specified
+                case 1:
+                    return attribs[0].RegistrationStrategy;
+                default:
+                    throw new InvalidOperationException(
+                        string.Format(
+                            "More than one {0} cannot be specified for grain interface {1}",
+                            typeof(MultiClusterRegistrationStrategy).Name,
+                            grainClass.Name));
+            }
         }
     }
 }

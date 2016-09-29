@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -134,6 +111,15 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns whether part of the primary key is of type long.
+        /// </summary>
+        /// <param name="grain">The target grain.</param>
+        public static bool IsPrimaryKeyBasedOnLong(this IAddressable grain)
+        {
+            return GetGrainId(grain).IsLongKey;
+        }
+
+        /// <summary>
         /// Returns the long representation of a grain primary key.
         /// </summary>
         /// <param name="grain">The grain to find the primary key for.</param>
@@ -153,6 +139,7 @@ namespace Orleans
         {
             return GetGrainId(grain).GetPrimaryKeyLong();
         }
+
         /// <summary>
         /// Returns the Guid representation of a grain primary key.
         /// </summary>
@@ -172,6 +159,16 @@ namespace Orleans
         public static Guid GetPrimaryKey(this IAddressable grain)
         {
             return GetGrainId(grain).GetPrimaryKey();
+        }
+
+        /// <summary>
+        /// Returns the string primary key of the grain.
+        /// </summary>
+        /// <param name="grain">The grain to find the primary key for.</param>
+        /// <returns>A string representing the primary key for this grain.</returns>
+        public static string GetPrimaryKeyString(this IAddressable grain)
+        {
+            return GetGrainId(grain).GetPrimaryKeyString();
         }
 
         public static long GetPrimaryKeyLong(this IGrain grain, out string keyExt)

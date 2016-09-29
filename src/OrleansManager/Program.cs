@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 using Orleans;
 using Orleans.Runtime;
 
@@ -33,7 +9,6 @@ namespace OrleansManager
     class Program
     {
         private static IManagementGrain systemManagement;
-        const int RETRIES = 3;
 
         static void Main(string[] args)
         {
@@ -190,8 +165,8 @@ namespace OrleansManager
 
             var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
-            WriteStatus(string.Format("**Calling DeleteGrain({0}, {1}, {2})", silo, grainId, RETRIES));
-            directory.DeleteGrain(grainId, RETRIES).Wait();
+            WriteStatus(string.Format("**Calling DeleteGrain({0}, {1})", silo, grainId));
+            directory.DeleteGrainAsync(grainId).Wait();
             WriteStatus(string.Format("**DeleteGrain finished OK."));
         }
 
@@ -204,11 +179,12 @@ namespace OrleansManager
 
             var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
-            WriteStatus(string.Format("**Calling LookupGrain({0}, {1}, {2})", silo, grainId, RETRIES));
-            Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.LookUp(grainId, RETRIES);
+            WriteStatus(string.Format("**Calling LookupGrain({0}, {1})", silo, grainId));
+            //Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.FullLookUp(grainId, true);
+            var lookupResult = await directory.LookupAsync(grainId);
 
             WriteStatus(string.Format("**LookupGrain finished OK. Lookup result is:"));
-            List<Tuple<SiloAddress, ActivationId>> list = lookupResult.Item1;
+            var list = lookupResult.Addresses;
             if (list == null)
             {
                 WriteStatus(string.Format("**The returned activation list is null."));
@@ -220,9 +196,9 @@ namespace OrleansManager
                 return;
             }
             Console.WriteLine("**There {0} {1} activations registered in the directory for this grain. The activations are:", (list.Count > 1) ? "are" : "is", list.Count);
-            foreach (Tuple<SiloAddress, ActivationId> tuple in list)
+            foreach (var tuple in list)
             {
-                WriteStatus(string.Format("**Activation {0} on silo {1}", tuple.Item2, tuple.Item1));
+                WriteStatus(string.Format("**Activation {0} on silo {1}", tuple.Activation, tuple.Silo));
             }
         }
 

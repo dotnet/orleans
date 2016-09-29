@@ -8,7 +8,7 @@
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       ZooKeeper Utilities Library of Microsoft Orleans - OrleansZooKeeperUtils.dll
     </summary>
@@ -20,13 +20,13 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Newtonsoft.Json" version="5.0.8" />
-	  <dependency id="ZooKeeperNetEx" version="3.4.6.1006" />
+	  <dependency id="ZooKeeperNetEx" version="3.4.8.5" />
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansZooKeeperUtils.dll" target="lib\net45" />
-    <file src="OrleansZooKeeperUtils.pdb" target="lib\net45" />
+    <file src="OrleansZooKeeperUtils.XML" target="lib\net451" />
+    <file src="OrleansZooKeeperUtils.dll" target="lib\net451" />
+    <file src="OrleansZooKeeperUtils.pdb" target="lib\net451" />
     <file src="$SRC_DIR$OrleansZooKeeperUtils\**\*.cs" target="src" />
   </files>
 </package>

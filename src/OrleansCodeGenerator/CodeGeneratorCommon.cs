@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -29,7 +6,6 @@ namespace Orleans.CodeGenerator
     using System.IO;
     using System.Linq;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -38,8 +14,7 @@ namespace Orleans.CodeGenerator
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
-
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -71,25 +46,28 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblyName">
         /// The name for the generated assembly.
         /// </param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static byte[] CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
 
             // Reference everything which can be referenced.
             var assemblies =
-                AppDomain.CurrentDomain.GetAssemblies()
+                System.AppDomain.CurrentDomain.GetAssemblies()
                     .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
                     .ToArray();
-            var logger = TraceLogger.GetLogger("CodeGenerator");
+            var logger = LogManager.GetLogger("CodeGenerator");
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
@@ -100,15 +78,12 @@ namespace Orleans.CodeGenerator
                 source = GenerateSourceCode(code);
 
                 // Compile the code and load the generated assembly.
-                if (logger.IsVerbose3)
-                {
-                    logger.LogWithoutBulkingAndTruncating(
-                        Severity.Verbose3,
-                        ErrorCode.CodeGenSourceGenerated,
-                        "Generating assembly {0} with source:\n{1}",
-                        assemblyName,
-                        source);
-                }
+                logger.LogWithoutBulkingAndTruncating(
+                    Severity.Verbose3,
+                    ErrorCode.CodeGenSourceGenerated,
+                    "Generating assembly {0} with source:\n{1}",
+                    assemblyName,
+                    source);
             }
             
             var compilation =
@@ -116,9 +91,12 @@ namespace Orleans.CodeGenerator
                     .AddSyntaxTrees(code.SyntaxTree)
                     .AddReferences(assemblies)
                     .WithOptions(options);
-            using (var stream = new MemoryStream())
+
+            var outputStream = new MemoryStream();
+            var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
+            try
             {
-                var compilationResult = compilation.Emit(stream);
+                var compilationResult = compilation.Emit(outputStream, symbolStream);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
@@ -131,9 +109,21 @@ namespace Orleans.CodeGenerator
                         source);
                     throw new CodeGenerationException(errors);
                 }
-                
-                logger.Verbose(ErrorCode.CodeGenCompilationSucceeded, "Compilation of assembly {0} succeeded.", assemblyName);
-                return stream.ToArray();
+
+                logger.Verbose(
+                    ErrorCode.CodeGenCompilationSucceeded,
+                    "Compilation of assembly {0} succeeded.",
+                    assemblyName);
+                return new GeneratedAssembly
+                {
+                    RawBytes = outputStream.ToArray(),
+                    DebugSymbolRawBytes = symbolStream?.ToArray()
+                };
+            }
+            finally
+            {
+                outputStream.Dispose();
+                symbolStream?.Dispose();
             }
         }
 
@@ -176,36 +166,6 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Get types which have corresponding generated classes marked with the provided marker attributes.
-        /// </summary>
-        /// <returns>Types which have corresponding generated classes marked with any of the provided marker attributes.</returns>
-        internal static HashSet<Type> GetTypesWithImplementations(params Type[] markerAttributes)
-        {
-            // Get assemblies which contain generated code.
-            var all =
-                AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(_ => _.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                    .SelectMany(_ => _.DefinedTypes);
-
-            // Get all generated types in each assembly.
-            var attributes = all.SelectMany(_ => _.GetCustomAttributes()).OfType<GeneratedAttribute>();
-            var results = new HashSet<Type>();
-            foreach (var attribute in attributes)
-            {
-                if (attribute.GrainType != null)
-                {
-                    results.Add(attribute.GrainType);
-                }
-                else if (!string.IsNullOrWhiteSpace(attribute.ForGrainType))
-                {
-                    results.Add(Type.GetType(attribute.ForGrainType));
-                }
-            }
-
-            return results;
-        }
-
-        /// <summary>
         /// Generates switch cases for the provided grain type.
         /// </summary>
         /// <param name="grainType">
@@ -222,11 +182,11 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public static SwitchSectionSyntax[] GenerateGrainInterfaceAndMethodSwitch(
             Type grainType,
-            IdentifierNameSyntax methodIdArgument,
+            ExpressionSyntax methodIdArgument,
             Func<MethodInfo, StatementSyntax[]> generateMethodHandler)
         {
-            var interfaces = GrainInterfaceData.GetRemoteInterfaces(grainType);
-            interfaces[GrainInterfaceData.GetGrainInterfaceId(grainType)] = grainType;
+            var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(grainType);
+            interfaces[GrainInterfaceUtils.GetGrainInterfaceId(grainType)] = grainType;
 
             // Switch on interface id.
             var interfaceCases = new List<SwitchSectionSyntax>();
@@ -234,7 +194,7 @@ namespace Orleans.CodeGenerator
             {
                 var interfaceType = @interface.Value;
                 var interfaceId = @interface.Key;
-                var methods = GrainInterfaceData.GetMethods(interfaceType);
+                var methods = GrainInterfaceUtils.GetMethods(interfaceType);
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
@@ -242,7 +202,7 @@ namespace Orleans.CodeGenerator
                 foreach (var method in methods)
                 {
                     // Generate switch case.
-                    var methodId = GrainInterfaceData.ComputeMethodId(method);
+                    var methodId = GrainInterfaceUtils.ComputeMethodId(method);
                     var methodType = method;
 
                     // Generate the switch label for this interface id.

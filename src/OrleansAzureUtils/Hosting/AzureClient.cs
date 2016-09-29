@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -97,6 +74,22 @@ namespace Orleans.Runtime.Host
             GrainClient.Uninitialize();
         }
 
+        /// <summary>
+        /// Returns default client configuration object for passing to AzureClient.
+        /// </summary>
+        /// <returns></returns>
+        public static ClientConfiguration DefaultConfiguration()
+        {
+            var config = new ClientConfiguration
+            {
+                GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
+                DeploymentId = GetDeploymentId(),
+                DataConnectionString = GetDataConnectionString(),
+            };
+            
+            return config;
+        }
+
         #region Internal implementation of client initialization processing
 
         private static void InitializeImpl_FromFile(FileInfo configFile)
@@ -124,7 +117,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception ex)
             {
-                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, TraceLogger.PrintException(ex));
+                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, LogFormatter.PrintException(ex));
                 Trace.TraceError(msg);
                 throw new AggregateException(msg, ex);
             }
@@ -146,12 +139,12 @@ namespace Orleans.Runtime.Host
             InitializeImpl_FromConfig(config);
         }
 
-        private static string GetDeploymentId()
+        internal static string GetDeploymentId()
         {
             return GrainClient.TestOnlyNoConnect ? "FakeDeploymentId" : serviceRuntimeWrapper.DeploymentId;
         }
 
-        private static string GetDataConnectionString()
+        internal static string GetDataConnectionString()
         {
             return GrainClient.TestOnlyNoConnect
                 ? "FakeConnectionString"
@@ -202,7 +195,7 @@ namespace Orleans.Runtime.Host
             OrleansException err;
             err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}. Last exception={1}",
                 deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}.", deploymentId));
-            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, TraceLogger.PrintException(err));
+            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
 

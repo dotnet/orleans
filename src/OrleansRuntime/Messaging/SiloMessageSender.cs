@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -63,7 +40,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
-            if (!msg.ContainsHeader(Message.Header.SENDING_SILO))
+            if (msg.SendingSilo == null)
                 msg.SendingSilo = messageCenter.MyAddress;
             
 
@@ -89,13 +66,10 @@ namespace Orleans.Runtime.Messaging
                 if (since < CONNECTION_RETRY_DELAY)
                 {
                     FailMessage(msg, String.Format("Recent ({0} ago, at {1}) connection failure trying to reach target silo {2}. Going to drop {3} msg {4} without sending. CONNECTION_RETRY_DELAY = {5}.",
-                        since, TraceLogger.PrintDate(failure), msg.TargetSilo.ToLongString(), msg.Direction, msg.Id, CONNECTION_RETRY_DELAY));
+                        since, LogFormatter.PrintDate(failure), msg.TargetSilo.ToLongString(), msg.Direction, msg.Id, CONNECTION_RETRY_DELAY));
                     return false;
                 }
             }
-
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.SendOutgoing);
 
             return true;
         }
@@ -171,7 +145,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 msg.ReleaseBodyAndHeaderBuffers();
-                if (Log.IsVerbose3) Log.Verbose3("Sending queue delay time for: {0} is {1}", msg, DateTime.UtcNow.Subtract((DateTime)msg.GetMetadata(OutboundMessageQueue.QUEUED_TIME_METADATA)));
+                if (Log.IsVerbose3) Log.Verbose3("Sending queue delay time for: {0} is {1}", msg, DateTime.UtcNow.Subtract(msg.QueuedTime ?? DateTime.UtcNow));
             }
         }
 
@@ -196,16 +170,16 @@ namespace Orleans.Runtime.Messaging
             if (msg == null) return;
 
             int maxRetries = DEFAULT_MAX_RETRIES;
-            if (msg.ContainsMetadata(Message.Metadata.MAX_RETRIES))
-                maxRetries = (int)msg.GetMetadata(Message.Metadata.MAX_RETRIES);
+            if (msg.MaxRetries.HasValue)
+                maxRetries = msg.MaxRetries.Value;
             
             int retryCount = 0;
-            if (msg.ContainsMetadata(RETRY_COUNT_TAG))
-                retryCount = (int)msg.GetMetadata(RETRY_COUNT_TAG);
+            if (msg.RetryCount.HasValue)
+                retryCount = msg.RetryCount.Value;
             
             if (retryCount < maxRetries)
             {
-                msg.SetMetadata(RETRY_COUNT_TAG, retryCount + 1);
+                msg.RetryCount = retryCount + 1;
                 messageCenter.OutboundQueue.SendMessage(msg);
             }
             else

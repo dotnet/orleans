@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -73,7 +50,9 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
+#if !NETSTANDARD_TODO
                 AcceptingSocket.BeginAccept(AcceptCallback, this);
+#endif
             }
             catch (Exception ex)
             {
@@ -121,7 +100,7 @@ namespace Orleans.Runtime.Messaging
 
             if (Cts.IsCancellationRequested) return false;
 
-            if (!ReadConnectionPreemble(sock, out client))
+            if (!ReadConnectionPreamble(sock, out client))
             {
                 return false;
             }
@@ -155,7 +134,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private bool ReadConnectionPreemble(Socket socket, out GrainId grainId)
+        private bool ReadConnectionPreamble(Socket socket, out GrainId grainId)
         {
             grainId = null;
             byte[] buffer = null;
@@ -194,7 +173,7 @@ namespace Orleans.Runtime.Messaging
                     if (bytesRead == 0)
                     {
                         Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed,
-                            "Remote socket closed while receiving connection preemble data from endpoint {0}.", sock.RemoteEndPoint);
+                            "Remote socket closed while receiving connection preamble data from endpoint {0}.", sock.RemoteEndPoint);
                         return null;
                     }
                     offset += bytesRead;
@@ -202,7 +181,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception ex)
                 {
                     Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving,
-                        "Exception receiving connection preemble data from endpoint " + sock.RemoteEndPoint, ex);
+                        "Exception receiving connection preamble data from endpoint " + sock.RemoteEndPoint, ex);
                     return null;
                 }
             }
@@ -228,6 +207,7 @@ namespace Orleans.Runtime.Messaging
             OpenReceiveSockets.Clear();
         }
 
+#if !NETSTANDARD_TODO
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "BeginAccept")]
         private static void AcceptCallback(IAsyncResult result)
         {
@@ -236,7 +216,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (ima == null)
                 {
-                    var logger = TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                    var logger = LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                     
                     if (result.AsyncState == null)
                         logger.Warn(ErrorCode.Messaging_IMA_AcceptCallbackNullState, "AcceptCallback invoked with a null unexpected async state");
@@ -321,7 +301,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception ex)
             {
-                var logger = ima != null ? ima.Log : TraceLogger.GetLogger("IncomingMessageAcceptor", TraceLogger.LoggerType.Runtime);
+                var logger = ima != null ? ima.Log : LogManager.GetLogger("IncomingMessageAcceptor", LoggerType.Runtime);
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
             }
         }
@@ -401,12 +381,10 @@ namespace Orleans.Runtime.Messaging
                 rcc.IMA.SafeCloseSocket(rcc.Sock);
             }
         }
+#endif
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
-            if (Message.WriteMessagingTraces)
-                msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
-
             // See it's a Ping message, and if so, short-circuit it
             object pingObj;
             var requestContext = msg.RequestContextData;
@@ -476,7 +454,6 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 if (Log.IsVerbose2) Log.Verbose2("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
-                if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueForForwarding);
                 MessageCenter.OutboundQueue.SendMessage(msg);
                 return;
             }
@@ -495,6 +472,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+#if !NETSTANDARD_TODO
         private void RestartAcceptingSocket()
         {
             try
@@ -510,6 +488,7 @@ namespace Orleans.Runtime.Messaging
                 throw;
             }
         }
+#endif
 
         private void SafeCloseSocket(Socket sock)
         {
@@ -517,7 +496,7 @@ namespace Orleans.Runtime.Messaging
             SocketManager.CloseSocket(sock);
         }
 
-
+#if !NETSTANDARD_TODO
         private class ReceiveCallbackContext
         {
             private readonly IncomingMessageBuffer _buffer;
@@ -538,7 +517,7 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    Sock.BeginReceive(_buffer.ReceiveBuffer, SocketFlags.None, callback, this);
+                    Sock.BeginReceive(_buffer.BuildReceiveBuffer(), SocketFlags.None, callback, this);
                 }
                 catch (Exception ex)
                 {
@@ -612,5 +591,6 @@ namespace Orleans.Runtime.Messaging
 #endif
             }
         }
+#endif
     }
 }

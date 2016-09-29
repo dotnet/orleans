@@ -1,24 +1,33 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
+    using Orleans.Providers;
+
+    public class OrleansJsonSerializer : IExternalSerializer
     {
-        public static JsonSerializerSettings settings;
-        private TraceLogger logger;
+        public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+        public const string IndentJsonProperty = "IndentJSON";
+        private static JsonSerializerSettings defaultSettings;
+        private Logger logger;
 
         static OrleansJsonSerializer()
         {
-            settings = new JsonSerializerSettings
+            defaultSettings = GetDefaultSerializerSettings();
+        }
+
+        /// <summary>
+        /// Returns the default serializer settings.
+        /// </summary>
+        /// <returns>The default serializer settings.</returns>
+        public static JsonSerializerSettings GetDefaultSerializerSettings()
+        {
+            var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All,
                 PreserveReferencesHandling = PreserveReferencesHandling.Objects,
@@ -26,7 +35,9 @@ namespace Orleans.Serialization
                 DefaultValueHandling = DefaultValueHandling.Ignore,
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
-                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+                Formatting = Formatting.None
             };
 
             settings.Converters.Add(new IPAddressConverter());
@@ -34,13 +45,44 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
+
+            return settings;
         }
-        
+
+        /// <summary>
+        /// Customises the given serializer settings using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="settings">The settings to update.</param>
+        /// <param name="config">The provider config.</param>
+        /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
+        {
+            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
+            {
+                bool useFullAssemblyNames;
+                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
+                {
+                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+                }
+            }
+
+            if (config.Properties.ContainsKey(IndentJsonProperty))
+            {
+                bool indentJson;
+                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
+                {
+                    settings.Formatting = Formatting.Indented;
+                }
+            }
+            return settings;
+        }
+
         /// <summary>
         /// Initializes the serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
@@ -87,7 +129,7 @@ namespace Orleans.Serialization
             }
 
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, settings);
+            return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
 
         /// <summary>
@@ -109,14 +151,14 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, defaultSettings);
             writer.Write(str);
         }
     }
 
     #region JsonConverters
 
-    class IPAddressConverter : JsonConverter
+    internal class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -136,7 +178,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class GrainIdConverter : JsonConverter
+    internal class GrainIdConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -160,7 +202,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class SiloAddressConverter : JsonConverter
+    internal class SiloAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -184,7 +226,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class UniqueKeyConverter : JsonConverter
+    internal class UniqueKeyConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -207,8 +249,8 @@ namespace Orleans.Serialization
             return addr;
         }
     }
- 
-    class IPEndPointConverter : JsonConverter
+
+    internal class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -234,6 +276,5 @@ namespace Orleans.Serialization
             return new IPEndPoint(address, port);
         }
     }
-
     #endregion
 }

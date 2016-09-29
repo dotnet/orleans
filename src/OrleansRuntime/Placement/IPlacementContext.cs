@@ -1,34 +1,12 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.Placement
 {
     internal interface IPlacementContext
     {
-        TraceLogger Logger { get; }
+        Logger Logger { get; }
 
         /// <summary>
         /// Lookup locally known directory information for a target grain
@@ -36,9 +14,11 @@ namespace Orleans.Runtime.Placement
         /// <param name="grain"></param>
         /// <param name="addresses">Local addresses will always be complete, remote may be partial</param>
         /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool FastLookup(GrainId grain, out List<ActivationAddress> addresses);
+        bool FastLookup(GrainId grain, out AddressesAndTag addresses);
 
-        Task<List<ActivationAddress>> FullLookup(GrainId grain);
+        Task<AddressesAndTag> FullLookup(GrainId grain);
+
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 
@@ -54,22 +34,23 @@ namespace Orleans.Runtime.Placement
         /// <returns></returns>
         bool TryGetActivationData(ActivationId id, out ActivationData activationData);
 
-        void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null);
+        void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy strategy, string genericArguments = null);
     }
 
     internal static class PlacementContextExtensions
     {
-        public static Task<List<ActivationAddress>> Lookup(this IPlacementContext @this, GrainId grainId)
+        public static Task<AddressesAndTag> Lookup(this IPlacementContext @this, GrainId grainId)
         {
-            List<ActivationAddress> l;
-            return @this.FastLookup(grainId, out l) ? Task.FromResult(l) : @this.FullLookup(grainId);
+            AddressesAndTag l;
+            return @this.FastLookup(grainId, out l) ? Task.FromResult(l) : @this.FullLookup(grainId); 
         }
 
         public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementContext @this, int typeCode, string genericArguments = null)
         {
             string unused;
             PlacementStrategy placement;
-            @this.GetGrainTypeInfo(typeCode, out unused, out placement, genericArguments);
+            MultiClusterRegistrationStrategy unusedActivationStrategy;
+            @this.GetGrainTypeInfo(typeCode, out unused, out placement, out unusedActivationStrategy, genericArguments);
             return placement;
         }
 
@@ -82,7 +63,8 @@ namespace Orleans.Runtime.Placement
         {
             string grainClass;
             PlacementStrategy unused;
-            @this.GetGrainTypeInfo(typeCode, out grainClass, out unused, genericArguments);
+            MultiClusterRegistrationStrategy unusedActivationStrategy;
+            @this.GetGrainTypeInfo(typeCode, out grainClass, out unused, out unusedActivationStrategy, genericArguments);
             return grainClass;
         }
 
@@ -91,9 +73,9 @@ namespace Orleans.Runtime.Placement
             return @this.GetGrainTypeName(grainId.GetTypeCode(), genericArguments);
         }
 
-        public static void GetGrainTypeInfo(this IPlacementContext @this, GrainId grainId, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
+        public static void GetGrainTypeInfo(this IPlacementContext @this, GrainId grainId, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
-            @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out placement, genericArguments);
+            @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out placement, out activationStrategy, genericArguments);
         }
     }
 }

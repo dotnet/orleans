@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -32,10 +9,11 @@ namespace Orleans.Runtime
 {
     internal class AssemblyLoader
     {
+#if !NETSTANDARD_TODO
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
         internal bool SimulateReflectionOnlyLoadFailure { get; set; }
@@ -45,7 +23,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             this.dirEnumArgs = dirEnumArgs;
             this.pathNameCriteria = pathNameCriteria;
@@ -79,7 +57,7 @@ namespace Orleans.Runtime
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             var loader =
                 NewAssemblyLoader(
@@ -101,8 +79,8 @@ namespace Orleans.Runtime
             loader.logger.Info("{0} assemblies loaded.", count);
             return discoveredAssemblyLocations;
         }
-
-        public static T TryLoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+#endif
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
             {
@@ -111,8 +89,8 @@ namespace Orleans.Runtime
                     TypeUtils.GetTypes(
                         assembly,
                         type =>
-                        typeof(T).GetTypeInfo().IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null).FirstOrDefault();
+                        typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
+                        && type.GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
@@ -132,12 +110,12 @@ namespace Orleans.Runtime
             }
         }
 
-        public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        public static T LoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
             {
                 var assembly = Assembly.Load(new AssemblyName(assemblyName));
-                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type)).First();
+                var foundType = TypeUtils.GetTypes(assembly, type => typeof(T).IsAssignableFrom(type), logger).First();
 
                 return (T)Activator.CreateInstance(foundType, true);
             }
@@ -148,13 +126,14 @@ namespace Orleans.Runtime
             }
         }
 
+#if !NETSTANDARD_TODO
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(
                 Dictionary<string, SearchOption> dirEnumArgs,
                 IEnumerable<AssemblyLoaderPathNameCriterion> pathNameCriteria,
                 IEnumerable<AssemblyLoaderReflectionCriterion> reflectionCriteria,
-                TraceLogger logger)
+                Logger logger)
         {
             if (null == dirEnumArgs)
                 throw new ArgumentNullException("dirEnumArgs");
@@ -451,5 +430,6 @@ namespace Orleans.Runtime
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
         }
+#endif
     }
 }

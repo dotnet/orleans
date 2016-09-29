@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <StorageProviders>
+      <Provider Type="UnitTests.StorageTests.MockStorageProvider" Name="test0" />
+      <Provider Type="UnitTests.StorageTests.MockStorageProvider" Name="test1" >
+      </Provider>
+    </StorageProviders>
+  </Globals>
+  <Defaults>
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}-{1}.log" PropagateActivityId="false" BulkMessageLimit="1000">
+      <!--
+      <TraceLevelOverride LogPrefix="Storage" TraceLevel="Verbose3" />
+      <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />
+      <TraceLevelOverride LogPrefix="Runtime.Message" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="Runtime.Catalog" TraceLevel="Verbose" />
+      <TraceLevelOverride LogPrefix="AssemblyLoader.Silo" TraceLevel="Warning" />
+      <TraceLevelOverride LogPrefix="ReminderService" TraceLevel="Verbose3" />
+      -->
+    </Tracing>
+    <Statistics MetricsTableWriteInterval="1000m" PerfCounterWriteInterval="1000m" LogWriteInterval="1000m" StatisticsCollectionLevel="Verbose"/>
+  </Defaults>
+  <Override Node="Primary">
+    <Networking Port="22222" />
+    <ProxyingGateway Address="localhost" Port="40000" />
+  </Override>
+</OrleansConfiguration>

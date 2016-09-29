@@ -1,25 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
 
 using System;
 using System.Collections.Generic;
@@ -28,14 +6,9 @@ namespace Orleans.Runtime
 {
     internal class IncomingMessageBuffer
     {
-        public List<ArraySegment<byte>> ReceiveBuffer
-        {
-            get { return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset); }
-        }
-
         private const int Kb = 1024;
         private const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
-        private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = DEFAULT_RECEIVE_BUFFER_SIZE * 8; // 1mg
+        private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
         private readonly List<ArraySegment<byte>> readBuffer;
         private readonly int maxSustainedBufferSize;
@@ -50,9 +23,9 @@ namespace Orleans.Runtime
         private int decodeOffset;
 
         private readonly bool supportForwarding;
-        private TraceLogger Log;
+        private Logger Log;
 
-        public IncomingMessageBuffer(TraceLogger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = logger;
             this.supportForwarding = supportForwarding;
@@ -64,6 +37,17 @@ namespace Orleans.Runtime
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
+        }
+
+        public List<ArraySegment<byte>> BuildReceiveBuffer()
+        {
+            // Opportunistic reset to start of buffer
+            if (decodeOffset == receiveOffset)
+            {
+                decodeOffset = 0;
+                receiveOffset = 0;
+            }
+            return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset);
         }
 
         public void UpdateReceivedData(int bytesRead)
@@ -84,7 +68,7 @@ namespace Orleans.Runtime
             msg = null;
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
-            if (receiveOffset - decodeOffset < KnownMessageSize())
+            if (receiveOffset - decodeOffset < CalculateKnownMessageSize())
                 return false;
 
             // parse lengths if needed
@@ -106,19 +90,14 @@ namespace Orleans.Runtime
                 bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
             }
 
-            // If message is too big for default buffer size, grow
-            while (decodeOffset + KnownMessageSize() > currentBufferSize)
+            // If message is too big for current buffer size, grow
+            while (decodeOffset + CalculateKnownMessageSize() > currentBufferSize)
             {
-                //TODO: Add configurable max message size for safety
-                //TODO: Review networking layer and add max size checks to all dictionaries, arrays, or other variable sized containers.
-                // double buffer size up to max grow block size, then only grow it in those intervals
-                int growBlockSize = Math.Min(currentBufferSize, GROW_MAX_BLOCK_SIZE);
-                readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
-                currentBufferSize += growBlockSize;
+                GrowBuffer();
             }
 
             // Is there enough read into the buffer to read full message
-            if (receiveOffset - decodeOffset < KnownMessageSize())
+            if (receiveOffset - decodeOffset < CalculateKnownMessageSize())
                 return false;
 
             // decode header
@@ -151,7 +130,20 @@ namespace Orleans.Runtime
             headerLength = 0;
             bodyLength = 0;
 
-            // drop buffers consumed in message and adjust parse receiveOffset
+            AdjustBuffer();
+
+            return true;
+        }
+
+        /// <summary>
+        /// This call cleans up the buffer state to make it optimal for next read.
+        /// The leading chunks, used by any processed messages, are removed from the front
+        ///   of the buffer and added to the back.   Decode and receiver offsets are adjusted accordingly.
+        /// If the buffer was grown over the max sustained buffer size (to read a large message) it is shrunken.
+        /// </summary>
+        private void AdjustBuffer()
+        {
+            // drop buffers consumed by messages and adjust offsets
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             while (readBuffer.Count != 0)
@@ -171,29 +163,25 @@ namespace Orleans.Runtime
             decodeOffset -= consumedBytes;
             receiveOffset -= consumedBytes;
 
+            // backfill any consumed buffers, to preserve buffer size.
             if (consumedBytes != 0)
             {
-                if (currentBufferSize <= maxSustainedBufferSize)
+                int backfillBytes = consumedBytes;
+                // If buffer is larger than max sustained size, backfill only up to max sustained buffer size.
+                if (currentBufferSize > maxSustainedBufferSize)
                 {
-                    readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
-                }
-                else
-                {
-                    // shrink buffer to DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE
-                    int backfillBytes = Math.Max(consumedBytes + maxSustainedBufferSize - currentBufferSize, 0);
+                    backfillBytes = Math.Max(consumedBytes + maxSustainedBufferSize - currentBufferSize, 0);
                     currentBufferSize -= consumedBytes;
                     currentBufferSize += backfillBytes;
-                    if (backfillBytes > 0)
-                    {
-                        readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
-                    }
+                }
+                if (backfillBytes > 0)
+                {
+                    readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
                 }
             }
-
-            return true;
         }
 
-        private int KnownMessageSize()
+        private int CalculateKnownMessageSize()
         {
             return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE;
         }
@@ -208,6 +196,16 @@ namespace Orleans.Runtime
                 dupBody.Add(dupSeg);
             }
             return dupBody;
+        }
+
+        private void GrowBuffer()
+        {
+            //TODO: Add configurable max message size for safety
+            //TODO: Review networking layer and add max size checks to all dictionaries, arrays, or other variable sized containers.
+            // double buffer size up to max grow block size, then only grow it in those intervals
+            int growBlockSize = Math.Min(currentBufferSize, GROW_MAX_BLOCK_SIZE);
+            readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
+            currentBufferSize += growBlockSize;
         }
     }
 }

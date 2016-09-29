@@ -1,25 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -27,152 +6,132 @@ namespace Orleans.CodeGenerator
     using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
-
-    using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
     /// <summary>
     /// The serializer generation manager.
     /// </summary>
-    internal static class SerializerGenerationManager
+    internal class SerializerGenerationManager
     {
-        /// <summary>
-        /// The namespaces which are excluded from serializer generation.
-        /// </summary>
-        private static readonly List<string> BlacklistedNamespaces = new List<string> { "System", "Microsoft.CodeAnalysis", "Microsoft.Win32" };
-
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly TraceLogger Log;
+        private readonly Logger log;
 
         /// <summary>
         /// The types to process.
         /// </summary>
-        private static readonly HashSet<Type> TypesToProcess;
+        private readonly HashSet<Type> typesToProcess;
 
         /// <summary>
         /// The processed types.
         /// </summary>
-        private static readonly HashSet<Type> ProcessedTypes;
+        private readonly HashSet<Type> processedTypes;
 
         /// <summary>
-        /// Initializes static members of the <see cref="SerializerGenerationManager"/> class.
+        /// Initializes members of the <see cref="SerializerGenerationManager"/> class.
         /// </summary>
-        static SerializerGenerationManager()
+        internal SerializerGenerationManager()
         {
-            TypesToProcess = new HashSet<Type>();
-            ProcessedTypes = new HashSet<Type>();
-            Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
+            typesToProcess = new HashSet<Type>();
+            processedTypes = new HashSet<Type>();
+
+            log = LogManager.GetLogger(typeof(SerializerGenerationManager).Name);
         }
 
-        /// <summary>
-        /// Gets the list of blocked namespaces.
-        /// </summary>
-        public static List<string> IgnoredNamespaces
+        internal bool IsTypeRecorded(Type type)
         {
-            get
+            return this.typesToProcess.Contains(type) || this.processedTypes.Contains(type);
+        }
+
+        internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
+        {
+            if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
             {
-                return BlacklistedNamespaces;
+                return false;
             }
-        }
 
-        internal static void RecordTypeToGenerate(Type t)
-        {
             var typeInfo = t.GetTypeInfo();
 
-            if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t) 
-                ||typeof (Exception).GetTypeInfo().IsAssignableFrom(t)) return;
+            if (typeInfo.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
+                || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
+                || typeof (Delegate).GetTypeInfo().IsAssignableFrom(t)
+                || typeof (Task<>).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.IsArray)
             {
-                RecordTypeToGenerate(typeInfo.GetElementType());
-                return;
+                RecordTypeToGenerate(typeInfo.GetElementType(), module, targetAssembly);
+                return false;
             }
 
-            if (typeInfo.IsNestedPublic || typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
+            if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
             {
-                Log.Warn(
+                log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,
                     "Skipping serializer generation for nested type {0}. If this type is used frequently, you may wish to consider making it non-nested.",
                     t.Name);
             }
 
-            if (typeInfo.IsGenericType)
+            if (t.IsConstructedGenericType)
             {
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
-                    if (!arg.IsGenericParameter)
-                        RecordTypeToGenerate(arg);
+                {
+                    RecordTypeToGenerate(arg, module, targetAssembly);
+                }
             }
 
-            if (typeInfo.IsInterface || typeInfo.IsAbstract || typeInfo.IsEnum || t == typeof (object) || t == typeof (void) 
-                || GrainInterfaceData.IsTaskType(t)) return;
+            if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
+                || GrainInterfaceUtils.IsTaskType(t)) return false;
 
-            if (typeInfo.IsGenericType)
+            if (t.IsConstructedGenericType)
             {
-                var def = typeInfo.GetGenericTypeDefinition();
-                if (def == typeof (Task<>) || (SerializationManager.GetSerializer(def) != null) ||
-                    ProcessedTypes.Contains(def) || typeof (IAddressable).IsAssignableFrom(def)) return;
-
-                if (def.Namespace != null && (def.Namespace.Equals("System") || def.Namespace.StartsWith("System.")))
-                    Log.Warn(
-                        ErrorCode.CodeGenSystemTypeRequiresSerializer,
-                        "System type " + def.Name + " requires a serializer.");
-                else
-                    TypesToProcess.Add(def);
-
-                return;
+                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
             }
 
             if (typeInfo.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
-                typeof (IAddressable).GetTypeInfo().IsAssignableFrom(t)) return;
+                typeof(IAddressable).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.Namespace != null && (typeInfo.Namespace.Equals("System") || typeInfo.Namespace.StartsWith("System.")))
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
-                              + "If you use arguments of this type a lot, consider asking the Orleans team to build a custom serializer for it.";
-                Log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
-                return;
+                              + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
+                log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                return false;
             }
 
-            bool hasCopier = false;
-            bool hasSerializer = false;
-            bool hasDeserializer = false;
-            foreach (var method in t.GetMethods(BindingFlags.Static | BindingFlags.Public))
+            if (TypeUtils.HasAllSerializationMethods(t)) return false;
+
+            // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
+            var skipSerialzerGeneration = t.GetAllFields()
+                .Any(
+                    field => !field.IsNotSerialized &&
+                        TypeUtilities.IsTypeIsInaccessibleForSerialization(
+                            field.FieldType,
+                            module,
+                            targetAssembly));
+            if (skipSerialzerGeneration)
             {
-                if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), false).Length > 0)
-                {
-                    hasSerializer = true;
-                }
-                else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), false).Length > 0)
-                {
-                    hasDeserializer = true;
-                }
-
-                if (method.GetCustomAttributes(typeof (CopierMethodAttribute), false).Length > 0)
-                    hasCopier = true;
+                return false;
             }
 
-            if (hasCopier && hasSerializer && hasDeserializer) return;
-
-            TypesToProcess.Add(t);
+            typesToProcess.Add(t);
+            return true;
         }
 
-        internal static bool GetNextTypeToProcess(out Type next)
+        internal bool GetNextTypeToProcess(out Type next)
         {
             next = null;
-            if (TypesToProcess.Count == 0) return false;
+            if (typesToProcess.Count == 0) return false;
 
-            var enumerator = TypesToProcess.GetEnumerator();
+            var enumerator = typesToProcess.GetEnumerator();
             enumerator.MoveNext();
             next = enumerator.Current;
 
-            TypesToProcess.Remove(next);
-            ProcessedTypes.Add(next);
+            typesToProcess.Remove(next);
+            processedTypes.Add(next);
 
             return true;
         }

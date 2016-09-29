@@ -1,31 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 
@@ -38,7 +15,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config, TraceLogger traceLogger);
+        Task Init(GlobalConfiguration config, Logger logger);
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 
@@ -105,11 +82,26 @@ namespace Orleans
     [Serializable]
     public class ReminderEntry
     {
-        // 1 & 2 combine to form a unique key, i.e., a reminder is uniquely identified using these two together
-        public GrainReference GrainRef { get; set; }        // 1
-        public string ReminderName { get; set; }    // 2
+        /// <summary>
+        /// The grain reference of the grain that created the reminder. Forms the reminder
+        /// primary key together with <see cref="ReminderName"/>.
+        /// </summary>
+        public GrainReference GrainRef { get; set; }
 
+        /// <summary>
+        /// The name of the reminder. Forms the reminder primary key together with 
+        /// <see cref="GrainRef"/>.
+        /// </summary>
+        public string ReminderName { get; set; }
+
+        /// <summary>
+        /// the time when the reminder was supposed to tick in the first time
+        /// </summary>
         public DateTime StartAt { get; set; }
+
+        /// <summary>
+        /// the time period for the reminder
+        /// </summary>
         public TimeSpan Period { get; set; }
 
         public string ETag { get; set; }

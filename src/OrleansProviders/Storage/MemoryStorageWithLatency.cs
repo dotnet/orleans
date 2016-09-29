@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-
 using Orleans.Providers;
 using Orleans.Runtime;
 
@@ -62,11 +38,14 @@ namespace Orleans.Storage
         private TimeSpan latency;
         private bool mockCallsOnly;
 
+        /// <summary> Default constructor. </summary>
         public MemoryStorageWithLatency()
             : base(NUM_STORE_GRAINS)
         {
         }
 
+        /// <summary> Initialization function for this storage provider. </summary>
+        /// <see cref="IProvider.Init"/>
         public override async Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             await base.Init(name, providerRuntime, config);
@@ -79,22 +58,29 @@ namespace Orleans.Storage
                 "true".Equals(config.Properties[MOCK_CALLS_PARAM_STRING], StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary> Shutdown function for this storage provider. </summary>
         public override async Task Close()
         {
             await MakeFixedLatencyCall(() => base.Close());
         }
 
-        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        /// <summary> Read state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        public override async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ReadStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        /// <summary> Write state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        public override async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
+           await MakeFixedLatencyCall(() => base.WriteStateAsync(grainType, grainReference, grainState));
         }
 
-        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, GrainState grainState)
+        /// <summary> Delete / Clear state data function for this storage provider. </summary>
+        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        public override async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             await MakeFixedLatencyCall(() => base.ClearStateAsync(grainType, grainReference, grainState));
         }
@@ -129,7 +115,7 @@ namespace Orleans.Storage
             if (error != null)
             {
                 // Wrap in AggregateException so that the original error stack trace is preserved.
-                throw new AggregateException(error); 
+                throw new AggregateException(error);
             }
         }
     }

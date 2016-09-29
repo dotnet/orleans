@@ -8,7 +8,6 @@ namespace Orleans.Runtime
         public void TrackTrace(string message)
         {
             Trace.TraceInformation(message);
-            Trace.Flush();
         }
 
         public void TrackTrace(string message, IDictionary<string, string> properties)
@@ -43,6 +42,16 @@ namespace Orleans.Runtime
         public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties), severity);
+        }
+
+        public void Flush()
+        {
+            Trace.Flush();
+        }
+
+        public void Close()
+        {
+            Trace.Close();
         }
     }
 }

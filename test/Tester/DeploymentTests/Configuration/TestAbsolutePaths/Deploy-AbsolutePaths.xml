@@ -1,0 +1,12 @@
+<Deployment Name="Deployment1" DeploymentGroup="A22B120C-52EF-435C-B2A4-67BADB1755CE" xmlns="urn:xcg-deployment">
+  <TargetLocation Path="C:\Orleans" />
+  <Packages>
+    <Package Name="Orleans Runtime" Type="System" Path="." />
+    <Package Name="Bundled Applications" Type="Application" Path=".\Applications" />
+    <Package Name="Tetris" Type="Application" Path="..\Applications\Tetris" Filter="Tetris*" />
+  </Packages>
+  <RuntimeConfiguration Path=".\OrleansConfiguration.xml" />
+  <Nodes>
+    <Node HostName="localhost" NodeName="Silo0" />
+  </Nodes>
+</Deployment>

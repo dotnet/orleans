@@ -1,47 +1,51 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Diagnostics;
 using System.Net;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
+    /// <summary>
+    /// Class that represents a handle to a silo
+    /// </summary>
     [Serializable]
     public class SiloHandle
     {
+        /// <summary> Get or set the silo </summary>
         public Silo Silo { get; set; }
+
+        /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
+
+#if !NETSTANDARD
+        // TODO: remove?
+        /// <summary> Get or set the TestingSiloOptions used by the silo </summary>
         public TestingSiloOptions Options { get; set; }
+#endif
+
+        /// <summary> Get or set configuration of the silo </summary>
+        public NodeConfiguration NodeConfiguration { get; set; }
+
+        /// <summary> Get or set the name of the silo </summary>
         public string Name { get; set; }
+
+        /// <summary> Get or set process used by the silo </summary>
         public Process Process { get; set; }
+
+        /// <summary> Get or set the machine name of the silo </summary>
         public string MachineName { get; set; }
+
+        /// <summary> Get or set the endpoint of the silo </summary>
         public IPEndPoint Endpoint { get; set; }
 
+        /// <summary> Get or set the gateway port of the silo </summary>
+        public int? GatewayPort { get; set; }
+
+        /// <summary> A string that represents the current SiloHandle </summary>
         public override string ToString()
         {
-            return String.Format("SiloHandle:{0}", Endpoint);
+            return String.Format("(SiloHandle endpoint={0} gatewayport={1})", Endpoint, GatewayPort);
         }
     }
 }

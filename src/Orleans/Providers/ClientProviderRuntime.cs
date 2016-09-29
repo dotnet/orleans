@@ -1,32 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Streams;
-
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers
 {
@@ -38,6 +14,7 @@ namespace Orleans.Providers
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
+        private InvokeInterceptor invokeInterceptor;
 
         public ClientProviderRuntime(IGrainFactory grainFactory, IServiceProvider serviceProvider) 
         {
@@ -49,6 +26,15 @@ namespace Orleans.Providers
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
+        public void SetInvokeInterceptor(InvokeInterceptor interceptor)
+        {
+            this.invokeInterceptor = interceptor;
+        }
+
+        public InvokeInterceptor GetInvokeInterceptor()
+        {
+            return this.invokeInterceptor;
+        }
 
         public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
         {
@@ -68,19 +54,22 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public async Task Reset()
+        public async Task Reset(bool cleanup = true)
         {
             if (streamDirectory != null)
             {
                 var tmp = streamDirectory;
                 streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
-                await tmp.Cleanup(true, true);
+                if (cleanup)
+                {
+                    await tmp.Cleanup(true, true);
+                }
             }
         }
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public Guid ServiceId
@@ -147,9 +136,9 @@ namespace Orleans.Providers
                 else
                 { 
                     extension = newExtensionFunc();
-                    var obj = ((Orleans.GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
+                    var obj = ((GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
 
-                    addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
+                    addressable = obj;
 
                     if (null == addressable)
                     {

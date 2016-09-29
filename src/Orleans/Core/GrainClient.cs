@@ -1,31 +1,10 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -225,9 +204,24 @@ namespace Orleans
                     tcs.SetException(exc); // Break promise
                 }
             };
+
             // Queue Init call to thread pool thread
             ThreadPool.QueueUserWorkItem(doInit, null);
-            CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            try
+            {
+                CurrentConfig = tcs.Task.Result; // Wait for Init to finish
+            }
+            catch (AggregateException ae)
+            {
+                // Flatten the aggregate exception, which can be deeply nested.
+                ae = ae.Flatten();
+
+                // If there is just one exception in the aggregate exception, throw that, otherwise throw the entire
+                // flattened aggregate exception.
+                var innerExceptions = ae.InnerExceptions;
+                var exceptionToThrow = innerExceptions.Count == 1 ? innerExceptions[0] : ae;
+                ExceptionDispatchInfo.Capture(exceptionToThrow).Throw();
+            }
         }
 
         /// <summary>
@@ -283,11 +277,22 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Test hook to uninitialize client without cleanup
+        /// </summary>
+        public static void HardKill()
+        {
+            lock (initLock)
+            {
+                InternalUninitialize(false);
+            }
+        }
+
+        /// <summary>
         /// This is the lock free version of uninitilize so we can share 
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>
-        private static void InternalUninitialize()
+        private static void InternalUninitialize(bool cleanup = true)
         {
             // Update this first so IsInitialized immediately begins returning
             // false.  Since this method should be protected externally by 
@@ -299,7 +304,7 @@ namespace Orleans
             {
                 try
                 {
-                    RuntimeClient.Current.Reset();
+                    RuntimeClient.Current.Reset(cleanup);
                 }
                 catch (Exception) { }
 
@@ -359,10 +364,10 @@ namespace Orleans
         /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
         /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings 
         /// such as <c>Orleans.RequestContext</c> will be picked up.
+        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
+        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
         /// </summary>
         /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        /// <param name="request">Details of the method to be invoked, including InterfaceId and MethodId</param>
-        /// <param name="grain">The GrainReference this request is being sent through.</param>
         public static Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
 
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()

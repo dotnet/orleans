@@ -1,26 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
+using Orleans.GrainDirectory;
 using System;
 using System.Threading.Tasks;
 
@@ -34,6 +12,37 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
+        internal override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementContext context)
+        {
+
+  
+            // first, check if we can find an activation for this client in the cache or local directory partition
+            AddressesAndTag addresses;
+            if (context.FastLookup(target, out addresses))
+                return ChooseRandomActivation(addresses.Addresses, context);
+
+            // we need to look up the directory entry for this grain on a remote silo
+            switch (target.Category)
+            {
+                case UniqueKey.Category.Client:
+                    {
+                        addresses = await context.FullLookup(target);
+                        return ChooseRandomActivation(addresses.Addresses, context);
+                    }
+
+                case UniqueKey.Category.GeoClient:
+                    {
+                        // we need to look up the activations in the remote cluster
+                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
+                        return ChooseRandomActivation(addresses.Addresses, context);
+                    }
+
+                default:
+                    throw new InvalidOperationException("Unsupported client type. Grain " + target);
+            }
+        }
+
+
         internal override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {

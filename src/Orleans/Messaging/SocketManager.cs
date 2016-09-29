@@ -1,27 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using Orleans.Runtime.Configuration;
@@ -86,12 +64,20 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                WriteConnectionPreemble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreamble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
-                var foo = new byte[4];
-                s.BeginReceive(foo, 0, 1, SocketFlags.None, ReceiveCallback,
-                    new Tuple<Socket, IPEndPoint, SocketManager>(s, target, this));
+                var receiveAsyncEventArgs = new SocketAsyncEventArgs
+                {
+                    BufferList = new List<ArraySegment<byte>> { new ArraySegment<byte>(new byte[4]) },
+                    UserToken = new Tuple<Socket, IPEndPoint, SocketManager>(s, target, this)
+                };
+                receiveAsyncEventArgs.Completed += ReceiveCallback;
+                bool receiveCompleted = s.ReceiveAsync(receiveAsyncEventArgs);
                 NetworkingStatisticsGroup.OnOpenedSendingSocket();
+                if (!receiveCompleted)
+                {
+                    ReceiveCallback(this, receiveAsyncEventArgs);
+                }
             }
             catch (Exception)
             {
@@ -108,7 +94,7 @@ namespace Orleans.Runtime
             return s;
         }
 
-        internal static void WriteConnectionPreemble(Socket socket, GrainId grainId)
+        internal static void WriteConnectionPreamble(Socket socket, GrainId grainId)
         {
             int size = 0;
             byte[] grainIdByteArray = null;
@@ -135,32 +121,20 @@ namespace Orleans.Runtime
         // We start an asynch receive, with this callback, off of every send socket.
         // Since we should never see data coming in on these sockets, having the receive complete means that
         // the socket is in an unknown state and we should close it and try again.
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void ReceiveCallback(IAsyncResult result)
+        private static void ReceiveCallback(object sender, SocketAsyncEventArgs socketAsyncEventArgs)
         {
+            var t = socketAsyncEventArgs.UserToken as Tuple<Socket, IPEndPoint, SocketManager>;
             try
             {
-                var t = result.AsyncState as Tuple<Socket, IPEndPoint, SocketManager>;
-                if (t == null) return;
-                if (!t.Item3.cache.ContainsKey(t.Item2)) return;
-
-                try
-                {
-                    t.Item1.EndReceive(result);
-                }
-                catch (Exception)
-                {
-                    // ignore
-                }
-                finally
-                {
-                    // Resolve potential race condition with this cache entry being updated since ContainsKey was called. TFS 180717.
-                    t.Item3.InvalidateEntry(t.Item2);
-                }
+                t?.Item3.InvalidateEntry(t.Item2);
             }
             catch (Exception ex)
             {
-                TraceLogger.GetLogger("SocketManager", TraceLogger.LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, String.Format("ReceiveCallback: {0}",result), ex);
+                LogManager.GetLogger("SocketManager", LoggerType.Runtime).Error(ErrorCode.Messaging_Socket_ReceiveError, $"ReceiveCallback: {t?.Item2}", ex);
+            }
+            finally
+            {
+                socketAsyncEventArgs.Dispose();
             }
         }
 
@@ -219,6 +193,7 @@ namespace Orleans.Runtime
                 // Ignore
             }
 
+#if !NETSTANDARD
             try
             {
                 s.Disconnect(false);
@@ -227,7 +202,7 @@ namespace Orleans.Runtime
             {
                 // Ignore
             }
-
+#endif
             try
             {
                 s.Dispose();

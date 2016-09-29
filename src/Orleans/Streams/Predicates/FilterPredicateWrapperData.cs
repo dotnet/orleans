@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -36,7 +13,7 @@ namespace Orleans.Streams
     /// Predicate filter functions must be staic (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
     /// </summary>
     [Serializable]
-    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper
+    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper, ISerializable
     {
         public object FilterData { get; private set; }
 
@@ -88,7 +65,7 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            Type funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
+            Type funcClassType = TypeUtils.ResolveType(funcClassName);
             MethodInfo method = funcClassType.GetMethod(funcMethodName);
             StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
 #if DEBUG
@@ -102,7 +79,7 @@ namespace Orleans.Streams
 #if DEBUG
             CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
 #endif
-            MethodInfo method = pred.Method;
+            MethodInfo method = pred.GetMethodInfo();
             className = method.DeclaringType.FullName;
             methodName = method.Name;
         }
@@ -111,7 +88,6 @@ namespace Orleans.Streams
         /// Check that the user-supplied stream predicate function is valid.
         /// Stream predicate functions must be static and not abstract.
         /// </summary>
-        /// <param name="func"></param>
         private static void CheckFilterPredicateFunc(StreamFilterPredicate predicate)
         {
             if (predicate == null)
@@ -119,7 +95,7 @@ namespace Orleans.Streams
                 throw new ArgumentNullException("predicate", "Stream Filter predicate function must not be null.");
             }
 
-            MethodInfo method = predicate.Method;
+            MethodInfo method = predicate.GetMethodInfo();
 
             if (!method.IsStatic || method.IsAbstract)
             {

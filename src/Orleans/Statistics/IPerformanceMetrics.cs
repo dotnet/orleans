@@ -1,30 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime.Configuration;
 
 
@@ -32,34 +10,98 @@ namespace Orleans.Runtime
 {
     public interface ICorePerformanceMetrics
     {
+        /// <summary>
+        /// CPU utilization
+        /// </summary>
         float CpuUsage { get; }
+
+        /// <summary>
+        /// Amount of memory available to processes running on the machine
+        /// </summary>
         long AvailablePhysicalMemory { get; }
+
+        /// <summary>
+        /// Current memory usage
+        /// </summary>
         long MemoryUsage { get; }
+
+        /// <summary>
+        /// Amount of physical memory on the machine
+        /// </summary>
         long TotalPhysicalMemory { get; }
+
+        /// <summary>
+        /// the current size of the send queue (number of messages waiting to be sent). 
+        /// Only captures remote messages to other silos (not including messages to the clients).
+        /// </summary>
         int SendQueueLength { get; }
+
+        /// <summary>
+        /// the current size of the receive queue (number of messages that arrived to this silo and 
+        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
+        /// as well as from the clients.
+        /// </summary>
         int ReceiveQueueLength { get; }
+
+        /// <summary>
+        /// total number of remote messages sent to other silos as well as to the clients.
+        /// </summary>
         long SentMessages { get; }
+
+        /// <summary>
+        /// total number of remote received messages, from other silos as well as from the clients.
+        /// </summary>
         long ReceivedMessages { get; }
     }
 
+    /// <summary>
+    /// A small set of per-silo important key performance metrics
+    /// </summary>
     public interface ISiloPerformanceMetrics : ICorePerformanceMetrics
-    {
+    {   
+        /// <summary>
+        /// the current size of the receive queue (number of messages that arrived to this silo and 
+        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
+        /// as well as from the clients.
+        /// </summary>
         long RequestQueueLength { get; }
+
+        /// <summary>
+        /// number of activations on this silo
+        /// </summary>
         int ActivationCount { get; }
+
+        /// <summary>
+        /// Number of activations on this silo that were used in the last 10 minutes 
+        /// (Note: this number may currently not be accurate if different age limits 
+        /// are used for different grain types).
+        /// </summary>
         int RecentlyUsedActivationCount { get; }
+
+        /// <summary>
+        /// Number of currently connected clients
+        /// </summary>
         long ClientCount { get; }
-        // More TBD
 
-        bool IsOverloaded { get; }
+        /// <summary>
+        /// whether this silo is currently overloaded and is in the load shedding mode.
+        /// </summary>
+        bool IsOverloaded { get; } 
 
-        void LatchIsOverload(bool overloaded);
-        void UnlatchIsOverloaded();
-        void LatchCpuUsage(float value);
-        void UnlatchCpuUsage();
+        void LatchIsOverload(bool overloaded); // For testing only
+        void UnlatchIsOverloaded(); // For testing only
+        void LatchCpuUsage(float value); // For testing only
+        void UnlatchCpuUsage(); // For testing only
     }
 
+    /// <summary>
+    /// A small set of per-Orleans-client important key performance metrics.
+    /// </summary>
     public interface IClientPerformanceMetrics : ICorePerformanceMetrics
     {
+        /// <summary>
+        /// number of gateways that this client is currently connected to.
+        /// </summary>
         long ConnectedGatewayCount { get; }
     }
 
@@ -263,6 +305,30 @@ namespace Orleans.Runtime
     }
 
     [Serializable]
+    public class DetailedGrainStatistic
+    {
+        /// <summary>
+        /// The type of the grain for this DetailedGrainStatistic.
+        /// </summary>
+        public string GrainType { get; set; }
+
+        /// <summary>
+        /// The silo address for this DetailedGrainStatistic.
+        /// </summary>
+        public SiloAddress SiloAddress { get; set; }
+
+        /// <summary>
+        /// Unique Id for the grain.
+        /// </summary>
+        public IGrainIdentity GrainIdentity { get; set; }
+
+        /// <summary>
+        /// The grains Category
+        /// </summary>
+        public string Category { get; set; }
+    }
+
+    [Serializable]
     internal class DetailedGrainReport
     {
         public GrainId Grain { get; set; } 
@@ -278,20 +344,21 @@ namespace Orleans.Runtime
         {
             return string.Format(Environment.NewLine 
                 + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
-                + "   LocalCacheActivationAddresses={4}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={5}"  + Environment.NewLine
-                + "   PrimaryForGrain={6}" + Environment.NewLine 
-                + "   GrainClassTypeName={7}" + Environment.NewLine
+                + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
+                + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
+                + "   PrimaryForGrain={5}" + Environment.NewLine 
+                + "   GrainClassTypeName={6}" + Environment.NewLine
                 + "   LocalActivations:" + Environment.NewLine
-                + "{3}." + Environment.NewLine,
-                        Grain.ToDetailedString(), 
-                        SiloName,
-                        SiloAddress.ToLongString(),
-                        Utils.EnumerableToString(LocalCacheActivationAddresses),
-                        Utils.EnumerableToString(LocalDirectoryActivationAddresses),
-                        PrimaryForGrain,
-                        GrainClassTypeName, 
-                        Utils.EnumerableToString(LocalActivations, str => string.Format("      {0}", str), "\n"));
+                + "{7}." + Environment.NewLine,
+                    Grain.ToDetailedString(),                                   // {0}
+                    SiloName,                                                   // {1}
+                    SiloAddress.ToLongString(),                                 // {2}
+                    Utils.EnumerableToString(LocalCacheActivationAddresses),    // {3}
+                    Utils.EnumerableToString(LocalDirectoryActivationAddresses),// {4}
+                    PrimaryForGrain,                                            // {5}
+                    GrainClassTypeName,                                         // {6}
+                    Utils.EnumerableToString(LocalActivations,                  // {7}
+                        str => string.Format("      {0}", str), "\n"));
         }
     }
 }

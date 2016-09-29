@@ -1,33 +1,11 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-﻿using System.Linq;
-﻿using System.Runtime.Remoting.Messaging;
-﻿using Orleans.Serialization;
-
+using System.Linq;
+#if !NETSTANDARD_TODO
+using System.Runtime.Remoting.Messaging;
+#endif
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -52,6 +30,8 @@ namespace Orleans.Runtime
     /// </remarks>
     public static class RequestContext
     {
+        // TODO: We can potentially use AsyncLocal<T> instead of the logical call context, which is supported in .NET Standard
+
         /// <summary>
         /// Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
         /// </summary>
@@ -131,7 +111,9 @@ namespace Orleans.Runtime
                 {
                     activityIdObj = Guid.Empty;
                 }
+#if !NETSTANDARD_TODO
                 Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
+#endif
             }
             if (contextData != null && contextData.Count > 0)
             {
@@ -151,6 +133,7 @@ namespace Orleans.Runtime
         {
             Dictionary<string, object> values = GetContextData();
 
+#if !NETSTANDARD_TODO
             if (PropagateActivityId)
             {
                 Guid activityId = Trace.CorrelationManager.ActivityId;
@@ -162,6 +145,7 @@ namespace Orleans.Runtime
                     SetContextData(values);
                 }
             }
+#endif
             if (values != null && values.Count != 0)
                 return values.ToDictionary(kvp => kvp.Key, kvp => SerializationManager.DeepCopy(kvp.Value));
             return null;
@@ -170,17 +154,25 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
+#if !NETSTANDARD_TODO
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
+#endif
         }
 
         private static void SetContextData(Dictionary<string, object> values)
         {
+#if !NETSTANDARD_TODO
             CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
+#endif
         }
 
         private static Dictionary<string, object> GetContextData()
         {
+#if !NETSTANDARD_TODO
             return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
+#else
+            return null;
+#endif
         }
     }
 }

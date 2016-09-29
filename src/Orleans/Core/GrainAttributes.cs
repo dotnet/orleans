@@ -1,28 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
-
+using System.Linq;
+using System.Reflection;
+using Orleans.GrainDirectory;
 namespace Orleans
 {
     namespace Concurrency
@@ -106,6 +85,47 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
         public sealed class ImmutableAttribute : Attribute
         {
+        }
+    }
+
+    namespace MultiCluster
+    {
+        /// <summary>
+        /// base class for multi cluster registration strategies.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public abstract class RegistrationAttribute : Attribute
+        {
+            internal MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
+
+            internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
+            {
+                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class will have a single instance across all available clusters. Any requests in any clusters will be forwarded to the single activation instance.
+        /// </summary>
+        public class GlobalSingleInstanceAttribute : RegistrationAttribute
+        {
+            public GlobalSingleInstanceAttribute()
+                : base(GlobalSingleInstanceRegistration.Singleton)
+            {
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class
+        /// will have an independent instance for each cluster with 
+        /// no coordination. 
+        /// </summary>
+        public class OneInstancePerClusterAttribute : RegistrationAttribute
+        {
+            public OneInstancePerClusterAttribute()
+                : base(ClusterLocalRegistration.Singleton)
+            {
+            }
         }
     }
 
@@ -260,7 +280,7 @@ namespace Orleans
 
         internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
         {
-            var attribs = type.GetCustomAttributes(typeof(FactoryAttribute), inherit: true);
+            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
 
             // if no attributes are specified, we default to FactoryTypes.Grain.
             if (0 == attribs.Length)
@@ -302,8 +322,8 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]
     public sealed class ImplicitStreamSubscriptionAttribute : Attribute
     {
-        internal string Namespace { get; private set; }
-
+        public string Namespace { get; private set; }
+        
         // We have not yet come to an agreement whether the provider should be specified as well.
         public ImplicitStreamSubscriptionAttribute(string streamNamespace)
         {

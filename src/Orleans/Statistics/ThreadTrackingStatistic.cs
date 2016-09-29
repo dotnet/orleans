@@ -1,30 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
 using System.Linq;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -57,7 +34,6 @@ namespace Orleans.Runtime
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
         /// <param name="threadName">Name used for logging the collected stastistics</param>
-        /// <param name="storage"></param>
         public ThreadTrackingStatistic(string threadName)
         {
             
@@ -135,14 +111,14 @@ namespace Orleans.Runtime
         {
             float allThreads = allthreasCounters.Select(cs => cs.GetCurrentValue()).Sum();
             float numRequests = allNumRequestsCounter.GetCurrentValue();
-            if (numRequests == 0) return 0;
-            return allThreads/numRequests;
+            if (numRequests > 0) return allThreads / numRequests;
+            return 0;
         }
 
         public static void FirstClientConnectedStartTracking()
         {
             ClientConnected = true;
-            }
+        }
 
         /// <summary>
         /// Call once when the thread is started, must be called from the thread being tracked
@@ -204,7 +180,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Call once after processing multiple requests as a batch or a single request, must be called from the thread being tracked
         /// </summary>
-        /// <param name="num">Number of processed requests</param>
         public void OnStopProcessing()
         {
             // Only once a client has connected do we start tracking statistics
@@ -233,6 +208,8 @@ namespace Orleans.Runtime
 
         private void TrackContextSwitches()
         {
+#if !NETSTANDARD_TODO
+            // TODO: this temporary exclusion should be resolved by #2147
             PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
             PerformanceCounter[] performanceCountersForThisThread = null;
 
@@ -262,6 +239,7 @@ namespace Orleans.Runtime
                     FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
                 }
             }
+#endif
         }
     }
 }

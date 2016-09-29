@@ -1,37 +1,13 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.CodeGenerator.Utilities
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Runtime;
 
     /// <summary>
@@ -67,8 +43,9 @@ namespace Orleans.CodeGenerator.Utilities
             return
                 SyntaxFactory.ParseTypeName(
                     type.GetParseableName(
-                        includeNamespace: includeNamespace,
-                        includeGenericParameters: includeGenericParameters));
+                        new TypeFormattingOptions(
+                            includeNamespace: includeNamespace,
+                            includeGenericParameters: includeGenericParameters)));
         }
         
         /// <summary>
@@ -85,7 +62,9 @@ namespace Orleans.CodeGenerator.Utilities
         /// </returns>
         public static NameSyntax GetNameSyntax(this Type type, bool includeNamespace = true)
         {
-            return SyntaxFactory.ParseName(type.GetParseableName(includeNamespace: includeNamespace));
+            return
+                SyntaxFactory.ParseName(
+                    type.GetParseableName(new TypeFormattingOptions(includeNamespace: includeNamespace)));
         }
 
         /// <summary>
@@ -110,6 +89,43 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
+        /// Returns <see cref="ParenthesizedExpressionSyntax"/>  representing parenthesized binary expression of  <paramref name="bindingFlags"/>.
+        /// </summary>
+        /// <param name="operationKind">
+        /// The kind of the binary expression.
+        /// </param> 
+        /// <param name="bindingFlags">
+        /// The binding flags.
+        /// </param>
+        /// <returns>
+        /// <see cref="ParenthesizedExpressionSyntax"/> representing parenthesized binary expression of <paramref name="bindingFlags"/>.
+        /// </returns>
+        public static ParenthesizedExpressionSyntax GetBindingFlagsParenthesizedExpressionSyntax(SyntaxKind operationKind, params BindingFlags[] bindingFlags)
+        {
+            if (bindingFlags.Length < 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    "bindingFlags", 
+                    string.Format("Can't create parenthesized binary expression with {0} arguments", bindingFlags.Length));
+            }
+
+            var flags = SyntaxFactory.IdentifierName("System").Member("Reflection").Member("BindingFlags");
+            var bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                operationKind,
+                flags.Member(bindingFlags[0].ToString()),
+                flags.Member(bindingFlags[1].ToString()));
+            for (var i = 2; i < bindingFlags.Length; i++)
+            {
+                bindingFlagsBinaryExpression = SyntaxFactory.BinaryExpression(
+                    operationKind,
+                    bindingFlagsBinaryExpression,
+                    flags.Member(bindingFlags[i].ToString()));
+            }
+
+            return SyntaxFactory.ParenthesizedExpression(bindingFlagsBinaryExpression);
+        }
+
+        /// <summary>
         /// Returns <see cref="ArrayTypeSyntax"/> representing the array form of <paramref name="type"/>.
         /// </summary>
         /// <param name="type">
@@ -124,7 +140,9 @@ namespace Orleans.CodeGenerator.Utilities
         public static ArrayTypeSyntax GetArrayTypeSyntax(this Type type, bool includeNamespace = true)
         {
             return
-                SyntaxFactory.ArrayType(SyntaxFactory.ParseTypeName(type.GetParseableName(includeNamespace: includeNamespace)))
+                SyntaxFactory.ArrayType(
+                    SyntaxFactory.ParseTypeName(
+                        type.GetParseableName(new TypeFormattingOptions(includeNamespace: includeNamespace))))
                     .AddRankSpecifiers(
                         SyntaxFactory.ArrayRankSpecifier().AddSizes(SyntaxFactory.OmittedArraySizeExpression()));
         }
@@ -193,6 +211,24 @@ namespace Orleans.CodeGenerator.Utilities
         }
 
         /// <summary>
+        /// Returns the name of the provided parameter.
+        /// If the parameter has no name (possible in F#),
+        /// it returns a name computed by suffixing "arg" with the parameter's index
+        /// </summary>
+        /// <param name="parameter"> The parameter. </param>
+        /// <param name="parameterIndex"> The parameter index in the list of parameters. </param>
+        /// <returns> The parameter name. </returns>
+        public static string GetOrCreateName(this ParameterInfo parameter, int parameterIndex)
+        {
+            var argName = parameter.Name;
+            if (String.IsNullOrWhiteSpace(argName))
+            {
+                argName = String.Format(CultureInfo.InvariantCulture, "arg{0:G}", parameterIndex);
+            }
+            return argName;
+        }
+
+        /// <summary>
         /// Returns the parameter list syntax for the provided method.
         /// </summary>
         /// <param name="method">
@@ -206,8 +242,8 @@ namespace Orleans.CodeGenerator.Utilities
             return
                 method.GetParameters()
                     .Select(
-                        parameter =>
-                        SyntaxFactory.Parameter(parameter.Name.ToIdentifier())
+                        (parameter, parameterIndex) =>
+                        SyntaxFactory.Parameter(parameter.GetOrCreateName(parameterIndex).ToIdentifier())
                             .WithType(parameter.ParameterType.GetTypeSyntax()))
                     .ToArray();
         }
@@ -235,15 +271,15 @@ namespace Orleans.CodeGenerator.Utilities
         /// <summary>
         /// Returns type constraint syntax for the provided generic type argument.
         /// </summary>
-        /// <param name="genericTypeArgument">
+        /// <param name="type">
         /// The type.
         /// </param>
         /// <returns>
         /// Type constraint syntax for the provided generic type argument.
         /// </returns>
-        public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type genericTypeArgument)
+        public static TypeParameterConstraintClauseSyntax[] GetTypeConstraintSyntax(this Type type)
         {
-            var typeInfo = genericTypeArgument.GetTypeInfo();
+            var typeInfo = type.GetTypeInfo();
             if (typeInfo.IsGenericTypeDefinition)
             {
                 var constraints = new List<TypeParameterConstraintClauseSyntax>();
@@ -251,6 +287,8 @@ namespace Orleans.CodeGenerator.Utilities
                 {
                     var parameterConstraints = new List<TypeParameterConstraintSyntax>();
                     var attributes = genericParameter.GenericParameterAttributes;
+
+                    // The "class" or "struct" constraints must come first.
                     if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
                     {
                         parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
@@ -260,12 +298,21 @@ namespace Orleans.CodeGenerator.Utilities
                         parameterConstraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
                     }
 
+                    // Follow with the base class or interface constraints.
                     foreach (var genericType in genericParameter.GetGenericParameterConstraints())
                     {
+                        // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
+                        if (genericType == typeof(ValueType))
+                        {
+                            continue;
+                        }
+
                         parameterConstraints.Add(SyntaxFactory.TypeConstraint(genericType.GetTypeSyntax()));
                     }
 
-                    if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint))
+                    // The "new()" constraint must be the last constraint in the sequence.
+                    if (attributes.HasFlag(GenericParameterAttributes.DefaultConstructorConstraint)
+                        && !attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
                     {
                         parameterConstraints.Add(SyntaxFactory.ConstructorConstraint());
                     }

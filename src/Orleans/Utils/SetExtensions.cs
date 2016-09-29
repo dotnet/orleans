@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Orleans
 {
@@ -34,11 +10,7 @@ namespace Orleans
         /// Shortcut to create HashSet from IEnumerable that supports type inference
         /// (which the standard constructor does not)
         /// </summary>
-        /// <typeparam name="TK"></typeparam>
-        /// <typeparam name="TV"></typeparam>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The element type</typeparam>
         public static HashSet<T> ToSet<T>(this IEnumerable<T> values)
         {
             if (values == null)
@@ -147,7 +119,6 @@ namespace Orleans
         /// <typeparam name="TValue">Value type</typeparam>
         /// <param name="a">Dictionary</param>
         /// <param name="b">Dictionary</param>
-        /// <param name="copy">Return a copy of a value</param>
         /// <param name="sync">Synchronize two immutable values</param>
         private static void Synchronize2<TKey, TKey2, TValue>(this Dictionary<TKey, Dictionary<TKey2, TValue>> a, Dictionary<TKey, Dictionary<TKey2, TValue>> b, Func<TValue, TValue, TValue> sync)
         {
@@ -178,7 +149,7 @@ namespace Orleans
         /// <typeparam name="T"></typeparam>
         /// <param name="list"></param>
         /// <param name="toString">Can supply null to use Object.ToString()</param>
-        /// <param name="before">Before each element, or space if unspecified</param>
+        /// <param name="separator">Before each element, or space if unspecified</param>
         /// <returns></returns>
         public static string ToStrings<T>(this IEnumerable<T> list, Func<T, object> toString = null, string separator = " ")
         {

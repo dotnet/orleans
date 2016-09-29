@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -30,7 +7,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace Orleans
 {
@@ -181,16 +158,16 @@ namespace Orleans
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver
         {
-            return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
+            return Task.FromResult(CreateObjectReferenceImpl<TGrainObserverInterface>(obj));
         }
 
-        internal Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
+        internal TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
                 where TGrainObserverInterface : IAddressable
         {
             return CreateObjectReferenceImpl<TGrainObserverInterface>(obj);
         }
 
-        private Task<TGrainObserverInterface> CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
+        private TGrainObserverInterface CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj)
         {
             var interfaceType = typeof(TGrainObserverInterface);
             var interfaceTypeInfo = interfaceType.GetTypeInfo();
@@ -227,9 +204,7 @@ namespace Orleans
                         interfaceType));
             }
 
-            return
-                GrainReference.CreateObjectReference(obj, invoker)
-                    .ContinueWith(result => this.Cast<TGrainObserverInterface>(result.GetAwaiter().GetResult()));
+            return Cast<TGrainObserverInterface>(RuntimeClient.Current.CreateObjectReference(obj, invoker));
         }
 
         /// <summary>
@@ -243,14 +218,15 @@ namespace Orleans
         public Task DeleteObjectReference<TGrainObserverInterface>(
             IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
         {
-            return GrainReference.DeleteObjectReference(obj);
+            RuntimeClient.Current.DeleteObjectReference(obj);
+            return TaskDone.Done;
         }
 
         private static IGrainMethodInvoker MakeInvoker(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo(); 
             CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
-            var genericInterfaceType = typeInfo.IsConstructedGenericType
+            var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
 
@@ -261,7 +237,7 @@ namespace Orleans
                 return null;
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (interfaceType.IsConstructedGenericType)
             {
                 invokerType = invokerType.MakeGenericType(typeInfo.GenericTypeArguments);
             }
@@ -292,7 +268,7 @@ namespace Orleans
         {
             var typeInfo = interfaceType.GetTypeInfo();
             CodeGeneratorManager.GenerateAndCacheCodeForAssembly(typeInfo.Assembly);
-            var genericInterfaceType = typeInfo.IsConstructedGenericType
+            var genericInterfaceType = interfaceType.IsConstructedGenericType
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
 
@@ -304,7 +280,7 @@ namespace Orleans
                     string.Format("Cannot find generated GrainReference class for interface '{0}'", interfaceType));
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (interfaceType.IsConstructedGenericType)
             {
                 grainReferenceType = grainReferenceType.MakeGenericType(typeInfo.GenericTypeArguments);
             }
@@ -341,7 +317,7 @@ namespace Orleans
                     Expression.Constant(interfaceType),
                     createLambda,
                     grainRefParameter,
-                    Expression.Constant(GrainInterfaceData.GetGrainInterfaceId(interfaceType)));
+                    Expression.Constant(GrainInterfaceUtils.GetGrainInterfaceId(interfaceType)));
 
             // Compile and return the reference casting lambda.
             var lambda = Expression.Lambda<GrainReferenceCaster>(body, grainRefParameter);
@@ -393,13 +369,14 @@ namespace Orleans
 
         internal static void FindSupportClasses(Type type)
         {
-            var invokerAttr = type.GetCustomAttribute<MethodInvokerAttribute>(false);
+            var typeInfo = type.GetTypeInfo();
+            var invokerAttr = typeInfo.GetCustomAttribute<MethodInvokerAttribute>(false);
             if (invokerAttr != null)
             {
                 GrainToInvokerMapping.TryAdd(invokerAttr.GrainType, type);
             }
             
-            var grainReferenceAttr = type.GetCustomAttribute<GrainReferenceAttribute>(false);
+            var grainReferenceAttr = typeInfo.GetCustomAttribute<GrainReferenceAttribute>(false);
             if (grainReferenceAttr != null)
             {
                 GrainToReferenceMapping.TryAdd(grainReferenceAttr.GrainType, type);

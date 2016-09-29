@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -42,7 +19,7 @@ namespace Orleans.Runtime
         private readonly object nextTicketLock;
         private DateTime nextTicket;
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public ActivationCollector(ClusterConfiguration config)
         {
@@ -56,7 +33,7 @@ namespace Orleans.Runtime
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = TraceLogger.GetLogger("ActivationCollector", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationCollector", LoggerType.Runtime);
         }
 
         public TimeSpan Quantum { get { return quantum; } }
@@ -216,7 +193,7 @@ namespace Orleans.Runtime
                     ApproximateCount, 
                     buckets.Count,       
                     Utils.EnumerableToString(
-                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => (Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items").ToString(CultureInfo.InvariantCulture)));
+                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
         }
 
         /// <summary>
@@ -267,7 +244,7 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
                                 "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
                                 "For now going to defer it's collection. Activation: {1}",
-                                TraceLogger.PrintDate(now),
+                                LogFormatter.PrintDate(now),
                                 activation.ToDetailedString());
                             ScheduleCollection(activation);
                         }
@@ -355,9 +332,9 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            if (Silo.CurrentSilo.TestHookup.Debug_OnDecideToCollectActivation != null)
+            if (Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation != null)
             {
-                Silo.CurrentSilo.TestHookup.Debug_OnDecideToCollectActivation(activation.Grain);
+                Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation(activation.Grain);
             }
         }
 

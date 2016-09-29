@@ -1,27 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
+using System.Collections.Concurrent;
 
 
 namespace Orleans.Runtime.Messaging
@@ -29,8 +7,8 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly RuntimeQueue<Message>[] messageQueues;
-        private readonly TraceLogger log;
+        private readonly BlockingCollection<Message>[] messageQueues;
+        private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
         public int Count
@@ -48,12 +26,12 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue()
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            messageQueues = new RuntimeQueue<Message>[n];
+            messageQueues = new BlockingCollection<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
-                messageQueues[i] = new RuntimeQueue<Message>();
+                messageQueues[i] = new BlockingCollection<Message>();
                 if (StatisticsCollector.CollectQueueStats)
                 {
                     var queueName = "IncomingMessageAgent." + category;
@@ -62,7 +40,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 i++;
             }
-            log = TraceLogger.GetLogger("Orleans.Messaging.InboundMessageQueue");
+            log = LogManager.GetLogger("Orleans.Messaging.InboundMessageQueue");
         }
 
         public void Stop()
@@ -79,8 +57,6 @@ namespace Orleans.Runtime.Messaging
 
         public void PostMessage(Message msg)
         {
-            if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueIncoming);
-
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectQueueStats)
             {

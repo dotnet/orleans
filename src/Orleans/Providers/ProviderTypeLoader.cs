@@ -1,30 +1,6 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -38,7 +14,7 @@ namespace Orleans.Providers
 
         private static readonly List<ProviderTypeLoader> managers;
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ProviderTypeLoader", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
 
         static ProviderTypeLoader()
         {
@@ -81,9 +57,9 @@ namespace Orleans.Providers
             }
         }
 
-        private void ProcessType(Type type)
+        private void ProcessType(TypeInfo typeInfo)
         {
-            var typeInfo = type.GetTypeInfo();
+            var type = typeInfo.AsType();
             if (alreadyProcessed.Contains(type) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(type)) return;
 
             alreadyProcessed.Add(type);
@@ -97,7 +73,7 @@ namespace Orleans.Providers
 
             try
             {
-                foreach (var type in assembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(assembly, logger))
                 {
                     ProcessType(type);
                 }
@@ -118,7 +94,7 @@ namespace Orleans.Providers
                 // We assume that it's better to fetch and iterate through the list of types once,
                 // and the list of TypeManagers many times, rather than the other way around.
                 // Certainly it can't be *less* efficient to do it this way.
-                foreach (var type in args.LoadedAssembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(args.LoadedAssembly, logger))
                 {
                     foreach (var mgr in managers)
                     {

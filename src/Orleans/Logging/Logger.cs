@@ -1,28 +1,4 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -35,77 +11,49 @@ namespace Orleans.Runtime
     public abstract class Logger
     {
         /// <summary> Current SeverityLevel set for this logger. </summary>
-        public abstract Severity SeverityLevel
-        {
-            get;
-        }
+        public abstract Severity SeverityLevel { get; }
 
-        public static ConcurrentBag<ITelemetryConsumer> TelemetryConsumers { get; set; }
+        /// <summary>
+        /// Name of logger instance
+        /// </summary>
+        public abstract string Name { get; }
 
+        /// <summary>
+        /// Find existing or create new Logger with the specified name
+        /// </summary>
+        /// <param name="loggerName">Name of the Logger to find or create</param>
+        /// <returns>Logger associated with the specified name</returns>
+        public abstract Logger GetLogger(string loggerName);
+
+        /// <summary>
+        /// Log message
+        /// </summary>
+        /// <param name="errorCode"></param>
+        /// <param name="sev"></param>
+        /// <param name="format"></param>
+        /// <param name="args"></param>
+        /// <param name="exception"></param>
+        public abstract void Log(int errorCode, Severity sev, string format, object[] args, Exception exception);
 
         /// <summary> Whether the current SeverityLevel would output <c>Warning</c> messages for this logger. </summary>
         [DebuggerHidden]
-        public bool IsWarning
-        {
-            get { return SeverityLevel >= Severity.Warning; }
-        }
+        public bool IsWarning => SeverityLevel >= Severity.Warning;
 
         /// <summary> Whether the current SeverityLevel would output <c>Info</c> messages for this logger. </summary>
         [DebuggerHidden]
-        public bool IsInfo
-        {
-            get { return SeverityLevel >= Severity.Info; }
-        }
+        public bool IsInfo => SeverityLevel >= Severity.Info;
 
         /// <summary> Whether the current SeverityLevel would output <c>Verbose</c> messages for this logger. </summary>
         [DebuggerHidden]
-        public bool IsVerbose
-        {
-            get { return SeverityLevel >= Severity.Verbose; }
-        }
+        public bool IsVerbose => SeverityLevel >= Severity.Verbose;
 
         /// <summary> Whether the current SeverityLevel would output <c>Verbose2</c> messages for this logger. </summary>
         [DebuggerHidden]
-        public bool IsVerbose2
-        {
-            get { return SeverityLevel >= Severity.Verbose2; }
-        }
+        public bool IsVerbose2 => SeverityLevel >= Severity.Verbose2;
 
         /// <summary> Whether the current SeverityLevel would output <c>Verbose3</c> messages for this logger. </summary>
         [DebuggerHidden]
-        public bool IsVerbose3
-        {
-            get { return SeverityLevel >= Severity.Verbose3; }
-        }
-
-        /// <summary> Output the specified message at <c>Verbose</c> log level. </summary>
-        public abstract void Verbose(string format, params object[] args);
-
-        /// <summary> Output the specified message at <c>Verbose2</c> log level. </summary>
-        public abstract void Verbose2(string format, params object[] args);
-
-        /// <summary> Output the specified message at <c>Verbose3</c> log level. </summary>
-        public abstract void Verbose3(string format, params object[] args);
-
-        /// <summary> Output the specified message at <c>Info</c> log level. </summary>
-        public abstract void Info(string format, params object[] args);
-
-#region Public log methods using int LogCode categorization.
-        /// <summary> Output the specified message and Exception at <c>Error</c> log level with the specified log id value. </summary>
-        public abstract void Error(int logCode, string message, Exception exception = null);
-        /// <summary> Output the specified message at <c>Warning</c> log level with the specified log id value. </summary>
-        public abstract void Warn(int logCode, string format, params object[] args);
-        /// <summary> Output the specified message and Exception at <c>Warning</c> log level with the specified log id value. </summary>
-        public abstract void Warn(int logCode, string message, Exception exception);
-        /// <summary> Output the specified message at <c>Info</c> log level with the specified log id value. </summary>
-        public abstract void Info(int logCode, string format, params object[] args);
-        /// <summary> Output the specified message at <c>Verbose</c> log level with the specified log id value. </summary>
-        public abstract void Verbose(int logCode, string format, params object[] args);
-        /// <summary> Output the specified message at <c>Verbose2</c> log level with the specified log id value. </summary>
-        public abstract void Verbose2(int logCode, string format, params object[] args);
-        /// <summary> Output the specified message at <c>Verbose3</c> log level with the specified log id value. </summary>
-        public abstract void Verbose3(int logCode, string format, params object[] args);
-        #endregion
+        public bool IsVerbose3 => SeverityLevel >= Severity.Verbose3;
 
         #region APM Methods
 

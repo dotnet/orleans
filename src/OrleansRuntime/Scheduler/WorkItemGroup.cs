@@ -1,33 +1,8 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
-
-using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime.Scheduler
@@ -43,8 +18,8 @@ namespace Orleans.Runtime.Scheduler
             Shutdown = 3
         }
 
-        private static readonly TraceLogger appLogger = TraceLogger.GetLogger("Scheduler.WorkItemGroup", TraceLogger.LoggerType.Runtime);
-        private readonly TraceLogger log;
+        private static readonly Logger appLogger = LogManager.GetLogger("Scheduler.WorkItemGroup", LoggerType.Runtime);
+        private readonly Logger log;
         private readonly OrleansTaskScheduler masterScheduler;
         private WorkGroupStatus state;
         private readonly Object lockable;
@@ -165,7 +140,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskRunner = new ActivationTaskScheduler(this);
-            log = IsSystemPriority ? TraceLogger.GetLogger("Scheduler." + Name + ".WorkItemGroup", TraceLogger.LoggerType.Runtime) : appLogger;
+            log = IsSystemPriority ? LogManager.GetLogger("Scheduler." + Name + ".WorkItemGroup", LoggerType.Runtime) : appLogger;
 
             if (StatisticsCollector.CollectShedulerQueuesStats)
             {
@@ -446,7 +421,7 @@ namespace Orleans.Runtime.Scheduler
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total EnQueued={1}; Total processed={2}; Quantum expirations={3}; ",
                     WorkItemCount, totalItemsEnQueued, totalItemsProcessed, quantumExpirations);
          
-                if (AverageQueueLenght != 0)
+                if (AverageQueueLenght > 0)
                 {
                     sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
                     if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)
@@ -466,7 +441,7 @@ namespace Orleans.Runtime.Scheduler
 
         private void ReportWorkGroupProblemWithBacktrace(string what, ErrorCode errorCode)
         {
-            var st = new StackTrace();
+            var st = Utils.GetStackTrace();
             var msg = string.Format("{0} {1}", what, DumpStatus());
             log.Warn(errorCode, msg + Environment.NewLine + " Called from " + st);
         }

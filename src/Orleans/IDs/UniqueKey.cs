@@ -1,31 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
-
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -46,6 +22,7 @@ namespace Orleans.Runtime
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
+            GeoClient = 7,
         }
 
         public UInt64 N0 { get; private set; }
@@ -83,7 +60,11 @@ namespace Orleans.Runtime
 
         public bool HasKeyExt
         {
-            get { return IdCategory == Category.KeyExtGrain; }
+            get {
+                var category = IdCategory;
+                return category == Category.KeyExtGrain       
+                    || category == Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
+            }
         }
 
         internal static readonly UniqueKey Empty =
@@ -135,7 +116,7 @@ namespace Orleans.Runtime
             // 0x0 and not useful for identification of the grain.
             if (n1 == 0 && n1 != 0)
                 throw new ArgumentException("n0 cannot be zero unless n1 is non-zero.", "n0");
-            if (category != Category.KeyExtGrain && keyExt != null)
+            if (category != Category.KeyExtGrain && category != Category.GeoClient && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
 
             var typeCodeData = ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
@@ -243,6 +224,16 @@ namespace Orleans.Runtime
             return PrimaryKeyToGuid(out unused);
         }
 
+        public string ClusterId
+        {
+            get
+            {
+                if (IdCategory != Category.GeoClient)
+                    throw new InvalidOperationException("ClusterId is only defined for geo clients");
+                return this.KeyExt;
+            }
+        }
+
         public override bool Equals(object o)
         {
             return o is UniqueKey && Equals((UniqueKey)o);
@@ -343,7 +334,7 @@ namespace Orleans.Runtime
                     }
                 }
             }
-            else if (null != keyExt)
+            else if (category != Category.GeoClient && null != keyExt)
             {
                 throw new ArgumentException("Extended key field is not null in non-extended UniqueIdentifier.");
             }

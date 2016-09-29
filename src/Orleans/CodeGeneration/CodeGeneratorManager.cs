@@ -1,33 +1,9 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 namespace Orleans.CodeGeneration
 {
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
     using System.Reflection;
-
     using Orleans.Runtime;
 
     /// <summary>
@@ -41,27 +17,34 @@ namespace Orleans.CodeGeneration
         private const string CodeGenAssemblyName = "OrleansCodeGenerator";
 
         /// <summary>
-        /// The runtime code generator.
-        /// </summary>
-        private static readonly Lazy<IRuntimeCodeGenerator> CodeGeneratorInstance =
-            new Lazy<IRuntimeCodeGenerator>(LoadCodeGenerator);
-
-        /// <summary>
-        /// The code generator cache.
-        /// </summary>
-        private static readonly Lazy<ICodeGeneratorCache> CodeGeneratorCacheInstance =
-            new Lazy<ICodeGeneratorCache>(LoadCodeGeneratorCache);
-
-        /// <summary>
         /// The log.
         /// </summary>
-        private static readonly TraceLogger Log = TraceLogger.GetLogger("CodeGenerator");
+        private static readonly Logger Log = LogManager.GetLogger("CodeGenerator");
 
         /// <summary>
         /// Empty generated assemblies.
         /// </summary>
-        private static readonly ReadOnlyDictionary<string, byte[]> EmptyGeneratedAssemblies =
-            new ReadOnlyDictionary<string, byte[]>(new Dictionary<string, byte[]>());
+        private static readonly ReadOnlyDictionary<string, GeneratedAssembly> EmptyGeneratedAssemblies =
+            new ReadOnlyDictionary<string, GeneratedAssembly>(new Dictionary<string, GeneratedAssembly>());
+
+        /// <summary>
+        /// The runtime code generator.
+        /// </summary>
+        private static IRuntimeCodeGenerator codeGeneratorInstance;
+
+        /// <summary>
+        /// The code generator cache.
+        /// </summary>
+        private static ICodeGeneratorCache codeGeneratorCacheInstance;
+
+        /// <summary>
+        /// Loads the code generator on demand
+        /// </summary>
+        public static void Initialize()
+        {
+            codeGeneratorInstance = LoadCodeGenerator();
+            codeGeneratorCacheInstance = codeGeneratorInstance as ICodeGeneratorCache;
+        }
 
         /// <summary>
         /// Ensures code for the <paramref name="input"/> assembly has been generated and loaded.
@@ -71,10 +54,9 @@ namespace Orleans.CodeGeneration
         /// </param>
         public static void GenerateAndCacheCodeForAssembly(Assembly input)
         {
-            var codeGen = CodeGeneratorInstance.Value;
-            if (codeGen != null)
+            if (codeGeneratorInstance != null)
             {
-                codeGen.GenerateAndLoadForAssembly(input);
+                codeGeneratorInstance.GenerateAndLoadForAssembly(input);
             }
         }
 
@@ -83,10 +65,9 @@ namespace Orleans.CodeGeneration
         /// </summary>
         public static void GenerateAndCacheCodeForAllAssemblies()
         {
-            var codeGen = CodeGeneratorInstance.Value;
-            if (codeGen != null)
+            if (codeGeneratorInstance != null)
             {
-                codeGen.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
+                codeGeneratorInstance.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
             }
         }
 
@@ -94,12 +75,11 @@ namespace Orleans.CodeGeneration
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
         /// </summary>
         /// <returns>The collection of generated assemblies.</returns>
-        public static IDictionary<string, byte[]> GetGeneratedAssemblies()
+        public static IDictionary<string, GeneratedAssembly> GetGeneratedAssemblies()
         {
-            var codeGen = CodeGeneratorCacheInstance.Value;
-            if (codeGen != null)
+            if (codeGeneratorCacheInstance != null)
             {
-                return codeGen.GetGeneratedAssemblies();
+                return codeGeneratorCacheInstance.GetGeneratedAssemblies();
             }
 
             return EmptyGeneratedAssemblies;
@@ -114,18 +94,17 @@ namespace Orleans.CodeGeneration
         /// <param name="generatedAssembly">
         /// The generated assembly.
         /// </param>
-        public static void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly)
+        public static void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly)
         {
-            var codeGen = CodeGeneratorCacheInstance.Value;
-            if (codeGen != null)
+            if (codeGeneratorCacheInstance != null)
             {
-                codeGen.AddGeneratedAssembly(targetAssemblyName, generatedAssembly);
+                codeGeneratorCacheInstance.AddGeneratedAssembly(targetAssemblyName, generatedAssembly);
             }
             else
             {
                 Log.Warn(
                     ErrorCode.CodeGenDllMissing,
-                    "CodeGenerationManager.AddCachedAssembly called but no code geenrator has been loaded.");
+                    "CodeGenerationManager.AddCachedAssembly called but no code generator has been loaded.");
             }
         }
 
@@ -135,7 +114,7 @@ namespace Orleans.CodeGeneration
         /// <returns>The code generator.</returns>
         private static IRuntimeCodeGenerator LoadCodeGenerator()
         {
-            var result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log);
+            IRuntimeCodeGenerator result = AssemblyLoader.TryLoadAndCreateInstance<IRuntimeCodeGenerator>(CodeGenAssemblyName, Log);
             if (result == null)
             {
                 Log.Warn(
@@ -144,15 +123,6 @@ namespace Orleans.CodeGeneration
             }
 
             return result;
-        }
-
-        /// <summary>
-        /// Loads the code generator cache.
-        /// </summary>
-        /// <returns>The code generator cache, or <see langword="null"/> if none was loaded.</returns>
-        private static ICodeGeneratorCache LoadCodeGeneratorCache()
-        {
-            return CodeGeneratorInstance.Value as ICodeGeneratorCache;
         }
     }
 }

@@ -1,22 +1,19 @@
-﻿using System;
+﻿#if !NETSTANDARD_TODO
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#if !DNXCORE50
+#if !NETSTANDARD
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
     {
-        private TraceLogger logger;
-        public void Initialize(TraceLogger logger)
+        private Logger logger;
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
@@ -127,4 +124,5 @@ namespace Orleans.Serialization
         }
     }
 }
+#endif
 #endif

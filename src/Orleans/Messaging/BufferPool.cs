@@ -1,29 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -31,12 +9,16 @@ namespace Orleans.Runtime
     internal class BufferPool
     {
         private readonly int byteBufferSize;
-        private readonly BlockingCollection<byte[]> buffers;
+        private readonly int maxBuffersCount;
+        private readonly bool limitBuffersCount;
+        private readonly ConcurrentBag<byte[]> buffers;
         private readonly CounterStatistic allocatedBufferCounter;
         private readonly CounterStatistic checkedOutBufferCounter;
         private readonly CounterStatistic checkedInBufferCounter;
         private readonly CounterStatistic droppedBufferCounter;
         private readonly CounterStatistic droppedTooLargeBufferCounter;
+
+        private int currentBufferCount;
 
         public static BufferPool GlobalPool;
 
@@ -66,11 +48,15 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="bufferSize">The size, in bytes, of each buffer.</param>
         /// <param name="maxBuffers">The maximum number of buffers to keep around, unused; by default, the number of unused buffers is unbounded.</param>
+        /// <param name="preallocationSize">Initial number of buffers to allocate.</param>
+        /// <param name="name">Name of the buffer pool.</param>
         private BufferPool(int bufferSize, int maxBuffers, int preallocationSize, string name)
         {
             Name = name;
             byteBufferSize = bufferSize;
-            buffers = maxBuffers <= 0 ? new BlockingCollection<byte[]>() : new BlockingCollection<byte[]>(maxBuffers);
+            maxBuffersCount = maxBuffers;
+            limitBuffersCount = maxBuffers > 0;
+            buffers = new ConcurrentBag<byte[]>();
 
             var globalPoolSizeStat = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_BUFFERS_INPOOL,
                                                                     () => Count);
@@ -105,6 +91,11 @@ namespace Orleans.Runtime
                 buffer = new byte[byteBufferSize];
                 allocatedBufferCounter.Increment();
             }
+            else if (limitBuffersCount)
+            {
+                Interlocked.Decrement(ref currentBufferCount);
+            }
+
             checkedOutBufferCounter.Increment();
 
             return buffer;
@@ -126,14 +117,20 @@ namespace Orleans.Runtime
         {
             if (buffer.Length == byteBufferSize)
             {
-                if (buffers.TryAdd(buffer))
-                {
-                    checkedInBufferCounter.Increment();
-                }
-                else
+                if (limitBuffersCount && currentBufferCount > maxBuffersCount)
                 {
                     droppedBufferCounter.Increment();
+                    return;
                 }
+
+                buffers.Add(buffer);
+
+                if (limitBuffersCount)
+                {
+                    Interlocked.Increment(ref currentBufferCount);
+                }
+
+                checkedInBufferCounter.Increment();
             }
             else
             {

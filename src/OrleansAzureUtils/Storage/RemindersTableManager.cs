@@ -1,40 +1,16 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.AzureUtils;
 using Microsoft.WindowsAzure.Storage.Table;
-                                     
+using Orleans.AzureUtils;
+
 
 namespace Orleans.Runtime.ReminderService
-{    
+{
     internal class ReminderTableEntry : TableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey
@@ -117,13 +93,13 @@ namespace Orleans.Runtime.ReminderService
             }
             catch (TimeoutException te)
             {
-                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
+                string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
                 singleton.Logger.Error(ErrorCode.AzureTable_38, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception ex)
             {
-                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
                 singleton.Logger.Error(ErrorCode.AzureTable_39, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
@@ -202,13 +178,9 @@ namespace Orleans.Runtime.ReminderService
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        private async Task<List<Tuple<ReminderTableEntry, string>>> FindAllReminderEntries()
+        private Task<List<Tuple<ReminderTableEntry, string>>> FindAllReminderEntries()
         {
-            Expression<Func<ReminderTableEntry, bool>> query =
-                instance => instance.ServiceId.Equals(ReminderTableEntry.ConstructServiceIdStr(ServiceId));
-
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
-            return queryResults.ToList();
+            return FindReminderEntries(0, 0);
         }
 
         internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)

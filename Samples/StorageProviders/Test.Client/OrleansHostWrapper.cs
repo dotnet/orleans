@@ -1,30 +1,11 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
 using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Reflection;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
-namespace Test.Client
+namespace Host
 {
     internal class OrleansHostWrapper : IDisposable
     {
@@ -93,15 +74,12 @@ namespace Test.Client
 
         private void Init()
         {
-            siloHost.LoadOrleansConfig();
         }
 
         private bool ParseArguments(string[] args)
         {
-            bool debug = false;
             string deploymentId = null;
 
-            string configFileName = "DevTestServerConfiguration.xml";
             string siloName = Dns.GetHostName(); // Default to machine name
 
             int argPos = 1;
@@ -118,9 +96,6 @@ namespace Test.Client
                         case "-help":
                             // Query usage help
                             return false;
-                        case "/debug":
-                            debug = true;
-                            break;
                         default:
                             Console.WriteLine("Bad command line arguments supplied: " + a);
                             return false;
@@ -139,10 +114,6 @@ namespace Test.Client
                         case "deploymentid":
                             deploymentId = split[1];
                             break;
-                        case "deploymentgroup":
-                            // TODO: Remove this at some point in future
-                            Console.WriteLine("Ignoring deprecated command line argument: " + a);
-                            break;
                         default:
                             Console.WriteLine("Bad command line arguments supplied: " + a);
                             return false;
@@ -154,11 +125,6 @@ namespace Test.Client
                     siloName = a;
                     argPos++;
                 }
-                else if (argPos == 2)
-                {
-                    configFileName = a;
-                    argPos++;
-                }
                 else
                 {
                     // Too many command line arguments
@@ -167,8 +133,23 @@ namespace Test.Client
                 }
             }
 
-            siloHost = new SiloHost(siloName);
-            siloHost.ConfigFileName = configFileName;
+            var config = ClusterConfiguration.LocalhostPrimarySilo();
+
+            //Comment out either one of these
+
+            //JSON Files
+            var props = new Dictionary<string, string>();
+            props["RootDirectory"] = @".\Samples.FileStorage";
+            config.Globals.RegisterStorageProvider<Samples.StorageProviders.OrleansFileStorage>("TestStore", props);
+
+//            //MongoDB
+//            var props = new Dictionary<string, string>();
+//            props["Database"] = "orleanssamples";
+//            props["ConnectionString"] = "mongodb://localhost:27017/";
+//            config.Globals.RegisterStorageProvider<Samples.StorageProviders.MongoDBStorage>("TestStore", props);
+
+            siloHost = new SiloHost(siloName, config);
+
             if (deploymentId != null)
                 siloHost.DeploymentId = deploymentId;
 
@@ -182,7 +163,6 @@ namespace Test.Client
     OrleansHost.exe [<siloName> [<configFile>]] [DeploymentId=<idString>] [/debug]
 Where:
     <siloName>      - Name of this silo in the Config file list (optional)
-    <configFile>    - Path to the Config file to use (optional)
     DeploymentId=<idString> 
                     - Which deployment group this host instance should run in (optional)
     /debug          - Turn on extra debug output during host startup (optional)");

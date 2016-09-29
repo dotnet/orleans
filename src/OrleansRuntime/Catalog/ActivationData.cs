@@ -1,36 +1,14 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Orleans.CodeGeneration;
+using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
-using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
 {
@@ -46,7 +24,7 @@ namespace Orleans.Runtime
         // defined for the grain class.
         // Note that in all cases we never have more than one copy of an actual invoker;
         // we may have a ExtensionInvoker per activation, in the worst case.
-        private class ExtensionInvoker : IGrainMethodInvoker
+        private class ExtensionInvoker : IGrainMethodInvoker, IGrainExtensionMap
         {
             // Because calls to ExtensionInvoker are allways made within the activation context,
             // we rely on the single-threading guarantee of the runtime and do not protect the map with a lock.
@@ -122,19 +100,17 @@ namespace Orleans.Runtime
             /// The base invoker will throw an appropriate exception if the request is not recognized.
             /// </summary>
             /// <param name="grain"></param>
-            /// <param name="interfaceId"></param>
-            /// <param name="methodId"></param>
-            /// <param name="arguments"></param>
+            /// <param name="request"></param>
             /// <returns></returns>
-            public Task<object> Invoke(IAddressable grain, int interfaceId, int methodId, object[] arguments)
+            public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
             {
-                if (extensionMap == null || !extensionMap.ContainsKey(interfaceId))
+                if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
                     throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", interfaceId));
+                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
 
-                var invoker = extensionMap[interfaceId].Item2;
-                var extension = extensionMap[interfaceId].Item1;
-                return invoker.Invoke(extension, interfaceId, methodId, arguments);
+                var invoker = extensionMap[request.InterfaceId].Item2;
+                var extension = extensionMap[request.InterfaceId].Item1;
+                return invoker.Invoke(extension, request);
             }
 
             public bool IsExtensionInstalled(int interfaceId)
@@ -145,6 +121,29 @@ namespace Orleans.Runtime
             public int InterfaceId
             {
                 get { return 0; } // 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
+            }
+
+            /// <summary>
+            /// Gets the extension from this instance if it is available.
+            /// </summary>
+            /// <param name="interfaceId">The interface id.</param>
+            /// <param name="extension">The extension.</param>
+            /// <returns>
+            /// <see langword="true"/> if the extension is found, <see langword="false"/> otherwise.
+            /// </returns>
+            public bool TryGetExtension(int interfaceId, out IGrainExtension extension)
+            {
+                Tuple<IGrainExtension, IGrainExtensionMethodInvoker> value;
+                if (extensionMap != null && extensionMap.TryGetValue(interfaceId, out value))
+                {
+                    extension = value.Item1;
+                }
+                else
+                {
+                    extension = null;
+                }
+
+                return extension != null;
             }
         }
 
@@ -157,7 +156,7 @@ namespace Orleans.Runtime
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
         private HashSet<GrainTimer> timers;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
@@ -166,18 +165,18 @@ namespace Orleans.Runtime
             nodeConfiguration = nodeConfig;
         }
 
-        public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, IActivationCollector collector, TimeSpan ageLimit)
+        public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, MultiClusterRegistrationStrategy registrationStrategy, IActivationCollector collector, TimeSpan ageLimit)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
             if (null == collector) throw new ArgumentNullException("collector");
 
-            logger = TraceLogger.GetLogger("ActivationData", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-
+            RegistrationStrategy = registrationStrategy;
             if (!Grain.IsSystemTarget && !Constants.IsSystemGrain(Grain))
             {
                 this.collector = collector;
@@ -395,9 +394,13 @@ namespace Orleans.Runtime
 
         public PlacementStrategy PlacedUsing { get; private set; }
 
-        // currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
+        public MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
+
+        // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
 
+        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
+        internal bool IsUsingGrainDirectory { get { return !IsStatelessWorker; } }
 
         public Message Running { get; private set; }
 
@@ -512,14 +515,14 @@ namespace Orleans.Runtime
                 return true;
             }
         }
- 
+
         /// <summary>
         /// Check whether this activation is overloaded. 
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
-        /// <param name="log">TraceLogger to use for reporting any overflow condition</param>
+        /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(TraceLogger log)
+        public LimitExceededException CheckOverloaded(Logger log)
         {
             LimitValue limitValue = GetMaxEnqueuedRequestLimit();
 
@@ -565,7 +568,7 @@ namespace Orleans.Runtime
             if (maxEnqueuedRequestsLimit != null) return maxEnqueuedRequestsLimit;
             if (GrainInstanceType != null)
             {
-                string limitName = CodeGeneration.GrainInterfaceData.IsStatelessWorker(GrainInstanceType)
+                string limitName = CodeGeneration.GrainInterfaceUtils.IsStatelessWorker(GrainInstanceType.GetTypeInfo())
                     ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER
                     : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
                 maxEnqueuedRequestsLimit = nodeConfiguration.LimitManager.GetLimit(limitName); // Cache for next time

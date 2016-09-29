@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,6 +10,12 @@ namespace Orleans.Runtime
     /// </summary>
     internal class SafeTimerBase : IDisposable
     {
+        private const string asyncTimerName = "asynTask.SafeTimerBase";
+        private const string syncTimerName = "sync.SafeTimerBase";
+
+        private static readonly Logger asyncLogger = LogManager.GetLogger(asyncTimerName, LoggerType.Runtime);
+        private static readonly Logger syncLogger = LogManager.GetLogger(syncTimerName, LoggerType.Runtime);
+
         private Timer               timer;
         private Func<object, Task>  asynTaskCallback;
         private TimerCallback       syncCallbackFunc;
@@ -41,7 +24,7 @@ namespace Orleans.Runtime
         private bool                timerStarted;
         private DateTime            previousTickTime;
         private int                 totalNumTicks;
-        private TraceLogger         logger;
+        private Logger      logger;
 
         internal SafeTimerBase(Func<object, Task> asynTaskCallback, object state)
         {
@@ -90,8 +73,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
 
-            logger = TraceLogger.GetLogger(GetFullName(), TraceLogger.LoggerType.Runtime);
-
+            logger = syncCallbackFunc != null ? syncLogger : asyncLogger;
             if (logger.IsVerbose) logger.Verbose(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
@@ -141,15 +123,12 @@ namespace Orleans.Runtime
         private string GetFullName()
         {
             // the type information is really useless and just too long. 
-            string name;
             if (syncCallbackFunc != null)
-                name = "sync";
-            else if (asynTaskCallback != null)
-                name = "asynTask";
-            else
-                throw new InvalidOperationException("invalid SafeTimerBase state");
+                return syncTimerName;
+            if (asynTaskCallback != null)
+                return asyncTimerName;
 
-            return String.Format("{0}.SafeTimerBase", name);
+            throw new InvalidOperationException("invalid SafeTimerBase state");
         }
 
         public bool CheckTimerFreeze(DateTime lastCheckTime, Func<string> callerName)
@@ -159,7 +138,7 @@ namespace Orleans.Runtime
         }
 
         public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
-                        TimeSpan dueTime, TimeSpan timerFrequency, TraceLogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
+                        TimeSpan dueTime, TimeSpan timerFrequency, Logger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
             TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;
             TimeSpan exceptedTimeToNexTick = totalNumTicks == 0 ? dueTime : timerFrequency;
@@ -178,7 +157,7 @@ namespace Orleans.Runtime
             var errMsg = String.Format("{0}{1} did not fire on time. Last fired at {2}, {3} since previous fire, should have fired after {4}.",
                 freezeCheck ? "Watchdog Freeze Alert: " : "-", // 0
                 getName == null ? "" : getName(),   // 1
-                TraceLogger.PrintDate(previousTickTime), // 2
+                LogFormatter.PrintDate(previousTickTime), // 2
                 timeSinceLastTick,                  // 3
                 exceptedTimeToNexTick);             // 4
 

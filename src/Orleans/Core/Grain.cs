@@ -1,27 +1,4 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
- //#define REREAD_STATE_AFTER_WRITE_FAILED
+//#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System;
 using System.Collections.Generic;
@@ -29,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -41,10 +17,6 @@ namespace Orleans
     {
         private IGrainRuntime runtime;
 
-        internal GrainState GrainState { get; set; }
-
-        internal IStorage Storage { get; set; }
-
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
@@ -53,19 +25,17 @@ namespace Orleans
 
         internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
-        internal IGrainRuntime Runtime
+        internal IGrainRuntime Runtime { get; set; }
+
+        protected IGrainFactory GrainFactory 
         {
-            get { return runtime; }
-            set
-            {
-                runtime = value;
-                GrainFactory = value.GrainFactory;
-            }
+            get { return Runtime.GrainFactory; }
         }
 
-        protected IGrainFactory GrainFactory { get; private set; }
-
-        protected IServiceProvider ServiceProvider { get; private set; }
+        protected IServiceProvider ServiceProvider 
+        {
+            get { return Runtime.ServiceProvider; }
+        }
 
         internal IGrainIdentity Identity;
 
@@ -82,14 +52,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
         {
             Identity = identity;
             Runtime = runtime;
-            GrainFactory = runtime.GrainFactory;
-            ServiceProvider = runtime.ServiceProvider;
         }
 
         
@@ -257,7 +223,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
-            return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
+            return Runtime.GetLogger(loggerName);
         }
 
         /// <summary>
@@ -281,16 +247,19 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain
-        where TGrainState : GrainState
+    public class Grain<TGrainState> : Grain, IStatefulGrain
     {
+        private readonly GrainState<TGrainState> grainState;
+
+        private IStorage storage;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
         /// Client code should use the GrainFactory to get a reference to a Grain.
         /// </summary>
-        protected Grain() : base()
+        protected Grain()
         {
+            grainState = new GrainState<TGrainState>();
         }
 
         /// <summary>
@@ -298,14 +267,11 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="state"></param>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
-            GrainState = state;
-            Storage = storage;
+            grainState = new GrainState<TGrainState>(state);
+            this.storage = storage;
         }
 
         /// <summary>
@@ -313,22 +279,37 @@ namespace Orleans
         /// </summary>
         protected TGrainState State
         {
-            get { return base.GrainState as TGrainState; }
+            get { return grainState.State; }
+            set { grainState.State = value; }
+        }
+        
+        void IStatefulGrain.SetStorage(IStorage storage)
+        {
+            this.storage = storage;
         }
 
+        IGrainState IStatefulGrain.GrainState
+        {
+            get { return grainState; }
+        }
+
+        /// <summary>Clear the current grain state data from backing store.</summary>
         protected virtual Task ClearStateAsync()
         {
-            return Storage.ClearStateAsync();
+            return storage.ClearStateAsync();
         }
 
+        /// <summary>Write of the current grain state data into backing store.</summary>
         protected virtual Task WriteStateAsync()
         {
-            return Storage.WriteStateAsync();
+            return storage.WriteStateAsync();
         }
 
+        /// <summary>Read the current grain state data from backing store.</summary>
+        /// <remarks>Any previous contents of the grain state data will be overwritten.</remarks>
         protected virtual Task ReadStateAsync()
         {
-            return Storage.ReadStateAsync();
+            return storage.ReadStateAsync();
         }
     }
 }

@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +21,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
-        private readonly TraceLogger                logger;
+        private readonly Logger logger;
 
         public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, bool isRewindable)
         {
@@ -52,7 +29,7 @@ namespace Orleans.Streams
             if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
             if (pubSub == null) throw new ArgumentNullException("pubSub");
 
-            logger = TraceLogger.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), LoggerType.Runtime);
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
@@ -76,7 +53,9 @@ namespace Orleans.Streams
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
-            
+            if (observer is GrainReference)
+                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", "observer");
+
             if (logger.IsVerbose) logger.Verbose("Subscribe Observer={0} Token={1}", observer, token);
             await BindExtensionLazy();
 
@@ -88,9 +67,30 @@ namespace Orleans.Streams
                 pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.StreamId, myGrainReference);
-            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
 
-            return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            // Optimistic Concurrency: 
+            // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
+            // and only if it succeeds store it locally (myExtension.SetObserver). 
+            // Basicaly, those 2 operations should be done as one atomic transaction - either both or none and isolated from concurrent reads.
+            // BUT: there is a distributed race here: the first msg may arrive before the call is awaited 
+            // (since the pubsub notifies the producer that may immideately produce)
+            // and will thus not find the subriptionHandle in the extension, basically violating "isolation". 
+            // Therefore, we employ Optimistic Concurrency Control here to guarantee isolation: 
+            // we optimisticaly store subscriptionId in the handle first before calling pubSub.RegisterConsumer
+            // and undo it in the case of failure. 
+            // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
+            // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
+            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            try
+            {
+                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
+                return subriptionHandle;
+            } catch(Exception)
+            {
+                // Undo the previous call myExtension.SetObserver.
+                myExtension.RemoveObserver(subscriptionId);
+                throw;
+            }            
         }
 
         public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
@@ -141,7 +141,7 @@ namespace Orleans.Streams
             await BindExtensionLazy();
 
             List<GuidId> subscriptionIds = await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream))
+            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream, IsRewindable))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
 
@@ -164,7 +164,7 @@ namespace Orleans.Streams
 
             } catch (Exception exc)
             {
-                logger.Warn((int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+                logger.Warn(ErrorCode.StreamProvider_ConsumerFailedToUnregister,
                     "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
             }
             myExtension = null;
@@ -191,7 +191,7 @@ namespace Orleans.Streams
                     {
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
                         var tup = await providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                            () => new StreamConsumerExtension(providerRuntime));
+                            () => new StreamConsumerExtension(providerRuntime, IsRewindable));
                         myExtension = tup.Item1;
                         myGrainReference = tup.Item2;
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        

@@ -1,36 +1,13 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-
+using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    #pragma warning disable 1574
+#pragma warning disable 1574
     /// <summary>
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>
@@ -163,5 +140,46 @@ namespace Orleans.Providers
             string s;
             return config.Properties.TryGetValue(key, out s) ? Type.GetType(s) : settingDefault;
         }
+
+        public static bool GetBoolProperty(this IProviderConfiguration config, string key, bool settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? bool.Parse(s) : settingDefault;
+        }
+
+        public static TimeSpan GetTimeSpanProperty(this IProviderConfiguration config, string key, TimeSpan settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
+        }
+    }
+
+    /// <summary>
+    /// Exception thrown whenever a provider has failed to be initialized.
+    /// </summary>
+    [Serializable]
+    public class ProviderInitializationException : OrleansException
+    {
+        public ProviderInitializationException()
+        { }
+        public ProviderInitializationException(string msg)
+            : base(msg)
+        { }
+        public ProviderInitializationException(string msg, Exception exc)
+            : base(msg, exc)
+        { }
+#if !NETSTANDARD
+        protected ProviderInitializationException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+#endif
     }
 }

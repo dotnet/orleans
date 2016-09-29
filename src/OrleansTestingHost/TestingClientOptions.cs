@@ -1,44 +1,39 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost
 {
+    /// <summary> Client options to use in <see cref="TestingSiloHost"/> </summary>
     public class TestingClientOptions
     {
+        /// <summary> Default path for the client config file </summary>
         public const string DEFAULT_CLIENT_CONFIG_FILE = "ClientConfigurationForTesting.xml";
 
+        /// <summary> Get or set the client config file </summary>
         public FileInfo ClientConfigFile { get; set; }
+
+        /// <summary> Get or set the response timeout </summary>
         public TimeSpan ResponseTimeout { get; set; }
+
+        /// <summary> If set to true the property <see cref="PreferedGatewayIndex"/> will be used </summary>
         public bool ProxiedGateway { get; set; }
+
+        /// <summary> Get or set the list of gateways to use </summary>
         public List<IPEndPoint> Gateways { get; set; }
+
+        /// <summary> The index in <see cref="Gateways"/> list to use as the prefered gateway </summary>
         public int PreferedGatewayIndex { get; set; }
+
+        /// <summary> If set to truem the activity id will be propagated </summary>
         public bool PropagateActivityId { get; set; }
 
+        /// <summary> Delegate to apply transformation to the client configuration </summary>
+        public Action<ClientConfiguration> AdjustConfig { get; set; }
+
+        /// <summary> Construct a new TestingClientOptions using default value </summary>
         public TestingClientOptions()
         {
             // all defaults except:
@@ -47,6 +42,8 @@ namespace Orleans.TestingHost
             ClientConfigFile = new FileInfo(DEFAULT_CLIENT_CONFIG_FILE);
         }
 
+        /// <summary> Copy the current TestingClientOptions </summary>
+        /// <returns>A copy of the target</returns>
         public TestingClientOptions Copy()
         {
             return new TestingClientOptions

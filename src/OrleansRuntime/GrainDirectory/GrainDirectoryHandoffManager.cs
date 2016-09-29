@@ -1,35 +1,9 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
-
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -44,27 +18,26 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, GlobalConfiguration config)
         {
-            logger = TraceLogger.GetLogger(this.GetType().FullName);
+            logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
             lastPromise = new Dictionary<SiloAddress, Task>();
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         internal List<ActivationAddress> GetHandedOffInfo(GrainId grain)
         {
-            foreach (var partition in directoryPartitionsMap.Values)
+            lock (this)
             {
-                var result = partition.LookUpGrain(grain);
-                if (result != null)
+                foreach (var partition in directoryPartitionsMap.Values)
                 {
-                    // Force the list to be created in order to avoid race conditions
-                    return result.Item1.Select(pair => ActivationAddress.GetAddress(pair.Item1, grain, pair.Item2)).ToList();
+                    var result = partition.LookUpActivations(grain);
+                    if (result.Addresses != null)
+                        return result.Addresses;
                 }
             }
             return null;
@@ -120,7 +93,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory.SchedulingContext);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -137,42 +110,47 @@ namespace Orleans.Runtime.GrainDirectory
             await Task.WhenAll(tasks);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         internal void ProcessSiloRemoveEvent(SiloAddress removedSilo)
         {
-            if (logger.IsVerbose) logger.Verbose("Processing silo remove event for " + removedSilo);
-
-            // Reset our follower list to take the changes into account
-            ResetFollowers();
-
-            // check if this is one of our successors (i.e., if I hold this silo's copy)
-            // (if yes, adjust local and/or handoffed directory partitions)
-            if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
-
-            // at least one predcessor should exist, which is me
-            SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
-            if (localDirectory.MyAddress.Equals(predecessor))
+            lock (this)
             {
-                if (logger.IsVerbose) logger.Verbose("Merging my partition with the copy of silo " + removedSilo);
-                // now I am responsible for this directory part
-                localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
-                // no need to send our new partition to all others, as they
-                // will realize the change and combine their copies without any additional communication (see below)
+                if (logger.IsVerbose) logger.Verbose("Processing silo remove event for " + removedSilo);
+
+                // Reset our follower list to take the changes into account
+                ResetFollowers();
+
+                // check if this is one of our successors (i.e., if I hold this silo's copy)
+                // (if yes, adjust local and/or handoffed directory partitions)
+                if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
+
+                // at least one predcessor should exist, which is me
+                SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
+                if (localDirectory.MyAddress.Equals(predecessor))
+                {
+                    if (logger.IsVerbose) logger.Verbose("Merging my partition with the copy of silo " + removedSilo);
+                    // now I am responsible for this directory part
+                    localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
+                    // no need to send our new partition to all others, as they
+                    // will realize the change and combine their copies without any additional communication (see below)
+                }
+                else
+                {
+                    if (logger.IsVerbose) logger.Verbose("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
+                    // adjust copy for the predecessor of the failed silo
+                    directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
+                }
+                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
+                if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
+                directoryPartitionsMap.Remove(removedSilo);
             }
-            else
-            {
-                if (logger.IsVerbose) logger.Verbose("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
-                // adjust copy for the predecessor of the failed silo
-                directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
-            }
-            if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
-            directoryPartitionsMap.Remove(removedSilo);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         internal void ProcessSiloStoppingEvent()
         {
-            ProcessSiloStoppingEvent_Impl();
+            lock (this)
+            {
+                ProcessSiloStoppingEvent_Impl();
+            }
         }
 
         private async void ProcessSiloStoppingEvent_Impl()
@@ -198,88 +176,89 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
         {
-            if (logger.IsVerbose) logger.Verbose("Processing silo add event for " + addedSilo);
-
-            // Reset our follower list to take the changes into account
-            ResetFollowers();
-
-            // check if this is one of our successors (i.e., if I should hold this silo's copy)
-            // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
-            // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
-            List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
-            if (!successors.Contains(addedSilo)) return;
-
-            // check if this is an immediate successor
-            if (successors[0].Equals(addedSilo))
+            lock (this)
             {
-                // split my local directory and send to my new immediate successor his share
-                if (logger.IsVerbose) logger.Verbose("Splitting my partition between me and " + addedSilo);
-                GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
-                    grain =>
-                    {
-                        var s = localDirectory.CalculateTargetSilo(grain);
-                        return (s != null) && !localDirectory.MyAddress.Equals(s);
-                    }, false);
-                List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
-                List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
+                if (logger.IsVerbose) logger.Verbose("Processing silo add event for " + addedSilo);
 
-                if (splitPartListSingle.Count > 0)
-                {
-                    if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
-                    localDirectory.Scheduler.QueueTask(async () =>
-                    {
-                        await localDirectory.GetDirectoryReference(successors[0]).RegisterManySingleActivation(
-                            splitPartListSingle, LocalGrainDirectory.NUM_RETRIES);
-                        splitPartListSingle.ForEach(
-                            activationAddress =>
-                                localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                    }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
-                }
+                // Reset our follower list to take the changes into account
+                ResetFollowers();
 
-                if (splitPartListMulti.Count > 0)
+                // check if this is one of our successors (i.e., if I should hold this silo's copy)
+                // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
+                // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
+                List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
+                if (!successors.Contains(addedSilo)) return;
+
+                // check if this is an immediate successor
+                if (successors[0].Equals(addedSilo))
                 {
-                    if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
-                    localDirectory.Scheduler.QueueTask(async () =>
+                    // split my local directory and send to my new immediate successor his share
+                    if (logger.IsVerbose) logger.Verbose("Splitting my partition between me and " + addedSilo);
+                    GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
+                        grain =>
+                        {
+                            var s = localDirectory.CalculateTargetSilo(grain);
+                            return (s != null) && !localDirectory.MyAddress.Equals(s);
+                        }, false);
+                    List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
+                    List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
+
+                    if (splitPartListSingle.Count > 0)
                     {
-                        await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti);
-                        splitPartListMulti.ForEach(
-                            activationAddress =>
-                                localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                    }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
-                }
-            }
-            else
-            {
-                // adjust partitions by splitting them accordingly between new and old silos
-                SiloAddress predecessorOfNewSilo = localDirectory.FindPredecessors(addedSilo, 1)[0];
-                if (!directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
-                {
-                    // we should have the partition of the predcessor of our new successor
-                    logger.Warn(ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
+                        if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
+                        localDirectory.Scheduler.QueueTask(async () =>
+                        {
+                            await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListSingle, singleActivation:true);
+                            splitPartListSingle.ForEach(
+                                activationAddress =>
+                                    localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
+                    }
+
+                    if (splitPartListMulti.Count > 0)
+                    {
+                        if (logger.IsVerbose) logger.Verbose("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
+                        localDirectory.Scheduler.QueueTask(async () =>
+                        {
+                            await localDirectory.GetDirectoryReference(successors[0]).RegisterMany(splitPartListMulti, singleActivation:false);
+                            splitPartListMulti.ForEach(
+                                activationAddress =>
+                                    localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
+                    }
                 }
                 else
                 {
-                    if (logger.IsVerbose) logger.Verbose("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
-                    GrainDirectoryPartition splitPart = directoryPartitionsMap[predecessorOfNewSilo].Split(
-                        grain =>
-                        {
-                            // Need to review the 2nd line condition.
-                            var s = localDirectory.CalculateTargetSilo(grain);
-                            return (s != null) && !predecessorOfNewSilo.Equals(s);
-                        }, true);
-                    directoryPartitionsMap[addedSilo] = splitPart;
+                    // adjust partitions by splitting them accordingly between new and old silos
+                    SiloAddress predecessorOfNewSilo = localDirectory.FindPredecessors(addedSilo, 1)[0];
+                    if (!directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
+                    {
+                        // we should have the partition of the predcessor of our new successor
+                        logger.Warn(ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
+                    }
+                    else
+                    {
+                        if (logger.IsVerbose) logger.Verbose("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
+                        GrainDirectoryPartition splitPart = directoryPartitionsMap[predecessorOfNewSilo].Split(
+                            grain =>
+                            {
+                                // Need to review the 2nd line condition.
+                                var s = localDirectory.CalculateTargetSilo(grain);
+                                return (s != null) && !predecessorOfNewSilo.Equals(s);
+                            }, true);
+                        directoryPartitionsMap[addedSilo] = splitPart;
+                    }
                 }
+
+                // remove partition of one of the old successors that we do not need to now
+                SiloAddress oldSuccessor = directoryPartitionsMap.FirstOrDefault(pair => !successors.Contains(pair.Key)).Key;
+                if (oldSuccessor == null) return;
+
+                if (logger.IsVerbose) logger.Verbose("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
+                directoryPartitionsMap.Remove(oldSuccessor);
             }
-
-            // remove partition of one of the old successors that we do not need to now
-            SiloAddress oldSuccessor = directoryPartitionsMap.FirstOrDefault(pair => !successors.Contains(pair.Key)).Key;
-            if (oldSuccessor == null) return;
-
-            if (logger.IsVerbose) logger.Verbose("Removing copy of the directory partition of silo " + oldSuccessor + " (holding copy of " + addedSilo + " instead)");
-            directoryPartitionsMap.Remove(oldSuccessor);
         }
 
         internal void AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy)
@@ -307,6 +286,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 directoryPartitionsMap[source].Update(partition);
             }
+
+            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
         }
 
         internal void RemoveHandoffPartition(SiloAddress source)
@@ -331,7 +312,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
         }
     }
 }

@@ -1,29 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Threading.Tasks;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Counters
@@ -32,9 +8,9 @@ namespace Orleans.Runtime.Counters
     {
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private PerfCountersStatistics perfCountersPublisher;
+        private CountersStatistics countersPublisher;
         internal SiloPerformanceMetrics MetricsTable;
-        private readonly TraceLogger logger = TraceLogger.GetLogger("SiloStatisticsManager");
+        private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
         internal SiloStatisticsManager(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig)
         {
@@ -47,7 +23,7 @@ namespace Orleans.Runtime.Counters
             runtimeStats = new RuntimeStatisticsGroup();
             logStatistics = new LogStatistics(nodeConfig.StatisticsLogWriteInterval, true);
             MetricsTable = new SiloPerformanceMetrics(runtimeStats, nodeConfig);
-            perfCountersPublisher = new PerfCountersStatistics(nodeConfig.StatisticsPerfCountersWriteInterval);
+            countersPublisher = new CountersStatistics(nodeConfig.StatisticsPerfCountersWriteInterval);
         }
 
         internal async Task SetSiloMetricsTableDataManager(Silo silo, NodeConfiguration nodeConfig)
@@ -138,7 +114,7 @@ namespace Orleans.Runtime.Counters
 
         internal void Start(NodeConfiguration config)
         {
-            perfCountersPublisher.Start();
+            countersPublisher.Start();
             logStatistics.Start();
             runtimeStats.Start();
             // Start performance metrics publisher
@@ -153,9 +129,9 @@ namespace Orleans.Runtime.Counters
             if (MetricsTable != null)
                 MetricsTable.Dispose();
             MetricsTable = null;
-            if (perfCountersPublisher != null)
-                perfCountersPublisher.Stop();
-            perfCountersPublisher = null;
+            if (countersPublisher != null)
+                countersPublisher.Stop();
+            countersPublisher = null;
             if (logStatistics != null)
             {
                 logStatistics.Stop();

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <SeedNode Address="localhost" Port="11111" />
+  </Globals>
+  <Defaults>
+    <Networking Address="localhost" Port="0" />
+    <Tracing DefaultTraceLevel="Info" TraceToConsole="false" TraceToFile="{0}.log" />
+  </Defaults>
+</OrleansConfiguration>

@@ -1,26 +1,3 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -85,7 +62,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         /// <param name="xmlElement"></param>
         /// <param name="logger"></param>
-        public void Load(XmlElement xmlElement, TraceLogger logger)
+        public void Load(XmlElement xmlElement, Logger logger)
         {
             bool found = false;
             foreach (XmlNode node in xmlElement.ChildNodes)
@@ -131,7 +108,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Returns the time period used to collect in-active activations of a given type.
         /// </summary>
-        /// <param name="type">Grain type full name.</param>
+        /// <param name="grainTypeFullName">Grain type full name.</param>
         /// <returns></returns>
         public TimeSpan GetCollectionAgeLimit(string grainTypeFullName)
         {
@@ -186,12 +163,11 @@ namespace Orleans.Runtime.Configuration
         /// Resets the time period to collect in-active activations for a given type to a default value.
         /// </summary>
         /// <param name="type">Grain type full name.</param>
-        /// <param name="ageLimit">The age limit to use.</param>
         public void ResetCollectionAgeLimitToDefault(Type type)
         {
             if (type == null)
             {
-                throw new ArgumentNullException("type");
+                throw new ArgumentNullException(nameof(type));
             }
             ResetCollectionAgeLimitToDefault(type.FullName);
         }
@@ -199,13 +175,12 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// Resets the time period to collect in-active activations for a given type to a default value.
         /// </summary>
-        /// <param name="type">Grain type full name string.</param>
-        /// <param name="ageLimit">The age limit to use.</param>
+        /// <param name="grainTypeFullName">Grain type full name.</param>
         public void ResetCollectionAgeLimitToDefault(string grainTypeFullName)
         {
             if (String.IsNullOrEmpty(grainTypeFullName))
             {
-                throw new ArgumentNullException("grainTypeFullName");
+                throw new ArgumentNullException(nameof(grainTypeFullName));
             }
             GrainTypeConfiguration config;
             if (!classSpecific.TryGetValue(grainTypeFullName, out config)) return;
@@ -228,7 +203,7 @@ namespace Orleans.Runtime.Configuration
             if (timeSpan < TimeSpan.Zero) throw new ArgumentOutOfRangeException(paramName);
         }
 
-        internal void ValidateConfiguration(TraceLogger logger)
+        internal void ValidateConfiguration(Logger logger)
         {
             foreach (GrainTypeConfiguration config in classSpecific.Values)
             {
@@ -304,6 +279,8 @@ namespace Orleans.Runtime.Configuration
             SetCollectionAgeLimit(ageLimit);
         }
 
+        /// <summary>Sets a custom collection age limit for a grain type.</summary>
+        /// <param name="ageLimit">Age limit for this type.</param>
         public void SetCollectionAgeLimit(TimeSpan? ageLimit)
         {
             if (ageLimit == null)
@@ -316,18 +293,18 @@ namespace Orleans.Runtime.Configuration
             {
                 if (GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT)
                 {
-                    throw new ArgumentException(string.Format("The AgeLimit attribute is required to be at least {0}.", minAgeLimit));
+                    throw new ArgumentOutOfRangeException($"The AgeLimit attribute is required to be at least {minAgeLimit}.");
                 }
             }
             collectionAgeLimit = ageLimit;
         }
 
         /// <summary>
-        /// Load this configuratin from xml element.
+        /// Load this configuration from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
         /// <param name="logger"></param>
-        public static GrainTypeConfiguration Load(XmlElement xmlElement, TraceLogger logger)
+        public static GrainTypeConfiguration Load(XmlElement xmlElement, Logger logger)
         {
             string fullTypeName = null;
             bool areDefaults = xmlElement.LocalName == "Defaults";
@@ -367,7 +344,7 @@ namespace Orleans.Runtime.Configuration
             throw new InvalidOperationException(string.Format("empty GrainTypeConfiguration for {0}", fullTypeName == null ? "defaults" : fullTypeName));
         }
 
-        internal void ValidateConfiguration(TraceLogger logger)
+        internal void ValidateConfiguration(Logger logger)
         {
             if (AreDefaults) return;
 
@@ -391,7 +368,7 @@ namespace Orleans.Runtime.Configuration
             }
             var typeInfo = type.GetTypeInfo();
             // postcondition: returned type must implement IGrain.
-            if (!typeof(IGrain).GetTypeInfo().IsAssignableFrom(type))
+            if (!typeof(IGrain).IsAssignableFrom(type))
             {
                 string errStr = String.Format("Type {0} must implement IGrain to be used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_3, errStr);

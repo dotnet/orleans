@@ -1,33 +1,7 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -38,26 +12,50 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueStreamProviderUtils
     {
         /// <summary>
-        /// Helper method for testing.
+        /// Helper method for testing. Deletes all the queues used by the specifed stream provider.
         /// </summary>
-        /// <param name="providerName"></param>
-        /// <param name="deploymentId"></param>
-        /// <param name="storageConnectionString"></param>
-        /// <param name="logger"></param>
-        /// <returns></returns>
-        public static async Task DeleteAllUsedAzureQueues(string providerName, string deploymentId, string storageConnectionString, Logger logger)
+        /// <param name="providerName">The Azure Queue stream privider name.</param>
+        /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
+        /// <param name="storageConnectionString">The azure storage connection string.</param>
+        public static async Task DeleteAllUsedAzureQueues(string providerName, string deploymentId, string storageConnectionString)
         {
             if (deploymentId != null)
             {
-                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.NumQueuesDefaultValue, providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
-                if (logger != null) logger.Info("About to delete all {0} Stream Queues\n", allQueues.Count);
+                var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
                     var manager = new AzureQueueDataManager(queueId.ToString(), deploymentId, storageConnectionString);
-                    await manager.DeleteQueue();
+                    deleteTasks.Add(manager.DeleteQueue());
                 }
+
+                await Task.WhenAll(deleteTasks);
+            }
+        }
+
+        /// <summary>
+        /// Helper method for testing. Clears all messages in all the queues used by the specifed stream provider.
+        /// </summary>
+        /// <param name="providerName">The Azure Queue stream privider name.</param>
+        /// <param name="deploymentId">The deployment ID hosting the stream provider.</param>
+        /// <param name="storageConnectionString">The azure storage connection string.</param>
+        public static async Task ClearAllUsedAzureQueues(string providerName, string deploymentId, string storageConnectionString)
+        {
+            if (deploymentId != null)
+            {
+                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.NumQueuesDefaultValue, providerName);
+                List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
+
+                var deleteTasks = new List<Task>();
+                foreach (var queueId in allQueues)
+                {
+                    var manager = new AzureQueueDataManager(queueId.ToString(), deploymentId, storageConnectionString);
+                    deleteTasks.Add(manager.ClearQueue());
+                }
+
+                await Task.WhenAll(deleteTasks);
             }
         }
     }

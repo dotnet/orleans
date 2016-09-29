@@ -1,26 +1,3 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Serialization;
@@ -63,7 +40,15 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         public virtual void SetPartitionKey(string deploymentId)
         {
-            PartitionKey = String.Format("DeliveryFailure_{0}_{1}", StreamProviderName, deploymentId);
+            PartitionKey = MakeDefaultPartitionKey(StreamProviderName, deploymentId);
+        }
+
+        /// <summary>
+        /// Default partition key
+        /// </summary>
+        public static string MakeDefaultPartitionKey(string streamProviderName, string deploymentId)
+        {
+            return $"DeliveryFailure_{streamProviderName}_{deploymentId}";
         }
 
         /// <summary>
@@ -71,7 +56,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         public virtual void SetRowkey()
         {
-            RowKey = String.Format("{0:x16}_{1}", ReverseOrderTimestampTicks(), Guid.NewGuid());
+            RowKey = $"{ReverseOrderTimestampTicks():x16}_{Guid.NewGuid()}";
         }
 
         /// <summary>
@@ -102,20 +87,20 @@ namespace Orleans.Providers.Streams.PersistentStreams
         ///  key with some other field (stream namespace?).
         /// </remarks>
         /// <returns></returns>
-        static protected long ReverseOrderTimestampTicks()
+        protected static long ReverseOrderTimestampTicks()
         {
             var now = DateTime.UtcNow;
             return DateTime.MaxValue.Ticks - now.Ticks;
         }
 
-        static private byte[] GetTokenBytes(StreamSequenceToken token)
+        private static byte[] GetTokenBytes(StreamSequenceToken token)
         {
             var bodyStream = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(token, bodyStream);
             return bodyStream.ToByteArray();
         }
 
-        static private StreamSequenceToken TokenFromBytes(byte[] bytes)
+        private static StreamSequenceToken TokenFromBytes(byte[] bytes)
         {
             var stream = new BinaryTokenStreamReader(bytes);
             return SerializationManager.Deserialize<StreamSequenceToken>(stream);

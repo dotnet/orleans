@@ -1,32 +1,10 @@
-﻿/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.SqlUtils
@@ -46,6 +24,20 @@ namespace Orleans.SqlUtils
         /// The invariant name of the connector for this database.
         /// </summary>
         private readonly string invariantName;
+
+        /// <summary>
+        /// If the ADO.NET provider of this storage supports cancellation or not. This
+        /// capability is queried and the the result is cached here.
+        /// </summary>
+        private readonly bool supportsCommandCancellation;
+
+        /// <summary>
+        /// If the underlying ADO.NET implementation is natively asynchronous
+        /// (the ADO.NET Db*.XXXAsync classes are overriden) or not.
+        /// </summary>
+        private readonly bool isSynchronousAdoNetImplementation;
+
+
         /// <summary>
         /// The invariant name of the connector for this database.
         /// </summary>
@@ -99,6 +91,8 @@ namespace Orleans.SqlUtils
         /// <param name="query">Executes a given statement. Especially intended to use with <em>SELECT</em> statement.</param>        
         /// <param name="parameterProvider">Adds parameters to the query. Parameter names must match those defined in the query.</param>
         /// <param name="selector">This function transforms the raw <see cref="IDataRecord"/> results to type <see paramref="TResult"/> the <see cref="int"/> parameter being the resultset number.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
+        /// <param name="commandBehavior">The command behavior that should be used. Defaults to <see cref="CommandBehavior.Default"/>.</param>
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
         /// <example>This sample shows how to make a hand-tuned database call.
         /// <code>
@@ -139,7 +133,7 @@ namespace Orleans.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>
         /// </example>
-        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, TResult> selector)
+        public Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -152,7 +146,11 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException("selector");
             }
 
-            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector).ConfigureAwait(continueOnCapturedContext: false)).Item1;
+            //It is certain the result is already ready here and can be collected straight away. Having a truly asynchronous result collection
+            //IAsyncEnumerable<TResult> or equivalent method ought to be used. Taking the result here without async-await saves for generating
+            //the async state machine.
+            var ret = ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, cancellationToken, commandBehavior).GetAwaiter().GetResult().Item1;
+            return Task.FromResult(ret);
         }
 
 
@@ -161,6 +159,8 @@ namespace Orleans.SqlUtils
         /// </summary>
         /// <param name="query">The query to execute.</param>
         /// <param name="parameterProvider">Adds parameters to the query. Parameter names must match those defined in the query.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
+        /// <param name="commandBehavior">The command behavior that should be used. Defaults to <see cref="CommandBehavior.Default"/>.</param>
         /// <returns>Affected rows count.</returns>
         /// <example>This sample shows how to make a hand-tuned database call.
         /// <code>
@@ -175,7 +175,7 @@ namespace Orleans.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>
         /// </example>
-        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider)
+        public Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -183,7 +183,11 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException("query");
             }
 
-            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id) => unit).ConfigureAwait(continueOnCapturedContext: false)).Item2;
+            //It is certain the result is already ready here and can be collected straight away. Having a truly asynchronous result collection
+            //IAsyncEnumerable<TResult> or equivalent method ought to be used. Taking the result here without async-await saves for generating
+            //the async state machine.
+            var ret = ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), cancellationToken, commandBehavior).GetAwaiter().GetResult().Item2;
+            return Task.FromResult(ret);
         }
 
         /// <summary>
@@ -195,22 +199,23 @@ namespace Orleans.SqlUtils
         {
             this.connectionString = connectionString;
             this.invariantName = invariantName;
+            supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
+            isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
         }
 
-
-        private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, TResult> selector)
+        private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
             int resultSetCount = 0;
             while(reader.HasRows)
             {
-                while(await reader.ReadAsync().ConfigureAwait(continueOnCapturedContext: false))
+                while(await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
                 {
-                    var obj = selector(reader, resultSetCount);
+                    var obj = await selector(reader, resultSetCount, cancellationToken).ConfigureAwait(false);
                     results.Add(obj);
                 }
 
-                await reader.NextResultAsync();
+                await reader.NextResultAsync(cancellationToken);
                 ++resultSetCount;
             }
 
@@ -218,34 +223,72 @@ namespace Orleans.SqlUtils
         }
 
 
-        private static async Task<Tuple<IEnumerable<TResult>, int>> ExecuteReaderAsync<TResult>(DbCommand command, Func<IDataRecord, int, TResult> selector)
+        private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteReaderAsync<TResult>(DbCommand command, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken, CommandBehavior commandBehavior)
         {
-            using(var reader = await command.ExecuteReaderAsync().ConfigureAwait(continueOnCapturedContext: false))
+            using(var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
-                return await SelectAsync(reader, selector).ConfigureAwait(false);
+                CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
+                try
+                {
+                    if(cancellationToken.CanBeCanceled && supportsCommandCancellation)
+                    {
+                        cancellationRegistration = cancellationToken.Register(CommandCancellation, Tuple.Create(reader, command), useSynchronizationContext: false);
+                    }
+                    return await SelectAsync(reader, selector, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                }
+                finally
+                {
+                    cancellationRegistration.Dispose();
+                }
             }
         }
-
+           
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
             Action<DbCommand> parameterProvider,
-            Func<DbCommand, Func<IDataRecord, int, TResult>, Task<Tuple<IEnumerable<TResult>, int>>> executor,
-            Func<IDataRecord, int, TResult> selector)
+            Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CancellationToken, CommandBehavior, Task<Tuple<IEnumerable<TResult>, int>>> executor,
+            Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
+            CancellationToken cancellationToken,
+            CommandBehavior commandBehavior)
         {
             using (var connection = DbConnectionFactory.CreateConnection(invariantName, connectionString))
             {
-                await connection.OpenAsync().ConfigureAwait(continueOnCapturedContext: false);
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 using(var command = connection.CreateCommand())
-                {
+                {                    
                     if(parameterProvider != null)
                     {
                         parameterProvider(command);
                     }
-
                     command.CommandText = query;
-                    return await executor(command, selector).ConfigureAwait(continueOnCapturedContext: false);
+
+                    Task<Tuple<IEnumerable<TResult>, int>> ret;
+                    if(isSynchronousAdoNetImplementation)
+                    {
+                        ret = Task.Run(() => executor(command, selector, cancellationToken, commandBehavior), cancellationToken);
+                    }
+                    else
+                    {
+                        ret = executor(command, selector, cancellationToken, commandBehavior);
+                    }
+
+                    return await ret.ConfigureAwait(continueOnCapturedContext: false);
                 }
+            }
+        }
+
+
+        private static void CommandCancellation(object state)
+        {
+            //The MSDN documentation tells that DbCommand.Cancel() should not be called for SqlCommand if the reader has been closed
+            //in order to avoid a race condition that would cause the SQL Server to stream the result set
+            //despite the connection already closed. Source: https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlcommand.cancel(v=vs.110).aspx.
+            //Enforcing this behavior across all providers does not seem to hurt.
+            var stateTuple = (Tuple<DbDataReader, DbCommand>)state;
+            if(!stateTuple.Item1.IsClosed)
+            {
+                stateTuple.Item2.Cancel();
             }
         }
     }

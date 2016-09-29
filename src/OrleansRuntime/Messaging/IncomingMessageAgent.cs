@@ -1,29 +1,5 @@
-/*
-Project Orleans Cloud Service SDK ver. 1.0
- 
-Copyright (c) Microsoft Corporation
- 
-All rights reserved.
- 
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
-associated documentation files (the ""Software""), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
-OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 using System;
 using System.Threading;
-
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
@@ -105,7 +81,6 @@ namespace Orleans.Runtime.Messaging
         private void ReceiveMessage(Message msg)
         {
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
-            if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.DequeueIncoming);
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
@@ -125,13 +100,11 @@ namespace Orleans.Runtime.Messaging
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
@@ -150,7 +123,7 @@ namespace Orleans.Runtime.Messaging
                     lock (targetActivation)
                     {
                         var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.State.Equals(ActivationState.Valid))
+                        if (target.State == ActivationState.Valid)
                         {
                             var overloadException = target.CheckOverloaded(Log);
                             if (overloadException != null)

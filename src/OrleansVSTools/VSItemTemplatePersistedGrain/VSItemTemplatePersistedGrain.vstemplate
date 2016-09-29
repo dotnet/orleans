@@ -4,11 +4,12 @@
     <Name>Orleans Persisted State Grain Class</Name>
     <Description>An empty Orleans grain class set up for persisting its state</Description>
     <Icon>Orleans.ico</Icon>
-    <TemplateID>bbb7f9f3-4dcd-4c75-b475-d42e7064b9df</TemplateID>
     <ProjectType>CSharp</ProjectType>
-    <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
+    <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <TemplateID>Orleans.Templates.Item.PersistedGrainImplementation</TemplateID>
+    <ShowByDefault>true</ShowByDefault>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
-    <DefaultName>PersistedGrain.cs</DefaultName>
+    <DefaultName>MyPersistedGrain.cs</DefaultName>
   </TemplateData>
   <TemplateContent>
     <References>

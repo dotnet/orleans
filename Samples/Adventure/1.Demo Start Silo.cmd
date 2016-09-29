@@ -2,11 +2,10 @@
 @echo off
 @if NOT "%ECHO%"=="" @echo %ECHO%
 
-SET CMDHOME=%~dp0.
-"%CMDHOME%\AdventureSetup\bin\Debug\AdventureSetup.exe"
+set CMDHOME=%~dp0.
 
 if exist "%CMDHOME%\AdventureSetup\bin\Debug\AdventureSetup.exe" (
-cd "%CMDHOME%\AdventureSetup\bin\Debug"
+cd /d "%CMDHOME%\AdventureSetup\bin\Debug"
 AdventureSetup.exe
 cd "%CMDHOME%"
 ) else (
