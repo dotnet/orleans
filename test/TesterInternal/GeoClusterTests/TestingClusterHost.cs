@@ -317,11 +317,11 @@ namespace Tests.GeoClusterTests
             var name = string.Format("Client-{0}-{1}", ClusterId, ClientNumber);
 
             // clients are assigned to silos round-robin
-            var gatewayport = ci.Silos[ClientNumber % ci.Silos.Count].GatewayPort;
+            var gatewayport = ci.Silos[ClientNumber % ci.Silos.Count].NodeConfiguration.ProxyGatewayEndpoint.Port;
 
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
 
-            var clientArgs = new object[] { name, gatewayport.Value, ClusterId, customizer };
+            var clientArgs = new object[] { name, gatewayport, ClusterId, customizer };
             var setup = new AppDomainSetup { ApplicationBase = Environment.CurrentDirectory };
             var clientDomain = AppDomain.CreateDomain(name, null, setup);
 
