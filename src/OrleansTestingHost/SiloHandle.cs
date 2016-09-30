@@ -18,9 +18,6 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the address of the silo </summary>
         public SiloAddress SiloAddress { get; set; }
 
-        /// <summary> Get or set the gateway port of the silo </summary>
-        public int? GatewayPort { get; set; }
-
         /// <summary>Gets whether the remote silo is expected to be active</summary>
         public abstract bool IsActive { get; }
 
@@ -39,7 +36,7 @@ namespace Orleans.TestingHost
         /// <summary> A string that represents the current SiloHandle </summary>
         public override string ToString()
         {
-            return $"(SiloHandle endpoint={SiloAddress.Endpoint} gatewayport={GatewayPort})";
+            return $"(SiloHandle endpoint={SiloAddress.Endpoint} gatewayport={NodeConfiguration.ProxyGatewayEndpoint?.Port})";
         }
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
