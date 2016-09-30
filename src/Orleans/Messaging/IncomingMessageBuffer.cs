@@ -30,15 +30,16 @@ namespace Orleans.Runtime
             bool supportForwarding = false,
             int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
             int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE,
-            IList<ArraySegment<byte>> readBuf = null)
+            IList<ArraySegment<byte>> readBuf = null,
+            byte[] bb = null)
         {
             Log = logger;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-            wtf = readBuf is List<ArraySegment<byte>>;
-            readBuffer = readBuf as List<ArraySegment<byte>> ?? BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
+            wtf = readBuf is List<ArraySegment<byte>> || bb != null;
+            readBuffer = bb != null ? new List<ArraySegment<byte>>{new ArraySegment<byte>(bb)}: BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize); // readBuf as List<ArraySegment<byte>> ??
             receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
@@ -58,7 +59,7 @@ namespace Orleans.Runtime
 
         public void UpdateReceivedData(int bytesRead)
         {
-            receiveOffset += bytesRead;
+               receiveOffset += bytesRead;
         }
 
         public void Reset()
@@ -161,7 +162,8 @@ namespace Orleans.Runtime
                     consumedBytes += seg.Count;
                      segms.Add(seg);
                     readBuffer.Remove(seg);
-                  //  BufferPool.GlobalPool.Release(seg.Array);
+                    if(!wtf)
+                  BufferPool.GlobalPool.Release(seg.Array);
                 }
                 else
                 {
@@ -184,6 +186,7 @@ namespace Orleans.Runtime
                 }
                 if (backfillBytes > 0)
                 {
+                    if (!wtf) readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
                     //readBuffer.AddRange(segms); // segms BufferPool.GlobalPool.GetMultiBuffer(backfillBytes)
                 }
             }

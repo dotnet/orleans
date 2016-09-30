@@ -605,10 +605,11 @@ namespace Orleans.Runtime.Messaging
             readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnIOCompleted);
             Interlocked.Increment(ref supCount);
             Log.Info(1244, supCount.ToString());
-            var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
+           // var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
             readEventArgs.UserToken = new ReceiveCallbackContext(sock, this);
+            readEventArgs.SetBuffer(new byte[1024*255],0, 1024 * 255);
             //  readEventArgs.SetBuffer(new Byte[1111], 0, 111); //todo 
-            readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
+            // readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
             return readEventArgs;
         }
 
@@ -675,8 +676,11 @@ namespace Orleans.Runtime.Messaging
                                 //        break;
                                 //    }
                                 //}
+                           
 
                                 token.ProcessReceived(e);
+                                e.Dispose();
+                                e = GetSocketAsyncEventArgs(s);
                                 if (!s.ReceiveAsync(e))
                                 {
                                     this.ProcessReceive(e);
@@ -700,6 +704,7 @@ namespace Orleans.Runtime.Messaging
                     catch (Exception ex)
                     {
                         Log.Error(11111,"qqqqqq", ex);
+                        throw;
                         //rcc.IMA.Log.Error(ErrorCode.Messaging_IMA_BadBufferReceived,
                         //    String.Format("ProcessReceivedBuffer exception with RemoteEndPoint {0}: ",
                         //        rcc.RemoteEndPoint), ex);
@@ -1011,8 +1016,8 @@ namespace Orleans.Runtime.Messaging
 
             public void ProcessReceived(SocketAsyncEventArgs e)
             {
-                if(e.BufferList.Count == 0)
-                    return;
+                //if(e.BufferList.Count == 0)
+                //    return;
                 bool wqwe;
                 if (!IncomingMessageAcceptor.qqqq.TryRemove(e, out wqwe))
                 {
@@ -1037,7 +1042,7 @@ namespace Orleans.Runtime.Messaging
 #endif
                 try
                 {
-                    _buffer = new IncomingMessageBuffer(IMA.Log, readBuf: e.BufferList);
+                    _buffer = new IncomingMessageBuffer(IMA.Log, bb: e.Buffer);//  readBuf: e.BufferList
                     _buffer.UpdateReceivedData(e.BytesTransferred);
 
                     Message msg;
