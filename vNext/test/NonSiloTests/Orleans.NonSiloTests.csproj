@@ -78,6 +78,27 @@
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTests.ImmutableCollections.cs">
       <Link>SerializationTests\SerializationTests.ImmutableCollections.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\CodeGeneratorTests.cs">
+      <Link>CodeGeneratorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\CounterTests.cs">
+      <Link>CounterTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\GatewaySelectionTest.cs">
+      <Link>GatewaySelectionTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\ManagementAgentTests.cs">
+      <Link>ManagementAgentTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\AsyncSerialExecutorTests.cs">
+      <Link>OrleansRuntime\AsyncSerialExecutorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\ExceptionsTests.cs">
+      <Link>OrleansRuntime\ExceptionsTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\Streams\SubscriptionMarkerTests.cs">
+      <Link>OrleansRuntime\Streams\SubscriptionMarkerTests.cs</Link>
+      </Compile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
