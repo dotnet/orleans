@@ -4,7 +4,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [Orleans.Providers.StorageProvider(ProviderName = "Memory")]
+    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class ValueTypeTestGrain : Grain<ValueTypeTestData>, IValueTypeTestGrain
     {
         public ValueTypeTestGrain()
