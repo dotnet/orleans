@@ -28,20 +28,22 @@ namespace Orleans.Core
             }
            
             this.grainTypeName = grainTypeName;
-           
-            this.baseGrain = statefulGrain as Grain;
             this.store = store;
         }
 
         internal void SetGrain(Grain grain)
         {
+            if(grain == null)
+                throw new ArgumentNullException(nameof(grain));
+
             statefulGrain = grain as IStatefulGrain;
 
-            if (statefulGrain?.GrainState == null)
-            {
-                throw new ArgumentNullException($"{nameof(grain)}", "No grain state object supplied");
-            }
+            if(statefulGrain == null)
+                throw new ArgumentException("Attempt to configure storage bridge for a non-perisstent grain.", nameof(grain));
 
+            if (statefulGrain.GrainState == null)
+                throw new ArgumentException("No grain state object supplied", nameof(grain));
+            
             this.baseGrain = grain;
         }
 
