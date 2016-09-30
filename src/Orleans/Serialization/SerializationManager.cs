@@ -138,7 +138,7 @@ namespace Orleans.Serialization
 
         #region Static initialization
 
-        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, IExternalSerializer fallback = null)
+        public static void InitializeForTesting(List<TypeInfo> serializationProviders = null, TypeInfo fallbackType = null)
         {
             try
             {
@@ -146,7 +146,7 @@ namespace Orleans.Serialization
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
                 AssemblyProcessor.Initialize();
-                fallbackSerializer = fallback ?? GetFallbackSerializer();
+                fallbackSerializer = GetFallbackSerializer(fallbackType);
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -154,10 +154,10 @@ namespace Orleans.Serialization
             }
         }
 
-        internal static void Initialize(List<TypeInfo> serializationProviders, IExternalSerializer fallback = null)
+        internal static void Initialize(List<TypeInfo> serializationProviders, TypeInfo fallbackType = null)
         {
             RegisterBuiltInSerializers();
-            fallbackSerializer = fallback ?? GetFallbackSerializer();
+            fallbackSerializer = GetFallbackSerializer(fallbackType);
 
             if (StatisticsCollector.CollectSerializationStats)
             {
@@ -1898,13 +1898,22 @@ namespace Orleans.Serialization
             return retVal;
         }
 
-        private static IExternalSerializer GetFallbackSerializer()
+        private static IExternalSerializer GetFallbackSerializer(TypeInfo fallbackType)
         {
+            IExternalSerializer serializer;
+            if (fallbackType != null)
+            {
+                serializer = (IExternalSerializer)Activator.CreateInstance(fallbackType.AsType());
+            }
+            else
+            {
 #if NETSTANDARD
-            var serializer = new IlBasedFallbackSerializer();
+                serializer = new IlBasedFallbackSerializer();
 #else
-            var serializer = new BinaryFormatterSerializer();
+                serializer = new BinaryFormatterSerializer();
 #endif
+            }
+
             serializer.Initialize(logger);
             return serializer;
         }

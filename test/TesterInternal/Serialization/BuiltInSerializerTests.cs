@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
-using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
@@ -51,17 +50,17 @@ namespace UnitTests.Serialization
         private void InitializeSerializer(SerializerToUse serializerToUse)
         {
             List<TypeInfo> serializationProviders = null;
-            IExternalSerializer fallback = null;
+            TypeInfo fallback = null;
             switch (serializerToUse)
             {
                 case SerializerToUse.Default:
                     break;
                 case SerializerToUse.IlBasedFallbackSerializer:
-                    fallback = new IlBasedFallbackSerializer();
+                    fallback = typeof(IlBasedFallbackSerializer).GetTypeInfo();
                     break;
 #if !NETSTANDARD_TODO
                 case SerializerToUse.BinaryFormatterFallbackSerializer:
-                    fallback = new BinaryFormatterSerializer();
+                    fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
                     break;
 #endif
                 default:

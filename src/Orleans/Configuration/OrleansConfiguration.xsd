@@ -249,6 +249,22 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="FallbackSerializationProvider" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            Specifies the fallback serialization provider, which is used for objects which can not otherwise be serialized.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="type" type="xs:string">
+            <xs:annotation>
+              <xs:documentation>
+                The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
