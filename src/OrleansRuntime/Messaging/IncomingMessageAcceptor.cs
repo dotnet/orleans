@@ -1,23 +1,28 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Messaging;
+using Orleans.Runtime.Messaging.Channels.Networking.Sockets.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAcceptor : AsynchAgent
     {
+        ///static readonly EventHandler<SocketAsyncEventArgs> onAcceptCompleted = OnAcceptCompleted;
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
         private LingerOption lingerOption = new LingerOption(true, 0);
-
+        private static SocketAsyncEventArgs spare;
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
-
+      static  ConcurrentDictionary<SocketAsyncEventArgs, bool> qqqq = new ConcurrentDictionary<SocketAsyncEventArgs, bool>(); 
         public Action<Message> SniffIncomingMessage
         {
             set
@@ -32,10 +37,11 @@ namespace Orleans.Runtime.Messaging
         private const int LISTEN_BACKLOG_SIZE = 1024;
 
         protected SocketDirection SocketDirection { get; private set; }
-
+        private int ccc;
         // Used for holding enough info to handle receive completion
         internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection)
         {
+            Interlocked.Increment(ref ccc);
             MessageCenter = msgCtr;
             listenAddress = here;
             if (here == null)
@@ -69,12 +75,12 @@ namespace Orleans.Runtime.Messaging
                 Log.Error(ErrorCode.MessagingBeginAcceptSocketException, "Exception beginning accept on listening socket", ex);
                 throw;
             }
-            if (Log.IsVerbose3) Log.Verbose3("Started accepting connections.");
+            if (Log.IsVerbose) Log.Verbose("Started accepting connections.");
         }
         private void OnAcceptCompleted(object sender, SocketAsyncEventArgs e)
         {
 #if  TRUE
-            this.ProcessAccept(e);
+            ((IncomingMessageAcceptor)e.UserToken).ProcessAccept(e, false);
 #endif
         }
 
@@ -82,9 +88,10 @@ namespace Orleans.Runtime.Messaging
 
         public override void Stop()
         {
+          //  mutex.ReleaseMutex();
             base.Stop();
 
-            if (Log.IsVerbose) Log.Verbose("Disconnecting the listening socket");
+         Log.Info("Disconnecting the listening socket");
             SocketManager.CloseSocket(AcceptingSocket);
 
             Socket[] temp;
@@ -123,7 +130,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (Log.IsVerbose2) Log.Verbose2(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
+            if (Log.IsVerbose) Log.Verbose(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
 
             if (expectProxiedConnection)
             {
@@ -288,7 +295,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                if (ima.Log.IsVerbose3) ima.Log.Verbose3("Received a connection from {0}", sock.RemoteEndPoint);
+                if (ima.Log.IsVerbose) ima.Log.Verbose("Received a connection from {0}", sock.RemoteEndPoint);
 
                 // Finally, process the incoming request:
                 // Prep the socket so it will reset on close
@@ -401,6 +408,7 @@ namespace Orleans.Runtime.Messaging
         }
 #else
 
+        private static bool qq = false;
         /// <summary>
         /// Begins an operation to accept a connection request from the client.
         /// </summary>
@@ -416,7 +424,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                acceptEventArg.AcceptSocket = null;
+                acceptEventArg.AcceptSocket = null; //AcceptingSocket
             }
 
             // AcceptAsync returns true if the I / O operation is pending.The SocketAsyncEventArgs.Completed event 
@@ -426,9 +434,11 @@ namespace Orleans.Runtime.Messaging
             // the result of the operation.
             try
             {
+                if (Log.IsVerbose) Log.Verbose("Start accept from ");
                 if (!AcceptingSocket.AcceptAsync(acceptEventArg))
                 {
-                    ProcessAccept(acceptEventArg);
+                    ProcessAccept(acceptEventArg, false);
+                   // acceptEventArg.AcceptSocket = AcceptingSocket;
                 }
             }
             catch (Exception ex)
@@ -445,11 +455,12 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        private int supCount;
         /// <summary>
         /// Process the accept for the socket listener.
         /// </summary>
         /// <param name="e">SocketAsyncEventArg associated with the completed accept operation.</param>
-        private void ProcessAccept(SocketAsyncEventArgs e)
+        private void ProcessAccept(SocketAsyncEventArgs e, bool completedSynchronously)
         {
             var ima = e.UserToken as IncomingMessageAcceptor;
             try
@@ -504,35 +515,20 @@ namespace Orleans.Runtime.Messaging
 
                 Socket sock = e.AcceptSocket;
 
-                // Then, start a new Accept 
-                try
-                {
-                    StartAccept(e);
-                }
-                catch (Exception ex)
-                {
-                    ima.Log.Warn(ErrorCode.MessagingBeginAcceptSocketException, "Exception on accepting socket during BeginAccept", ex);
-                    // Open a new one
-                    ima.RestartAcceptingSocket();
-                }
+            
 
                 if (sock.Connected)
-                {
+                 {
                     try
                     {
-                        if (ima.Log.IsVerbose3) ima.Log.Verbose3("Received a connection from {0}", sock.RemoteEndPoint);
+                        if (ima.Log.IsVerbose) ima.Log.Verbose("Received a connection from {0}", sock.RemoteEndPoint);
 
                         // Finally, process the incoming request:
                         // Prep the socket so it will reset on close
-                        sock.LingerState = lingerOption;
+                        sock.LingerState = new LingerOption(true, 0);
                         if (ima.RecordOpenedSocket(sock))
                         {
-                            SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs(); // todo: pool
-                            readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnIOCompleted);
-                            var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
-                            readEventArgs.UserToken = new ReceiveCallbackContext(sock, this, pool);
-                            //  readEventArgs.SetBuffer(new Byte[1111], 0, 111); //todo 
-                            readEventArgs.BufferList = BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
+                            var readEventArgs =GetSocketAsyncEventArgs(sock); // GetOrCreateSocketAsyncEventArgs(); //
                             if (readEventArgs != null) // todo ????
                             {
                                 // Get the socket for the accepted client connection and put it into the 
@@ -568,13 +564,30 @@ namespace Orleans.Runtime.Messaging
                     catch (SocketException ex)
                     {
                         //Token token = e.UserToken as Token; todo
-                        //  Log.Warn(ErrorCode.Messaging_ExceptionBeginReceiving, "Error when processing data received from {0}:\r\n{1}", token.Connection.RemoteEndPoint, ex);
+                         Log.Warn(ErrorCode.Messaging_ExceptionBeginReceiving, "Error when processing data received from {0}:\r\n{1}", "Q", ex); //qtoken.Connection.RemoteEndPoint
                     }
                     catch (Exception ex)
                     {
                         this.Log.Warn(ErrorCode.MessagingBeginReceiveException, "Exception trying to process accept from endpoint ", ex);
                         throw;
                     }
+
+                }
+                // Then, start a new Accept 
+                if (completedSynchronously)
+                {
+                    return;
+                }
+
+                try
+                {
+                    StartAccept(e);
+                }
+                catch (Exception ex)
+                {
+                    ima.Log.Warn(ErrorCode.MessagingBeginAcceptSocketException, "Exception on accepting socket during BeginAccept", ex);
+                    // Open a new one
+                    ima.RestartAcceptingSocket();
                 }
             }
             catch (Exception ex)
@@ -584,8 +597,24 @@ namespace Orleans.Runtime.Messaging
             }
 
         }
+
+        private SocketAsyncEventArgs GetSocketAsyncEventArgs(Socket sock)
+        {
+            SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs(); // todo: pool
+            qqqq.TryAdd(readEventArgs, false);
+            readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnIOCompleted);
+            Interlocked.Increment(ref supCount);
+            Log.Info(1244, supCount.ToString());
+            var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
+            readEventArgs.UserToken = new ReceiveCallbackContext(sock, this);
+            //  readEventArgs.SetBuffer(new Byte[1111], 0, 111); //todo 
+            readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
+            return readEventArgs;
+        }
+
         private void OnIOCompleted(object sender, SocketAsyncEventArgs e)
         {
+            if (Log.IsVerbose) Log.Verbose("OnIOCompleted");
             // Determine which type of operation just completed and call the associated handler.
             switch (e.LastOperation)
             {
@@ -621,32 +650,70 @@ namespace Orleans.Runtime.Messaging
                 {
 
                     Socket s = token.Sock;
-                    if (s.Available == 0)
+                //   if(s.Available == 0)
+                    { 
+                    // Set return buffer.
+                    try
                     {
-                        // Set return buffer.
-                        try
+                        //if (Log.IsVerbose) Log.Verbose("token.ProcessReceived(e);");
+                        //    token.ProcessReceived(e);
+                      //  while (s.Available != 0)
                         {
-                            token.ProcessReceived(e);
+
+                                //if (!s.ReceiveAsync(e))
+                                //{
+                                //    if (Log.IsVerbose) Log.Verbose(" if (!s.ReceiveAsync(e))");
+                                //        token.ProcessReceived(e);
+                                //    }
+                                //    if (e.SocketError != SocketError.Success)
+                                //    {
+                                //        throw new SocketException((int)e.SocketError);
+                                //    }
+                                //    int len = e.BytesTransferred;
+                                //    if (len <= 0)
+                                //    {
+                                //        break;
+                                //    }
+                                //}
+
+                                token.ProcessReceived(e);
+                                if (!s.ReceiveAsync(e))
+                                {
+                                    this.ProcessReceive(e);
+                                    if (e.SocketError != SocketError.Success)
+                                    {
+                                        throw new SocketException((int)e.SocketError);
+                                    }
+                                    int len = e.BytesTransferred;
+                                    if (len <= 0)
+                                    {
+                                       // break;
+                                    }
+                                    //  await ((Signal)e.UserToken).WaitAsync();
+                                    //token.ProcessReceived(e);
+                                }
+                            }
+
+                            //e = GetSocketAsyncEventArgs(s);
+
                         }
-                        catch (Exception ex)
-                        {
-                            //rcc.IMA.Log.Error(ErrorCode.Messaging_IMA_BadBufferReceived,
-                            //    String.Format("ProcessReceivedBuffer exception with RemoteEndPoint {0}: ",
-                            //        rcc.RemoteEndPoint), ex);
-                            //// There was a problem with the buffer, presumably data corruption, so give up
-                            //rcc.IMA.SafeCloseSocket(rcc.Sock);
-                            // And we're done
-                            return;
-                        }
-                    }
-                    else if (!s.ReceiveAsync(e))
+                    catch (Exception ex)
                     {
-                        this.ProcessReceive(e);
-                    }
+                        Log.Error(11111,"qqqqqq", ex);
+                        //rcc.IMA.Log.Error(ErrorCode.Messaging_IMA_BadBufferReceived,
+                        //    String.Format("ProcessReceivedBuffer exception with RemoteEndPoint {0}: ",
+                        //        rcc.RemoteEndPoint), ex);
+                        //// There was a problem with the buffer, presumably data corruption, so give up
+                        //rcc.IMA.SafeCloseSocket(rcc.Sock);
+                        // And we're done
+                        return;
+                        }
+                     }
                 }
                 else
                 {
 
+                    if (Log.IsVerbose) Log.Verbose(" if (!s.SafeCloseSocket(e))");
                     //  IMA.Log.Warn(ErrorCode.MessagingBeginReceiveException, "Exception trying to begin receive from endpoint " + RemoteEndPoint, ex);
                     token.IMA.SafeCloseSocket(token.Sock);
                     // todo this.ProcessError(e);
@@ -654,6 +721,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
+                if (Log.IsVerbose) Log.Verbose(" i  token.IMA.SafeCloseSocket(token.Sock);");
                 token.IMA.SafeCloseSocket(token.Sock);
                 //// And we're done
                 //return;
@@ -674,7 +742,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                if (Log.IsVerbose2) Log.Verbose2("Responding to Ping from {0}", msg.SendingSilo);
+                if (Log.IsVerbose) Log.Verbose("Responding to Ping from {0}", msg.SendingSilo);
 
                 if (!msg.TargetSilo.Equals(MessageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
@@ -732,7 +800,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(MessageCenter.MyAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                if (Log.IsVerbose2) Log.Verbose2("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                if (Log.IsVerbose) Log.Verbose("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
                 MessageCenter.OutboundQueue.SendMessage(msg);
                 return;
             }
@@ -772,6 +840,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
+                if (Log.IsVerbose) Log.Verbose("RestartAcceptingSocket");
                 SocketManager.CloseSocket(AcceptingSocket);
                 AcceptingSocket = SocketManager.GetAcceptingSocketForEndpoint(listenAddress);
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
@@ -790,7 +859,43 @@ namespace Orleans.Runtime.Messaging
             RecordClosedSocket(sock);
             SocketManager.CloseSocket(sock);
         }
-
+        internal static SocketAsyncEventArgs GetOrCreateSocketAsyncEventArgs()
+        {
+            var obj = Interlocked.Exchange(ref spare, null);
+            if (obj == null)
+            {
+                obj = new SocketAsyncEventArgs();
+                obj.Completed += OnAsyncCompleted; // only for new, otherwise multi-fire
+            }
+            if (obj.UserToken is Signal)
+            {
+                ((Signal)obj.UserToken).Reset();
+            }
+            else
+            {
+                obj.UserToken = new Signal();
+            }
+            return obj;
+        }
+        private static void OnAsyncCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            try
+            {
+                switch (e.LastOperation)
+                {
+                    case SocketAsyncOperation.Send:
+                    case SocketAsyncOperation.Receive:
+                        ReleasePending(e);
+                        break;
+                }
+            }
+            catch { }
+        }
+        private static void ReleasePending(SocketAsyncEventArgs e)
+        {
+            var pending = (Signal)e.UserToken;
+            pending.Set();
+        }
 #if DISABLE
         private class ReceiveCallbackContext
         {
@@ -897,7 +1002,7 @@ namespace Orleans.Runtime.Messaging
             public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; private set; }
 
-            public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima, List<ArraySegment<byte>> buffer)
+            public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima)
             {
                 Sock = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
@@ -908,7 +1013,11 @@ namespace Orleans.Runtime.Messaging
             {
                 if(e.BufferList.Count == 0)
                     return;
-
+                bool wqwe;
+                if (!IncomingMessageAcceptor.qqqq.TryRemove(e, out wqwe))
+                {
+                    //throw new Exception("WTF");
+                }
 #if TRACK_DETAILED_STATS
                 ThreadTrackingStatistic tracker = null;
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -934,6 +1043,7 @@ namespace Orleans.Runtime.Messaging
                     Message msg;
                     while (_buffer.TryDecodeMessage(out msg))
                     {
+                        if (IMA.Log.IsVerbose) IMA.Log.Verbose("_buffer.TryDecodeMessage(out msg))");
                         IMA.HandleMessage(msg, Sock);
                     }
                 }
@@ -965,66 +1075,7 @@ namespace Orleans.Runtime.Messaging
 #endif
             }
         }
-
-            public void ProcessReceivedBuffer(int bytes)
-            {
-                if (bytes == 0)
-                    return;
-
-#if TRACK_DETAILED_STATS
-                ThreadTrackingStatistic tracker = null;
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    int id = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    if (!trackers.TryGetValue(id, out tracker))
-                    {
-                        tracker = new ThreadTrackingStatistic("ThreadPoolThread." + System.Threading.Thread.CurrentThread.ManagedThreadId);
-                        bool added = trackers.TryAdd(id, tracker);
-                        if (added)
-                        {
-                            tracker.OnStartExecution();
-                        }
-                    }
-                    tracker.OnStartProcessing();
-                }
-#endif
-                //try
-                //{
-                //    _buffer.UpdateReceivedData(bytes);
-
-                //    Message msg;
-                //    while (_buffer.TryDecodeMessage(out msg))
-                //    {
-                //        IMA.HandleMessage(msg, Sock);
-                //    }
-                //}
-                //catch (Exception exc)
-                //{
-                //    try
-                //    {
-                //        // Log details of receive state machine
-                //        IMA.Log.Error(ErrorCode.MessagingProcessReceiveBufferException,
-                //            string.Format(
-                //            "Exception trying to process {0} bytes from endpoint {1}",
-                //                bytes, RemoteEndPoint),
-                //            exc);
-                //    }
-                //    catch (Exception) { }
-                //    _buffer.Reset(); // Reset back to a hopefully good base state
-
-                //    throw;
-                //}
-#if TRACK_DETAILED_STATS
-                finally
-                {
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        tracker.IncrementNumberOfProcessed();
-                        tracker.OnStopProcessing();
-                    }
-                }
-#endif
-            }
+        
         }
     }
 

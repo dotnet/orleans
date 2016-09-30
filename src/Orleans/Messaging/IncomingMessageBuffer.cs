@@ -149,19 +149,19 @@ namespace Orleans.Runtime
         /// </summary>
         private void AdjustBuffer()
         {
-            if(wtf) return;
-            
             // drop buffers consumed by messages and adjust offsets
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
+            List < ArraySegment < byte >> segms = new List<ArraySegment<byte>>();
             while (readBuffer.Count != 0)
             {
                 ArraySegment<byte> seg = readBuffer[0];
                 if (seg.Count <= decodeOffset - consumedBytes)
                 {
                     consumedBytes += seg.Count;
+                     segms.Add(seg);
                     readBuffer.Remove(seg);
-                    BufferPool.GlobalPool.Release(seg.Array);
+                  //  BufferPool.GlobalPool.Release(seg.Array);
                 }
                 else
                 {
@@ -184,7 +184,7 @@ namespace Orleans.Runtime
                 }
                 if (backfillBytes > 0)
                 {
-                    readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
+                    //readBuffer.AddRange(segms); // segms BufferPool.GlobalPool.GetMultiBuffer(backfillBytes)
                 }
             }
         }
