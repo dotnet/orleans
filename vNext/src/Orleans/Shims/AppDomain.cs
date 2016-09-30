@@ -38,6 +38,10 @@ namespace Orleans
             {
                 typeof(Exception).GetTypeInfo().Assembly,
                 typeof(AssemblyProcessor).GetTypeInfo().Assembly,
+                // load up classes for testing, until Assembly scanning is supported in vNext
+                Assembly.Load(new AssemblyName("Orleans.NonSiloTests")),
+                Assembly.Load(new AssemblyName("TestInternalGrains")),
+                Assembly.Load(new AssemblyName("TestGrainInterfaces")) 
             };
             return assemblies;
         }

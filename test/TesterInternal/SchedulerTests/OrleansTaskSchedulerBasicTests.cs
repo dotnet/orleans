@@ -618,7 +618,8 @@ namespace UnitTests.SchedulerTests
             Assert.Equal(10, n);  // "Work items executed concurrently"
             scheduler.Stop();
         }
-
+#if !NETSTANDARD_TODO
+        // blocked on upgrate RequestContext to corelre compaible
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
         public void Sched_Task_RequestContext_NewTask_ContinueWith()
         {
@@ -704,7 +705,7 @@ namespace UnitTests.SchedulerTests
             t0.Wait(TimeSpan.FromSeconds(10));
             Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }
-
+#endif
         private void LogContext(string what)
         {
             lock (lockable)

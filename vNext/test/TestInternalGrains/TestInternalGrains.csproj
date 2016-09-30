@@ -1,15 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform>AnyCPU</Platform>
-    <ProductVersion>10.0.20506</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{A972213F-189B-41D4-90FE-38D513C1106A}</ProjectGuid>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A682ABC1-1A51-4794-8012-DA8E59EBC72A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
-    <AssemblyName>TestGrainInterfaces</AssemblyName>
+    <RootNamespace>UnitTests.Grains</RootNamespace>
+    <AssemblyName>TestInternalGrains</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -39,26 +38,20 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IActivateDeactivateWatcherGrain.cs">
-      <Link>IActivateDeactivateWatcherGrain.cs</Link>
+    <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
+      <Link>PersistenceTestGrains.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
-      <Link>IPersistenceTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISerializationGeneratorTests.cs">
-      <Link>ISerializationGeneratorTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
-      <Link>IStreamLifecycleTestGrains.cs</Link>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
+      <Link>StreamLifecycleTestGrains.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
@@ -69,11 +62,18 @@
       <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{a972213f-189b-41d4-90fe-38d513c1106a}</Project>
+      <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="project.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <PropertyGroup>
-    <OrleansProjectType>Client</OrleansProjectType>
+    <OrleansProjectType>Server</OrleansProjectType>
   </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
   <Choose>
@@ -95,6 +95,8 @@
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
-  </Target> 
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
   -->
 </Project>

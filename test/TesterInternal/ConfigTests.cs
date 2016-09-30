@@ -681,7 +681,7 @@ namespace UnitTests
                 Assert.Equal(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type); // Provider type #" + i
             }
         }
-
+        
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
         public void Config_StorageProvider_SomeConfig()
         {

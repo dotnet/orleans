@@ -27,7 +27,7 @@ namespace UnitTests.SerializerTests
         {
             CopyCounter++;
             var obj = input as ClassWithCustomCopier;
-            return new ClassWithCustomCopier() {IntProperty = obj.IntProperty, StringProperty = obj.StringProperty};
+            return new ClassWithCustomCopier() { IntProperty = obj.IntProperty, StringProperty = obj.StringProperty };
         }
     }
 
@@ -65,13 +65,12 @@ namespace UnitTests.SerializerTests
             return result;
         }
     }
-    
+
     public class CustomSerializerTests
     {
         public CustomSerializerTests()
         {
             LogManager.Initialize(new NodeConfiguration());
-
             SerializationManager.InitializeForTesting();
         }
 

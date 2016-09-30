@@ -105,7 +105,10 @@ namespace UnitTests.StorageTests
             }
             else
             {
+#if !NETSTANDARD_TODO
+                //blocked by port HierarchicalKeyStore to coreclr
                 StateStore = new HierarchicalKeyStore(numKeys);
+#endif
             }
 
             Log.Info(0, "Finished Init Name={0} Config={1}", name, config);
@@ -161,7 +164,7 @@ namespace UnitTests.StorageTests
             }
             return TaskDone.Done;
         }
-        #endregion
+#endregion
 
         private static string GetId(GrainReference grainReference)
         {
