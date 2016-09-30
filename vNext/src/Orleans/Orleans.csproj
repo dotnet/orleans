@@ -232,6 +232,9 @@
     <Compile Include="..\..\..\src\Orleans\Core\GrainAttributes.cs">
       <Link>Core\GrainAttributes.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\GrainCasterFactory.cs">
+      <Link>Core\GrainCasterFactory.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\Orleans\Core\GrainClient.cs">
       <Link>Core\GrainClient.cs</Link>
     </Compile>

@@ -58,7 +58,7 @@ namespace Orleans
                 "caster_" + grainReferenceType.Name,
                 typeof(object),
                 new[] { typeof(IAddressable) },
-                typeof(GrainFactory).Module,
+                typeof(GrainFactory).GetTypeInfo().Module,
                 true);
             var il = method.GetILGenerator();
             var returnLabel = il.DefineLabel();
