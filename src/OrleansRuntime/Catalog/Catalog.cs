@@ -382,14 +382,14 @@ namespace Orleans.Runtime
 
 #region Grains
 
-        internal bool IsReentrantGrain(ActivationId running)
+        internal bool IsMessageInterleaves(Message message, ActivationId running)
         {
             ActivationData target;
             GrainTypeData data;
             return TryGetActivationData(running, out target) &&
                 target.GrainInstance != null &&
                 GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
-                data.IsReentrant;
+                data.IsMessageInterleaves(message);
         }
 
         public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)

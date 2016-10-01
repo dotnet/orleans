@@ -21,8 +21,8 @@ namespace Orleans.Runtime
         internal Type StateObjectType { get; private set; }
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
+        Func<object, bool> IsMessageInterleavesPredicate { get; set; }
    
-     
         public GrainTypeData(Type type, Type stateObjectType)
         {
             var typeInfo = type.GetTypeInfo();
@@ -33,6 +33,7 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
+            IsMessageInterleavesPredicate = _ => false;
         }
 
         /// <summary>
@@ -126,6 +127,20 @@ namespace Orleans.Runtime
                             typeof(MultiClusterRegistrationStrategy).Name,
                             grainClass.Name));
             }
+        }
+
+        // used by Orleankka's bootstrapper
+        internal void SetMessageAlwaysInterleaves(Func<object, bool> predicate)
+        {
+            if (predicate == null)
+                throw new ArgumentNullException(nameof(predicate));
+
+            IsMessageInterleavesPredicate = predicate;
+        }
+
+        public bool IsMessageInterleaves(Message message)
+        {
+            return IsReentrant || IsMessageInterleavesPredicate(message.BodyObject.GetType());
         }
     }
 }
