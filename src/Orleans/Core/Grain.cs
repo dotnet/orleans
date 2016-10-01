@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -247,7 +248,7 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStatefulGrain
+    public class Grain<TGrainState> : Grain, IStatefulGrain where TGrainState : new()
     {
         private readonly GrainState<TGrainState> grainState;
 
