@@ -1,24 +1,20 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Data;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Globalization;
-using System.Linq.Expressions;
-using System.Threading;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
-using Orleans.Async;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Providers;
+using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
-using Orleans.Runtime.Providers;
 
 
 namespace Orleans.Runtime
@@ -126,7 +122,7 @@ namespace Orleans.Runtime
             ActivationData sendingActivation = null;
             if (schedulingContext == null)
             {
-                throw new InvalidExpressionException(
+                throw new InvalidOperationException(
                     String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext) "
                         + "RuntimeContext.Current={1} TaskScheduler.Current={2}",
                         message,
@@ -172,7 +168,7 @@ namespace Orleans.Runtime
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context == null && !oneWay)
-                logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, new StackTrace());
+                logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
 
             if (message.IsExpirableMessage(Config.Globals))
                 message.Expiration = DateTime.UtcNow + ResponseTimeout + Constants.MAXIMUM_CLOCK_SKEW;
@@ -245,7 +241,7 @@ namespace Orleans.Runtime
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
             if (logger.IsVerbose) logger.Verbose("Resend {0}", message);
-            message.SetMetadata(Message.Metadata.TARGET_HISTORY, message.GetTargetHistory());
+            message.TargetHistory = message.GetTargetHistory();
 
             if (message.TargetGrain.IsSystemTarget)
             {
@@ -254,13 +250,14 @@ namespace Orleans.Runtime
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.RemoveHeader(Message.Header.IS_NEW_PLACEMENT);
+                message.IsNewPlacement = false;
                 dispatcher.Transport.SendMessage(message);
             }
             else
             {
-                message.RemoveHeader(Message.Header.TARGET_ACTIVATION);
-                message.RemoveHeader(Message.Header.TARGET_SILO);
+                message.TargetActivation = null;
+                message.TargetSilo = null;
+                message.ClearTargetAddress();
                 dispatcher.SendMessage(message);
             }
         }
@@ -279,13 +276,14 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                if (message.CacheInvalidationHeader != null)
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address);
+                        directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
+   
 #if false
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
@@ -357,7 +355,7 @@ namespace Orleans.Runtime
                         var exc = new GrainExtensionNotInstalledException(error);
                         string extraDebugInfo = null;
 #if DEBUG
-                        extraDebugInfo = new StackTrace().ToString();
+                        extraDebugInfo = Utils.GetStackTrace();
 #endif
                         logger.Warn(ErrorCode.Stream_ExtensionNotInstalled, 
                             string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
@@ -450,14 +448,25 @@ namespace Orleans.Runtime
         }
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy = 
-            new Lazy<Func<Exception, Exception>>(() =>
-            {
-                ParameterExpression exceptionParameter = Expression.Parameter(typeof(Exception));
-                MethodCallExpression prepForRemotingCall = Expression.Call(exceptionParameter, "PrepForRemoting", Type.EmptyTypes);
-                Expression<Func<Exception, Exception>> lambda = Expression.Lambda<Func<Exception, Exception>>(prepForRemotingCall, exceptionParameter);
-                Func<Exception, Exception> func = lambda.Compile();
-                return func;
-            });
+            new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
+
+        private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
+        {
+            var methodInfo = typeof(Exception).GetMethod(
+                "PrepForRemoting",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var method = new DynamicMethod(
+                "PrepForRemoting",
+                typeof(Exception),
+                new[] { typeof(Exception) },
+                typeof(SerializationManager).GetTypeInfo().Module,
+                true);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, methodInfo);
+            il.Emit(OpCodes.Ret);
+            return (Func<Exception, Exception>)method.CreateDelegate(typeof(Func<Exception, Exception>));
+        }
 
         private static Exception PrepareForRemoting(Exception exception)
         {
@@ -536,7 +545,7 @@ namespace Orleans.Runtime
                     case Message.RejectionTypes.Unrecoverable:
                     // fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (!message.ContainsHeader(Message.Header.CACHE_INVALIDATION_HEADER))
+                        if (message.CacheInvalidationHeader == null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
@@ -769,7 +778,7 @@ namespace Orleans.Runtime
 
         public string CaptureRuntimeEnvironment()
         {
-            var callStack = new System.Diagnostics.StackTrace(1); // Don't include this method in stack trace
+            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
             return String.Format(
                   "   TaskScheduler={0}" + Environment.NewLine 
                 + "   RuntimeContext={1}" + Environment.NewLine

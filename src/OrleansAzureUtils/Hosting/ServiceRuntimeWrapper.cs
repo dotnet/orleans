@@ -4,12 +4,11 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Streams;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime.Host
 {
     /// <summary>
-    /// Interfacse exposed by ServiceRuntimeWrapper for functionality provided 
+    /// Interface exposed by ServiceRuntimeWrapper for functionality provided 
     /// by Microsoft.WindowsAzure.ServiceRuntime.
     ///  </summary>
     public interface IServiceRuntimeWrapper
@@ -63,14 +62,14 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// /// <param name="handlerObject">Object that handler is part of, or null for a static method</param>
         /// <param name="handler">Handler to subscribe</param>
-        void SubscribeForStoppingNotifcation(object handlerObject, EventHandler<object> handler);
+        void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler);
 
         /// <summary>
         /// Unsubscribes given even handler from role instance Stopping event
         /// </summary>
         /// /// <param name="handlerObject">Object that handler is part of, or null for a static method</param>
         /// <param name="handler">Handler to unsubscribe</param>
-        void UnsubscribeFromStoppingNotifcation(object handlerObject, EventHandler<object> handler);
+        void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler);
     }
 
 
@@ -158,14 +157,14 @@ namespace Orleans.Runtime.Host
             return (string) roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] {configurationSettingName});
         }
 
-        public void SubscribeForStoppingNotifcation(object handlerObject, EventHandler<object> handler)
+        public void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler)
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventAdd.Invoke(null, new object[] { handlerDelegate });
             
         }
 
-        public void UnsubscribeFromStoppingNotifcation(object handlerObject, EventHandler<object> handler)
+        public void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler)
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventRemove.Invoke(null, new[] { handlerDelegate });

@@ -3,7 +3,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -44,23 +43,23 @@ namespace UnitTests
         {
             string str = "1ms";
             TimeSpan ts = TimeSpan.FromMilliseconds(1);
-            Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
 
             str = "2s";
             ts = TimeSpan.FromSeconds(2);
-            Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
 
             str = "3m";
             ts = TimeSpan.FromMinutes(3);
-            Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
 
             str = "4hr";
             ts = TimeSpan.FromHours(4);
-            Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
 
             str = "5"; // Default unit is seconds
             ts = TimeSpan.FromSeconds(5);
-            Assert.AreEqual(ts, ConfigUtilities.ParseTimeSpan(str, str), str);
+            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -71,35 +70,35 @@ namespace UnitTests
             config.Load(input);
             input.Close();
 
-            Assert.AreEqual<int>(2, config.Globals.SeedNodes.Count, "Seed node count is incorrect");
-            Assert.AreEqual<IPEndPoint>(new IPEndPoint(IPAddress.Loopback, 11111), config.Globals.SeedNodes[0], "First seed node is set incorrectly");
-            Assert.AreEqual<IPEndPoint>(new IPEndPoint(IPAddress.IPv6Loopback, 22222), config.Globals.SeedNodes[1], "Second seed node is set incorrectly");
+            Assert.Equal<int>(2, config.Globals.SeedNodes.Count); // Seed node count is incorrect
+            Assert.Equal<IPEndPoint>(new IPEndPoint(IPAddress.Loopback, 11111), config.Globals.SeedNodes[0]); // First seed node is set incorrectly
+            Assert.Equal<IPEndPoint>(new IPEndPoint(IPAddress.IPv6Loopback, 22222), config.Globals.SeedNodes[1]); // Second seed node is set incorrectly
 
-            Assert.AreEqual<int>(12345, config.Defaults.Port, "Default port is set incorrectly");
-            Assert.AreEqual<string>("UnitTests.General.TestStartup,Tester", config.Defaults.StartupTypeName);
+            Assert.Equal<int>(12345, config.Defaults.Port); // Default port is set incorrectly
+            Assert.Equal<string>("UnitTests.General.TestStartup,Tester", config.Defaults.StartupTypeName);
 
             NodeConfiguration nc;
             bool hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node1", out nc);
-            Assert.IsTrue(hasNodeConfig, "Node Node1 has config");
-            Assert.AreEqual<int>(11111, nc.Port, "Port is set incorrectly for node Node1");
-            Assert.IsTrue(nc.IsPrimaryNode, "Node1 should be primary node");
-            Assert.IsTrue(nc.IsSeedNode, "Node1 should be seed node");
-            Assert.IsFalse(nc.IsGatewayNode, "Node1 should not be gateway node");
-            Assert.AreEqual<string>("UnitTests.General.TestStartup,Tester", nc.StartupTypeName, "Startup type should be copied automatically");
+            Assert.True(hasNodeConfig); // Node Node1 has config
+            Assert.Equal<int>(11111, nc.Port); // Port is set incorrectly for node Node1
+            Assert.True(nc.IsPrimaryNode, "Node1 should be primary node");
+            Assert.True(nc.IsSeedNode, "Node1 should be seed node");
+            Assert.False(nc.IsGatewayNode, "Node1 should not be gateway node");
+            Assert.Equal<string>("UnitTests.General.TestStartup,Tester", nc.StartupTypeName); // Startup type should be copied automatically
 
             hasNodeConfig = config.TryGetNodeConfigurationForSilo("Node2", out nc);
-            Assert.IsTrue(hasNodeConfig, "Node Node2 has config");
-            Assert.AreEqual<int>(22222, nc.Port, "Port is set incorrectly for node Node2");
-            Assert.IsFalse(nc.IsPrimaryNode, "Node2 should not be primary node");
-            Assert.IsTrue(nc.IsSeedNode, "Node2 should be seed node");
-            Assert.IsTrue(nc.IsGatewayNode, "Node2 should be gateway node");
+            Assert.True(hasNodeConfig, "Node Node2 has config");
+            Assert.Equal<int>(22222, nc.Port); // Port is set incorrectly for node Node2
+            Assert.False(nc.IsPrimaryNode, "Node2 should not be primary node");
+            Assert.True(nc.IsSeedNode, "Node2 should be seed node");
+            Assert.True(nc.IsGatewayNode, "Node2 should be gateway node");
 
             hasNodeConfig = config.TryGetNodeConfigurationForSilo("Store", out nc);
-            Assert.IsTrue(hasNodeConfig, "Node Store has config");
-            Assert.AreEqual<int>(12345, nc.Port, "IP port is set incorrectly for node Store");
-            Assert.IsFalse(nc.IsPrimaryNode, "Store should not be primary node");
-            Assert.IsFalse(nc.IsSeedNode, "Store should not be seed node");
-            Assert.IsFalse(nc.IsGatewayNode, "Store should not be gateway node");
+            Assert.True(hasNodeConfig, "Node Store has config");
+            Assert.Equal<int>(12345, nc.Port); // IP port is set incorrectly for node Store
+            Assert.False(nc.IsPrimaryNode, "Store should not be primary node");
+            Assert.False(nc.IsSeedNode, "Store should not be seed node");
+            Assert.False(nc.IsGatewayNode, "Store should not be gateway node");
 
             //IPAddress[] ips = Dns.GetHostAddresses("");
             //IPEndPoint ep = new IPEndPoint(IPAddress.Loopback, 12345);
@@ -112,7 +111,7 @@ namespace UnitTests
             //    }
             //}
 
-            //Assert.AreEqual<IPEndPoint>(ep, nc.Endpoint, "IP endpoint is set incorrectly for node Store");
+            //Assert.Equal<IPEndPoint>(ep, nc.Endpoint, "IP endpoint is set incorrectly for node Store");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -122,13 +121,13 @@ namespace UnitTests
             oc.StandardLoad();
             NodeConfiguration n = oc.CreateNodeConfigurationForSilo("Node1");
             string fname = n.TraceFileName;
-            Assert.IsNotNull(fname);
-            Assert.IsFalse(fname.Contains(":"), "Log file name should not contain colons.");
+            Assert.NotNull(fname);
+            Assert.False(fname.Contains(":"), "Log file name should not contain colons.");
 
             // Check that .NET is happy with the file name
             var f = new FileInfo(fname);
-            Assert.IsNotNull(f.Name);
-            Assert.AreEqual(fname, f.Name);
+            Assert.NotNull(f.Name);
+            Assert.Equal(fname, f.Name);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -148,13 +147,13 @@ namespace UnitTests
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
 
-            Assert.AreEqual(baseLogFileName, fname);
+            Assert.Equal(baseLogFileName, fname);
 
             LogManager.Initialize(n);
 
-            Assert.IsTrue(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
-            Assert.IsTrue(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
-            Assert.IsFalse(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
+            Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
+            Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
+            Assert.False(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -176,13 +175,13 @@ namespace UnitTests
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
 
-            Assert.AreEqual(baseLogFileName, fname);
+            Assert.Equal(baseLogFileName, fname);
 
             LogManager.Initialize(n);
 
-            Assert.IsTrue(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
-            Assert.IsTrue(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
-            Assert.IsFalse(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
+            Assert.True(File.Exists(baseLogFileName), "Base name log file exists: " + baseLogFileName);
+            Assert.True(File.Exists(expectedLogFileName), "Expected name log file exists: " + expectedLogFileName);
+            Assert.False(File.Exists(baseLogFileNamePlusOne), "Munged log file exists: " + baseLogFileNamePlusOne);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -195,7 +194,7 @@ namespace UnitTests
             FileInfo fileInfo = new FileInfo(logFileName);
 
             CreateIfNotExists(fileInfo);
-            Assert.IsTrue(fileInfo.Exists, "Log file should exist: " + fileInfo.FullName);
+            Assert.True(fileInfo.Exists, "Log file should exist: " + fileInfo.FullName);
 
             long initialSize = fileInfo.Length;
 
@@ -204,11 +203,11 @@ namespace UnitTests
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
 
-            Assert.AreEqual(logFileName, fname);
+            Assert.Equal(logFileName, fname);
 
             LogManager.Initialize(n);
 
-            Assert.IsTrue(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
+            Assert.True(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
 
             Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
 
@@ -217,11 +216,11 @@ namespace UnitTests
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 
-            Assert.IsTrue(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
+            Assert.True(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
 
             long currentSize = fileInfo.Length;
 
-            Assert.IsTrue(currentSize > initialSize, "Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize);
+            Assert.True(currentSize > initialSize, string.Format("Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -235,7 +234,7 @@ namespace UnitTests
 
             DeleteIfExists(fileInfo);
 
-            Assert.IsFalse(File.Exists(fileInfo.FullName), "Log file should not exist: " + fileInfo.FullName);
+            Assert.False(File.Exists(fileInfo.FullName), "Log file should not exist: " + fileInfo.FullName);
 
             long initialSize = 0;
 
@@ -244,11 +243,11 @@ namespace UnitTests
             NodeConfiguration n = config.CreateNodeConfigurationForSilo(siloName);
             string fname = n.TraceFileName;
 
-            Assert.AreEqual(logFileName, fname);
+            Assert.Equal(logFileName, fname);
 
             LogManager.Initialize(n);
 
-            Assert.IsTrue(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
+            Assert.True(File.Exists(fileInfo.FullName), "Log file exists - before write: " + fileInfo.FullName);
 
             Logger myLogger = LogManager.GetLogger("MyLogger", LoggerType.Application);
 
@@ -257,11 +256,11 @@ namespace UnitTests
 
             fileInfo.Refresh(); // Need to refresh cached view of FileInfo
 
-            Assert.IsTrue(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
+            Assert.True(fileInfo.Exists, "Log file exists - after write: " + fileInfo.FullName);
 
             long currentSize = fileInfo.Length;
 
-            Assert.IsTrue(currentSize > initialSize, "Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize);
+            Assert.True(currentSize > initialSize, string.Format("Log file {0} should have been written to: Initial size = {1} Current size = {2}", logFileName, initialSize, currentSize));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -275,16 +274,16 @@ namespace UnitTests
             DeleteIfExists(fileInfo);
 
             bool fileExists = fileInfo.Exists;
-            Assert.IsFalse(fileExists, "Log file should not exist: " + fileInfo.FullName);
+            Assert.False(fileExists, "Log file should not exist: " + fileInfo.FullName);
 
             CreateIfNotExists(fileInfo);
 
             fileExists = fileInfo.Exists;
-            Assert.IsTrue(fileExists, "Log file should exist: " + fileInfo.FullName);
+            Assert.True(fileExists, "Log file should exist: " + fileInfo.FullName);
 
             long initialSize = fileInfo.Length;
-
-            Assert.AreEqual(0, initialSize, "Log file {0} should be empty. Current size = {1}", logFileName, initialSize);
+            bool isLogFileEmpty = initialSize == 0;
+            Assert.True(isLogFileEmpty, $"Log file {logFileName} should be empty. Current size = {initialSize}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -292,10 +291,9 @@ namespace UnitTests
         {
             var cfg = new ClientConfiguration();
             var str = cfg.ToString();
-            Assert.IsNotNull(str, "ClientConfiguration.ToString");
+            Assert.NotNull(str);
             output.WriteLine(str);
-            Assert.IsNull(cfg.SourceFile, "SourceFile");
-            //Assert.IsNull(cfg.TraceFileName, "TraceFileName");
+            Assert.Null(cfg.SourceFile);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -315,11 +313,11 @@ namespace UnitTests
             var cfg = new ClientConfiguration();
             cfg.TraceFilePattern = string.Empty;
             output.WriteLine(cfg.ToString());
-            Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
+           Assert.Null(cfg.TraceFileName);
 
             cfg.TraceFilePattern = null;
             output.WriteLine(cfg.ToString());
-            Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
+           Assert.Null(cfg.TraceFileName);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -339,11 +337,11 @@ namespace UnitTests
             var cfg = new NodeConfiguration();
             cfg.TraceFilePattern = string.Empty;
             output.WriteLine(cfg.ToString());
-            Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
+           Assert.Null(cfg.TraceFileName); // TraceFileName should be null
 
             cfg.TraceFilePattern = null;
             output.WriteLine(cfg.ToString());
-            Assert.IsNull(cfg.TraceFileName, "TraceFileName should be null");
+           Assert.Null(cfg.TraceFileName); // TraceFileName should be null
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Logger")]
@@ -354,16 +352,14 @@ namespace UnitTests
             string filename = "Config_LogConsumers-ClientConfiguration.xml";
 
             var cfg = ClientConfiguration.LoadFromFile(filename);
-            Assert.AreEqual(filename, cfg.SourceFile);
+            Assert.Equal(filename, cfg.SourceFile);
 
             LogManager.Initialize(cfg);
-            Assert.AreEqual(1, LogManager.LogConsumers.Count,
-                "Number of log consumers: " + string.Join(",", LogManager.LogConsumers));
-            Assert.AreEqual(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName, "Log consumer type #1");
+            Assert.Equal(1, LogManager.LogConsumers.Count);
+            Assert.Equal(typeof(DummyLogConsumer).FullName, LogManager.LogConsumers.Last().GetType().FullName); // Log consumer type #1
 
-            Assert.AreEqual(1, LogManager.TelemetryConsumers.Count,
-                "Number of telemetry consumers: " + string.Join(",", LogManager.TelemetryConsumers));
-            Assert.AreEqual(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName, "TelemetryConsumers consumer type #1");
+            Assert.Equal(1, LogManager.TelemetryConsumers.Count);
+            Assert.Equal(typeof(TraceTelemetryConsumer).FullName, LogManager.TelemetryConsumers.First().GetType().FullName); // TelemetryConsumers consumer type #1
 
         }
 
@@ -376,18 +372,18 @@ namespace UnitTests
 
             var cfg = new ClusterConfiguration();
             cfg.LoadFromFile(filename);
-            Assert.AreEqual(filename, cfg.SourceFile);
+            Assert.Equal(filename, cfg.SourceFile);
 
             LogManager.Initialize(cfg.CreateNodeConfigurationForSilo("Primary"));
 
             var actualLogConsumers = LogManager.LogConsumers.Select(x => x.GetType()).ToList();
-            Xunit.Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
-            Assert.AreEqual(1, actualLogConsumers.Count);
+            Assert.Contains(typeof(DummyLogConsumer), actualLogConsumers);
+            Assert.Equal(1, actualLogConsumers.Count);
 
             var actualTelemetryConsumers = LogManager.TelemetryConsumers.Select(x => x.GetType()).ToList();
-            Xunit.Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
-            Xunit.Assert.Contains(typeof(ConsoleTelemetryConsumer), actualTelemetryConsumers);
-            Assert.AreEqual(2, actualTelemetryConsumers.Count);
+            Assert.Contains(typeof(TraceTelemetryConsumer), actualTelemetryConsumers);
+            Assert.Contains(typeof(ConsoleTelemetryConsumer), actualTelemetryConsumers);
+            Assert.Equal(2, actualTelemetryConsumers.Count);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -398,23 +394,23 @@ namespace UnitTests
 
             string limitName;
             LimitValue limit;
-            //Assert.IsTrue(config.LimitManager.LimitValues.Count >= 3, "Number of LimitValues: " + string.Join(",", config.LimitValues));
+            //Assert.True(config.LimitManager.LimitValues.Count >= 3, "Number of LimitValues: " + string.Join(",", config.LimitValues));
             for (int i = 1; i <= 3; i++)
             {
                 limitName = "Limit" + i;
                 limit = config.LimitManager.GetLimit(limitName);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
 
             limitName = "NoHardLimit";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(4, limit.SoftLimitThreshold, "Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(4, limit.SoftLimitThreshold); // Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // Hard limit " + limitName
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -425,28 +421,28 @@ namespace UnitTests
             orleansConfig.LoadFromFile(filename);
             NodeConfiguration config;
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
-            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+            Assert.True(hasNodeConfig); // Node Primary has config
 
 
             string limitName;
             LimitValue limit;
-            //Assert.IsTrue(config.LimitManager.LimitValues.Count >= 3, "Number of LimitValues: " + string.Join(",", config.LimitValues));
+            //Assert.True(config.LimitManager.LimitValues.Count >= 3, "Number of LimitValues: " + string.Join(",", config.LimitValues));
             for (int i = 1; i <= 3; i++)
             {
                 limitName = "Limit" + i;
                 limit = config.LimitManager.GetLimit(limitName);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
 
             limitName = "NoHardLimit";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(4, limit.SoftLimitThreshold, "Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(4, limit.SoftLimitThreshold); // Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // Hard limit " + limitName
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -457,9 +453,9 @@ namespace UnitTests
 
             string limitName = "NotPresent";
             LimitValue limit = config.LimitManager.GetLimit(limitName);
-            Assert.AreEqual(0, limit.SoftLimitThreshold);
-            Assert.AreEqual(0, limit.HardLimitThreshold);
-            Assert.AreEqual(limitName, limit.Name);
+            Assert.Equal(0, limit.SoftLimitThreshold);
+            Assert.Equal(0, limit.HardLimitThreshold);
+            Assert.Equal(limitName, limit.Name);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -470,14 +466,13 @@ namespace UnitTests
             orleansConfig.LoadFromFile(filename);
             NodeConfiguration config;
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
-            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
-
+            Assert.True(hasNodeConfig, "Node Primary has config");
 
             string limitName = "NotPresent";
             LimitValue limit = config.LimitManager.GetLimit(limitName);
-            Assert.AreEqual(0, limit.SoftLimitThreshold);
-            Assert.AreEqual(0, limit.HardLimitThreshold);
-            Assert.AreEqual(limitName, limit.Name);
+            Assert.Equal(0, limit.SoftLimitThreshold);
+            Assert.Equal(0, limit.HardLimitThreshold);
+            Assert.Equal(limitName, limit.Name);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -488,7 +483,7 @@ namespace UnitTests
             orleansConfig.LoadFromFile(filename);
             NodeConfiguration config;
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
-            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+            Assert.True(hasNodeConfig, "Node Primary has config");
 
 
             string limitName;
@@ -497,25 +492,25 @@ namespace UnitTests
             {
                 limitName = "Limit" + i;
                 limit = config.LimitManager.GetLimit(limitName);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
 
             limitName = "NoHardLimit";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(4, limit.SoftLimitThreshold, "Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(4, limit.SoftLimitThreshold); // Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + limitName
 
             limitName = "NotPresent";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(0, limit.SoftLimitThreshold, "No Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(0, limit.SoftLimitThreshold); // No Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + limitName
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -530,25 +525,25 @@ namespace UnitTests
             {
                 limitName = "Limit" + i;
                 limit = config.LimitManager.GetLimit(limitName);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
 
             limitName = "NoHardLimit";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(4, limit.SoftLimitThreshold, "Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(4, limit.SoftLimitThreshold); // Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + limitName
 
             limitName = "NotPresent";
             limit = config.LimitManager.GetLimit(limitName);
-            Assert.IsNotNull(limit);
-            Assert.AreEqual(limitName, limit.Name, "Limit name " + limitName);
-            Assert.AreEqual(0, limit.SoftLimitThreshold, "No Soft limit " + limitName);
-            Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + limitName);
+            Assert.NotNull(limit);
+            Assert.Equal(limitName, limit.Name); // Limit name " + limitName
+            Assert.Equal(0, limit.SoftLimitThreshold); // No Soft limit " + limitName
+            Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + limitName
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Limits")]
@@ -563,19 +558,19 @@ namespace UnitTests
             {
                 limitName = "NotPresent" + i;
                 limit = config.LimitManager.GetLimit(limitName, i);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + i
             }
             for (int i = 1; i <= 3; i++)
             {
                 limitName = "NotPresent" + i;
                 limit = config.LimitManager.GetLimit(limitName, i, 2 * i);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
         }
 
@@ -587,7 +582,7 @@ namespace UnitTests
             orleansConfig.LoadFromFile(filename);
             NodeConfiguration config;
             bool hasNodeConfig = orleansConfig.TryGetNodeConfigurationForSilo("Primary", out config);
-            Assert.IsTrue(hasNodeConfig, "Node Primary has config");
+            Assert.True(hasNodeConfig); // Node Primary has config"
 
             string limitName;
             LimitValue limit;
@@ -595,19 +590,19 @@ namespace UnitTests
             {
                 limitName = "NotPresent" + i;
                 limit = config.LimitManager.GetLimit(limitName, i);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(0, limit.HardLimitThreshold, "No Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(0, limit.HardLimitThreshold); // No Hard limit " + i
             }
             for (int i = 1; i <= 3; i++)
             {
                 limitName = "NotPresent" + i;
                 limit = config.LimitManager.GetLimit(limitName, i, 2 * i);
-                Assert.IsNotNull(limit);
-                Assert.AreEqual(limitName, limit.Name, "Limit name " + i);
-                Assert.AreEqual(i, limit.SoftLimitThreshold, "Soft limit " + i);
-                Assert.AreEqual(2 * i, limit.HardLimitThreshold, "Hard limit " + i);
+                Assert.NotNull(limit);
+                Assert.Equal(limitName, limit.Name); // Limit name " + i
+                Assert.Equal(i, limit.SoftLimitThreshold); // Soft limit " + i
+                Assert.Equal(2 * i, limit.HardLimitThreshold); // Hard limit " + i
             }
         }
 
@@ -619,7 +614,7 @@ namespace UnitTests
             output.WriteLine("Input = " + azureConnectionStringInput);
             string azureConnectionString = ConfigUtilities.PrintDataConnectionInfo(azureConnectionStringInput);
             output.WriteLine("Output = " + azureConnectionString);
-            Assert.IsTrue(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
+            Assert.True(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed account key info from Azure connection string " + azureConnectionString);
         }
 
@@ -631,7 +626,7 @@ namespace UnitTests
             output.WriteLine("Input = " + sqlConnectionStringInput);
             string sqlConnectionString = ConfigUtilities.PrintSqlConnectionString(sqlConnectionStringInput);
             output.WriteLine("Output = " + sqlConnectionString);
-            Assert.IsTrue(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
+            Assert.True(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);
         }
 
@@ -643,13 +638,11 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
             var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Storage"];
-            Assert.IsNotNull(providerConfigs, "Null provider configs");
-            Assert.IsNotNull(providerConfigs.Providers, "Null providers");
-            Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
+            ValidateProviderConfigs(providerConfigs, numProviders);
 
             ProviderConfiguration pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[0];
-            Assert.AreEqual("orleanstest1", pCfg.Name, "Provider name #1");
-            Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #1");
+            Assert.Equal("orleanstest1", pCfg.Name); // Provider name #1
+            Assert.Equal("AzureTable", pCfg.Type); // Provider type #1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -660,17 +653,16 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
             var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Storage"];
-            Assert.IsNotNull(providerConfigs, "Null provider configs");
-            Assert.IsNotNull(providerConfigs.Providers, "Null providers");
-            Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
+            ValidateProviderConfigs(providerConfigs, numProviders);
+
 
             ProviderConfiguration pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[0];
-            Assert.AreEqual("orleanstest1", pCfg.Name, "Provider name #1");
-            Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #1");
+            Assert.Equal("orleanstest1", pCfg.Name); // Provider name #1
+            Assert.Equal("AzureTable", pCfg.Type); // Provider type #1
 
             pCfg = (ProviderConfiguration)providerConfigs.Providers.Values.ToList()[1];
-            Assert.AreEqual("orleanstest2", pCfg.Name, "Provider name #2");
-            Assert.AreEqual("AzureTable", pCfg.Type, "Provider type #2");
+            Assert.Equal("orleanstest2", pCfg.Name); // Provider name #2
+            Assert.Equal("AzureTable", pCfg.Type); // Provider type #2
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
@@ -681,14 +673,12 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
             var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Storage"];
-            Assert.IsNotNull(providerConfigs, "Null provider configs");
-            Assert.IsNotNull(providerConfigs.Providers, "Null providers");
-            Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
+            ValidateProviderConfigs(providerConfigs, numProviders);
             for (int i = 0; i < providerConfigs.Providers.Count; i++)
             {
                 IProviderConfiguration provider = providerConfigs.Providers.Values.ToList()[i];
-                Assert.AreEqual("test" + i, ((ProviderConfiguration)provider).Name, "Provider name #" + i);
-                Assert.AreEqual(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type, "Provider type #" + i);
+                Assert.Equal("test" + i, ((ProviderConfiguration)provider).Name); // Provider name #" + i
+                Assert.Equal(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type); // Provider type #" + i
             }
         }
 
@@ -700,22 +690,21 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
             var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Storage"];
-            Assert.IsNotNull(providerConfigs, "Null provider configs");
-            Assert.IsNotNull(providerConfigs.Providers, "Null providers");
-            Assert.AreEqual(numProviders, providerConfigs.Providers.Count, "Num provider configs");
+            ValidateProviderConfigs(providerConfigs, numProviders);
+
             for (int i = 0; i < providerConfigs.Providers.Count; i++)
             {
                 IProviderConfiguration provider = providerConfigs.Providers.Values.ToList()[i];
-                Assert.AreEqual("config" + i, ((ProviderConfiguration)provider).Name, "Provider name #" + i);
-                Assert.AreEqual(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type, "Provider type #" + i);
+                Assert.Equal("config" + i, ((ProviderConfiguration)provider).Name); // Provider name #" + i
+                Assert.Equal(typeof(MockStorageProvider).FullName, ((ProviderConfiguration)provider).Type); // Provider type #" + i
                 for (int j = 0; j < 2; j++)
                 {
                     int num = 2 * i + j;
                     string key = "Prop" + num;
                     string cfg = provider.Properties[key];
-                    Assert.IsNotNull(cfg, "Null config value " + key);
-                    Assert.IsFalse(string.IsNullOrWhiteSpace(cfg), "Blank config value " + key);
-                    Assert.AreEqual(num.ToString(CultureInfo.InvariantCulture), cfg, "Config value {0} = {1}", key, cfg);
+                    Assert.NotNull(cfg); // Null config value " + key
+                    Assert.False(string.IsNullOrWhiteSpace(cfg)); // Blank config value " + key
+                    Assert.Equal(num.ToString(CultureInfo.InvariantCulture), string.Format(cfg, "Config value {0} = {1}", key, cfg));
                 }
             }
         }
@@ -728,8 +717,8 @@ namespace UnitTests
             var orleansConfig = new ClusterConfiguration();
             orleansConfig.LoadFromFile(filename);
 
-            Assert.IsNotNull(orleansConfig.Defaults.AdditionalAssemblyDirectories, "Additional Assembly Dictionary");
-            Assert.AreEqual(numPaths, orleansConfig.Defaults.AdditionalAssemblyDirectories.Count, "Additional Assembly count");
+            Assert.NotNull(orleansConfig.Defaults.AdditionalAssemblyDirectories); // Additional Assembly Dictionary
+            Assert.Equal(numPaths, orleansConfig.Defaults.AdditionalAssemblyDirectories.Count); // Additional Assembly count
 
         }
 
@@ -743,8 +732,8 @@ namespace UnitTests
 
             output.WriteLine(config.Globals.ToString());
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, config.Globals.ReminderServiceType, "ReminderServiceType");
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.MembershipTableGrain, config.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain, config.Globals.ReminderServiceType); // ReminderServiceType
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Gateway")]
@@ -756,7 +745,7 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.AreEqual(ClientConfiguration.GatewayProviderType.Config, config.GatewayProvider, "GatewayProviderType");
+            Assert.Equal(ClientConfiguration.GatewayProviderType.Config, config.GatewayProvider); // GatewayProviderType
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -774,11 +763,11 @@ namespace UnitTests
 
                 output.WriteLine(config);
 
-                Assert.IsNotNull(config, "Client.CurrentConfig");
+                Assert.NotNull(config); // Client.CurrentConfig
 
-                Assert.AreEqual(filename, Path.GetFileName(config.SourceFile), "ClientConfig.SourceFile");
+                Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
 
-                Assert.AreEqual(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider, "GatewayProviderType");
+                Assert.Equal(ClientConfiguration.GatewayProviderType.AzureTable, config.GatewayProvider); // GatewayProviderType
             }
             finally
             {
@@ -793,7 +782,7 @@ namespace UnitTests
             GrainClient.TestOnlyNoConnect = true;
             try
             {
-                Xunit.Assert.Throws<FileNotFoundException>(() =>
+                Assert.Throws<FileNotFoundException>(() =>
                     GrainClient.Initialize(filename));
             }
             finally
@@ -806,7 +795,7 @@ namespace UnitTests
         public void ClientConfig_FromFile_FileNotFound()
         {
             const string filename = "ClientConfig_NotFound.xml";
-            Xunit.Assert.Throws<FileNotFoundException>(() =>
+            Assert.Throws<FileNotFoundException>(() =>
             ClientConfiguration.LoadFromFile(filename));
         }
 
@@ -815,7 +804,7 @@ namespace UnitTests
         {
             const string filename = "SiloConfig_NotFound.xml";
             var config = new ClusterConfiguration();
-            Xunit.Assert.Throws<FileNotFoundException>(() =>
+            Assert.Throws<FileNotFoundException>(() =>
                 config.LoadFromFile(filename));
         }
 
@@ -826,10 +815,10 @@ namespace UnitTests
 
             var config = ClientConfiguration.LoadFromFile(filename);
 
-            Assert.IsNotNull(config, "ClientConfiguration null");
-            Assert.IsNotNull(config.ToString(), "ClientConfiguration.ToString");
+            Assert.NotNull(config); // ClientConfiguration null
+            Assert.NotNull(config.ToString()); // ClientConfiguration.ToString
 
-            Assert.AreEqual(filename, Path.GetFileName(config.SourceFile), "ClientConfig.SourceFile");
+            Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // ClientConfig.SourceFile
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -840,9 +829,9 @@ namespace UnitTests
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
 
-            Assert.IsNotNull(config.ToString(), "OrleansConfiguration.ToString");
+            Assert.NotNull(config.ToString()); // OrleansConfiguration.ToString
 
-            Assert.AreEqual(filename, Path.GetFileName(config.SourceFile), "OrleansConfiguration.SourceFile");
+            Assert.Equal(filename, Path.GetFileName(config.SourceFile)); // OrleansConfiguration.SourceFile
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
@@ -854,14 +843,14 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider, "GatewayProviderType");
-            Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProviderToUse, "GatewayProviderToUse");
+            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider); // GatewayProviderType
+            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProviderToUse); // GatewayProviderToUse
 
-            Assert.IsNotNull(config.DataConnectionString, "Connection string should not be null");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(config.DataConnectionString), "Connection string should not be blank");
+            Assert.NotNull(config.DataConnectionString); // Connection string should not be null
+            Assert.False(string.IsNullOrWhiteSpace(config.DataConnectionString)); // Connection string should not be blank
 
-            Assert.IsFalse(config.UseAzureSystemStore, "Should not be using Azure storage");
-            Assert.IsTrue(config.UseSqlSystemStore, "Should be using SqlServer storage");
+            Assert.False(config.UseAzureSystemStore); // Should not be using Azure storage
+            Assert.True(config.UseSqlSystemStore); // Should be using SqlServer storage
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
@@ -873,14 +862,14 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.AreEqual(1, config.ProviderConfigurations.Count, "Number of Providers Types");
-            Assert.AreEqual("Statistics", config.ProviderConfigurations.Keys.First(), "Client Stats Providers");
+            Assert.Equal(1, config.ProviderConfigurations.Count); // Number of Providers Types
+            Assert.Equal("Statistics", config.ProviderConfigurations.Keys.First()); // Client Stats Providers
             ProviderCategoryConfiguration statsProviders = config.ProviderConfigurations["Statistics"];
-            Assert.AreEqual(1, statsProviders.Providers.Count, "Number of Stats Providers");
-            Assert.AreEqual("SQL", statsProviders.Providers.Keys.First(), "Stats provider name");
+            Assert.Equal(1, statsProviders.Providers.Count); // Number of Stats Providers
+            Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.AreEqual("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type, "Stats provider class name");
+            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
@@ -896,16 +885,16 @@ namespace UnitTests
 
             output.WriteLine(orleansConfig.Globals);
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.SqlServer, orleansConfig.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.SqlServer, orleansConfig.Globals.ReminderServiceType, "ReminderServiceType");
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.SqlServer, orleansConfig.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.SqlServer, orleansConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.IsNotNull(orleansConfig.Globals.DataConnectionString, "DataConnectionString should not be null");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(orleansConfig.Globals.DataConnectionString), "DataConnectionString should not be blank");
+            Assert.NotNull(orleansConfig.Globals.DataConnectionString); // DataConnectionString should not be null
+            Assert.False(string.IsNullOrWhiteSpace(orleansConfig.Globals.DataConnectionString)); // DataConnectionString should not be blank
 
-            Assert.IsFalse(orleansConfig.Globals.UseAzureSystemStore, "Should not be using Azure storage");
-            Assert.IsTrue(orleansConfig.Globals.UseSqlSystemStore, "Should be using SqlServer storage");
+            Assert.False(orleansConfig.Globals.UseAzureSystemStore); // Should not be using Azure storage
+            Assert.True(orleansConfig.Globals.UseSqlSystemStore); // Should be using SqlServer storage
 
-            Assert.AreEqual(orleansConfig.Globals.ServiceId, myGuid, "ServiceId");
+            Assert.Equal(orleansConfig.Globals.ServiceId, myGuid); // ServiceId
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("SqlServer")]
@@ -918,14 +907,14 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.AreEqual(2, config.Globals.ProviderConfigurations.Count, "Number of Providers Types");
-            Assert.IsTrue(config.Globals.ProviderConfigurations.Keys.Contains("Statistics"), "Stats Providers");
+            Assert.Equal(2, config.Globals.ProviderConfigurations.Count); // Number of Providers Types
+            Assert.True(config.Globals.ProviderConfigurations.Keys.Contains("Statistics")); // Stats Providers
             ProviderCategoryConfiguration statsProviders = config.Globals.ProviderConfigurations["Statistics"];
-            Assert.AreEqual(1, statsProviders.Providers.Count, "Number of Stats Providers");
-            Assert.AreEqual("SQL", statsProviders.Providers.Keys.First(), "Stats provider name");
+            Assert.Equal(1, statsProviders.Providers.Count); // Number of Stats Providers
+            Assert.Equal("SQL", statsProviders.Providers.Keys.First()); // Stats provider name
             ProviderConfiguration providerConfig = (ProviderConfiguration)statsProviders.Providers["SQL"];
             // Note: Use string here instead of typeof(SqlStatisticsPublisher).FullName to prevent cascade load of this type
-            Assert.AreEqual("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type, "Stats provider class name");
+            Assert.Equal("Orleans.Providers.SqlServer.SqlStatisticsPublisher", providerConfig.Type); // Stats provider class name
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -952,14 +941,14 @@ namespace UnitTests
 
             ClusterConfiguration siloConfig = host.Config;
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType, "ReminderServiceType");
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.AreEqual(deploymentId, siloConfig.Globals.DeploymentId, "DeploymentId");
-            Assert.AreEqual(connectionString, siloConfig.Globals.DataConnectionString, "DataConnectionString");
+            Assert.Equal(deploymentId, siloConfig.Globals.DeploymentId); // DeploymentId
+            Assert.Equal(connectionString, siloConfig.Globals.DataConnectionString); // DataConnectionString
 
-            Assert.IsTrue(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.IsFalse(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
+            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -976,8 +965,8 @@ namespace UnitTests
 
             output.WriteLine(siloConfig.Globals);
 
-            Assert.AreEqual("", siloConfig.SourceFile, "SourceFile should be blank for programmatic config");
-            Assert.AreEqual(11, siloConfig.Globals.CacheSize, "CacheSize picked up from config object");
+            Assert.Equal("", siloConfig.SourceFile); // SourceFile should be blank for programmatic config
+            Assert.Equal(11, siloConfig.Globals.CacheSize); // CacheSize picked up from config object
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config")]
@@ -995,8 +984,8 @@ namespace UnitTests
 
             output.WriteLine(config);
 
-            Assert.AreEqual(null, config.SourceFile, "SourceFile should be blank for programmatic config");
-            Assert.AreEqual(11, config.PreferedGatewayIndex, "PreferedGatewayIndex picked up from config object");
+            Assert.Equal(null, config.SourceFile); // SourceFile should be blank for programmatic config
+            Assert.Equal(11, config.PreferedGatewayIndex); // PreferedGatewayIndex picked up from config object
 
             config.CheckGatewayProviderSettings();
         }
@@ -1008,12 +997,12 @@ namespace UnitTests
 
             var config = new ClusterConfiguration();
             config.LoadFromFile(filename);
-            Assert.IsTrue(config.Globals.MembershipTableAssembly == "MembershipTableDLL");
-            Assert.IsTrue(config.Globals.ReminderTableAssembly == "RemindersTableDLL");
-            Assert.IsTrue(config.Globals.AdoInvariant == "AdoInvariantValue");
-            Assert.IsTrue(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
-            Assert.IsTrue(config.Globals.DataConnectionString == "MembershipConnectionString");
-            Assert.IsTrue(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
+            Assert.True(config.Globals.MembershipTableAssembly == "MembershipTableDLL");
+            Assert.True(config.Globals.ReminderTableAssembly == "RemindersTableDLL");
+            Assert.True(config.Globals.AdoInvariant == "AdoInvariantValue");
+            Assert.True(config.Globals.AdoInvariantForReminders == "AdoInvariantForReminders");
+            Assert.True(config.Globals.DataConnectionString == "MembershipConnectionString");
+            Assert.True(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -1028,14 +1017,14 @@ namespace UnitTests
 
             output.WriteLine(siloConfig.Globals);
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType, "ReminderServiceType");
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.IsNotNull(siloConfig.Globals.DataConnectionString, "DataConnectionString should not be null");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString), "DataConnectionString should not be blank");
+            Assert.NotNull(siloConfig.Globals.DataConnectionString); // DataConnectionString should not be null
+            Assert.False(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString)); // DataConnectionString should not be blank
 
-            Assert.IsTrue(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.IsFalse(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
+            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
@@ -1048,14 +1037,14 @@ namespace UnitTests
             var siloConfig = new ClusterConfiguration();
             siloConfig.LoadFromFile(filename);
 
-            Assert.AreEqual(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType, "LivenessType");
-            Assert.AreEqual(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType, "ReminderServiceType");
+            Assert.Equal(GlobalConfiguration.LivenessProviderType.AzureTable, siloConfig.Globals.LivenessType); // LivenessType
+            Assert.Equal(GlobalConfiguration.ReminderServiceProviderType.AzureTable, siloConfig.Globals.ReminderServiceType); // ReminderServiceType
 
-            Assert.IsNotNull(siloConfig.Globals.DataConnectionString, "DataConnectionString should not be null");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString), "DataConnectionString should not be blank");
+            Assert.NotNull(siloConfig.Globals.DataConnectionString); // DataConnectionString should not be null
+            Assert.False(string.IsNullOrWhiteSpace(siloConfig.Globals.DataConnectionString), "DataConnectionString should not be blank");
 
-            Assert.IsTrue(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
-            Assert.IsFalse(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
+            Assert.True(siloConfig.Globals.UseAzureSystemStore, "Should be using Azure storage");
+            Assert.False(siloConfig.Globals.UseSqlSystemStore, "Should not be using SqlServer storage");
         }
 
         internal static void DeleteIfExists(FileInfo fileInfo)
@@ -1065,8 +1054,8 @@ namespace UnitTests
                 fileInfo.Delete();
                 fileInfo.Refresh();
             }
-            Assert.IsFalse(File.Exists(fileInfo.FullName), "File.Exists: {0}", fileInfo.FullName);
-            Assert.IsFalse(fileInfo.Exists, "FileInfo.Exists: {0}", fileInfo.FullName);
+            Assert.False(File.Exists(fileInfo.FullName), $"File.Exists: {fileInfo.FullName}");
+            Assert.False(fileInfo.Exists, $"FileInfo.Exists: {fileInfo.FullName}");
         }
 
         internal static void CreateIfNotExists(FileInfo fileInfo)
@@ -1079,8 +1068,15 @@ namespace UnitTests
                 }
                 fileInfo.Refresh();
             }
-            Assert.IsTrue(File.Exists(fileInfo.FullName), "File.Exists: {0}", fileInfo.FullName);
-            Assert.IsTrue(fileInfo.Exists, "FileInfo.Exists: {0}", fileInfo.FullName);
+            Assert.True(File.Exists(fileInfo.FullName), $"File.Exists: {fileInfo.FullName}");
+            Assert.True(fileInfo.Exists, $"FileInfo.Exists: {fileInfo.FullName}");
+        }
+
+        private static void ValidateProviderConfigs(ProviderCategoryConfiguration providerConfigs, int numProviders)
+        {
+            Assert.NotNull(providerConfigs); // Null provider configs
+            Assert.NotNull(providerConfigs.Providers); // Null providers
+            Assert.Equal(numProviders, providerConfigs.Providers.Count); // Num provider configs
         }
     }
 

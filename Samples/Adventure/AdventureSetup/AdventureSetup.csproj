@@ -100,9 +100,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Adventure.cs" />
-    <Compile Include="OrleansHostWrapper.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureSetup\Adventure.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureSetup\OrleansHostWrapper.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureSetup\Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -120,10 +120,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="AdventureMap.json">
+    <Content Include="..\..\AdventureDotNetCli\AdventureSetup\AdventureMap.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="OrleansConfiguration.xml">
+    <Content Include="..\..\AdventureDotNetCli\AdventureSetup\OrleansConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

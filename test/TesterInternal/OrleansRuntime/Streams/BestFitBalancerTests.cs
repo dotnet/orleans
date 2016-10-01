@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Streams;
 using Xunit;
 
@@ -141,10 +140,10 @@ namespace UnitTests.OrleansRuntime.Streams
             Dictionary<int, List<int>> balancerResultsFromReversedInputs = resourceBalancer.GetDistribution(buckets);
             ValidateBalance(buckets, resources, balancerResultsFromReversedInputs, idealBalance);
 
-            Assert.IsTrue(balancerResults.Keys.SequenceEqual(balancerResultsFromReversedInputs.Keys), "Bucket order");
+            Assert.True(balancerResults.Keys.SequenceEqual(balancerResultsFromReversedInputs.Keys), "Bucket order");
             foreach (int bucket in balancerResults.Keys)
             {
-                Assert.IsTrue(balancerResults[bucket].SequenceEqual(balancerResultsFromReversedInputs[bucket]), "Resource order");
+                Assert.True(balancerResults[bucket].SequenceEqual(balancerResultsFromReversedInputs[bucket]), "Resource order");
             }
         }
 
@@ -154,20 +153,20 @@ namespace UnitTests.OrleansRuntime.Streams
             var resultResources = new List<int>();
             foreach (KeyValuePair<int, List<int>> kvp in balancerResults)
             {
-                Assert.IsFalse(resultBuckets.Contains(kvp.Key), "Duplicate bucket found.");
-                Assert.IsTrue(buckets.Contains(kvp.Key), "Unknown bucket found.");
+                Assert.False(resultBuckets.Contains(kvp.Key), "Duplicate bucket found.");
+                Assert.True(buckets.Contains(kvp.Key), "Unknown bucket found.");
                 resultBuckets.Add(kvp.Key);
                 kvp.Value.ForEach(resource =>
                 {
-                    Assert.IsFalse(resultResources.Contains(resource), "Duplicate resource found.");
-                    Assert.IsTrue(resources.Contains(resource), "Unknown resource found.");
+                    Assert.False(resultResources.Contains(resource), "Duplicate resource found.");
+                    Assert.True(resources.Contains(resource), "Unknown resource found.");
                     resultResources.Add(resource);
                 });
-                Assert.IsTrue(idealBalance <= kvp.Value.Count, "Balance not ideal");
-                Assert.IsTrue(idealBalance + 1 >= kvp.Value.Count, "Balance not ideal");
+                Assert.True(idealBalance <= kvp.Value.Count, "Balance not ideal");
+                Assert.True(idealBalance + 1 >= kvp.Value.Count, "Balance not ideal");
             }
-            Assert.AreEqual(buckets.Count, resultBuckets.Count, "bucket counts do not match");
-            Assert.AreEqual(resources.Count, resultResources.Count, "resource counts do not match");
+            Assert.Equal(buckets.Count, resultBuckets.Count);  // "bucket counts do not match"
+            Assert.Equal(resources.Count, resultResources.Count);  // "resource counts do not match"
         }
     }
 }

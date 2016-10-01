@@ -1,9 +1,9 @@
 
 using System;
 using System.Threading.Tasks;
-using Orleans.Streams;
-using Orleans.Runtime;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {

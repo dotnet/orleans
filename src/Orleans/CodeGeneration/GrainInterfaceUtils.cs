@@ -4,9 +4,8 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
 {

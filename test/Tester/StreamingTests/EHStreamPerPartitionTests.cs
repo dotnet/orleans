@@ -31,8 +31,8 @@ namespace UnitTests.StreamingTests
         private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
                 EHConsumerGroup, EHPath);
 
-        private static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        private static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
             new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
@@ -63,7 +63,7 @@ namespace UnitTests.StreamingTests
                 var settings = new Dictionary<string, string>();
 
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
                 EventHubConfig.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 

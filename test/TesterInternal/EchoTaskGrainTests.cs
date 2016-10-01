@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {
@@ -50,7 +49,7 @@ namespace UnitTests.General
             string received = await grain.EchoAsync(expectedEcho);
             logger.Info("EchoGrain.Echo took " + clock.Elapsed);
 
-            Assert.AreEqual(expectedEcho, received);
+            Assert.Equal(expectedEcho, received);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -61,14 +60,14 @@ namespace UnitTests.General
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
             bool ok = promise.ContinueWith(t =>
             {
-                if (!t.IsFaulted) Assert.Fail("EchoError should not have completed successfully");
+                if (!t.IsFaulted) Assert.True(false); // EchoError should not have completed successfully
 
                 Exception exc = t.Exception;
                 while (exc is AggregateException) exc = exc.InnerException;
                 string received = exc.Message;
-                Assert.AreEqual(expectedEchoError, received);
+                Assert.Equal(expectedEchoError, received);
             }).Wait(timeout);
-            Assert.IsTrue(ok, "Finished OK");
+            Assert.True(ok); // Finished OK
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
@@ -84,16 +83,16 @@ namespace UnitTests.General
             Task<int> promise = grain.BlockingCallTimeoutAsync(delay60);
             bool ok = promise.ContinueWith(t =>
             {
-                if (!t.IsFaulted) Assert.Fail("BlockingCallTimeout should not have completed successfully");
+                if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
 
                 Exception exc = t.Exception;
                 while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsInstanceOfType(exc, typeof(TimeoutException), "Received exception type: {0}", exc);
+                Assert.IsAssignableFrom<TimeoutException>(exc);
             }).Wait(delay45);
             sw.Stop();
-            Assert.IsTrue(ok, "Wait should not have timed-out. The grain call should have time out.");
-            Assert.IsTrue(TimeIsLonger(sw.Elapsed, delay30), "Elapsted time out of range: {0}", sw.Elapsed);
-            Assert.IsTrue(TimeIsShorter(sw.Elapsed, delay60), "Elapsted time out of range: {0}", sw.Elapsed);
+            Assert.True(ok); // Wait should not have timed-out. The grain call should have time out.
+            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -108,16 +107,16 @@ namespace UnitTests.General
             try
             {
                 int res = await grain.BlockingCallTimeoutAsync(delay60);
-                Assert.Fail("BlockingCallTimeout should not have completed successfully");
+                Assert.True(false); // BlockingCallTimeout should not have completed successfully
             }
             catch (Exception exc)
             {
                 while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsInstanceOfType(exc, typeof(TimeoutException), "Received exception type: {0}", exc);
+                Assert.IsAssignableFrom<TimeoutException>(exc);
             }
             sw.Stop();
-            Assert.IsTrue(TimeIsLonger(sw.Elapsed, delay30), "Elapsted time out of range: {0}", sw.Elapsed);
-            Assert.IsTrue(TimeIsShorter(sw.Elapsed, delay60), "Elapsted time out of range: {0}", sw.Elapsed);
+            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
@@ -132,16 +131,16 @@ namespace UnitTests.General
             try
             {
                 int res = await grain.BlockingCallTimeoutAsync(delay60);
-                Assert.Fail("BlockingCallTimeout should not have completed successfully, but returned " + res);
+                Assert.True(false, "BlockingCallTimeout should not have completed successfully, but returned " + res);
             }
             catch (Exception exc)
             {
                 while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsInstanceOfType(exc, typeof(TimeoutException), "Received exception type: {0}", exc);
+                Assert.IsAssignableFrom<TimeoutException>(exc);
             }
             sw.Stop();
-            Assert.IsTrue(TimeIsLonger(sw.Elapsed, delay30), "Elapsted time out of range: {0}", sw.Elapsed);
-            Assert.IsTrue(TimeIsShorter(sw.Elapsed, delay60), "Elapsted time out of range: {0}", sw.Elapsed);
+            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -155,7 +154,7 @@ namespace UnitTests.General
             string received = await grain.GetLastEchoAsync();
             logger.Info("EchoGrain.LastEcho took " + clock.Elapsed);
 
-            Assert.AreEqual(expectedEcho, received, "LastEcho-Echo");
+            Assert.Equal(expectedEcho, received); // LastEcho-Echo
 
             EchoGrain_EchoError();
 
@@ -163,7 +162,7 @@ namespace UnitTests.General
             received = await grain.GetLastEchoAsync();
             logger.Info("EchoGrain.LastEcho-Error took " + clock.Elapsed);
 
-            Assert.AreEqual(expectedEchoError, received, "LastEcho-Error");
+            Assert.Equal(expectedEchoError, received); // LastEcho-Error
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -261,13 +260,13 @@ namespace UnitTests.General
             IBlockingEchoTaskGrain g = GrainClient.GrainFactory.GetGrain<IBlockingEchoTaskGrain>(GetRandomGrainId());
 
             string received = await g.Echo(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "Echo");
+            Assert.Equal(expectedEcho, received); // Echo
 
             received = await g.CallMethodAV_Await(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "CallMethodAV_Await");
+            Assert.Equal(expectedEcho, received); // CallMethodAV_Await
 
             received = await g.CallMethodTask_Await(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "CallMethodTask_Await");
+            Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Echo")]
@@ -276,13 +275,13 @@ namespace UnitTests.General
             IReentrantBlockingEchoTaskGrain g = GrainClient.GrainFactory.GetGrain<IReentrantBlockingEchoTaskGrain>(GetRandomGrainId());
 
             string received = await g.Echo(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "Echo");
+            Assert.Equal(expectedEcho, received); // Echo
 
             received = await g.CallMethodAV_Await(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "CallMethodAV_Await");
+            Assert.Equal(expectedEcho, received); // CallMethodAV_Await
 
             received = await g.CallMethodTask_Await(expectedEcho);
-            Assert.AreEqual(expectedEcho, received, "CallMethodTask_Await");
+            Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
         // ---------- Utility methods ----------

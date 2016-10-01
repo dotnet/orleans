@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using Xunit;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.General
 {

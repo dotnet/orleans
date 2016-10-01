@@ -1,9 +1,8 @@
 using System;
 using System.Net;
 using System.Threading;
-
-using Orleans.Runtime.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {

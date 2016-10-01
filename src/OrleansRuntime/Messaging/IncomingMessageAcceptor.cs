@@ -50,7 +50,9 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
+#if !NETSTANDARD_TODO
                 AcceptingSocket.BeginAccept(AcceptCallback, this);
+#endif
             }
             catch (Exception ex)
             {
@@ -98,7 +100,7 @@ namespace Orleans.Runtime.Messaging
 
             if (Cts.IsCancellationRequested) return false;
 
-            if (!ReadConnectionPreemble(sock, out client))
+            if (!ReadConnectionPreamble(sock, out client))
             {
                 return false;
             }
@@ -132,7 +134,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private bool ReadConnectionPreemble(Socket socket, out GrainId grainId)
+        private bool ReadConnectionPreamble(Socket socket, out GrainId grainId)
         {
             grainId = null;
             byte[] buffer = null;
@@ -171,7 +173,7 @@ namespace Orleans.Runtime.Messaging
                     if (bytesRead == 0)
                     {
                         Log.Warn(ErrorCode.GatewayAcceptor_SocketClosed,
-                            "Remote socket closed while receiving connection preemble data from endpoint {0}.", sock.RemoteEndPoint);
+                            "Remote socket closed while receiving connection preamble data from endpoint {0}.", sock.RemoteEndPoint);
                         return null;
                     }
                     offset += bytesRead;
@@ -179,7 +181,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception ex)
                 {
                     Log.Warn(ErrorCode.GatewayAcceptor_ExceptionReceiving,
-                        "Exception receiving connection preemble data from endpoint " + sock.RemoteEndPoint, ex);
+                        "Exception receiving connection preamble data from endpoint " + sock.RemoteEndPoint, ex);
                     return null;
                 }
             }
@@ -205,6 +207,7 @@ namespace Orleans.Runtime.Messaging
             OpenReceiveSockets.Clear();
         }
 
+#if !NETSTANDARD_TODO
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "BeginAccept")]
         private static void AcceptCallback(IAsyncResult result)
         {
@@ -378,6 +381,7 @@ namespace Orleans.Runtime.Messaging
                 rcc.IMA.SafeCloseSocket(rcc.Sock);
             }
         }
+#endif
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
@@ -468,6 +472,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+#if !NETSTANDARD_TODO
         private void RestartAcceptingSocket()
         {
             try
@@ -483,6 +488,7 @@ namespace Orleans.Runtime.Messaging
                 throw;
             }
         }
+#endif
 
         private void SafeCloseSocket(Socket sock)
         {
@@ -490,7 +496,7 @@ namespace Orleans.Runtime.Messaging
             SocketManager.CloseSocket(sock);
         }
 
-
+#if !NETSTANDARD_TODO
         private class ReceiveCallbackContext
         {
             private readonly IncomingMessageBuffer _buffer;
@@ -585,5 +591,6 @@ namespace Orleans.Runtime.Messaging
 #endif
             }
         }
+#endif
     }
 }

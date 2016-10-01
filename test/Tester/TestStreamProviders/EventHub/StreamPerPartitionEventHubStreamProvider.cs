@@ -13,6 +13,8 @@ namespace Tester.TestStreamProviders.EventHub
     {
         public class AdapterFactory : EventHubAdapterFactory
         {
+            private TimePurgePredicate timePurgePredicate = null;
+
             public AdapterFactory()
             {
                 CacheFactory = CreateQueueCache;
@@ -20,8 +22,12 @@ namespace Tester.TestStreamProviders.EventHub
 
             private IEventHubQueueCache CreateQueueCache(string partition, IStreamQueueCheckpointer<string> checkpointer, Logger log)
             {
-                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterConfig.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool);
+                if (timePurgePredicate != null)
+                {
+                    timePurgePredicate = new TimePurgePredicate(adapterSettings.DataMinTimeInCache, adapterSettings.DataMaxAgeInCache);
+                }
+                var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
+                var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate);
                 return new EventHubQueueCache(checkpointer, dataAdapter, log);
             }
         }
@@ -30,12 +36,11 @@ namespace Tester.TestStreamProviders.EventHub
         {
             private readonly Guid partitionStreamGuid;
 
-            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool)
-                : base(bufferPool)
+            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge)
+                : base(bufferPool, timePurge)
             {
                 partitionStreamGuid = GetPartitionGuid(partitionKey);
             }
-
 
             public override StreamPosition GetStreamPosition(EventData queueMessage)
             {

@@ -18,6 +18,8 @@ namespace Orleans.Streams
         internal StreamEventDeliveryFailureException(StreamId streamId)
             : base(string.Format(ErrorStringFormat, streamId.ProviderName, streamId)) { }
         public StreamEventDeliveryFailureException(string message, Exception innerException) : base(message, innerException) { }
+#if !NETSTANDARD
         public StreamEventDeliveryFailureException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+#endif
     }
 }

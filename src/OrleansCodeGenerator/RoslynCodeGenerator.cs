@@ -7,13 +7,10 @@ namespace Orleans.CodeGenerator
     using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -25,8 +22,8 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The compiled assemblies.
         /// </summary>
-        private static readonly ConcurrentDictionary<string, GeneratedAssembly> CompiledAssemblies =
-            new ConcurrentDictionary<string, GeneratedAssembly>();
+        private static readonly ConcurrentDictionary<string, CachedAssembly> CompiledAssemblies =
+            new ConcurrentDictionary<string, CachedAssembly>();
 
         /// <summary>
         /// The logger.
@@ -67,9 +64,9 @@ namespace Orleans.CodeGenerator
         /// <param name="generatedAssembly">
         /// The generated assembly.
         /// </param>
-        public void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly)
+        public void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly)
         {
-            CompiledAssemblies.TryAdd(targetAssemblyName, new GeneratedAssembly { RawBytes = generatedAssembly });
+            CompiledAssemblies.TryAdd(targetAssemblyName, new CachedAssembly(generatedAssembly));
         }
 
         /// <summary>
@@ -92,8 +89,14 @@ namespace Orleans.CodeGenerator
             }
 
             var timer = Stopwatch.StartNew();
+            var emitDebugSymbols = false;
             foreach (var input in inputs)
             {
+                if (!emitDebugSymbols)
+                {
+                    emitDebugSymbols |= RuntimeVersion.IsAssemblyDebugBuild(input);
+                }
+
                 RegisterGeneratedCodeTargets(input);
                 TryLoadGeneratedAssemblyFromCache(input);
             }
@@ -110,15 +113,18 @@ namespace Orleans.CodeGenerator
                 // Generate code for newly loaded assemblies.
                 var generatedSyntax = GenerateForAssemblies(grainAssemblies, true);
 
-                var compiled = default(byte[]);
+                CachedAssembly generatedAssembly;
                 if (generatedSyntax.Syntax != null)
                 {
-                    compiled = CompileAndLoad(generatedSyntax);
+                    generatedAssembly = CompileAndLoad(generatedSyntax, emitDebugSymbols);
+                }
+                else
+                {
+                    generatedAssembly = new CachedAssembly { Loaded = true };
                 }
 
                 foreach (var assembly in generatedSyntax.SourceAssemblies)
                 {
-                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
                     CompiledAssemblies.AddOrUpdate(
                         assembly.GetName().FullName,
                         generatedAssembly,
@@ -165,15 +171,19 @@ namespace Orleans.CodeGenerator
                 var timer = Stopwatch.StartNew();
                 var generated = GenerateForAssemblies(new List<Assembly> { input }, true);
 
-                var compiled = default(byte[]);
+                CachedAssembly generatedAssembly;
                 if (generated.Syntax != null)
                 {
-                    compiled = CompileAndLoad(generated);
+                    var emitDebugSymbols = RuntimeVersion.IsAssemblyDebugBuild(input);
+                    generatedAssembly = CompileAndLoad(generated, emitDebugSymbols);
+                }
+                else
+                {
+                    generatedAssembly = new CachedAssembly { Loaded = true };
                 }
 
                 foreach (var assembly in generated.SourceAssemblies)
                 {
-                    var generatedAssembly = new GeneratedAssembly { Loaded = true, RawBytes = compiled };
                     CompiledAssemblies.AddOrUpdate(
                         assembly.GetName().FullName,
                         generatedAssembly,
@@ -227,9 +237,9 @@ namespace Orleans.CodeGenerator
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
         /// </summary>
         /// <returns>The collection of generated assemblies.</returns>
-        public IDictionary<string, byte[]> GetGeneratedAssemblies()
+        public IDictionary<string, GeneratedAssembly> GetGeneratedAssemblies()
         {
-            return CompiledAssemblies.ToDictionary(_ => _.Key, _ => _.Value.RawBytes);
+            return CompiledAssemblies.ToDictionary(_ => _.Key, _ => (GeneratedAssembly)_.Value);
         }
 
         /// <summary>
@@ -240,7 +250,7 @@ namespace Orleans.CodeGenerator
         /// </param>
         private static void TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
         {
-            GeneratedAssembly cached;
+            CachedAssembly cached;
             if (!CompiledAssemblies.TryGetValue(targetAssembly.GetName().FullName, out cached)
                 || cached.RawBytes == null || cached.Loaded)
             {
@@ -248,7 +258,7 @@ namespace Orleans.CodeGenerator
             }
 
             // Load the assembly and mark it as being loaded.
-            Assembly.Load(cached.RawBytes);
+            Assembly.Load(cached.RawBytes, cached.DebugSymbolRawBytes);
             cached.Loaded = true;
         }
 
@@ -256,12 +266,18 @@ namespace Orleans.CodeGenerator
         /// Compiles the provided syntax tree, and loads and returns the result.
         /// </summary>
         /// <param name="generatedSyntax">The syntax tree.</param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>The compilation output.</returns>
-        private static byte[] CompileAndLoad(GeneratedSyntax generatedSyntax)
+        private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax, bool emitDebugSymbols)
         {
-            var rawAssembly = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen.dll");
-            Assembly.Load(rawAssembly);
-            return rawAssembly;
+            var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen", emitDebugSymbols: emitDebugSymbols);
+            Assembly.Load(generated.RawBytes, generated.DebugSymbolRawBytes);
+            return new CachedAssembly(generated)
+            {
+                Loaded = true
+            };
         }
 
         /// <summary>
@@ -329,7 +345,7 @@ namespace Orleans.CodeGenerator
                 KnownAssemblyAttribute knownAssemblyAttribute;
                 var considerAllTypesForSerialization = knownAssemblyAttributes.TryGetValue(assembly, out knownAssemblyAttribute)
                                           && knownAssemblyAttribute.TreatTypesAsSerializable;
-                foreach (var type in assembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(assembly, Logger))
                 {
                     var considerForSerialization = considerAllTypesForSerialization || type.GetTypeInfo().IsSerializable;
                     ConsiderType(type, runtime, targetAssembly, includedTypes, considerForSerialization);
@@ -506,8 +522,8 @@ namespace Orleans.CodeGenerator
             // Get assemblies which contain generated code.
             var all =
                 AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(_ => _.GetCustomAttribute<GeneratedCodeAttribute>() != null)
-                    .SelectMany(_ => _.DefinedTypes);
+                    .Where(assemblies => assemblies.GetCustomAttribute<GeneratedCodeAttribute>() != null)
+                    .SelectMany(assembly => TypeUtils.GetDefinedTypes(assembly, Logger));
 
             // Get all generated types in each assembly.
             var attributes = all.SelectMany(_ => _.GetCustomAttributes<GeneratedAttribute>());
@@ -549,24 +565,24 @@ namespace Orleans.CodeGenerator
             var targets = input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>();
             foreach (var target in targets)
             {
-                CompiledAssemblies.TryAdd(target.AssemblyName, new GeneratedAssembly { Loaded = true });
+                CompiledAssemblies.TryAdd(target.AssemblyName, new CachedAssembly { Loaded = true });
             }
         }
 
-        /// <summary>
-        /// Represents a generated assembly.
-        /// </summary>
-        private class GeneratedAssembly
+        private class CachedAssembly : GeneratedAssembly
         {
+            public CachedAssembly()
+            {
+            }
+
+            public CachedAssembly(GeneratedAssembly generated) : base(generated)
+            {
+            }
+
             /// <summary>
             /// Gets or sets a value indicating whether or not the assembly has been loaded.
             /// </summary>
             public bool Loaded { get; set; }
-
-            /// <summary>
-            /// Gets or sets a serialized representation of the assembly.
-            /// </summary>
-            public byte[] RawBytes { get; set; }
         }
     }
 }

@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -254,7 +253,7 @@ namespace Orleans.Runtime.MembershipService
 
         private bool IsFunctionalMBR(SiloStatus status)
         {
-            return status.Equals(SiloStatus.Active) || status.Equals(SiloStatus.ShuttingDown) || status.Equals(SiloStatus.Stopping);
+            return status == SiloStatus.Active || status == SiloStatus.ShuttingDown || status == SiloStatus.Stopping;
         }
 
         public bool IsFunctionalDirectory(SiloAddress silo)
@@ -401,7 +400,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus)
         {
             MembershipTableData table;
-            if (newStatus.Equals(SiloStatus.Active))
+            if (newStatus == SiloStatus.Active)
             {
                 table = await membershipTableProvider.ReadAll();
             }
@@ -441,7 +440,7 @@ namespace Orleans.Runtime.MembershipService
             myEntry.Status = newStatus;
             myEntry.IAmAliveTime = now;
 
-            if (newStatus.Equals(SiloStatus.Active) && orleansConfig.Globals.ValidateInitialConnectivity)
+            if (newStatus == SiloStatus.Active && orleansConfig.Globals.ValidateInitialConnectivity)
                 await GetJoiningPreconditionPromise(table);
             
             TableVersion next = table.Version.Next();
@@ -455,12 +454,12 @@ namespace Orleans.Runtime.MembershipService
         {
             // send pings to all Active nodes, that are known to be alive
             List<MembershipEntry> members = table.Members.Select(tuple => tuple.Item1).Where(
-                entry => entry.Status.Equals(SiloStatus.Active) &&
+                entry => entry.Status == SiloStatus.Active &&
                         !entry.SiloAddress.Equals(MyAddress) &&
                         !HasMissedIAmAlives(entry, false)).ToList();
 
             logger.LogWithoutBulkingAndTruncating(Severity.Info, ErrorCode.MembershipSendingPreJoinPing, "About to send pings to {0} nodes in order to validate communication in the Joining state. Pinged nodes = {1}",
-                members.Count, Utils.EnumerableToString(members, entry => entry.ToFullString(true)));
+                members.Count.ToString(), Utils.EnumerableToString(members, entry => entry.ToFullString(true)));
 
             var pingPromises = new List<Task>();
             foreach (var entry in members)
@@ -544,7 +543,7 @@ namespace Orleans.Runtime.MembershipService
         {
             foreach (var entry in table.Members.Select(tuple => tuple.Item1).
                                                             Where(entry => !entry.SiloAddress.Equals(MyAddress)).
-                                                            Where(entry => entry.Status.Equals(SiloStatus.Active)))
+                                                            Where(entry => entry.Status == SiloStatus.Active))
             {
                 HasMissedIAmAlives(entry, true);
             }
@@ -960,20 +959,20 @@ namespace Orleans.Runtime.MembershipService
             // get all valid (non-expired) votes
             var freshVotes = entry.GetFreshVotes(orleansConfig.Globals.DeathVoteExpirationTimeout);
 
-            if (logger.IsVerbose2) logger.Verbose2("-Current number of fresh Voters for {0} is {1}", silo.ToLongString(), freshVotes.Count);
+            if (logger.IsVerbose2) logger.Verbose2("-Current number of fresh Voters for {0} is {1}", silo.ToLongString(), freshVotes.Count.ToString());
 
             if (freshVotes.Count >= orleansConfig.Globals.NumVotesForDeathDeclaration)
             {
                 // this should not happen ...
                 var str = String.Format("-Silo {0} is suspected by {1} which is more or equal than {2}, but is not marked as dead. This is a bug!!!",
-                    entry.SiloAddress.ToLongString(), freshVotes.Count, orleansConfig.Globals.NumVotesForDeathDeclaration);
+                    entry.SiloAddress.ToLongString(), freshVotes.Count.ToString(), orleansConfig.Globals.NumVotesForDeathDeclaration.ToString());
                 logger.Error(ErrorCode.Runtime_Error_100053, str);
                 KillMyselfLocally("Found a bug 1! Will commit suicide.");
                 return false;
             }
 
             // handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = membershipOracleData.GetSiloStatuses(status => status.Equals(SiloStatus.Active), true).Count;
+            int activeSilos = membershipOracleData.GetSiloStatuses(status => status == SiloStatus.Active, true).Count;
             // find if I have already voted
             int myVoteIndex = freshVotes.FindIndex(voter => MyAddress.Equals(voter.Item1));
 

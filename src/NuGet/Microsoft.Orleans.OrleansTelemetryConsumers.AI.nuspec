@@ -8,7 +8,7 @@
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Microsoft Orleans Telemetry Consumer for Azure Application Insights
     </summary>

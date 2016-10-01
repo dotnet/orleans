@@ -1,7 +1,7 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using Orleans.GrainDirectory;
-using System.Linq;
 namespace Orleans
 {
     namespace Concurrency
@@ -101,6 +101,17 @@ namespace Orleans
             internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
             {
                 RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class will have a single instance across all available clusters. Any requests in any clusters will be forwarded to the single activation instance.
+        /// </summary>
+        public class GlobalSingleInstanceAttribute : RegistrationAttribute
+        {
+            public GlobalSingleInstanceAttribute()
+                : base(GlobalSingleInstanceRegistration.Singleton)
+            {
             }
         }
 

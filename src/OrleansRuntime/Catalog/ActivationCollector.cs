@@ -193,7 +193,7 @@ namespace Orleans.Runtime
                     ApproximateCount, 
                     buckets.Count,       
                     Utils.EnumerableToString(
-                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => (Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items").ToString(CultureInfo.InvariantCulture)));
+                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
         }
 
         /// <summary>

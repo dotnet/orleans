@@ -4,10 +4,9 @@ namespace Orleans.CodeGeneration
     using System.Collections.Generic;
     using System.IO;
     using System.Reflection;
-
     using Orleans.CodeGenerator;
-    using Orleans.Serialization;
     using Orleans.Runtime;
+    using Orleans.Serialization;
 
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.

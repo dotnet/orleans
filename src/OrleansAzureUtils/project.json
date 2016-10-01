@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "WindowsAzure.Storage": "7.0.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

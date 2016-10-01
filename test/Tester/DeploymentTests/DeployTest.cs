@@ -485,9 +485,9 @@ namespace UnitTests
             Assert.NotNull(configDoc);
             XNamespace deployNamespace = "urn:xcg-deployment";
             XElement targetElement = configDoc.Root.Element(deployNamespace + "TargetLocation");
-            Assert.NotNull(targetElement); // "Could not find the TargetLocation element in the configuration file: {0}", configFile);
+            Assert.NotNull(targetElement);  // "Could not find the TargetLocation element in the configuration file: {0}", configFile
             XAttribute pathAttribute = targetElement.Attribute("Path");
-            Assert.NotNull(pathAttribute); // The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile);
+            Assert.NotNull(pathAttribute);  // The Path attribute of the TargetLocation element in the configuration file is missing or does not have a value : {0}", configFile
             pathValue = pathAttribute.Value;
             return pathValue;
         }

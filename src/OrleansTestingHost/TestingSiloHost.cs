@@ -13,9 +13,12 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
+using OrleansTelemetryConsumers.Counters;
 
 namespace Orleans.TestingHost
 {
+    using Orleans.CodeGeneration;
+
     /// <summary>
     /// Important note: <see cref="TestingSiloHost"/> will be eventually deprectated. It is recommended that you use <see cref="TestCluster"/> instead.
     /// A host class for local testing with Orleans using in-process silos.
@@ -35,28 +38,47 @@ namespace Orleans.TestingHost
     /// </remarks>
     public class TestingSiloHost
     {
+        /// <summary> Single instance of TestingSiloHost </summary>
         public static TestingSiloHost Instance { get; set; }
 
+        /// <summary> Primary silo handle </summary>
         public SiloHandle Primary { get; private set; }
-        public SiloHandle Secondary { get; private set; }
-        protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
 
-        protected TestingSiloOptions siloInitOptions { get; private set; }
-        protected TestingClientOptions clientInitOptions { get; private set; }
+        /// <summary> List of handles to the secondary silos </summary>
+        public SiloHandle Secondary { get; private set; }
+
+        private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
+        private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
+
+        private TestingSiloOptions siloInitOptions { get; set; }
+
+        private TestingClientOptions clientInitOptions { get; set; }
+
+        /// <summary> Get or set the client configuration/// </summary>
         public ClientConfiguration ClientConfig { get; private set; }
+
+        /// <summary> Get or set the global configuration </summary>
         public GlobalConfiguration Globals { get; private set; }
 
+        /// <summary> The deploymentId value to use in the cluster </summary>
         public string DeploymentId = null;
+
+        /// <summary> The prefix to use in the deploymentId </summary>
         public string DeploymentIdPrefix = null;
 
+        /// <summary> Base port number for silos in cluster </summary>
         public const int BasePort = 22222;
+
+        /// <summary> Base port number for the gateway silos </summary>
         public const int ProxyBasePort = 40000;
 
+        /// <summary> Number of silos in the cluster </summary>
         private static int InstanceCounter = 0;
 
+        /// <summary> GrainFactory to use in the tests </summary>
         public IGrainFactory GrainFactory { get; private set; }
 
+        /// <summary> Get the logger to use in tests </summary>
         protected Logger logger
         {
             get { return GrainClient.Logger; }
@@ -102,6 +124,7 @@ namespace Orleans.TestingHost
         {
         }
 
+        /// <summary> Create a new TestingSiloHost without initialization </summary>
         public static TestingSiloHost CreateUninitialized()
         {
             return new TestingSiloHost("Uninitialized");
@@ -154,6 +177,11 @@ namespace Orleans.TestingHost
             }
         }
 
+        /// <summary>
+        /// Stop the TestingSilo and restart it.
+        /// </summary>
+        /// <param name="siloOptions">Cluster options to use.</param>
+        /// <param name="clientOptions">Client optin to use.</param>
         public void RedeployTestingSiloHost(TestingSiloOptions siloOptions = null, TestingClientOptions clientOptions = null)
         {
             StopAllSilos();
@@ -426,6 +454,9 @@ namespace Orleans.TestingHost
             return null;
         }
 
+        /// <summary> Modify the cluster configurations to the test environment </summary>
+        /// <param name="config">The cluster configuration to modify</param>
+        /// <param name="options">the TestingSiloOptions to modify</param>
         public static void AdjustForTest(ClusterConfiguration config, TestingSiloOptions options)
         {
             if (options.AdjustConfig != null) {
@@ -435,6 +466,9 @@ namespace Orleans.TestingHost
             config.AdjustForTestEnvironment();
         }
 
+        /// <summary> Modify the ClientConfiguration to the test environment </summary>
+        /// <param name="config">The client configuration to modify</param>
+        /// <param name="options">the TestingClientOptions to modify</param>
         public static void AdjustForTest(ClientConfiguration config, TestingClientOptions options)
         {
             if (options.AdjustConfig != null) {
@@ -459,7 +493,7 @@ namespace Orleans.TestingHost
                 {
                     // If we have never seen generated code for this assembly before, or generated code might be
                     // newer, store it for later silo creation.
-                    byte[] existing;
+                    GeneratedAssembly existing;
                     if (!this.additionalAssemblies.TryGetValue(assembly.Key, out existing) || assembly.Value != null)
                     {
                         this.additionalAssemblies[assembly.Key] = assembly.Value;
@@ -468,7 +502,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static Dictionary<string, byte[]> TryGetGeneratedAssemblies(SiloHandle siloHandle)
+        private static Dictionary<string, GeneratedAssembly> TryGetGeneratedAssemblies(SiloHandle siloHandle)
         {
             var tryToRetrieveGeneratedAssemblies = Task.Run(() =>
             {
@@ -500,6 +534,7 @@ namespace Orleans.TestingHost
             return null;
         }
 
+        /// <summary> Initialize the grain client </summary>
         public void InitializeClient()
         {
             InitializeClient(clientInitOptions, siloInitOptions.LargeMessageWarningThreshold);
@@ -672,6 +707,15 @@ namespace Orleans.TestingHost
             return StartOrleansSilo(this, type, options, instanceCount, shared);
         }
 
+        /// <summary>
+        /// Start a new silo in the target cluster
+        /// </summary>
+        /// <param name="host">The target cluster</param>
+        /// <param name="type">The type of the silo to deploy</param>
+        /// <param name="options">The options to use for the silo</param>
+        /// <param name="instanceCount">The instance count of the silo</param>
+        /// <param name="shared">The shared AppDomain to use</param>
+        /// <returns>A handle to the deployed silo</returns>
         public static SiloHandle StartOrleansSilo(TestingSiloHost host, Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
         {
             if (host == null) throw new ArgumentNullException("host");
@@ -755,10 +799,11 @@ namespace Orleans.TestingHost
             nodeConfig.PropagateActivityId = config.Defaults.PropagateActivityId;
             nodeConfig.BulkMessageLimit = config.Defaults.BulkMessageLimit;
 
+            int? gatewayport = null;
             if (nodeConfig.ProxyGatewayEndpoint != null && nodeConfig.ProxyGatewayEndpoint.Address != null)
             {
-                int proxyBasePort = options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort;
-                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, proxyBasePort + instanceCount);
+                gatewayport = (options.ProxyBasePort < 0 ? ProxyBasePort : options.ProxyBasePort) + instanceCount;
+                nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.ProxyGatewayEndpoint.Address, gatewayport.Value);
             }
 
             config.Globals.ExpectedClusterSize = 2;
@@ -779,6 +824,7 @@ namespace Orleans.TestingHost
                 Silo = silo,
                 Options = options,
                 Endpoint = silo.SiloAddress.Endpoint,
+                GatewayPort = gatewayport,
                 AppDomain = appDomain,
             };
             host.ImportGeneratedAssemblies(retValue);
@@ -861,8 +907,14 @@ namespace Orleans.TestingHost
                 new object[] { });
 
             appDomain.UnhandledException += ReportUnobservedException;
+            appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
 
             return silo;
+        }
+
+        private static void RegisterPerfCountersTelemetryConsumer()
+        {
+            LogManager.TelemetryConsumers.Add(new OrleansPerfCounterTelemetryConsumer());
         }
 
         private static void UnloadSiloInAppDomain(AppDomain appDomain)

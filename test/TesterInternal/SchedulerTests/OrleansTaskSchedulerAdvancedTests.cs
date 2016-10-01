@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -55,7 +54,7 @@ namespace UnitTests.SchedulerTests
                         {
                             // ReSharper disable AccessToModifiedClosure
                             output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current); 
-                            Assert.IsFalse(insideTask, "Starting new task when I am already inside task of iteration {0}", n);
+                            Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                             insideTask = true;
                             int k = n; 
                             Thread.Sleep(100); 
@@ -70,8 +69,8 @@ namespace UnitTests.SchedulerTests
             Thread.Sleep(1500);
 
             // N should be 10, because all tasks should execute serially
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(10, n, "Work items executed concurrently");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(10,  n);  // "Work items executed concurrently"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -89,7 +88,7 @@ namespace UnitTests.SchedulerTests
                     var task1 = Task.Factory.StartNew(() => 
                     {
                         output.WriteLine("Starting 1"); 
-                        Assert.IsFalse(insideTask, "Starting new task when I am already inside task of iteration {0}", n);
+                        Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                         insideTask = true;
                         output.WriteLine("===> 1a"); 
                         Thread.Sleep(1000); n = n + 3; 
@@ -99,7 +98,7 @@ namespace UnitTests.SchedulerTests
                     var task2 = Task.Factory.StartNew(() =>
                     {
                         output.WriteLine("Starting 2");
-                        Assert.IsFalse(insideTask, "Starting new task when I am alraedy inside task of iteration {0}", n);
+                        Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                         insideTask = true;
                         output.WriteLine("===> 2a");
                         task1.Wait();
@@ -120,11 +119,11 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
+                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
             }
 
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(15, n, "Work items executed out of order");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(15,  n);  // "Work items executed out of order"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -146,14 +145,14 @@ namespace UnitTests.SchedulerTests
         {
             string msg = string.Format("1-{0} MainDone={1} inside Task {2}", n, mainDone, Task.CurrentId);
             output.WriteLine("1 ===> " + msg);
-            Assert.IsTrue(mainDone, msg + " -- Main turn should be finished");
+            Assert.True(mainDone, msg + " -- Main turn should be finished");
             stageNum1 = n;
         }
         private void SubProcess2(int n)
         {
             string msg = string.Format("2-{0} MainDone={1} inside Task {2}", n, mainDone, Task.CurrentId);
             output.WriteLine("2 ===> " + msg);
-            Assert.IsTrue(mainDone, msg + " -- Main turn should be finished");
+            Assert.True(mainDone, msg + " -- Main turn should be finished");
             stageNum2 = n;
         }
     
@@ -190,14 +189,14 @@ namespace UnitTests.SchedulerTests
             }), context);
 
             try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
-            catch (TimeoutException) { Assert.Fail("Timeout-1"); }
+            catch (TimeoutException) { Assert.True(false, "Timeout-1"); }
             try { await result2.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
-            catch (TimeoutException) { Assert.Fail("Timeout-2"); }
+            catch (TimeoutException) { Assert.True(false, "Timeout-2"); }
 
-            Assert.AreNotEqual(0, stageNum1, "Work items did not get executed-1");
-            Assert.AreNotEqual(0, stageNum2, "Work items did not get executed-2");
-            Assert.AreEqual(14, stageNum1, "Work items executed out of order-1");
-            Assert.AreEqual(22, stageNum2, "Work items executed out of order-2");
+            Assert.NotEqual(0, stageNum1); // "Work items did not get executed-1"
+            Assert.NotEqual(0, stageNum2);  // "Work items did not get executed-2"
+            Assert.Equal(14,  stageNum1);  // "Work items executed out of order-1"
+            Assert.Equal(22,  stageNum2);  // "Work items executed out of order-2"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -224,40 +223,40 @@ namespace UnitTests.SchedulerTests
             masterScheduler.QueueWorkItem(new ClosureWorkItem(() =>
             {
                 Log(1, "Outer ClosureWorkItem " + Task.CurrentId + " starting");
-                Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #0");
+                Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #0"
 
                 Log(2, "Starting wrapper Task");
                 wrapper = Task.Factory.StartNew(() =>
                 {
                     Log(3, "Inside wrapper Task Id=" + Task.CurrentId);
-                    Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                    Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #1"
 
                     // Execution chain #1
                     Log(4, "Wrapper Task Id=" + Task.CurrentId + " creating Task chain");
                     Task task1 = Task.Factory.StartNew(() =>
                     {
                         Log(5, "#11 Inside sub-Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #11");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #11"
                         SubProcess1(11);
                     });
                     Task task2 = task1.ContinueWith((Task task) =>
                     {
                         Log(6, "#12 Inside continuation Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #12");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #12"
                         if (task.IsFaulted) throw task.Exception.Flatten();
                         SubProcess1(12);
                     });
                     Task task3 = task2.ContinueWith(task =>
                     {
                         Log(7, "#13 Inside continuation Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #13");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #13"
                         if (task.IsFaulted) throw task.Exception.Flatten();
                         SubProcess1(13);
                     });
                     finalTask1 = task3.ContinueWith(task =>
                     {
                         Log(8, "#14 Inside final continuation Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #14");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #14"
                         if (task.IsFaulted) throw task.Exception.Flatten();
                         SubProcess1(14);
                         result1.SetResult(true);
@@ -268,13 +267,13 @@ namespace UnitTests.SchedulerTests
                     Task promise2 = Task.Factory.StartNew(() =>
                     {
                         Log(10, "#21 Inside sub-Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #21");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #21"
                         SubProcess2(21);
                     });
                     finalPromise2 = promise2.ContinueWith((_) =>
                     {
                         Log(11, "#22 Inside final continuation Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #22");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #22"
                         SubProcess2(22);
                         result2.SetResult(true);
                     });
@@ -300,14 +299,14 @@ namespace UnitTests.SchedulerTests
                 if (wrapper != null) break;
                 Thread.Sleep(TimeSpan.FromSeconds(1).Multiply(waitFactor));
             }
-            Assert.IsNotNull(wrapper, "Wrapper Task was not created");
+            Assert.NotNull(wrapper); // Wrapper Task was not created
 
             Log(18, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
             bool finished = wrapper.Wait(TimeSpan.FromSeconds(2 * waitFactor));
             Log(19, "Done waiting for wrapper Task Id=" + wrapper.Id + " Finished=" + finished);
             if (!finished) throw new TimeoutException();
-            Assert.IsFalse(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
-            Assert.IsTrue(wrapper.IsCompleted, "Wrapper Task should be completed");
+            Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
+            Assert.True(wrapper.IsCompleted, "Wrapper Task should be completed");
 
             Log(20, "Waiting for TaskWorkItem to complete");
             for (int i = 0; i < 15 * waitFactor; i++)
@@ -316,29 +315,29 @@ namespace UnitTests.SchedulerTests
                 Thread.Sleep(1000 * waitFactor);
             }
             Log(21, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
-            Assert.IsTrue(mainDone, "Main Task should be completed");
-            Assert.IsNotNull(finalTask1, "Task chain #1 not created");
-            Assert.IsNotNull(finalPromise2, "Task chain #2 not created");
+            Assert.True(mainDone, "Main Task should be completed");
+            Assert.NotNull(finalTask1); // Task chain #1 not created
+            Assert.NotNull(finalPromise2); // Task chain #2 not created
 
             Log(22, "Waiting for final task #1 to complete");
             bool ok = finalTask1.Wait(TimeSpan.FromSeconds(4 * waitFactor));
             Log(23, "Done waiting for final task #1 complete Ok=" + ok);
             if (!ok) throw new TimeoutException();
-            Assert.IsFalse(finalTask1.IsFaulted, "Final Task faulted: " + finalTask1.Exception);
-            Assert.IsTrue(finalTask1.IsCompleted, "Final Task completed");
-            Assert.IsTrue(result1.Task.Result, "Timeout-1");
+            Assert.False(finalTask1.IsFaulted, "Final Task faulted: " + finalTask1.Exception);
+            Assert.True(finalTask1.IsCompleted, "Final Task completed");
+            Assert.True(result1.Task.Result, "Timeout-1");
 
             Log(24, "Waiting for final promise #2 to complete");
             finalPromise2.Wait(TimeSpan.FromSeconds(4 * waitFactor));
             Log(25, "Done waiting for final promise #2");
-            Assert.IsFalse(finalPromise2.IsFaulted, "Final Task faulted: " + finalPromise2.Exception);
-            Assert.IsTrue(finalPromise2.IsCompleted, "Final Task completed");
-            Assert.IsTrue(result2.Task.Result, "Timeout-2");
+            Assert.False(finalPromise2.IsFaulted, "Final Task faulted: " + finalPromise2.Exception);
+            Assert.True(finalPromise2.IsCompleted, "Final Task completed");
+            Assert.True(result2.Task.Result, "Timeout-2");
 
-            Assert.AreNotEqual(0, stageNum1, "Work items did not get executed-1");
-            Assert.AreEqual(14, stageNum1, "Work items executed out of order-1");
-            Assert.AreNotEqual(0, stageNum2, "Work items did not get executed-2");
-            Assert.AreEqual(22, stageNum2, "Work items executed out of order-2");
+            Assert.NotEqual(0,  stageNum1);  // "Work items did not get executed-1"
+            Assert.Equal(14,  stageNum1);  // "Work items executed out of order-1"
+            Assert.NotEqual(0,  stageNum2);  // "Work items did not get executed-2"
+            Assert.Equal(22,  stageNum2);  // "Work items executed out of order-2"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -359,31 +358,31 @@ namespace UnitTests.SchedulerTests
             orleansTaskScheduler.QueueWorkItem(new ClosureWorkItem(() =>
             {
                 Log(1, "Outer ClosureWorkItem " + Task.CurrentId + " starting");
-                Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #0");
+                Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #0"
 
                 Log(2, "Starting wrapper Task");
                 wrapper = Task.Factory.StartNew(() =>
                 {
                     Log(3, "Inside wrapper Task Id=" + Task.CurrentId);
-                    Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                    Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #1"
 
                     Log(4, "Wrapper Task " + Task.CurrentId + " creating AC chain");
                     Task promise1 = Task.Factory.StartNew(() =>
                     {
                         Log(5, "#1 Inside AC Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #1"
                         SubProcess1(1);
                     });
                     Task promise2 = promise1.ContinueWith((_) =>
                     {
                         Log(6, "#2 Inside AC Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #2"
                         SubProcess1(2);
                     });
                     finalPromise = promise2.ContinueWith((_) =>
                     {
                         Log(7, "#3 Inside final AC Task Id=" + Task.CurrentId);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #3");
+                        Assert.Equal(activationScheduler,  TaskScheduler.Current);  // "TaskScheduler.Current #3"
                         SubProcess1(3);
                         result.SetResult(true);
                     });
@@ -409,14 +408,14 @@ namespace UnitTests.SchedulerTests
                 if (wrapper != null) break;
                 Thread.Sleep(TimeSpan.FromSeconds(1).Multiply(waitFactor));
             }
-            Assert.IsNotNull(wrapper, "Wrapper Task was not created");
+            Assert.NotNull(wrapper); // Wrapper Task was not created
 
             Log(14, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
             bool finished = wrapper.Wait(TimeSpan.FromSeconds(2 * waitFactor));
             Log(15, "Done waiting for wrapper Task Id=" + wrapper.Id + " Finished=" + finished);
             if (!finished) throw new TimeoutException();
-            Assert.IsFalse(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
-            Assert.IsTrue(wrapper.IsCompleted, "Wrapper Task should be completed");
+            Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
+            Assert.True(wrapper.IsCompleted, "Wrapper Task should be completed");
 
             Log(16, "Waiting for TaskWorkItem to complete");
             for (int i = 0; i < 15 * waitFactor; i++)
@@ -425,18 +424,18 @@ namespace UnitTests.SchedulerTests
                 Thread.Sleep(1000 * waitFactor);
             }
             Log(17, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
-            Assert.IsTrue(mainDone, "Main Task should be completed");
-            Assert.IsNotNull(finalPromise, "AC chain not created");
+            Assert.True(mainDone, "Main Task should be completed");
+            Assert.NotNull(finalPromise); // AC chain not created
 
             Log(18, "Waiting for final AC promise to complete");
             finalPromise.Wait(TimeSpan.FromSeconds(4 * waitFactor));
             Log(19, "Done waiting for final promise");
-            Assert.IsFalse(finalPromise.IsFaulted, "Final AC faulted: " + finalPromise.Exception);
-            Assert.IsTrue(finalPromise.IsCompleted, "Final AC completed");
-            Assert.IsTrue(result.Task.Result, "Timeout-1");
+            Assert.False(finalPromise.IsFaulted, "Final AC faulted: " + finalPromise.Exception);
+            Assert.True(finalPromise.IsCompleted, "Final AC completed");
+            Assert.True(result.Task.Result, "Timeout-1");
 
-            Assert.AreNotEqual(0, stageNum1, "Work items did not get executed-1");
-            Assert.AreEqual(3, stageNum1, "Work items executed out of order-1");
+            Assert.NotEqual(0,  stageNum1);  // "Work items did not get executed-1"
+            Assert.Equal(3,  stageNum1);  // "Work items executed out of order-1"
         }
         
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -458,9 +457,9 @@ namespace UnitTests.SchedulerTests
                 }), context);
             // ReSharper restore AccessToModifiedClosure
 
-            Assert.IsTrue(result.Task.Wait(TwoSeconds));
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(1, n, "Work items executed out of order");
+            Assert.True(result.Task.Wait(TwoSeconds));
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(1,  n);  // "Work items executed out of order"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -487,7 +486,7 @@ namespace UnitTests.SchedulerTests
                 result.SetResult(true);
             }),context);
             // ReSharper restore AccessToModifiedClosure
-            Assert.IsTrue(result.Task.Wait(TwoSeconds)); // Wait for main (one that creates tasks) work item to finish.
+            Assert.True(result.Task.Wait(TwoSeconds)); // Wait for main (one that creates tasks) work item to finish.
 
             var promise = Task<int[]>.Factory.ContinueWhenAll(tasks, (res) => 
             {
@@ -495,10 +494,10 @@ namespace UnitTests.SchedulerTests
                 int taskNum = 1;
                 foreach (var t in tasks)
                 {
-                    Assert.IsTrue(t.IsCompleted, "Sub-Task completed");
-                    Assert.IsFalse(t.IsFaulted, "Sub-Task faulted: " + t.Exception);
+                    Assert.True(t.IsCompleted, "Sub-Task completed");
+                    Assert.False(t.IsFaulted, "Sub-Task faulted: " + t.Exception);
                     var val = t.Result;
-                    Assert.AreEqual(taskNum, val, "Value returned by Task " + taskNum);
+                    Assert.Equal(taskNum,  val);  // "Value returned by Task " + taskNum
                     output.Add(val);
                     taskNum++;
                 }
@@ -508,10 +507,10 @@ namespace UnitTests.SchedulerTests
             bool ok = promise.Wait(TimeSpan.FromSeconds(8));
             if (!ok) throw new TimeoutException();
 
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(12, n, "Not all work items executed");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(12,  n);  // "Not all work items executed"
             long ms = stopwatch.ElapsedMilliseconds;
-            Assert.IsTrue(4000 <= ms && ms <= 5000, "Wait time out of range, expected between 4000 and 5000 milliseconds, was " + ms);
+            Assert.True(4000 <= ms && ms <= 5000, "Wait time out of range, expected between 4000 and 5000 milliseconds, was " + ms);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -550,10 +549,10 @@ namespace UnitTests.SchedulerTests
             task1.Ignore();
             task2.Ignore();
             task3.Ignore();
-            Assert.IsTrue(result1.Task.Wait(TwoSeconds), "First ContinueWith did not fire.");
-            Assert.IsTrue(result2.Task.Wait(TwoSeconds), "Second ContinueWith did not fire.");
-            Assert.AreEqual(true, failed1, "First ContinueWith did not fire error handler.");
-            Assert.AreEqual(true, failed2, "Second ContinueWith did not fire error handler.");
+            Assert.True(result1.Task.Wait(TwoSeconds), "First ContinueWith did not fire.");
+            Assert.True(result2.Task.Wait(TwoSeconds), "Second ContinueWith did not fire.");
+            Assert.Equal(true,  failed1);  // "First ContinueWith did not fire error handler."
+            Assert.Equal(true,  failed2);  // "Second ContinueWith did not fire error handler."
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -605,21 +604,21 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("Done Faulted={0}", task.IsFaulted);
                     CheckRuntimeContext(context);
-                    Assert.IsFalse(task.IsFaulted, "Faulted with Exception=" + task.Exception);
+                    Assert.False(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
             });
             wrapper.Start(scheduler);
             bool ok = wrapper.Wait(TimeSpan.FromSeconds(1));
             if (!ok) throw new TimeoutException();
 
-            Assert.IsFalse(wrapper.IsFaulted, "Wrapper Task Faulted with Exception=" + wrapper.Exception);
-            Assert.IsTrue(wrapper.IsCompleted, "Wrapper Task completed");
+            Assert.False(wrapper.IsFaulted, "Wrapper Task Faulted with Exception=" + wrapper.Exception);
+            Assert.True(wrapper.IsCompleted, "Wrapper Task completed");
             bool finished = result.Task.Wait(TimeSpan.FromSeconds(2));
-            Assert.IsNotNull(endOfChain, "End of chain Task created successfully");
-            Assert.IsFalse(endOfChain.IsFaulted, "Task chain Faulted with Exception=" + endOfChain.Exception);
-            Assert.IsTrue(finished, "Wrapper Task completed ok");
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(1, n, "Work items executed out of order");
+            Assert.NotNull(endOfChain); // End of chain Task created successfully
+            Assert.False(endOfChain.IsFaulted, "Task chain Faulted with Exception=" + endOfChain.Exception);
+            Assert.True(finished, "Wrapper Task completed ok");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(1,  n);  // "Work items executed out of order"
         }
 
         private void Log(int level, string what)
@@ -634,9 +633,9 @@ namespace UnitTests.SchedulerTests
 
         private static void CheckRuntimeContext(ISchedulingContext context)
         {
-            Assert.IsNotNull(RuntimeContext.Current, "Runtime context should not be null");
-            Assert.IsNotNull(RuntimeContext.Current.ActivationContext, "Activation context should not be null");
-            Assert.AreEqual(context, RuntimeContext.Current.ActivationContext, "Activation context");
+            Assert.NotNull(RuntimeContext.Current); // Runtime context should not be null
+            Assert.NotNull(RuntimeContext.Current.ActivationContext); // Activation context should not be null
+            Assert.Equal(context,  RuntimeContext.Current.ActivationContext);  // "Activation context"
         }
     }
 }

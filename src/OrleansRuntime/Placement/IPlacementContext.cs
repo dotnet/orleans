@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -18,6 +17,8 @@ namespace Orleans.Runtime.Placement
         bool FastLookup(GrainId grain, out AddressesAndTag addresses);
 
         Task<AddressesAndTag> FullLookup(GrainId grain);
+
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 

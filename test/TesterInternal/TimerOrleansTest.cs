@@ -4,14 +4,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.TimerTests
@@ -36,12 +34,12 @@ namespace UnitTests.TimerTests
                 Thread.Sleep(period.Multiply(10));
                 int last = grain.GetCounter().Result;
                 output.WriteLine("value = " + last);
-                //Assert.IsTrue(10 == last || 9 == last, last.ToString());
+                //Assert.True(10 == last || 9 == last, last.ToString());
 
                 grain.StopDefaultTimer().Wait();
                 Thread.Sleep(period.Multiply(10));
                 int curr = grain.GetCounter().Result;
-                //Assert.IsTrue(curr == last || curr == last + 1, curr.ToString() + " " + last.ToString());
+                //Assert.True(curr == last || curr == last + 1, curr.ToString() + " " + last.ToString());
             }
         }
 
@@ -63,7 +61,7 @@ namespace UnitTests.TimerTests
                 ITimerGrain grain = grains[i];
                 int last = grain.GetCounter().Result;
                 output.WriteLine("value = " + last);
-                //Assert.AreEqual(10, last);
+                //Assert.Equal(10, last);
             }
             for (int i = 0; i < grains.Count; i++)
             {
@@ -83,7 +81,7 @@ namespace UnitTests.TimerTests
             Thread.Sleep(period.Multiply(10));
             int last = grain.GetCounter().Result;
             output.WriteLine("value = " + last);
-            Assert.IsTrue(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
+            Assert.True(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
 
             var additionalSilo = this.HostedCluster.StartAdditionalSilo();
             try
@@ -96,9 +94,9 @@ namespace UnitTests.TimerTests
                 stopwatch.Stop();
 
                 last = grain.GetCounter().Result;
-                Assert.IsTrue(last >= 20);
+                Assert.True(last >= 20);
                 double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
-                Assert.IsTrue(last <= maximalNumTicks);
+                Assert.True(last <= maximalNumTicks);
                 //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
                 output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
             }
@@ -131,10 +129,10 @@ namespace UnitTests.TimerTests
                 await Task.Delay(wait);
 
                 int tickCount = await grain.GetTickCount();
-                Assert.AreEqual(1, tickCount, "Should be {0} timer callback", tickCount);
+                Assert.Equal(1, tickCount);
 
                 Exception err = await grain.GetException();
-                Assert.IsNull(err, "Should be no exceptions during timer callback");
+                Assert.Null(err); // Should be no exceptions during timer callback
             }
             catch (Exception exc)
             {
@@ -154,7 +152,7 @@ namespace UnitTests.TimerTests
 
             if (error != null)
             {
-                Assert.Fail("Test {0} failed with error {1}", testName, error);
+                Assert.True(false, $"Test {testName} failed with error {error}");
             }
         }
     }

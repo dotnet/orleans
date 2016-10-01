@@ -2,7 +2,6 @@ namespace Orleans.Serialization
 {
     using System;
     using System.Text;
-
     using Bond.IO;
 
     internal sealed class InputStream : IInputStream, ICloneable<InputStream>

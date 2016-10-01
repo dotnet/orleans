@@ -3,15 +3,20 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Orleans.SqlUtils;
+using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
+using OrleansAWSUtils.Storage;
 using Tester;
 using UnitTests.General;
+using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -59,9 +64,9 @@ namespace UnitTests.MembershipTests
                 IPEndPoint silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
-                    Assert.True(pair.Value.Equals(SiloStatus.ShuttingDown)
-                        || pair.Value.Equals(SiloStatus.Stopping)
-                        || pair.Value.Equals(SiloStatus.Dead),
+                    Assert.True(pair.Value == SiloStatus.ShuttingDown
+                        || pair.Value == SiloStatus.Stopping
+                        || pair.Value == SiloStatus.Dead,
                         string.Format("SiloStatus for {0} should now be ShuttingDown or Stopping or Dead instead of {1}", silo, pair.Value));
                 }
                 else
@@ -273,6 +278,88 @@ namespace UnitTests.MembershipTests
         }
     }
 
+    [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    public class LivenessTests_DynamoDB : LivenessTestsBase
+    {
+        private static Lazy<bool> isDynamoDbAvailable = new Lazy<bool>(() =>
+        {
+            try
+            {
+                DynamoDBStorage storage;
+                try
+                {
+                    storage = new DynamoDBStorage($"Service=http://localhost:8000", null);
+                }
+                catch (AmazonServiceException)
+                {
+                    return false;
+                }
+                storage.InitializeTable("TestTable", new List<KeySchemaElement> {
+                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
+                }, new List<AttributeDefinition> {
+                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
+                }).WithTimeout(TimeSpan.FromSeconds(2), "Unable to connect to AWS DynamoDB simulator").Wait();
+                return true;
+            }
+            catch (Exception exc)
+            {
+                if(exc.InnerException is TimeoutException)
+                    return false;
+
+                throw;
+            }
+        });
+
+        public LivenessTests_DynamoDB(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        public override TestCluster CreateTestCluster()
+        {
+            if (!isDynamoDbAvailable.Value)
+                throw new SkipException("Unable to connect to DynamoDB simulator");
+
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = "Service=http://localhost:8000;"; ;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.Custom;
+            options.ClusterConfiguration.Globals.MembershipTableAssembly = "OrleansAWSUtils";
+            options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Liveness_AWS_DynamoDB_1()
+        {
+            await Do_Liveness_OracleTest_1();
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Liveness_AWS_DynamoDB_2_Restart_Primary()
+        {
+            await Do_Liveness_OracleTest_2(0);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Liveness_AWS_DynamoDB_3_Restart_GW()
+        {
+            await Do_Liveness_OracleTest_2(1);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Liveness_AWS_DynamoDB_4_Restart_Silo_1()
+        {
+            await Do_Liveness_OracleTest_2(2);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Liveness_AWS_DynamoDB_5_Kill_Silo_1_With_Timers()
+        {
+            await Do_Liveness_OracleTest_2(2, false, true);
+        }
+    }
+
     public class LivenessTests_ZK : LivenessTestsBase
     {
         public LivenessTests_ZK(ITestOutputHelper output) : base(output)
@@ -367,6 +454,58 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(2, false, true);
         }
     }
+
+
+
+    public class LivenessTests_PostgreSql : LivenessTestsBase
+    {
+        public const string TestDatabaseName = "orleanstest";
+        public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
+        {
+        }
+        public override TestCluster CreateTestCluster()
+        {
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_1()
+        {
+            await Do_Liveness_OracleTest_1();
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_2_Restart_Primary()
+        {
+            await Do_Liveness_OracleTest_2(0);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_3_Restartl_GW()
+        {
+            await Do_Liveness_OracleTest_2(1);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_4_Restart_Silo_1()
+        {
+            await Do_Liveness_OracleTest_2(2);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
+        {
+            await Do_Liveness_OracleTest_2(2, false, true);
+        }
+    }
+
 
     public class LivenessTests_MySql : LivenessTestsBase
     {

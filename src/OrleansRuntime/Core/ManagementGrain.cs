@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Xml;
-using Orleans.Runtime.MembershipService;
 using Orleans.MultiCluster;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Management
 {
@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Management
             var table = await mTable.ReadAll();
             
             var t = onlyActive ? 
-                table.Members.Where(item => item.Item1.Status.Equals(SiloStatus.Active)).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
+                table.Members.Where(item => item.Item1.Status == SiloStatus.Active).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
                 table.Members.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
             return t;
         }
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Management
             if (onlyActive)
             {
                 return table.Members
-                    .Where(item => item.Item1.Status.Equals(SiloStatus.Active))
+                    .Where(item => item.Item1.Status == SiloStatus.Active)
                     .Select(x => x.Item1)
                     .ToArray();
             }
@@ -211,6 +211,14 @@ namespace Orleans.Runtime.Management
             }
         }
 
+        public async Task UpdateStreamProviders(SiloAddress[] hostIds, IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
+        {
+            SiloAddress[] silos = GetSiloAddresses(hostIds);
+            List<Task> actionPromises = PerformPerSiloAction(silos,
+                s => GetSiloControlReference(s).UpdateStreamProviders(streamProviderConfigurations));
+            await Task.WhenAll(actionPromises);
+        }
+
         public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
         {
             if (hostsIds == null)
@@ -221,6 +229,7 @@ namespace Orleans.Runtime.Management
             var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
             await Task.WhenAll(all);
             return all.SelectMany(s => s.Result).Distinct().ToArray();
+
         }
 
         public async Task<int> GetTotalActivationCount()

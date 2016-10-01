@@ -20,11 +20,18 @@ namespace Orleans.TestingHost
         private ClusterConfiguration _clusterConfiguration;
         private ClientConfiguration _clientConfiguration;
 
+        /// <summary>
+        /// Create a new TestClusterOptions with the default initial silo count. See <see cref="DefaultInitialSilosCount"/>.
+        /// </summary>
         public TestClusterOptions()
             : this(DefaultInitialSilosCount)
         {
         }
 
+        /// <summary>
+        /// Create a new TestClusterOptions
+        /// </summary>
+        /// <param name="initialSilosCount">The number of initial silos to deploy.</param>
         public TestClusterOptions(short initialSilosCount)
         {
             this.InitialSilosCount = initialSilosCount;
@@ -32,16 +39,39 @@ namespace Orleans.TestingHost
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
         }
 
+        /// <summary>
+        /// The default initial silos count. See <see cref="TestClusterOptions"/>.
+        /// </summary>
         public static short DefaultInitialSilosCount { get; set; } = 2;
+
+        /// <summary>
+        /// Is set to true, by default the cluster will output traces in the console
+        /// </summary>
         public static bool DefaultTraceToConsole { get; set; } = true;
+
+        /// <summary>
+        /// Default subfolder the the logs
+        /// </summary>
         public static string DefaultLogsFolder { get; set; } = "logs";
 
+        /// <summary>
+        /// Base port number to use for silo's gateways
+        /// </summary>
         public int BaseGatewayPort { get; set; }
 
+        /// <summary>
+        /// Base port number to use for silos
+        /// </summary>
         public int BaseSiloPort { get; set; }
 
+        /// <summary>
+        /// The number of initial silos to deploy.
+        /// </summary>
         public short InitialSilosCount { get; set; }
 
+        /// <summary>
+        /// The cluster configuration. If no value set, build a new one with <see cref="BuildClusterConfiguration()"/>
+        /// </summary>
         public ClusterConfiguration ClusterConfiguration
         {
             get { return _clusterConfiguration ??
@@ -49,6 +79,9 @@ namespace Orleans.TestingHost
             set { _clusterConfiguration = value; }
         }
 
+        /// <summary>
+        /// The client configuration. If no value set, build a new one with <see cref="BuildClientConfiguration(Runtime.Configuration.ClusterConfiguration)"/>
+        /// </summary>
         public ClientConfiguration ClientConfiguration
         {
             get { return _clientConfiguration ??
@@ -70,10 +103,17 @@ namespace Orleans.TestingHost
             return BuildClusterConfiguration(baseSiloPort, baseGatewayPort, silosCount);
         }
 
-        public ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount)
+        /// <summary>
+        /// Build a cluster configuration.
+        /// </summary>
+        /// <param name="baseSiloPort">Base port number to use for silos</param>
+        /// <param name="baseGatewayPort">Base port number to use for silo's gateways</param>
+        /// <param name="silosCount">The number of initial silos to deploy.</param>
+        /// <returns>The builded cluster configuration</returns>
+        public static ClusterConfiguration BuildClusterConfiguration(int baseSiloPort, int baseGatewayPort, int silosCount)
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(baseSiloPort, baseGatewayPort);
-            config.Globals.DeploymentId = CreateDeploymentId();
+            config.Globals.DeploymentId = CreateDeploymentId(baseSiloPort);
             config.Defaults.TraceToConsole = DefaultTraceToConsole;
             if (!string.IsNullOrWhiteSpace(DefaultLogsFolder))
             {
@@ -97,6 +137,15 @@ namespace Orleans.TestingHost
             return config;
         }
 
+        /// <summary>
+        /// Add a silo config to the target cluster config.
+        /// </summary>
+        /// <param name="config">The target cluster configuration</param>
+        /// <param name="siloType">The type of the silo to add</param>
+        /// <param name="instanceNumber">The instance number of the silo</param>
+        /// <param name="baseSiloPort">Base silo port to use</param>
+        /// <param name="baseGatewayPort">Base gateway silo port to use</param>
+        /// <returns>The silo configuration added</returns>
         public static NodeConfiguration AddNodeConfiguration(ClusterConfiguration config, Silo.SiloType siloType, short instanceNumber, int baseSiloPort, int baseGatewayPort)
         {
             string siloName;
@@ -123,6 +172,12 @@ namespace Orleans.TestingHost
             return nodeConfig;
         }
 
+        /// <summary>
+        /// Build the client configuration based on the cluster configuration. If a debugger is attached, 
+        /// the response timeout will be overridden to 1000000ms
+        /// </summary>
+        /// <param name="clusterConfig">The reference cluster configuration.</param>
+        /// <returns>THe builded client configuration</returns>
         public static ClientConfiguration BuildClientConfiguration(ClusterConfiguration clusterConfig)
         {
             var config = new ClientConfiguration();
@@ -160,17 +215,14 @@ namespace Orleans.TestingHost
             }
 
             config.DataConnectionString = clusterConfig.Globals.DataConnectionString;
+            config.AdoInvariant = clusterConfig.Globals.AdoInvariant;
             config.PropagateActivityId = clusterConfig.Defaults.PropagateActivityId;
             config.DeploymentId = clusterConfig.Globals.DeploymentId;
-            if (Debugger.IsAttached)
-            {
-                // Test is running inside debugger - Make timeout ~= infinite
-                config.ResponseTimeout = TimeSpan.FromMilliseconds(1000000);
-            }
-            else
-            {
-                config.ResponseTimeout = clusterConfig.Globals.ResponseTimeout;
-            }
+
+            // If a debugger is attached, override the timeout setting
+            config.ResponseTimeout = Debugger.IsAttached
+                ? TimeSpan.FromMilliseconds(1000000)
+                : clusterConfig.Globals.ResponseTimeout;
 
             config.LargeMessageWarningThreshold = clusterConfig.Defaults.LargeMessageWarningThreshold;
 
@@ -179,13 +231,13 @@ namespace Orleans.TestingHost
             return config;
         }
 
-        private string CreateDeploymentId()
+        private static string CreateDeploymentId(int baseSiloPort)
         {
             string prefix = "testdepid-";
             int randomSuffix = ThreadSafeRandom.Next(1000);
             DateTime now = DateTime.UtcNow;
             string DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
-            string depId = $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{this.BaseSiloPort}-{randomSuffix}";
+            string depId = $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{baseSiloPort}-{randomSuffix}";
             return depId;
         }
     }

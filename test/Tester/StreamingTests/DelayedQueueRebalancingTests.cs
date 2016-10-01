@@ -2,7 +2,6 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
@@ -11,6 +10,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {

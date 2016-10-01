@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
@@ -27,8 +26,8 @@ namespace UnitTests.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        public static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        public static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
             EHConsumerGroup, EHPath);
@@ -60,7 +59,7 @@ namespace UnitTests.StreamingTests
             {
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
                 EventHubConfig.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 

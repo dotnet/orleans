@@ -6,6 +6,9 @@ using Newtonsoft.Json;
 
 namespace Orleans.TestingHost
 {
+    /// <summary>
+    /// Helper class to load storage credentials from <see cref="ORLEANS_TEST_SECRETS_FILE_NAME"/>. See also <seealso cref="StorageTestConstants"/>.
+    /// </summary>
     public static class OrleansTestSecrets
     {
         // In order to specify your own test secrets you should:
@@ -20,6 +23,8 @@ namespace Orleans.TestingHost
         // MSBuild unit test framework runs a script "SetupTestScript.cmd" (that is specified in Local.testsettings), which
         // copies ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH\OrleansTestSecrets.json into where the unit tests are run.
         // At runtime OrleansTestSecrets class will read this file and use your storage account key.
+
+        /// <summary> The path of the file containing the storage credentials </summary>
         public const string ORLEANS_TEST_SECRETS_FILE_NAME = "OrleansTestSecrets.json";
 
         [Serializable]
@@ -29,6 +34,11 @@ namespace Orleans.TestingHost
             public string EventHubConnectionString { get; set; }
         }
 
+        /// <summary>
+        /// Try to load the storage credentials from <see cref="ORLEANS_TEST_SECRETS_FILE_NAME"/> and
+        /// store them in <see cref="StorageTestConstants.DataConnectionString"/> and <see cref="StorageTestConstants.EventHubConnectionString"/>
+        /// </summary>
+        /// <returns>True if success, false otherwise</returns>
         public static bool TryLoad()
         {
             try

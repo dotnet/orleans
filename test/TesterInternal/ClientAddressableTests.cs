@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests
 {
@@ -37,7 +36,7 @@ namespace UnitTests
 
             public Task<int> OnSerialStress(int n)
             {
-                Assert.AreEqual(this.counter, n);
+                Assert.Equal(this.counter, n);
                 ++this.counter;
                 return Task.FromResult(10000 + n);
             }
@@ -50,10 +49,10 @@ namespace UnitTests
 
             public void VerifyNumbers(int iterationCount)
             {
-                Assert.AreEqual(iterationCount, this.numbers.Count);
+                Assert.Equal(iterationCount, this.numbers.Count);
                 this.numbers.Sort();
                 for (var i = 0; i < this.numbers.Count; ++i)
-                    Assert.AreEqual(i, this.numbers[i]);
+                    Assert.Equal(i, this.numbers[i]);
             }
         }
 
@@ -78,7 +77,7 @@ namespace UnitTests
             const string expected = "o hai!";
             await proxy.SetTarget(myRef);
             var actual = await proxy.HappyPath(expected);
-            Assert.AreEqual(expected, actual);
+            Assert.Equal(expected, actual);
 
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }
@@ -94,7 +93,7 @@ namespace UnitTests
             var proxy = GrainClient.GrainFactory.GetGrain<IClientAddressableTestGrain>(GetRandomGrainId());
             await proxy.SetTarget(myRef);
 
-            await Xunit.Assert.ThrowsAsync<ApplicationException>(() =>
+            await Assert.ThrowsAsync<ApplicationException>(() =>
                 proxy.SadPath(message)
             );
 
@@ -113,7 +112,7 @@ namespace UnitTests
             await rendez.SetProducer(myRef);
             await consumer.Setup();
             var n = await consumer.PollProducer();
-            Assert.AreEqual(1, n);
+            Assert.Equal(1, n);
 
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }

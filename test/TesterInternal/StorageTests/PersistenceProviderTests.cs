@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers;
@@ -248,10 +247,10 @@ namespace UnitTests.StorageTests
             storage.ConvertToStorageFormat(initialState, entity);
 
             var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
-            Assert.IsNotNull(convertedState, "Converted state");
-            Assert.AreEqual(initialState.A, convertedState.A, "A");
-            Assert.AreEqual(initialState.B, convertedState.B, "B");
-            Assert.AreEqual(initialState.C, convertedState.C, "C");
+            Assert.NotNull(convertedState);
+            Assert.Equal(initialState.A, convertedState.A);
+            Assert.Equal(initialState.B, convertedState.B);
+            Assert.Equal(initialState.C, convertedState.C);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -273,14 +272,14 @@ namespace UnitTests.StorageTests
             await store.WriteStateAsync(testName, reference, state);
             TimeSpan writeTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
-            Assert.IsTrue(writeTime >= expectedLatency, "Write: Expected minimum latency = {0} Actual = {1}", expectedLatency, writeTime);
+            Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
-            Assert.IsTrue(readTime >= expectedLatency, "Read: Expected minimum latency = {0} Actual = {1}", expectedLatency, readTime);
+            Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
 
         [Fact, TestCategory("Persistence"), TestCategory("Performance"), TestCategory("JSON")]
@@ -319,8 +318,8 @@ namespace UnitTests.StorageTests
         {
             string className = typeof(MockStorageProvider).FullName;
             Type classType = TypeUtils.ResolveType(className);
-            Assert.IsNotNull(classType, "Type");
-            Assert.IsTrue(typeof(IStorageProvider).IsAssignableFrom(classType), "Is an IStorageProvider : {0}", classType.FullName);
+            Assert.NotNull(classType); // Type
+            Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
 
         #region Utility functions
@@ -355,9 +354,9 @@ namespace UnitTests.StorageTests
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
-            Assert.AreEqual(grainState.State.A, storedState.A, "A");
-            Assert.AreEqual(grainState.State.B, storedState.B, "B");
-            Assert.AreEqual(grainState.State.C, storedState.C, "C");
+            Assert.Equal(grainState.State.A, storedState.A);
+            Assert.Equal(grainState.State.B, storedState.B);
+            Assert.Equal(grainState.State.C, storedState.C);
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
@@ -385,9 +384,9 @@ namespace UnitTests.StorageTests
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(grainState.State.A, storedGrainState.State.A, "A");
-            Assert.AreEqual(grainState.State.B, storedGrainState.State.B, "B");
-            Assert.AreEqual(grainState.State.C, storedGrainState.State.C, "C");
+            Assert.Equal(grainState.State.A, storedGrainState.State.A);
+            Assert.Equal(grainState.State.B, storedGrainState.State.B);
+            Assert.Equal(grainState.State.C, storedGrainState.State.C);
 
             return storedGrainState;
         }
@@ -419,10 +418,10 @@ namespace UnitTests.StorageTests
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.IsNotNull(storedGrainState.State, "State");
-            Assert.AreEqual(default(string), storedGrainState.State.A, "A");
-            Assert.AreEqual(default(int), storedGrainState.State.B, "B");
-            Assert.AreEqual(default(long), storedGrainState.State.C, "C");
+            Assert.NotNull(storedGrainState.State);
+            Assert.Equal(default(string), storedGrainState.State.A);
+            Assert.Equal(default(int), storedGrainState.State.B);
+            Assert.Equal(default(long), storedGrainState.State.C);
 
             return storedGrainState;
         }

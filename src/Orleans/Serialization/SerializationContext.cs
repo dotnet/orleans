@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Orleans.Serialization
 {
+    using System.Runtime.CompilerServices;
+
     /// <summary>
     /// Maintains context information for current thread during serialization operations.
     /// </summary>
@@ -62,7 +62,7 @@ namespace Orleans.Serialization
 
             public override int GetHashCode(object obj)
             {
-                return obj == null ? 0 : obj.GetHashCode();
+                return obj == null ? 0 : RuntimeHelpers.GetHashCode(obj);
             }
         }
 

@@ -23,6 +23,8 @@ namespace Orleans.Runtime.Configuration
 
         public string Type { get; private set; }
         public string Name { get; private set; }
+        public IProviderManager ProviderManager {get { return providerManager; } }
+
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>

@@ -116,7 +116,6 @@ namespace Orleans
         /// <summary>
         /// Returns a <see cref="Task{Object}"/> for the provided <see cref="Task{Object}"/>.
         /// </summary>
-        /// <typeparam name="object">The underlying type of <paramref name="task"/>.</typeparam>
         /// <param name="task">The task.</param>
         public static Task<object> Box(this Task<object> task)
         {
@@ -259,7 +258,7 @@ namespace Orleans
         /// This will apply a timeout delay to the task, allowing us to exit early
         /// </summary>
         /// <param name="taskToComplete">The task we will timeout after timeSpan</param>
-        /// <param name="timeout">Amount of time to wait before timing out</param>
+        /// <param name="timeSpan">Amount of time to wait before timing out</param>
         /// <exception cref="TimeoutException">If we time out we will get this exception</exception>
         /// <returns>The value of the completed task</returns>
         public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeSpan)

@@ -1,0 +1,12 @@
+﻿{
+  "dependencies": {
+    "BenchmarkDotNet": "0.9.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

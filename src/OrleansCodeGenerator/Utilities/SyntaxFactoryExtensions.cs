@@ -2,16 +2,14 @@ namespace Orleans.CodeGenerator.Utilities
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Runtime;
-    using System.Globalization;
-	
+
     /// <summary>
     /// The syntax factory extensions.
     /// </summary>

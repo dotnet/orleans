@@ -32,8 +32,8 @@ namespace UnitTests.StreamingTests
         private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
                 EHConsumerGroup, EHPath);
 
-        private static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        private static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
             new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
@@ -45,7 +45,8 @@ namespace UnitTests.StreamingTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(2);
+                // poor fault injection requires grain instances stay on same host, so only single host for this test
+                var options = new TestClusterOptions(1);
                 // register stream provider
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
@@ -66,7 +67,7 @@ namespace UnitTests.StreamingTests
                 var settings = new Dictionary<string, string>();
 
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
                 EventHubConfig.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 

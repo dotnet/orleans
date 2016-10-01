@@ -5,14 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Xunit;
-using UnitTests.Tester;
+using Xunit.Sdk;
 
 namespace UnitTests.General
 {
@@ -258,7 +257,7 @@ namespace UnitTests.General
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
                 SiloAddress s = siloHandle.Silo.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo((uint)key);
-                Assert.AreEqual(truth, s, string.Format("Lookup wrong for key: {0} on silo: {1}", key, siloHandle.Silo.SiloAddress));
+                Assert.Equal(truth, s);
             }
         }
 
@@ -368,7 +367,7 @@ namespace UnitTests.General
                     assertion();
                     return;
                 }
-                catch (Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException)
+                catch (XunitException)
                 {
                     if (sw.ElapsedMilliseconds > timeout.TotalMilliseconds)
                     {

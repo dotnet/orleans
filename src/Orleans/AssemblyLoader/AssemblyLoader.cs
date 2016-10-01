@@ -9,6 +9,7 @@ namespace Orleans.Runtime
 {
     internal class AssemblyLoader
     {
+#if !NETSTANDARD_TODO
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
@@ -78,7 +79,7 @@ namespace Orleans.Runtime
             loader.logger.Info("{0} assemblies loaded.", count);
             return discoveredAssemblyLocations;
         }
-
+#endif
         public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
@@ -89,7 +90,7 @@ namespace Orleans.Runtime
                         assembly,
                         type =>
                         typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
+                        && type.GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
@@ -125,6 +126,7 @@ namespace Orleans.Runtime
             }
         }
 
+#if !NETSTANDARD_TODO
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(
@@ -428,5 +430,6 @@ namespace Orleans.Runtime
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
         }
+#endif
     }
 }

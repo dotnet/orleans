@@ -4,14 +4,10 @@ namespace UnitTests.Serialization
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
-
-    using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-
+    using GrainInterfaces;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
-    using GrainInterfaces;
     using Xunit;
 
     /// <summary>
@@ -76,23 +72,21 @@ namespace UnitTests.Serialization
             var final = counters.Select(_ => _.GetCurrentValue()).ToList();
 
             // Ensure that serialization was correctly performed.
-            Assert.IsInstanceOfType(
-                deserialized,
-                grainReference.GetType(),
-                "Deserialized GrainReference type should match original type");
+            Assert.IsAssignableFrom(grainReference.GetType(), deserialized); //Deserialized GrainReference type should match original type
+
             var deserializedGrainReference = (GrainReference)deserialized;
-            Assert.IsTrue(
+            Assert.True(
                 deserializedGrainReference.GrainId.Equals(grainReference.GrainId),
                 "Deserialized GrainReference should have same GrainId as original value.");
-            Assert.IsInstanceOfType(copy, grainReference.GetType(), "DeepCopy GrainReference type should match original type");
-            Assert.IsTrue(
+            Assert.IsAssignableFrom(grainReference.GetType(), copy);
+            Assert.True(
                 copy.GrainId.Equals(grainReference.GrainId),
                 "DeepCopy GrainReference should have same GrainId as original value.");
 
             // Check that the counters have not changed.
             var initialString = string.Join(",", initial);
             var finalString = string.Join(",", final);
-            Assert.AreEqual(initialString, finalString, "GrainReference serialization should not use fallback serializer.");
+            Assert.Equal(initialString, finalString); // GrainReference serialization should not use fallback serializer.
         }
 
         /// <summary>

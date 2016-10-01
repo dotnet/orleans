@@ -16,10 +16,8 @@ namespace Orleans.Streams
             table = new Dictionary<string, HashSet<int>>();
         }
 
-        /// <summary>
-        /// Initializes any implicit stream subscriptions specified for a grain class type. If the grain class specified does not have any associated namespaces, then nothing is done.
-        /// </summary>
-        /// <param name="grainClass">A grain class type.</param>
+        /// <summary>Initializes any implicit stream subscriptions specified for a grain class type. If the grain class specified does not have any associated namespaces, then nothing is done.</summary>
+        /// <param name="grainClasses">A grain class type.</param>
         /// <exception cref="System.ArgumentException">
         /// Duplicate specification of namespace "...".
         /// </exception>

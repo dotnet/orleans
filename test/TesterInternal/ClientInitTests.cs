@@ -1,5 +1,4 @@
 ﻿using System;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -28,24 +27,24 @@ namespace UnitTests
         {
             // First initialize will have been done by the default cluster fixture
 
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_Uninitialize()
         {
             GrainClient.Uninitialize();
-            Assert.IsFalse(GrainClient.IsInitialized);
+            Assert.False(GrainClient.IsInitialized);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
         public void ClientInit_UnThenReinitialize()
         {
             GrainClient.Uninitialize();
-            Assert.IsFalse(GrainClient.IsInitialized);
+            Assert.False(GrainClient.IsInitialized);
 
             GrainClient.Initialize(HostedCluster.ClientConfiguration);
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
@@ -54,10 +53,10 @@ namespace UnitTests
             // First initialize will have been done by orleans unit test base class
 
             GrainClient.Initialize(HostedCluster.ClientConfiguration);
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
 
             GrainClient.Initialize(HostedCluster.ClientConfiguration);
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client")]
@@ -68,23 +67,23 @@ namespace UnitTests
 
             // First initialize will have been done by orleans unit test base class, so uninitialize back to null state
             GrainClient.Uninitialize();
-            Assert.IsFalse(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-            Assert.IsFalse(LogManager.IsInitialized, "Logger.IsInitialized");
+            Assert.False(GrainClient.IsInitialized, "GrainClient.IsInitialized");
+            Assert.False(LogManager.IsInitialized, "Logger.IsInitialized");
 
             try
             {
                 OutsideRuntimeClient.TestOnlyThrowExceptionDuringInit = true;
-                Xunit.Assert.Throws<InvalidOperationException>(() =>
+                Assert.Throws<InvalidOperationException>(() =>
                     GrainClient.Initialize(cfg));
 
-                Assert.IsFalse(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-                Assert.IsFalse(LogManager.IsInitialized, "Logger.IsInitialized");
+                Assert.False(GrainClient.IsInitialized, "GrainClient.IsInitialized");
+                Assert.False(LogManager.IsInitialized, "Logger.IsInitialized");
 
                 OutsideRuntimeClient.TestOnlyThrowExceptionDuringInit = false;
 
                 GrainClient.Initialize(cfg);
-                Assert.IsTrue(GrainClient.IsInitialized, "GrainClient.IsInitialized");
-                Assert.IsTrue(LogManager.IsInitialized, "Logger.IsInitialized");
+                Assert.True(GrainClient.IsInitialized, "GrainClient.IsInitialized");
+                Assert.True(LogManager.IsInitialized, "Logger.IsInitialized");
             }
             finally
             {
@@ -96,16 +95,16 @@ namespace UnitTests
         public void ClientInit_InitializeUnThenReInit()
         {
             GrainClient.Initialize(HostedCluster.ClientConfiguration);
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
 
             GrainClient.Uninitialize();
-            Assert.IsFalse(GrainClient.IsInitialized);
+            Assert.False(GrainClient.IsInitialized);
 
             GrainClient.Initialize(HostedCluster.ClientConfiguration);
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
 
             GrainClient.Uninitialize();
-            Assert.IsFalse(GrainClient.IsInitialized);
+            Assert.False(GrainClient.IsInitialized);
         }
     }
 }

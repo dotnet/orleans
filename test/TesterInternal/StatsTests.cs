@@ -4,14 +4,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Xunit;
-using Tester;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.Stats
@@ -51,13 +49,13 @@ namespace UnitTests.Stats
             ClientConfiguration config = this.HostedCluster.ClientConfig;
 
             OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.IsNotNull(ogc.ClientStatistics, "Client Statistics Manager is setup");
+            Assert.NotNull(ogc.ClientStatistics);
 
-            Assert.AreEqual("MockStats", config.StatisticsProviderName, "Client.StatisticsProviderName");
+            Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             Silo silo = this.HostedCluster.Primary.Silo;
-            Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
-            Assert.AreEqual("MockStats", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
+            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+            Assert.Equal("MockStats",  silo.LocalConfig.StatisticsProviderName);  // "Silo.StatisticsProviderName"
 
             // Check we got some stats & metrics callbacks on both client and server.
             var siloStatsCollector = this.HostedCluster.Primary.Silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
@@ -75,10 +73,10 @@ namespace UnitTests.Stats
                 numSiloMetricsCalls);
             output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
 
-            Assert.IsTrue(numClientMetricsCalls > 0, "Some client metrics calls = {0}", numClientMetricsCalls);
-            Assert.IsTrue(numSiloMetricsCalls > 0, "Some silo metrics calls = {0}", numSiloMetricsCalls);
-            Assert.IsTrue(numClientStatsCalls > 0, "Some client stats calls = {0}", numClientStatsCalls);
-            Assert.IsTrue(numSiloStatsCalls > 0, "Some silo stats calls = {0}", numSiloStatsCalls);
+            Assert.True(numClientMetricsCalls > 0, $"Some client metrics calls = {numClientMetricsCalls}");
+            Assert.True(numSiloMetricsCalls > 0, $"Some silo metrics calls = {numSiloMetricsCalls}");
+            Assert.True(numClientStatsCalls > 0, $"Some client stats calls = {numClientStatsCalls}");
+            Assert.True(numSiloStatsCalls > 0, $"Some silo stats calls = {numSiloStatsCalls}");
         }
     }
     
@@ -174,22 +172,22 @@ namespace UnitTests.Stats
         [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
         public void ClientInit_SqlServer_WithStats()
         {
-            Assert.IsTrue(GrainClient.IsInitialized);
+            Assert.True(GrainClient.IsInitialized);
 
             ClientConfiguration config = this.HostedCluster.ClientConfig;
 
-            Assert.AreEqual(ClientConfiguration.GatewayProviderType.SqlServer, config.GatewayProvider, "GatewayProviderType");
+            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer,  config.GatewayProvider);  // "GatewayProviderType"
 
-            Assert.IsTrue(config.UseSqlSystemStore, "Client UseSqlSystemStore");
+            Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
 
             OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.IsNotNull(ogc.ClientStatistics, "Client Statistics Manager is setup");
+            Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
 
-            Assert.AreEqual("SQL", config.StatisticsProviderName, "Client.StatisticsProviderName");
+            Assert.Equal("SQL",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             Silo silo = this.HostedCluster.Primary.Silo;
-            Assert.IsTrue(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
-            Assert.AreEqual("SQL", silo.LocalConfig.StatisticsProviderName, "Silo.StatisticsProviderName");
+            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
+            Assert.Equal("SQL",  silo.LocalConfig.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }
 #endif

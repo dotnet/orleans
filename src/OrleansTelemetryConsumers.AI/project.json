@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "Microsoft.ApplicationInsights": "1.2.3"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

@@ -11,62 +11,50 @@ namespace Orleans.Runtime
 {
     internal class Message : IOutgoingMessage
     {
-        // NOTE:  These are encoded on the wire as bytes for efficiency.  They are only integer enums to avoid boxing
-        // This means we can't have over byte.MaxValue of them.
-        public enum Header
-        {
-            ALWAYS_INTERLEAVE = 1,
-            CACHE_INVALIDATION_HEADER,
-            CATEGORY,
-            CORRELATION_ID,
-            DEBUG_CONTEXT,
-            DIRECTION,
-            EXPIRATION,
-            FORWARD_COUNT,
-            INTERFACE_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-            METHOD_ID,  // DEPRECATED - leave that enum value to maintain next enum numerical values
-            NEW_GRAIN_TYPE,
-            GENERIC_GRAIN_TYPE,
-            RESULT,
-            REJECTION_INFO,
-            REJECTION_TYPE,
-            READ_ONLY,
-            RESEND_COUNT,
-            SENDING_ACTIVATION,
-            SENDING_GRAIN,
-            SENDING_SILO,
-            IS_NEW_PLACEMENT,
-
-            TARGET_ACTIVATION,
-            TARGET_GRAIN,
-            TARGET_SILO,
-            TARGET_OBSERVER,
-            TIMESTAMPS, // DEPRECATED - leave that enum value to maintain next enum numerical values
-            IS_UNORDERED,
-
-            PRIOR_MESSAGE_ID,
-            PRIOR_MESSAGE_TIMES,
-
-            REQUEST_CONTEXT,
-            // Do not add over byte.MaxValue of these.
-        }
-
-        public static class Metadata
-        {
-            public const string MAX_RETRIES = "MaxRetries";
-            public const string EXCLUDE_TARGET_ACTIVATIONS = "#XA";
-            public const string TARGET_HISTORY = "TargetHistory";
-            public const string ACTIVATION_DATA = "ActivationData";
-        }
-
-
         public static int LargeMessageSizeThreshold { get; set; }
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        private readonly Dictionary<Header, object> headers;
+        #region metadata
+
         [NonSerialized]
-        private Dictionary<string, object> metadata;
+        private string _targetHistory;
+
+        [NonSerialized]
+        private DateTime? _queuedTime;
+
+        [NonSerialized]
+        private int? _retryCount;
+
+        [NonSerialized]
+        private int? _maxRetries;
+
+        public string TargetHistory
+        {
+            get { return _targetHistory; }
+            set { _targetHistory = value; }
+        }
+
+        
+        public DateTime? QueuedTime
+        {
+            get { return _queuedTime; }
+            set { _queuedTime = value; }
+        }
+
+        public int? RetryCount
+        {
+            get { return _retryCount; }
+            set { _retryCount = value; }
+        }
+
+        public int? MaxRetries
+        {
+            get { return _maxRetries; }
+            set { _maxRetries = value; }
+        }
+
+        #endregion
 
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
@@ -117,84 +105,90 @@ namespace Orleans.Runtime
             GatewayTooBusy,
         }
 
+        internal HeadersContainer Headers { get; set; } = new HeadersContainer();
+
         public Categories Category
         {
-            get { return GetScalarHeader<Categories>(Header.CATEGORY); }
-            set { SetHeader(Header.CATEGORY, value); }
+            get { return Headers.Category; }
+            set { Headers.Category = value; }
         }
 
         public Directions Direction
         {
-            get { return GetScalarHeader<Directions>(Header.DIRECTION); }
-            set { SetHeader(Header.DIRECTION, value); }
+            get { return Headers.Direction ?? default(Directions); }
+            set { Headers.Direction = value; }
         }
+
+        public bool HasDirection => Headers.Direction.HasValue;
 
         public bool IsReadOnly
         {
-            get { return GetScalarHeader<bool>(Header.READ_ONLY); }
-            set { SetHeader(Header.READ_ONLY, value); }
+            get { return Headers.IsReadOnly; }
+            set { Headers.IsReadOnly = value; }
         }
 
         public bool IsAlwaysInterleave
         {
-            get { return GetScalarHeader<bool>(Header.ALWAYS_INTERLEAVE); }
-            set { SetHeader(Header.ALWAYS_INTERLEAVE, value); }
+            get { return Headers.IsAlwaysInterleave; }
+            set { Headers.IsAlwaysInterleave = value; }
         }
 
         public bool IsUnordered
         {
-            get { return GetScalarHeader<bool>(Header.IS_UNORDERED); }
-            set
-            {
-                if (value || ContainsHeader(Header.IS_UNORDERED))
-                    SetHeader(Header.IS_UNORDERED, value);
-            }
+            get { return Headers.IsUnordered; }
+            set { Headers.IsUnordered = value; }
+        }
+
+        public bool IsReturnedFromRemoteCluster
+        {
+            get { return Headers.IsReturnedFromRemoteCluster; }
+            set { Headers.IsReturnedFromRemoteCluster = value; }
         }
 
         public CorrelationId Id
         {
-            get { return GetSimpleHeader<CorrelationId>(Header.CORRELATION_ID); }
-            set { SetHeader(Header.CORRELATION_ID, value); }
+            get { return Headers.Id; }
+            set { Headers.Id = value; }
         }
 
         public int ResendCount
         {
-            get { return GetScalarHeader<int>(Header.RESEND_COUNT); }
-            set { SetHeader(Header.RESEND_COUNT, value); }
+            get { return Headers.ResendCount; }
+            set {  Headers.ResendCount = value; }
         }
 
         public int ForwardCount
         {
-            get { return GetScalarHeader<int>(Header.FORWARD_COUNT); }
-            set { SetHeader(Header.FORWARD_COUNT, value); }
+            get { return Headers.ForwardCount; }
+            set {  Headers.ForwardCount = value; }
         }
-
+        
         public SiloAddress TargetSilo
         {
-            get { return (SiloAddress)GetHeader(Header.TARGET_SILO); }
+            get { return Headers.TargetSilo; }
             set
             {
-                SetHeader(Header.TARGET_SILO, value);
+                Headers.TargetSilo = value;
                 targetAddress = null;
             }
         }
-
+        
         public GrainId TargetGrain
         {
-            get { return GetSimpleHeader<GrainId>(Header.TARGET_GRAIN); }
+            get { return Headers.TargetGrain; }
             set
             {
-                SetHeader(Header.TARGET_GRAIN, value);
+                Headers.TargetGrain = value;
                 targetAddress = null;
             }
         }
-
+        
         public ActivationId TargetActivation
         {
-            get { return GetSimpleHeader<ActivationId>(Header.TARGET_ACTIVATION); }
+            get { return Headers.TargetActivation; }
             set
             {
-                SetHeader(Header.TARGET_ACTIVATION, value);
+                Headers.TargetActivation = value;
                 targetAddress = null;
             }
         }
@@ -210,43 +204,43 @@ namespace Orleans.Runtime
                 targetAddress = value;
             }
         }
-
+        
         public GuidId TargetObserverId
         {
-            get { return GetSimpleHeader<GuidId>(Header.TARGET_OBSERVER); }
+            get { return Headers.TargetObserverId; }
             set
             {
-                SetHeader(Header.TARGET_OBSERVER, value);
+                Headers.TargetObserverId = value;
                 targetAddress = null;
             }
         }
-
+        
         public SiloAddress SendingSilo
         {
-            get { return (SiloAddress)GetHeader(Header.SENDING_SILO); }
+            get { return Headers.SendingSilo; }
             set
             {
-                SetHeader(Header.SENDING_SILO, value);
+                Headers.SendingSilo = value;
                 sendingAddress = null;
             }
         }
-
+        
         public GrainId SendingGrain
         {
-            get { return GetSimpleHeader<GrainId>(Header.SENDING_GRAIN); }
+            get { return Headers.SendingGrain; }
             set
             {
-                SetHeader(Header.SENDING_GRAIN, value);
+                Headers.SendingGrain = value;
                 sendingAddress = null;
             }
         }
-
+        
         public ActivationId SendingActivation
         {
-            get { return GetSimpleHeader<ActivationId>(Header.SENDING_ACTIVATION); }
+            get { return Headers.SendingActivation; }
             set
             {
-                SetHeader(Header.SENDING_ACTIVATION, value);
+                Headers.SendingActivation = value;
                 sendingAddress = null;
             }
         }
@@ -262,33 +256,29 @@ namespace Orleans.Runtime
                 sendingAddress = value;
             }
         }
-
+        
         public bool IsNewPlacement
         {
-            get { return GetScalarHeader<bool>(Header.IS_NEW_PLACEMENT); }
+            get { return Headers.IsNewPlacement; }
             set
             {
-                if (value || ContainsHeader(Header.IS_NEW_PLACEMENT))
-                    SetHeader(Header.IS_NEW_PLACEMENT, value);
+                 Headers.IsNewPlacement = value;
             }
         }
 
         public ResponseTypes Result
         {
-            get { return GetScalarHeader<ResponseTypes>(Header.RESULT); }
-            set { SetHeader(Header.RESULT, value); }
+            get { return Headers.Result; }
+            set {  Headers.Result = value; }
         }
 
-        public DateTime Expiration
+        public DateTime? Expiration
         {
-            get { return GetScalarHeader<DateTime>(Header.EXPIRATION); }
-            set { SetHeader(Header.EXPIRATION, value); }
+            get { return Headers.Expiration; }
+            set { Headers.Expiration = value; }
         }
 
-        public bool IsExpired
-        {
-            get { return (ContainsHeader(Header.EXPIRATION)) && DateTime.UtcNow > Expiration; }
-        }
+        public bool IsExpired => Expiration.HasValue && DateTime.UtcNow > Expiration.Value;
 
         public bool IsExpirableMessage(IMessagingConfiguration config)
         {
@@ -300,32 +290,31 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
         }
-        
+
         public string DebugContext
         {
-            get { return GetStringHeader(Header.DEBUG_CONTEXT); }
-            set { SetHeader(Header.DEBUG_CONTEXT, value); }
+            get { return GetNotNullString(Headers.DebugContext); }
+            set { Headers.DebugContext = value; }
         }
 
-        public IEnumerable<ActivationAddress> CacheInvalidationHeader
+        public List<ActivationAddress> CacheInvalidationHeader
         {
-            get
-            {
-                object obj = GetHeader(Header.CACHE_INVALIDATION_HEADER);
-                return obj == null ? null : ((IEnumerable)obj).Cast<ActivationAddress>();
-            }
+            get { return Headers.CacheInvalidationHeader; }
+            set { Headers.CacheInvalidationHeader = value; }
         }
+
+ 
 
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
             var list = new List<ActivationAddress>();
-            if (ContainsHeader(Header.CACHE_INVALIDATION_HEADER))
+            if (CacheInvalidationHeader != null)
             {
-                var prevList = ((IEnumerable)GetHeader(Header.CACHE_INVALIDATION_HEADER)).Cast<ActivationAddress>();
-                list.AddRange(prevList);
+                list.AddRange(CacheInvalidationHeader);
             }
+
             list.Add(address);
-            SetHeader(Header.CACHE_INVALIDATION_HEADER, list);
+            CacheInvalidationHeader = list;
         }
 
         // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
@@ -347,35 +336,35 @@ namespace Orleans.Runtime
         /// </summary>
         public string NewGrainType
         {
-            get { return GetStringHeader(Header.NEW_GRAIN_TYPE); }
-            set { SetHeader(Header.NEW_GRAIN_TYPE, value); }
+            get { return GetNotNullString(Headers.NewGrainType); }
+            set { Headers.NewGrainType = value; }
         }
-
+        
         /// <summary>
         /// Set by caller's grain reference 
         /// </summary>
         public string GenericGrainType
         {
-            get { return GetStringHeader(Header.GENERIC_GRAIN_TYPE); }
-            set { SetHeader(Header.GENERIC_GRAIN_TYPE, value); }
+            get { return GetNotNullString(Headers.GenericGrainType); }
+            set { Headers.GenericGrainType = value; }
         }
 
         public RejectionTypes RejectionType
         {
-            get { return GetScalarHeader<RejectionTypes>(Header.REJECTION_TYPE); }
-            set { SetHeader(Header.REJECTION_TYPE, value); }
+            get { return Headers.RejectionType; }
+            set { Headers.RejectionType = value; }
         }
 
         public string RejectionInfo
         {
-            get { return GetStringHeader(Header.REJECTION_INFO); }
-            set { SetHeader(Header.REJECTION_INFO, value); }
+            get { return GetNotNullString(Headers.RejectionInfo); }
+            set { Headers.RejectionInfo = value; }
         }
 
         public Dictionary<string, object> RequestContextData
         {
-            get { return GetScalarHeader<Dictionary<string, object>>(Header.REQUEST_CONTEXT); }
-            set { SetHeader(Header.REQUEST_CONTEXT, value); }
+            get { return Headers.RequestContextData; }
+            set { Headers.RequestContextData = value; }
         }
 
         public object BodyObject
@@ -430,11 +419,6 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            // average headers items count is 14 items, and while the Header enum contains 18 entries
-            // the closest prime number is 17; assuming that possibility of all 18 headers being at the same time is low enough to
-            // choose 17 in order to avoid allocations of two additional items on each call, and allocate 37 instead of 19 in rare cases
-            headers = new Dictionary<Header, object>(17);
-            metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
             headerBytes = null;
@@ -474,10 +458,8 @@ namespace Orleans.Runtime
         // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
-            metadata = new Dictionary<string, object>();
-
             var input = new BinaryTokenStreamReader(header);
-            headers = SerializationManager.DeserializeMessageHeaders(input);
+            Headers = SerializationManager.DeserializeMessageHeaders(input);
             if (deserializeBody)
             {
                 bodyObject = DeserializeBody(body);
@@ -498,47 +480,43 @@ namespace Orleans.Runtime
                 TargetSilo = this.SendingSilo
             };
 
-            if (this.ContainsHeader(Header.SENDING_GRAIN))
+            if (SendingGrain != null)
             {
-                response.SetHeader(Header.TARGET_GRAIN, this.GetHeader(Header.SENDING_GRAIN));
-                if (this.ContainsHeader(Header.SENDING_ACTIVATION))
+                response.TargetGrain = SendingGrain;
+                if (SendingActivation != null)
                 {
-                    response.SetHeader(Header.TARGET_ACTIVATION, this.GetHeader(Header.SENDING_ACTIVATION));
+                    response.TargetActivation = SendingActivation;
                 }
             }
 
             response.SendingSilo = this.TargetSilo;
-            if (this.ContainsHeader(Header.TARGET_GRAIN))
+            if (TargetGrain != null)
             {
-                response.SetHeader(Header.SENDING_GRAIN, this.GetHeader(Header.TARGET_GRAIN));
-                if (this.ContainsHeader(Header.TARGET_ACTIVATION))
+                response.SendingGrain = TargetGrain;
+                if (TargetActivation != null)
                 {
-                    response.SetHeader(Header.SENDING_ACTIVATION, this.GetHeader(Header.TARGET_ACTIVATION));
+                    response.SendingActivation = TargetActivation;
                 }
                 else if (this.TargetGrain.IsSystemTarget)
                 {
-                    response.SetHeader(Header.SENDING_ACTIVATION, ActivationId.GetSystemActivation(TargetGrain, TargetSilo));
+                    response.SendingActivation = ActivationId.GetSystemActivation(TargetGrain, TargetSilo);
                 }
             }
 
-            if (this.ContainsHeader(Header.DEBUG_CONTEXT))
+            if (DebugContext != null)
             {
-                response.SetHeader(Header.DEBUG_CONTEXT, this.GetHeader(Header.DEBUG_CONTEXT));
+                response.DebugContext = DebugContext;
             }
-            if (this.ContainsHeader(Header.CACHE_INVALIDATION_HEADER))
-            {
-                response.SetHeader(Header.CACHE_INVALIDATION_HEADER, this.GetHeader(Header.CACHE_INVALIDATION_HEADER));
-            }
-            if (this.ContainsHeader(Header.EXPIRATION))
-            {
-                response.SetHeader(Header.EXPIRATION, this.GetHeader(Header.EXPIRATION));
-            }
+
+            response.CacheInvalidationHeader = CacheInvalidationHeader;
+            response.Expiration = Expiration;
 
             var contextData = RequestContext.Export();
             if (contextData != null)
             {
                 response.RequestContextData = contextData;
             }
+
             return response;
         }
 
@@ -549,7 +527,7 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
-            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, new System.Diagnostics.StackTrace(true));
+            if (logger.IsVerbose) logger.Verbose("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }
 
@@ -562,94 +540,14 @@ namespace Orleans.Runtime
             };
         }
 
-        public bool ContainsHeader(Header tag)
+        public void ClearTargetAddress()
         {
-            return headers.ContainsKey(tag);
+            targetAddress = null;
         }
 
-        public void RemoveHeader(Header tag)
+        private static string GetNotNullString(string s)
         {
-            lock (headers)
-            {
-                headers.Remove(tag);
-                if (tag == Header.TARGET_ACTIVATION || tag == Header.TARGET_GRAIN | tag == Header.TARGET_SILO)
-                    targetAddress = null;
-            }
-        }
-
-        public void SetHeader(Header tag, object value)
-        {
-            lock (headers)
-            {
-                headers[tag] = value;
-            }
-        }
-
-        public object GetHeader(Header tag)
-        {
-            object val;
-            bool flag;
-            lock (headers)
-            {
-                flag = headers.TryGetValue(tag, out val);
-            }
-            return flag ? val : null;
-        }
-
-        public string GetStringHeader(Header tag)
-        {
-            object val;
-            if (!headers.TryGetValue(tag, out val)) return String.Empty;
-
-            var s = val as string;
-            return s ?? String.Empty;
-        }
-
-        public T GetScalarHeader<T>(Header tag)
-        {
-            object val;
-            if (headers.TryGetValue(tag, out val))
-            {
-                return (T)val;
-            }
-            return default(T);
-        }
-
-        public T GetSimpleHeader<T>(Header tag)
-        {
-            object val;
-            if (!headers.TryGetValue(tag, out val) || val == null) return default(T);
-
-            return val is T ? (T) val : default(T);
-        }
-
-        public bool ContainsMetadata(string tag)
-        {
-            return metadata != null && metadata.ContainsKey(tag);
-        }
-
-        public void SetMetadata(string tag, object data)
-        {
-            metadata = metadata ?? new Dictionary<string, object>();
-            metadata[tag] = data;
-        }
-
-        public void RemoveMetadata(string tag)
-        {
-            if (metadata != null)
-            {
-                metadata.Remove(tag);
-            }
-        }
-
-        public object GetMetadata(string tag)
-        {
-            object data;
-            if (metadata != null && metadata.TryGetValue(tag, out data))
-            {
-                return data;
-            }
-            return null;
+            return s ?? string.Empty;
         }
 
         /// <summary>
@@ -673,10 +571,7 @@ namespace Orleans.Runtime
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
             var headerStream = new BinaryTokenStreamWriter();
-            lock (headers) // Guard against any attempts to modify message headers while we are serializing them
-            {
-                SerializationManager.SerializeMessageHeaders(headers, headerStream);
-            }
+            SerializationManager.SerializeMessageHeaders(Headers, headerStream);
 
             if (bodyBytes == null)
             {
@@ -753,18 +648,43 @@ namespace Orleans.Runtime
                 sb.Append(debugContex).Append(".");
             }
 
-            lock (headers)
-            {
-                foreach (var pair in headers)
-                {
-                    if (pair.Key != Header.DEBUG_CONTEXT)
-                    {
-                        sb.AppendFormat("{0}={1};", pair.Key, pair.Value);
-                    }
-                    sb.AppendLine();
-                }
-            }
+            AppendIfExists(HeadersContainer.Headers.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
+            AppendIfExists(HeadersContainer.Headers.CATEGORY, sb, (m) => m.Category);
+            AppendIfExists(HeadersContainer.Headers.DIRECTION, sb, (m) => m.Direction);
+            AppendIfExists(HeadersContainer.Headers.EXPIRATION, sb, (m) => m.Expiration);
+            AppendIfExists(HeadersContainer.Headers.FORWARD_COUNT, sb, (m) => m.ForwardCount);
+            AppendIfExists(HeadersContainer.Headers.GENERIC_GRAIN_TYPE, sb, (m) => m.GenericGrainType);
+            AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
+            AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
+            AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
+            AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
+            AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
+            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
+            AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
+            AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
+            AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
+            AppendIfExists(HeadersContainer.Headers.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
+            AppendIfExists(HeadersContainer.Headers.RESEND_COUNT, sb, (m) => m.ResendCount);
+            AppendIfExists(HeadersContainer.Headers.RESULT, sb, (m) => m.Result);
+            AppendIfExists(HeadersContainer.Headers.SENDING_ACTIVATION, sb, (m) => m.SendingActivation);
+            AppendIfExists(HeadersContainer.Headers.SENDING_GRAIN, sb, (m) => m.SendingGrain);
+            AppendIfExists(HeadersContainer.Headers.SENDING_SILO, sb, (m) => m.SendingSilo);
+            AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
+            AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
+            AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
+            AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
+
             return sb.ToString();
+        }
+        
+        private void AppendIfExists(HeadersContainer.Headers header, StringBuilder sb, Func<Message, object> valueProvider)
+        {
+            // used only under log3 level
+            if ((Headers.GetHeadersMask() & header) != HeadersContainer.Headers.NONE)
+            {
+                sb.AppendFormat("{0}={1};", header, valueProvider(this));
+                sb.AppendLine();
+            }
         }
 
         public override string ToString()
@@ -802,13 +722,6 @@ namespace Orleans.Runtime
 
         internal void SetTargetPlacement(PlacementResult value)
         {
-            if ((value.IsNewPlacement ||
-                     (ContainsHeader(Header.TARGET_ACTIVATION) &&
-                     !TargetActivation.Equals(value.Activation))))
-            {
-                RemoveHeader(Header.PRIOR_MESSAGE_ID);
-                RemoveHeader(Header.PRIOR_MESSAGE_TIMES);
-            }
             TargetActivation = value.Activation;
             TargetSilo = value.Silo;
 
@@ -824,22 +737,22 @@ namespace Orleans.Runtime
         {
             var history = new StringBuilder();
             history.Append("<");
-            if (ContainsHeader(Header.TARGET_SILO))
+            if (TargetSilo != null)
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (ContainsHeader(Header.TARGET_GRAIN))
+            if (TargetGrain != null)
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (ContainsHeader(Header.TARGET_ACTIVATION))
+            if (TargetActivation != null)
             {
                 history.Append(TargetActivation);
             }
             history.Append(">");
-            if (ContainsMetadata(Message.Metadata.TARGET_HISTORY))
+            if (!string.IsNullOrEmpty(TargetHistory))
             {
-                history.Append("    ").Append(GetMetadata(Message.Metadata.TARGET_HISTORY));
+                history.Append("    ").Append(TargetHistory);
             }
             return history.ToString();
         }
@@ -880,6 +793,605 @@ namespace Orleans.Runtime
             MessagingStatisticsGroup.OnMessageExpired(phase);
             if (logger.IsVerbose2) logger.Verbose2("Dropping an expired message: {0}", this);
             ReleaseBodyAndHeaderBuffers();
+        }
+
+        [Serializable]
+        public class HeadersContainer
+        {
+            [Flags]
+            public enum Headers
+            {
+                NONE = 0,
+                ALWAYS_INTERLEAVE = 1 << 0,
+                CACHE_INVALIDATION_HEADER = 1 << 1,
+                CATEGORY = 1 << 2,
+                CORRELATION_ID = 1 << 3,
+                DEBUG_CONTEXT = 1 << 4,
+                DIRECTION = 1 << 5,
+                EXPIRATION = 1 << 6,
+                FORWARD_COUNT = 1 << 7,
+                NEW_GRAIN_TYPE = 1 << 8,
+                GENERIC_GRAIN_TYPE = 1 << 9,
+                RESULT = 1 << 10,
+                REJECTION_INFO = 1 << 11,
+                REJECTION_TYPE = 1 << 12,
+                READ_ONLY = 1 << 13,
+                RESEND_COUNT = 1 << 14,
+                SENDING_ACTIVATION = 1 << 15,
+                SENDING_GRAIN = 1 <<16,
+                SENDING_SILO = 1 << 17,
+                IS_NEW_PLACEMENT = 1 << 18,
+
+                TARGET_ACTIVATION = 1 << 19,
+                TARGET_GRAIN = 1 << 20,
+                TARGET_SILO = 1 << 21,
+                TARGET_OBSERVER = 1 << 22,
+                IS_UNORDERED = 1 << 23,
+                REQUEST_CONTEXT = 1 << 24,
+                IS_RETURNED_FROM_REMOTE_CLUSTER = 1 << 25,
+                // Do not add over int.MaxValue of these.
+            }
+
+            private Categories _category;
+            private Directions? _direction;
+            private bool _isReadOnly;
+            private bool _isAlwaysInterleave;
+            private bool _isUnordered;
+            private bool _isReturnedFromRemoteCluster;
+            private CorrelationId _id;
+            private int _resendCount;
+            private int _forwardCount;
+            private SiloAddress _targetSilo;
+            private GrainId _targetGrain;
+            private ActivationId _targetActivation;
+            private GuidId _targetObserverId;
+            private SiloAddress _sendingSilo;
+            private GrainId _sendingGrain;
+            private ActivationId _sendingActivation;
+            private bool _isNewPlacement;
+            private ResponseTypes _result;
+            private DateTime? _expiration;
+            private string _debugContext;
+            private List<ActivationAddress> _cacheInvalidationHeader;
+            private string _newGrainType;
+            private string _genericGrainType;
+            private RejectionTypes _rejectionType;
+            private string _rejectionInfo;
+            private Dictionary<string, object> _requestContextData;
+
+            public Categories Category
+            {
+                get { return _category; }
+                set
+                {
+                    _category = value;
+                }
+            }
+
+            public Directions? Direction
+            {
+                get { return _direction; }
+                set
+                {
+                    _direction = value;
+                }
+            }
+
+            public bool IsReadOnly
+            {
+                get { return _isReadOnly; }
+                set
+                {
+                    _isReadOnly = value;
+                }
+            }
+
+            public bool IsAlwaysInterleave
+            {
+                get { return _isAlwaysInterleave; }
+                set
+                {
+                    _isAlwaysInterleave = value;
+                }
+            }
+
+            public bool IsUnordered
+            {
+                get { return _isUnordered; }
+                set
+                {
+                    _isUnordered = value;
+                }
+            }
+
+            public bool IsReturnedFromRemoteCluster
+            {
+                get { return _isReturnedFromRemoteCluster; }
+                set
+                {
+                    _isReturnedFromRemoteCluster = value;
+                }
+            }
+
+            public CorrelationId Id
+            {
+                get { return _id; }
+                set
+                {
+                    _id = value;
+                }
+            }
+
+            public int ResendCount
+            {
+                get { return _resendCount; }
+                set
+                {
+                    _resendCount = value;
+                }
+            }
+
+            public int ForwardCount
+            {
+                get { return _forwardCount; }
+                set
+                {
+                    _forwardCount = value;
+                }
+            }
+
+            public SiloAddress TargetSilo
+            {
+                get { return _targetSilo; }
+                set
+                {
+                    _targetSilo = value;
+                }
+            }
+
+            public GrainId TargetGrain
+            {
+                get { return _targetGrain; }
+                set
+                {
+                    _targetGrain = value;
+                }
+            }
+
+            public ActivationId TargetActivation
+            {
+                get { return _targetActivation; }
+                set
+                {
+                    _targetActivation = value;
+                }
+            }
+
+            public GuidId TargetObserverId
+            {
+                get { return _targetObserverId; }
+                set
+                {
+                    _targetObserverId = value;
+                }
+            }
+
+            public SiloAddress SendingSilo
+            {
+                get { return _sendingSilo; }
+                set
+                {
+                    _sendingSilo = value;
+                }
+            }
+
+            public GrainId SendingGrain
+            {
+                get { return _sendingGrain; }
+                set
+                {
+                    _sendingGrain = value;
+                }
+            }
+
+            public ActivationId SendingActivation
+            {
+                get { return _sendingActivation; }
+                set
+                {
+                    _sendingActivation = value;
+                }
+            }
+
+            public bool IsNewPlacement
+            {
+                get { return _isNewPlacement; }
+                set
+                {
+                    _isNewPlacement = value;
+                }
+            }
+
+            public ResponseTypes Result
+            {
+                get { return _result; }
+                set
+                {
+                    _result = value;
+                }
+            }
+
+            public DateTime? Expiration
+            {
+                get { return _expiration; }
+                set
+                {
+                    _expiration = value;
+                }
+            }
+
+
+            public string DebugContext
+            {
+                get { return _debugContext; }
+                set
+                {
+                    _debugContext = value;
+                }
+            }
+
+            public List<ActivationAddress> CacheInvalidationHeader
+            {
+                get { return _cacheInvalidationHeader; }
+                set
+                {
+                    _cacheInvalidationHeader = value;
+                }
+            }
+
+            /// <summary>
+            /// Set by sender's placement logic when NewPlacementRequested is true
+            /// so that receiver knows desired grain type
+            /// </summary>
+            public string NewGrainType
+            {
+                get { return _newGrainType; }
+                set
+                {
+                    _newGrainType = value;
+                }
+            }
+
+            /// <summary>
+            /// Set by caller's grain reference 
+            /// </summary>
+            public string GenericGrainType
+            {
+                get { return _genericGrainType; }
+                set
+                {
+                    _genericGrainType = value;
+                }
+            }
+
+            public RejectionTypes RejectionType
+            {
+                get { return _rejectionType; }
+                set
+                {
+                    _rejectionType = value;
+                }
+            }
+
+            public string RejectionInfo
+            {
+                get { return _rejectionInfo; }
+                set
+                {
+                    _rejectionInfo = value;
+                }
+            }
+
+            public Dictionary<string, object> RequestContextData
+            {
+                get { return _requestContextData; }
+                set
+                {
+                    _requestContextData = value;
+                }
+            }
+
+            internal Headers GetHeadersMask()
+            {
+                Headers headers = Headers.NONE;
+                if(Category != default(Categories))
+                    headers = headers | Headers.CATEGORY;
+
+                headers = _direction == null ? headers & ~Headers.DIRECTION : headers | Headers.DIRECTION;
+                if (IsReadOnly)
+                    headers = headers | Headers.READ_ONLY;
+                if (IsAlwaysInterleave)
+                    headers = headers | Headers.ALWAYS_INTERLEAVE;
+                if(IsUnordered)
+                    headers = headers | Headers.IS_UNORDERED;
+
+                headers = _id == null ? headers & ~Headers.CORRELATION_ID : headers | Headers.CORRELATION_ID;
+
+                if (_resendCount != default(int))
+                    headers = headers | Headers.RESEND_COUNT;
+                if(_forwardCount != default (int))
+                    headers = headers | Headers.FORWARD_COUNT;
+
+                headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
+                headers = _targetGrain == null ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
+                headers = _targetActivation == null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
+                headers = _targetObserverId == null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
+                headers = _sendingSilo == null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
+                headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
+                headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
+                headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
+                headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
+                headers = _expiration == null ? headers & ~Headers.EXPIRATION : headers | Headers.EXPIRATION;
+                headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
+                headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
+                headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
+                headers = string.IsNullOrEmpty(GenericGrainType) ? headers & ~Headers.GENERIC_GRAIN_TYPE : headers | Headers.GENERIC_GRAIN_TYPE;
+                headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
+                headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
+                headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
+                return headers;
+            }
+
+            static HeadersContainer()
+            {
+                Register();
+            }
+
+
+            [Orleans.CodeGeneration.CopierMethodAttribute]
+            public static System.Object DeepCopier(System.Object original)
+            {
+                return original;
+            }
+
+            [Orleans.CodeGeneration.SerializerMethodAttribute]
+            public static void Serializer(System.Object untypedInput,  BinaryTokenStreamWriter stream, System.Type expected)
+            {
+                HeadersContainer input = (HeadersContainer)untypedInput;
+                var headers = input.GetHeadersMask();
+                stream.Write((int)headers);
+                if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
+                {
+                    var count = input.CacheInvalidationHeader.Count;
+                    stream.Write(input.CacheInvalidationHeader.Count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        WriteObj(stream, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
+                    }
+                }
+
+                if ((headers & Headers.CATEGORY) != Headers.NONE)
+                {
+                    stream.Write((byte)input.Category);
+                }
+
+                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
+                    stream.Write(input.DebugContext);
+
+                if ((headers & Headers.DIRECTION) != Headers.NONE)
+                    stream.Write((byte)input.Direction.Value);
+
+                if ((headers & Headers.EXPIRATION) != Headers.NONE)
+                    stream.Write(input.Expiration.Value);
+
+                if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
+                    stream.Write(input.ForwardCount);
+
+                if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
+                    stream.Write(input.GenericGrainType);
+
+                if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
+                    stream.Write(input.Id);
+
+                if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
+                    stream.Write(input.IsAlwaysInterleave);
+
+                if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
+                    stream.Write(input.IsNewPlacement);
+
+                if ((headers & Headers.READ_ONLY) != Headers.NONE)
+                    stream.Write(input.IsReadOnly);
+
+                if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
+                    stream.Write(input.IsUnordered);
+
+                if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
+                    stream.Write(input.NewGrainType);
+
+                if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
+                    stream.Write(input.RejectionInfo);
+
+                if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
+                    stream.Write((byte)input.RejectionType);
+
+                if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
+                {
+                    var requestData = input.RequestContextData;
+                    var count = requestData.Count;
+                    stream.Write(count);
+                    foreach (var d in requestData)
+                    {
+                        stream.Write(d.Key);
+                        SerializationManager.SerializeInner(d.Value, stream, typeof(object));
+                    }
+                }
+
+                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
+                    stream.Write(input.ResendCount);
+
+                if ((headers & Headers.RESULT) != Headers.NONE)
+                    stream.Write((byte)input.Result);
+
+                if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
+                {
+                    stream.Write(input.SendingActivation);
+                }
+
+                if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
+                {
+                    stream.Write(input.SendingGrain);
+                }
+
+                if ((headers & Headers.SENDING_SILO) != Headers.NONE)
+                {
+                    stream.Write(input.SendingSilo);
+                }
+
+                if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
+                {
+                    stream.Write(input.TargetActivation);
+                }
+
+                if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
+                {
+                    stream.Write(input.TargetGrain);
+                }
+
+                if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
+                {
+                    WriteObj(stream, typeof(GuidId), input.TargetObserverId);
+                }
+
+                if ((headers & Headers.TARGET_SILO) != Headers.NONE)
+                {
+                    stream.Write(input.TargetSilo);
+                }
+            }
+
+            [Orleans.CodeGeneration.DeserializerMethodAttribute]
+            public static System.Object Deserializer(System.Type expected,  BinaryTokenStreamReader stream)
+            {
+                var result = new HeadersContainer();
+                Orleans.Serialization.DeserializationContext.Current.RecordObject(result);
+                var headers = (Headers)stream.ReadInt();
+
+                if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
+                {
+                    var n = stream.ReadInt();
+                    if (n > 0)
+                    {
+                       var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
+                        for (int i = 0; i < n; i++)
+                        {
+                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), stream));
+                        }
+                    }
+                }
+
+                if ((headers & Headers.CATEGORY) != Headers.NONE)
+                    result.Category = (Categories)stream.ReadByte();
+
+                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
+                    result.DebugContext = stream.ReadString();
+
+                if ((headers & Headers.DIRECTION) != Headers.NONE)
+                    result.Direction = (Message.Directions)stream.ReadByte();
+
+                if ((headers & Headers.EXPIRATION) != Headers.NONE)
+                    result.Expiration = stream.ReadDateTime();
+
+                if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
+                    result.ForwardCount = stream.ReadInt();
+
+                if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
+                    result.GenericGrainType = stream.ReadString();
+
+                if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
+                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), stream);
+
+                if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
+                    result.IsAlwaysInterleave = ReadBool(stream);
+
+                if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
+                    result.IsNewPlacement = ReadBool(stream);
+
+                if ((headers & Headers.READ_ONLY) != Headers.NONE)
+                    result.IsReadOnly = ReadBool(stream);
+
+                if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
+                    result.IsUnordered = ReadBool(stream);
+
+                if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
+                    result.NewGrainType = stream.ReadString();
+
+                if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
+                    result.RejectionInfo = stream.ReadString();
+
+                if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
+                    result.RejectionType = (RejectionTypes)stream.ReadByte();
+
+                if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
+                {
+                    var c = stream.ReadInt();
+                    var requestData = new Dictionary<string, object>(c);
+                    for (int i = 0; i < c; i++)
+                    {
+                        requestData[stream.ReadString()] = SerializationManager.DeserializeInner(null, stream);
+                    }
+                    result.RequestContextData = requestData;
+                }
+
+                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
+                    result.ResendCount = stream.ReadInt();
+
+                if ((headers & Headers.RESULT) != Headers.NONE)
+                    result.Result = (Orleans.Runtime.Message.ResponseTypes)stream.ReadByte();
+
+                if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
+                    result.SendingActivation = stream.ReadActivationId();
+
+                if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
+                    result.SendingGrain = stream.ReadGrainId();
+
+                if ((headers & Headers.SENDING_SILO) != Headers.NONE)
+                    result.SendingSilo = stream.ReadSiloAddress();
+
+                if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE) 
+                    result.TargetActivation = stream.ReadActivationId();
+
+                if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
+                    result.TargetGrain = stream.ReadGrainId();
+
+                if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
+                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), stream);
+
+                if ((headers & Headers.TARGET_SILO) != Headers.NONE)
+                    result.TargetSilo = stream.ReadSiloAddress();
+
+                return (HeadersContainer)result;
+            }
+
+            private static bool ReadBool(BinaryTokenStreamReader stream)
+            {
+                return stream.ReadByte() == (byte) SerializationTokenType.True;
+            }
+
+            private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
+            {
+                var ser = SerializationManager.GetSerializer(type);
+                ser.Invoke(input, stream, type);
+            }
+
+            private static object ReadObj(Type t, BinaryTokenStreamReader stream)
+            {
+                var des = SerializationManager.GetDeserializer(t);
+                return des.Invoke(t, stream);
+            }
+
+            public static void Register()
+            {
+                 SerializationManager.Register(typeof(HeadersContainer), DeepCopier, Serializer, Deserializer);
+            }
         }
     }
 }

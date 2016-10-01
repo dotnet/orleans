@@ -1,8 +1,6 @@
 using System;
-using System.Threading.Tasks;
-using Orleans.Core;
-using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.ReminderService;
 
 
 namespace Orleans.Runtime

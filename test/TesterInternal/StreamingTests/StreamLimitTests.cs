@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -12,7 +11,6 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -92,7 +90,7 @@ namespace UnitTests.StreamingTests
             }
             MaxConsumersPerStream = loopCount - 1;
             output.WriteLine("Finished search for MaxConsumersPerStream with value {0}", MaxConsumersPerStream);
-            Assert.AreNotEqual(0, MaxConsumersPerStream, "MaxConsumersPerStream should be greater than zero.");
+            Assert.NotEqual(0,  MaxConsumersPerStream);  // "MaxConsumersPerStream should be greater than zero."
             output.WriteLine("MaxConsumersPerStream={0}", MaxConsumersPerStream);
         }
 
@@ -125,7 +123,7 @@ namespace UnitTests.StreamingTests
             }
             MaxProducersPerStream = loopCount - 1;
             output.WriteLine("Finished search for MaxProducersPerStream with value {0}", MaxProducersPerStream);
-            Assert.AreNotEqual(0, MaxProducersPerStream, "MaxProducersPerStream should be greater than zero.");
+            Assert.NotEqual(0,  MaxProducersPerStream);  // "MaxProducersPerStream should be greater than zero."
             output.WriteLine("MaxProducersPerStream={0}", MaxProducersPerStream);
         }
 
@@ -348,9 +346,9 @@ namespace UnitTests.StreamingTests
             }
 
             int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
-            Assert.AreEqual(0, activeConsumerGrains, "Initial Consumer count should be zero");
+            Assert.Equal(0,  activeConsumerGrains);  //  "Initial Consumer count should be zero"
             int activeProducerGrains = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
-            Assert.AreEqual(0, activeProducerGrains, "Initial Producer count should be zero");
+            Assert.Equal(0,  activeProducerGrains);  //  "Initial Producer count should be zero"
 
             if (warmUpPubSub)
             {
@@ -359,7 +357,7 @@ namespace UnitTests.StreamingTests
                 pipeline.Wait();
 
                 int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
-                Assert.AreEqual(streamIds.Length, activePubSubGrains, "Initial PubSub count -- should all be warmed up");
+                Assert.Equal(streamIds.Length,  activePubSubGrains);  //  "Initial PubSub count -- should all be warmed up"
             }
 
             Guid[] producerIds = new Guid[numProducers];
@@ -378,7 +376,7 @@ namespace UnitTests.StreamingTests
                 pipeline.Wait();
 
                 int activePublisherGrains = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
-                Assert.AreEqual(numProducers, activePublisherGrains, "Initial Publisher count -- should all be warmed up");
+                Assert.Equal(numProducers,  activePublisherGrains);  //  "Initial Publisher count -- should all be warmed up"
             }
 
             var promises = new List<Task>();
@@ -417,19 +415,19 @@ namespace UnitTests.StreamingTests
             sw.Stop();
 
             int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
-            Assert.AreEqual(activeConsumerGrains + (numStreams * numConsumers), consumerCount, "The right number of Consumer grains are active");
+            Assert.Equal(activeConsumerGrains + (numStreams * numConsumers),  consumerCount);  //  "The right number of Consumer grains are active"
 
             int producerCount = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
-            Assert.AreEqual(activeProducerGrains + (numStreams * numProducers), producerCount, "The right number of Producer grains are active");
+            Assert.Equal(activeProducerGrains + (numStreams * numProducers),  producerCount);  //  "The right number of Producer grains are active"
 
             int pubSubCount = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
-            Assert.AreEqual(streamIds.Length, pubSubCount, "Final PubSub count -- no more started");
+            Assert.Equal(streamIds.Length,  pubSubCount);  //  "Final PubSub count -- no more started"
 
             TimeSpan elapsed = sw.Elapsed;
             int totalSubscriptions = numStreams * numConsumers;
             double rps = totalSubscriptions / elapsed.TotalSeconds;
             output.WriteLine("Subscriptions-per-second = {0} during period {1}", rps, elapsed);
-            Assert.AreNotEqual(0.0, rps, "RPS greater than zero");
+            Assert.NotEqual(0.0,  rps);  // "RPS greater than zero"
             return TaskDone.Done;
         }
 
@@ -462,11 +460,11 @@ namespace UnitTests.StreamingTests
                 pipeline.Wait();
 
                 int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
-                Assert.AreEqual(streamIds.Length, activePubSubGrains, "Initial PubSub count -- should all be warmed up");
+                Assert.Equal(streamIds.Length,  activePubSubGrains);  //  "Initial PubSub count -- should all be warmed up"
             }
             
             int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
-            Assert.AreEqual(0, activeConsumerGrains, "Initial Consumer count should be zero");
+            Assert.Equal(0,  activeConsumerGrains);  //  "Initial Consumer count should be zero"
 
             Stopwatch sw = Stopwatch.StartNew();
 
@@ -479,13 +477,13 @@ namespace UnitTests.StreamingTests
             sw.Stop();
 
             int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
-            Assert.AreEqual(activeConsumerGrains + (numStreams * numConsumers), consumerCount, "The correct number of new Consumer grains are active");
+            Assert.Equal(activeConsumerGrains + (numStreams * numConsumers),  consumerCount);  //  "The correct number of new Consumer grains are active"
 
             TimeSpan elapsed = sw.Elapsed;
             int totalSubscriptions = numStreams * numConsumers;
             double rps = totalSubscriptions / elapsed.TotalSeconds;
             output.WriteLine("Subscriptions-per-second = {0} during period {1}", rps, elapsed);
-            Assert.AreNotEqual(0.0, rps, "RPS greater than zero");
+            Assert.NotEqual(0.0,  rps);  // "RPS greater than zero"
             return TaskDone.Done;
         }
 
@@ -516,7 +514,7 @@ namespace UnitTests.StreamingTests
         //    int totalSubscription = numSt* numConsumers);
         //    double rps = totalSubscription/elapsed.TotalSeconds;
         //    output.WriteLine("Subscriptions-per-second = {0} during period {1}", rps, elapsed);
-        //    Assert.AreNotEqual(0.0, rps, "RPS greater than zero");
+        //    Assert.NotEqual(0.0, rps, "RPS greater than zero");
         //}
 
         private void WarmUpPubSub(string streamProviderName, Guid[] streamIds, AsyncPipeline pipeline)
@@ -724,18 +722,18 @@ namespace UnitTests.StreamingTests
 
             // Check Consumer counts
             int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, StreamNamespace);
-            Assert.AreEqual(numConsumers, consumerCount, "ConsumerCount for Stream {0}", streamId);
+            Assert.Equal(numConsumers,  consumerCount);  //  "ConsumerCount for Stream {0}", streamId
 
             // Check Producer counts
             int producerCount = await pubSub.ProducerCount(streamId, streamProviderName, StreamNamespace);
-            Assert.AreEqual(numProducers, producerCount, "ProducerCount for Stream {0}", streamId);
+            Assert.Equal(numProducers,  producerCount);  //  "ProducerCount for Stream {0}", streamId
 
             // Check message counts received by consumers
             int totalMessages = (numMessages + 1) * numProducers;
             foreach (var grain in consumers)
             {
                 int count = await grain.GetReceivedCount();
-                Assert.AreEqual(totalMessages, count, "ReceivedCount for Consumer grain {0}", grain.GetPrimaryKey());
+                Assert.Equal(totalMessages,  count); //  "ReceivedCount for Consumer grain {0}", grain.GetPrimaryKey());
             }
 
             double rps = totalMessages/sw.Elapsed.TotalSeconds;

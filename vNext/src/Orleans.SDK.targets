@@ -1,0 +1,105 @@
+<!--
+***********************************************************************************************
+Orleans Target for SDK Developers
+Copyright (C) Microsoft Corporation. All rights reserved.
+***********************************************************************************************
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Work out the path to ClientGenerator.exe -->
+  <Choose>
+    <!-- Using Orleans NuGet packages -->
+    <When Condition="Exists('$(MSBuildThisFileDirectory)..\tools')">
+      <PropertyGroup>
+        <CodeGenToolExeDir>$(MSBuildThisFileDirectory)..\tools</CodeGenToolExeDir>
+      </PropertyGroup>
+    </When>
+    <!-- Internal build within Orleans.sln -->
+    <When Condition="'$(OrleansReferencesBase)' != ''">
+      <PropertyGroup>
+        <CodeGenToolExeDir>$(OrleansReferencesBase)</CodeGenToolExeDir>
+      </PropertyGroup>
+    </When>
+    <!-- Legacy support for OrleansSDK -->
+    <When Condition="'$(OrleansSDK)' != ''">
+      <PropertyGroup>
+        <CodeGenToolExeDir>$(OrleansSDK)\Binaries\OrleansClient</CodeGenToolExeDir>
+      </PropertyGroup>
+    </When>
+  </Choose>
+
+  <Choose>
+    <When Condition="HasTrailingSlash('$(CodeGenToolExeDir)')">
+      <PropertyGroup>
+        <CodeGenToolExe>$(CodeGenToolExeDir)ClientGenerator.exe</CodeGenToolExe>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <CodeGenToolExe>$(CodeGenToolExeDir)\ClientGenerator.exe</CodeGenToolExe>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+
+  <!-- include the codegen file in the project if it isn't there already -->
+  <Target Name="OrleansCodeGenerationFileInclude"
+          BeforeTargets="BeforeBuild">
+
+    <FindInList
+      List="@(Compile)"
+      ItemSpecToFind="Properties\orleans.codegen.cs"
+      CaseSensitive="false">
+      <Output TaskParameter="ItemFound" ItemName="CodegenCsAlreadyDefined"/>
+    </FindInList>
+
+    <ItemGroup Condition="'@(CodegenCsAlreadyDefined)'==''">
+      <Compile Include="Properties\orleans.codegen.cs" />
+    </ItemGroup>
+  </Target>
+
+  <!-- This target is run just before Clean for any Orleans project -->
+  <Target Name="OrleansCodeGenerationClean"
+          BeforeTargets="Clean"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
+          Inputs="$(ProjectDir)Properties\orleans.codegen.cs"
+          Outputs="AlwaysRun">
+    <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
+  </Target>
+
+  <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
+  <Target Name="OrleansCodeGeneration"
+          AfterTargets="BeforeCompile;ResolveReferences"
+          BeforeTargets="CoreCompile"
+          Condition="'$(OrleansCodeGenPrecompile)'!='true'"
+          Inputs="@(Compile);@(ReferencePath)"
+          Outputs="$(ProjectDir)$(IntermediateOutputPath)$(TargetName)$(TargetExt)">
+    <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
+    <Message Text="[OrleansCodeGeneration] 
+- CodeGenToolExeDir=$(CodeGenToolExeDir)
+- OrleansReferencesBase=$(OrleansReferencesBase)
+- OrleansSDK=$(OrleansSDK)
+- Using CodeGenToolExe location=$(CodeGenToolExe)
+" />
+    <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
+    <Delete Files="$(ProjectDir)Properties\orleans.codegen.cs" ContinueOnError="true" />
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs"
+      Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')"
+      ForceTouch="true"
+      AlwaysCreate="true"
+      ContinueOnError="true" />
+    <PropertyGroup>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
+    </PropertyGroup>
+    <ItemGroup>
+      <CodeGenArgs Include="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')"/>
+    </ItemGroup>
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
+    <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
+    <Exec Command='"$(CodeGenToolExe)" "@$(ArgsFile)"' />
+  </Target>
+</Project>

@@ -18,7 +18,7 @@ def buildString = '''call Build.cmd && Test.cmd'''
     
     Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
     Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
-    Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results.xml')
+    Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results*.xml')
     // Archive only on commit builds.
     if (!isPR) {
         Utilities.addArchival(newJob, 'Binaries/**')

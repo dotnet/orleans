@@ -2,9 +2,8 @@ namespace Orleans.Runtime
 {
     using System;
     using System.Collections.Generic;
-    using System.Reflection;
     using System.Linq;
-
+    using System.Reflection;
     using Orleans.CodeGeneration;
     using Orleans.Serialization;
 
@@ -98,11 +97,14 @@ namespace Orleans.Runtime
             {
                 Logger.Verbose3("Processing assembly {0}", assemblyName);
             }
+
+#if !NETSTANDARD
             // If the assembly is loaded for reflection only avoid processing it.
             if (assembly.ReflectionOnly)
             {
                 return;
             }
+#endif
 
             // Don't bother re-processing an assembly we've already scanned
             lock (ProcessedAssemblies)
@@ -121,7 +123,6 @@ namespace Orleans.Runtime
             }
 
             // Process each type in the assembly.
-            var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
             var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, Logger).ToArray();
 
             // Process each type in the assembly.
@@ -135,10 +136,8 @@ namespace Orleans.Runtime
                     {
                         Logger.Verbose3("Processing type {0}", typeName);
                     }
-                    if (shouldProcessSerialization)
-                    {
-                        SerializationManager.FindSerializationInfo(type);
-                    }
+
+                    SerializationManager.FindSerializationInfo(type);
     
                     GrainFactory.FindSupportClasses(type);
                 }

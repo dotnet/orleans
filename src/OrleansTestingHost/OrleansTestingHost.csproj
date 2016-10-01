@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -35,10 +36,6 @@
     <DocumentationFile>bin\Release\OrleansTestingHost.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -83,6 +80,10 @@
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj">
+      <Project>{69f40a37-4a2f-44d4-a994-cc165c12fb91}</Project>
+      <Name>OrleansTelemetryConsumers.Counters</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
@@ -98,7 +99,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <None Include="project.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->

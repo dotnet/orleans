@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -11,9 +10,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using UnitTests.Tester;
-using Tester;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
@@ -70,7 +67,7 @@ namespace UnitTests.StreamingTests
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeRead);
 
             // TODO: expect StorageProviderInjectedError directly instead of OrleansException
-            await Xunit.Assert.ThrowsAsync<OrleansException>(() =>
+            await Assert.ThrowsAsync<OrleansException>(() =>
                 Test_PubSub_Stream(StreamProviderName, StreamId));
         }
 
@@ -79,10 +76,10 @@ namespace UnitTests.StreamingTests
         {
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
 
-            var exception = await Xunit.Assert.ThrowsAsync<OrleansException>(() =>
+            var exception = await Assert.ThrowsAsync<OrleansException>(() =>
                 Test_PubSub_Stream(StreamProviderName, StreamId));
 
-            Assert.IsInstanceOfType(exception.InnerException, typeof (StorageProviderInjectedError));
+            Assert.IsAssignableFrom<StorageProviderInjectedError>(exception.InnerException);
         }
 
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
@@ -99,7 +96,7 @@ namespace UnitTests.StreamingTests
 
             int received1 = await consumer.GetReceivedCount();
 
-            Assert.IsTrue(received1 > 1, "Received count for consumer {0} is too low = {1}", consumer, received1);
+            Assert.True(received1 > 1, $"Received count for consumer {consumer} is too low = {received1}");
 
             // Unsubscribe
             await consumer.ClearGrain();
@@ -110,7 +107,7 @@ namespace UnitTests.StreamingTests
 
             int received2 = await consumer.GetReceivedCount();
 
-            Assert.AreEqual(0, received2, "Received count for consumer {0} is wrong = {1}", consumer, received2);
+            Assert.Equal(0, received2);  // $"Received count for consumer {consumer} is wrong = {received2}"
 
         }
 

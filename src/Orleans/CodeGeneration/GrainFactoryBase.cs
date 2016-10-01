@@ -1,6 +1,6 @@
 using System;
-using Orleans.Runtime;
 using System.Reflection;
+using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
 {

@@ -50,9 +50,11 @@ namespace Orleans.Providers.Streams.Common
         /// Given a purge request, indicates if a cached message should be purged from the cache
         /// </summary>
         /// <param name="cachedMessage"></param>
+        /// <param name="newestCachedMessage"></param>
         /// <param name="purgeRequest"></param>
+        /// <param name="nowUtc"></param>
         /// <returns></returns>
-        bool ShouldPurge(ref TCachedMessage cachedMessage, IDisposable purgeRequest);
+        bool ShouldPurge(ref TCachedMessage cachedMessage, ref TCachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc);
 
         /// <summary>
         /// Assignable purge action.  This is called when a purge request is triggered.

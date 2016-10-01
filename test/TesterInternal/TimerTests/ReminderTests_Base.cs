@@ -6,7 +6,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -14,7 +13,6 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -71,7 +69,7 @@ namespace UnitTests.TimerTests
             {
                 // First handle should now be out of date once the seconf handle to the same reminder was obtained
                 await grain.StopReminder(r1);
-                Assert.Fail("Removed reminder1, which shouldn't be possible.");
+                Assert.True(false, "Removed reminder1, which shouldn't be possible.");
             }
             catch (Exception exc)
             {
@@ -116,13 +114,11 @@ namespace UnitTests.TimerTests
 
             foreach (var remRegistered in registered)
             {
-                Assert.IsTrue(fetched.Remove(remRegistered),
-                              "Couldn't get reminder {0}. Registered list: {1}, fetched list: {2}",
-                              remRegistered,
-                              Utils.EnumerableToString(registered),
-                              Utils.EnumerableToString(remindersList, r => r.ReminderName));
+                Assert.True(fetched.Remove(remRegistered), $"Couldn't get reminder {remRegistered}. " +
+                                                           $"Registered list: {Utils.EnumerableToString(registered)}, " +
+                                                           $"fetched list: {Utils.EnumerableToString(remindersList, r => r.ReminderName)}");
             }
-            Assert.IsTrue(fetched.Count == 0, "More than registered reminders. Extra: {0}", Utils.EnumerableToString(fetched));
+            Assert.True(fetched.Count == 0, $"More than registered reminders. Extra: {Utils.EnumerableToString(fetched)}");
 
             // do some time tests as well
             log.Info("Time tests");
@@ -131,7 +127,7 @@ namespace UnitTests.TimerTests
             for (int i = 0; i < count; i++)
             {
                 long curr = await grain.GetCounter(DR + "_" + i);
-                Assert.AreEqual(2, curr, string.Format("Incorrect ticks for {0}_{1}", DR, i));
+                Assert.Equal(2,  curr); // string.Format("Incorrect ticks for {0}_{1}", DR, i));
             }
         }
         #endregion
@@ -172,7 +168,7 @@ namespace UnitTests.TimerTests
 
             // request a reminder that does not exist
             IGrainReminder reminder = await g1.GetReminderObject("blarg");
-            Assert.IsNull(reminder, "reminder != null");
+           Assert.Null(reminder);
         }
 
         #endregion
@@ -337,12 +333,12 @@ namespace UnitTests.TimerTests
             await grain.StartReminder(DR);
             Thread.Sleep(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
             long last = await grain.GetCounter(DR);
-            Assert.AreEqual(failCheckAfter, last, "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
+            Assert.Equal(failCheckAfter,   last);  // "{0} CopyGrain {1} Reminder {2}" // Time(), grain.GetPrimaryKey(), DR);
 
             await grain.StopReminder(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
             long curr = await grain.GetCounter(DR);
-            Assert.AreEqual(last, curr, "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
+            Assert.Equal(last,  curr); // "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
 
             return true;
         }
@@ -359,7 +355,7 @@ namespace UnitTests.TimerTests
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendFormat("Grain: {0} Grain PrimaryKey: {1}, Reminder: {2}, SleepFor: {3} Time now: {4}",
-                grain.ToString(), grain.GetPrimaryKey(), reminderName, sleepFor, Time());
+                grain, grain.GetPrimaryKey(), reminderName, sleepFor, Time());
             sb.AppendFormat(
                 " -- Expecting value in the range between {0} and {1}, and got value {2}.",
                 lowerLimit, upperLimit, val);
@@ -367,7 +363,7 @@ namespace UnitTests.TimerTests
 
             bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
 
-            Skip.IfNot(tickCountIsInsideRange, string.Format("AssertIsInRange: {0}  -- WHICH IS OUTSIDE RANGE.", sb));
+            Skip.IfNot(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
         }
 
         protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)

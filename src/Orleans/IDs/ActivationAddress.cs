@@ -10,7 +10,6 @@ namespace Orleans.Runtime
         public GrainId Grain { get; private set; }
         public ActivationId Activation { get; private set; }
         public SiloAddress Silo { get; private set; }
-        public MultiClusterStatus Status { get; private set; }
 
         public bool IsComplete
         {
@@ -18,12 +17,11 @@ namespace Orleans.Runtime
         }
 
         [JsonConstructor]
-        private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation, MultiClusterStatus status)
+        private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
             Silo = silo;
             Grain = grain;
             Activation = activation;
-            Status = status;
         }
 
         public static ActivationAddress NewActivationAddress(SiloAddress silo, GrainId grain)
@@ -32,12 +30,12 @@ namespace Orleans.Runtime
             return GetAddress(silo, grain, activation);
         }
 
-        public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation, MultiClusterStatus status = MultiClusterStatus.Owned)
+        public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
             // Silo part is not mandatory
             if (grain == null) throw new ArgumentNullException("grain");
 
-            return new ActivationAddress(silo, grain, activation, status);
+            return new ActivationAddress(silo, grain, activation);
         }
 
         public override bool Equals(object obj)

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
@@ -55,7 +55,7 @@ namespace UnitTests.StreamingTests
             output.WriteLine(fmtMsg);
             if (expected != -1)
             {
-                Assert.AreEqual(expected, actual, msg, args);
+                Assert.Equal(expected, actual);
             }
         }
     }

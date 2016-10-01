@@ -53,8 +53,6 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
         {
             Identity = identity;
@@ -270,9 +268,6 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="state"></param>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
@@ -299,16 +294,20 @@ namespace Orleans
             get { return grainState; }
         }
 
+        /// <summary>Clear the current grain state data from backing store.</summary>
         protected virtual Task ClearStateAsync()
         {
             return storage.ClearStateAsync();
         }
 
+        /// <summary>Write of the current grain state data into backing store.</summary>
         protected virtual Task WriteStateAsync()
         {
             return storage.WriteStateAsync();
         }
 
+        /// <summary>Read the current grain state data from backing store.</summary>
+        /// <remarks>Any previous contents of the grain state data will be overwritten.</remarks>
         protected virtual Task ReadStateAsync()
         {
             return storage.ReadStateAsync();

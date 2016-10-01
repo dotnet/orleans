@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -42,26 +43,6 @@
     </AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Bond, Version">
-      <HintPath>$(SolutionDir)packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Bond.Attributes">
-      <HintPath>$(SolutionDir)packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.Attributes.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Bond.IO">
-      <HintPath>$(SolutionDir)packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.IO.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Bond.JSON">
-      <HintPath>$(SolutionDir)packages\Bond.Runtime.CSharp.3.0.7\lib\net45\Bond.JSON.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -91,7 +72,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <None Include="project.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

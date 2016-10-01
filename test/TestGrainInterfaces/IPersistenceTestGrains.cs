@@ -80,6 +80,48 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
+    public interface IAWSStorageTestGrain : IGrainWithGuidKey
+    {
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageGenericGrain<T> : IGrainWithIntegerKey
+    {
+        Task<T> GetValue();
+        Task DoWrite(T val);
+        Task<T> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_GuidExtendedKey : IGrainWithGuidCompoundKey
+    {
+        Task<string> GetExtendedKeyValue();
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_LongKey : IGrainWithIntegerKey
+    {
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
+    {
+        Task<string> GetExtendedKeyValue();
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
     public interface IPersistenceErrorGrain : IGrainWithGuidKey
     {
         Task<int> GetValue();

@@ -1,10 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Net;
-using System.Runtime;
 using System.Threading;
-using System.Globalization;
-using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 
@@ -13,7 +11,11 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Allows programmatically hosting an Orleans silo in the curent app domain.
     /// </summary>
-    public class SiloHost : MarshalByRefObject, IDisposable
+    public class SiloHost :
+#if !NETSTANDARD_TODO
+        MarshalByRefObject,
+# endif
+        IDisposable
     {
         /// <summary> Name of this silo. </summary>
         public string Name { get; set; }
@@ -114,7 +116,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void InitializeOrleansSilo()
         {
-#if DEBUG
+#if DEBUG && !NETSTANDARD
             AssemblyLoaderUtils.EnableAssemblyLoadTracing();
 #endif
 
@@ -122,6 +124,7 @@ namespace Orleans.Runtime.Host
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
                 orleans = new Silo(Name, Type, Config);
+                logger.Info(ErrorCode.Runtime_Error_100288, "Successfully initialized Orleans silo '{0}' as a {1} node.", orleans.Name, orleans.Type);
             }
             catch (Exception exc)
             {
@@ -137,6 +140,7 @@ namespace Orleans.Runtime.Host
         {
             Utils.SafeExecute(UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler);
             Utils.SafeExecute(LogManager.UnInitialize);
+            Utils.SafeExecute(GrainTypeManager.Stop);
         }
 
         /// <summary>

@@ -4,14 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -88,13 +86,13 @@ namespace UnitTests.TimerTests
             // retrieve the value of the counter-- it should match the sequence number which is the number of periods
             // we've waited.
             long last = await grain.GetCounter(DR);
-            Assert.AreEqual(2, last, Time());
+            Assert.Equal(2, last);
             // stop the timer and wait for a whole period.
             await grain.StopReminder(DR);
             Thread.Sleep(period.Multiply(1) + LEEWAY); // giving some leeway
             // the counter should not have changed.
             long curr = await grain.GetCounter(DR);
-            Assert.AreEqual(last, curr, Time());
+            Assert.Equal(last, curr);
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
@@ -105,13 +103,13 @@ namespace UnitTests.TimerTests
             await grain.StartReminder(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
             long last = await grain.GetCounter(DR);
-            Assert.AreEqual(2, last, Time());
+            Assert.Equal(2, last);
 
             await grain.StopReminder(DR);
             TimeSpan sleepFor = period.Multiply(1) + LEEWAY;
             Thread.Sleep(sleepFor); // giving some leeway
             long curr = await grain.GetCounter(DR);
-            Assert.AreEqual(last, curr, Time());
+            Assert.Equal(last, curr);
             AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
 
             // start the same reminder again
@@ -303,7 +301,7 @@ namespace UnitTests.TimerTests
             Task<IGrainReminder> promise2 = grain.StartReminder(DR);
             Task<IGrainReminder>[] tasks = { promise1, promise2 };
             await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(15));
-            //Assert.AreNotEqual(promise1.Result, promise2.Result);
+            //Assert.NotEqual(promise1.Result, promise2.Result);
             // TODO: write tests where period of a reminder is changed
         }
         #endregion
@@ -321,17 +319,17 @@ namespace UnitTests.TimerTests
             await g2.StartReminder(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
             long last1 = await g1.GetCounter(DR);
-            Assert.AreEqual(4, last1, string.Format("{0} Grain fault", Time()));
+            Assert.Equal(4, last1);
             long last2 = await g2.GetCounter(DR);
-            Assert.AreEqual(2, last2, string.Format("{0} CopyGrain fault", Time()));
+            Assert.Equal(2, last2); // CopyGrain fault
 
             await g1.StopReminder(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
             await g2.StopReminder(DR);
             long curr1 = await g1.GetCounter(DR);
-            Assert.AreEqual(last1, curr1, string.Format("{0} Grain fault", Time()));
+            Assert.Equal(last1, curr1);
             long curr2 = await g2.GetCounter(DR);
-            Assert.AreEqual(4, curr2, string.Format("{0} CopyGrain fault", Time()));
+            Assert.Equal(4, curr2); // CopyGrain fault
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
@@ -383,7 +381,7 @@ namespace UnitTests.TimerTests
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
             IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            await Xunit.Assert.ThrowsAsync<ArgumentException>(() =>
+            await Assert.ThrowsAsync<ArgumentException>(() =>
                 grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
         }
         #endregion
@@ -394,7 +392,7 @@ namespace UnitTests.TimerTests
         {
             IReminderGrainWrong grain = GrainClient.GrainFactory.GetGrain<IReminderGrainWrong>(0);
 
-            await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() =>
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 grain.StartReminder(DR));
         }
         #endregion

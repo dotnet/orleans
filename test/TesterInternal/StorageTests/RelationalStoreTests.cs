@@ -1,7 +1,4 @@
-﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans;
-using Orleans.Runtime;
-using Orleans.SqlUtils;
+﻿
 using System;
 using System.Data;
 using System.Data.Common;
@@ -9,6 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+using Orleans.SqlUtils;
 using UnitTests.General;
 using Xunit;
 
@@ -75,7 +75,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
             {                
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(sqlServerStorage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
-                Assert.IsTrue(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
+                Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }
         }
 
@@ -86,7 +86,7 @@ namespace UnitTests.StorageTests.SQLAdapter
             {             
                 tokenSource.CancelAfter(StreamCancellationTimeoutLimit);
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(mySqlStorage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
-                Assert.IsTrue(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
+                Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }
         }
 
@@ -190,7 +190,7 @@ namespace UnitTests.StorageTests.SQLAdapter
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
                     if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(1))))
                     {
-                        Assert.Fail(string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
+                        Assert.True(false, string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }
                 }
                 catch(Exception ex)
@@ -201,11 +201,11 @@ namespace UnitTests.StorageTests.SQLAdapter
                     {
                         //If the operation is cancelled already before database calls, a OperationCancelledException
                         //will be thrown in any case.
-                        Assert.IsTrue(ex is DbException || ex is OperationCanceledException, "Unexcepted exception: {0}", ex);
+                        Assert.True(ex is DbException || ex is OperationCanceledException, $"Unexcepted exception: {ex}");
                     }
                     else
                     {
-                        Assert.IsTrue(ex is OperationCanceledException, "Unexcepted exception: {0}", ex);
+                        Assert.True(ex is OperationCanceledException, $"Unexcepted exception: {ex}");
                     }
                 }
             }

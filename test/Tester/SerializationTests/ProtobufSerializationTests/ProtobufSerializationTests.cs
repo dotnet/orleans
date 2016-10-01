@@ -1,11 +1,10 @@
-﻿using System.IO;
+﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
-
 using Google.Protobuf;
 using Orleans.Serialization;
 using Xunit;
-using System;
 
 namespace UnitTests.Serialization
 {

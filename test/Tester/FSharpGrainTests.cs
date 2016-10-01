@@ -1,11 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
+using UnitTests.FSharpTypes;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
-using UnitTests.FSharpTypes;
 using Xunit;
-using Tester;
 
 namespace UnitTests.General
 {

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
@@ -67,10 +66,10 @@ namespace UnitTests.SchedulerTests
             t.Start(scheduler);
 
             int received = t.Result;
-            Assert.IsTrue(t.IsCompleted, "Task should have completed");
-            Assert.IsFalse(t.IsFaulted, "Task should not thrown exception: " + t.Exception);
-            Assert.IsTrue(done, "Task should be done");
-            Assert.AreEqual(expected, received, "Task did not return expected value " + expected);
+            Assert.True(t.IsCompleted, "Task should have completed");
+            Assert.False(t.IsFaulted, "Task should not thrown exception: " + t.Exception);
+            Assert.True(done, "Task should be done");
+            Assert.Equal(expected, received);      
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -87,10 +86,10 @@ namespace UnitTests.SchedulerTests
             t.Start(activationScheduler);
 
             int received = t.Result;
-            Assert.IsTrue(t.IsCompleted, "Task should have completed");
-            Assert.IsFalse(t.IsFaulted, "Task should not thrown exception: " + t.Exception);
-            Assert.IsTrue(done, "Task should be done");
-            Assert.AreEqual(expected, received, "Task did not return expected value " + expected);
+            Assert.True(t.IsCompleted, "Task should have completed");
+            Assert.False(t.IsFaulted, "Task should not thrown exception: " + t.Exception);
+            Assert.True(done, "Task should be done");
+            Assert.Equal(expected, received);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -114,8 +113,8 @@ namespace UnitTests.SchedulerTests
             Thread.Sleep(1000);
 
             // N should be 15, because the two tasks should execute in order
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(15, n, "Work items executed out of order");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(15, n);
             output.WriteLine("Test executed OK.");
             orleansTaskScheduler.Stop();
         }
@@ -143,8 +142,8 @@ namespace UnitTests.SchedulerTests
             Thread.Sleep(2000);
 
             // N should be 15, because the two tasks should execute in order
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(15, n, "Work items executed out of order");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(15, n);
             output.WriteLine("Test executed OK.");
             orleansTaskScheduler.Stop();
         }
@@ -172,8 +171,8 @@ namespace UnitTests.SchedulerTests
             Thread.Sleep(TimeSpan.FromSeconds(2));
 
             // N should be 15, because the two tasks should execute in order
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(15, n, "Work items executed out of order");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(15, n);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -193,14 +192,14 @@ namespace UnitTests.SchedulerTests
             pause1.Set();
             bool ok = task1.Wait(TimeSpan.FromMilliseconds(100));
             if (!ok) throw new TimeoutException();
-            Assert.IsTrue(task1.IsCompleted, "Task.IsCompleted-1");
-            Assert.IsFalse(task1.IsFaulted, "Task.IsFaulted-1");
+            Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
+            Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             pause2.Set();
             ok = task2.Wait(TimeSpan.FromMilliseconds(100));
             if (!ok) throw new TimeoutException();
-            Assert.IsTrue(task2.IsCompleted, "Task.IsCompleted-2");
-            Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
+            Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
+            Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -220,16 +219,16 @@ namespace UnitTests.SchedulerTests
             bool ok = task1.Wait(TimeSpan.FromMilliseconds(100));
             if (!ok) throw new TimeoutException();
 
-            Assert.IsTrue(task1.IsCompleted, "Task.IsCompleted-1");
-            Assert.IsFalse(task1.IsFaulted, "Task.IsFaulted-1");
+            Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
+            Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             task2.Start(scheduler);
             pause2.Set();
             ok = task2.Wait(TimeSpan.FromMilliseconds(100));
             if (!ok) throw new TimeoutException();
 
-            Assert.IsTrue(task2.IsCompleted, "Task.IsCompleted-2");
-            Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
+            Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
+            Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -261,16 +260,16 @@ namespace UnitTests.SchedulerTests
             bool ok1 = wrapper1.Wait(TimeSpan.FromMilliseconds(1000));
             if (!ok1) throw new TimeoutException();
 
-            Assert.IsTrue(task1.IsCompleted, "Task.IsCompleted-1");
-            Assert.IsFalse(task1.IsFaulted, "Task.IsFaulted-1");
+            Assert.True(task1.IsCompleted, "Task.IsCompleted-1");
+            Assert.False(task1.IsFaulted, "Task.IsFaulted-1");
 
             wrapper2.Start(scheduler);
             pause2.Set();
             bool finished = wrapper2.Wait(TimeSpan.FromMilliseconds(100));
             if (!finished) throw new TimeoutException();
 
-            Assert.IsTrue(task2.IsCompleted, "Task.IsCompleted-2");
-            Assert.IsFalse(task2.IsFaulted, "Task.IsFaulted-2");
+            Assert.True(task2.IsCompleted, "Task.IsCompleted-2");
+            Assert.False(task2.IsFaulted, "Task.IsFaulted-2");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -306,8 +305,8 @@ namespace UnitTests.SchedulerTests
                 });
                 wrappers[i].ContinueWith(t =>
                 {
-                    Assert.IsFalse(t.IsFaulted, "Warpper.IsFaulted-" + taskNum + " " + t.Exception);
-                    Assert.IsTrue(t.IsCompleted, "Wrapper.IsCompleted-" + taskNum);
+                    Assert.False(t.IsFaulted, "Warpper.IsFaulted-" + taskNum + " " + t.Exception);
+                    Assert.True(t.IsCompleted, "Wrapper.IsCompleted-" + taskNum);
                 });
                 output.WriteLine("Created Wrapper-" + taskNum + " Task.Id=" + wrappers[taskNum].Id);
             }
@@ -317,15 +316,15 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < wrappers.Length; i++)
             {
                 bool ok = wrappers[i].Wait(TimeSpan.FromMilliseconds(NumTasks * 150 * 2));
-                Assert.IsTrue(ok, "Wait completed successfully for Wrapper-" + i);
+                Assert.True(ok, "Wait completed successfully for Wrapper-" + i);
             }
 
             for (int i = 0; i < tasks.Length; i++)
             {
                 bool ok = tasks[i].Wait(TimeSpan.FromMilliseconds(NumTasks * 150 * 2));
-                Assert.IsTrue(ok, "Wait completed successfully for Task-" + i);
-                Assert.IsFalse(tasks[i].IsFaulted, "Task.IsFaulted-" + i + " " + tasks[i].Exception);
-                Assert.IsTrue(tasks[i].IsCompleted, "Task.IsCompleted-" + i);
+                Assert.True(ok, "Wait completed successfully for Task-" + i);
+                Assert.False(tasks[i].IsFaulted, "Task.IsFaulted-" + i + " " + tasks[i].Exception);
+                Assert.True(tasks[i].IsCompleted, "Task.IsCompleted-" + i);
             }
         }
 
@@ -359,7 +358,7 @@ namespace UnitTests.SchedulerTests
                     output.WriteLine("Inside ClosureWorkItem-" + taskNum);
                     tasks[taskNum].Start(scheduler);
                     bool ok = tasks[taskNum].Wait(TimeSpan.FromMilliseconds(NumTasks * 100));
-                    Assert.IsTrue(ok, "Wait completed successfully inside ClosureWorkItem-" + taskNum);
+                    Assert.True(ok, "Wait completed successfully inside ClosureWorkItem-" + taskNum);
                 });
             }
 
@@ -368,14 +367,14 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < tasks.Length; i++)
             {
                 bool ok = tasks[i].Wait(TimeSpan.FromMilliseconds(NumTasks * 150));
-                Assert.IsTrue(ok, "Wait completed successfully for Task-" + i);
+                Assert.True(ok, "Wait completed successfully for Task-" + i);
             }
 
 
             for (int i = 0; i < tasks.Length; i++)
             {
-                Assert.IsFalse(tasks[i].IsFaulted, "Task.IsFaulted-" + i + " Exception=" + tasks[i].Exception);
-                Assert.IsTrue(tasks[i].IsCompleted, "Task.IsCompleted-" + i);
+                Assert.False(tasks[i].IsFaulted, "Task.IsFaulted-" + i + " Exception=" + tasks[i].Exception);
+                Assert.True(tasks[i].IsCompleted, "Task.IsCompleted-" + i);
             }
         }
 
@@ -396,13 +395,13 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #0");
+                    Assert.Equal(activationScheduler, TaskScheduler.Current); //
 
                     t1 = new Task(() =>
                     {
                         output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                             SynchronizationContext.Current, TaskScheduler.Current);
-                        Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                        Assert.Equal(activationScheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
                         result1.SetResult(true);
                     });
                     t1.Start();
@@ -416,14 +415,14 @@ namespace UnitTests.SchedulerTests
             }), context);
 
             result0.Task.Wait(TimeSpan.FromSeconds(1));
-            Assert.IsTrue(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
-            Assert.IsTrue(result0.Task.Result, "Task-0 completed");
+            Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
+            Assert.True(result0.Task.Result, "Task-0 completed");
 
-            Assert.IsNotNull(t1, "Task-1 started");
+            Assert.NotNull(t1); // Task-1 started
             result1.Task.Wait(TimeSpan.FromSeconds(1));
-            Assert.IsTrue(t1.IsCompleted, "Task-1 completed");
-            Assert.IsFalse(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
-            Assert.IsTrue(result1.Task.Result, "Task-1 completed");
+            Assert.True(t1.IsCompleted, "Task-1 completed");
+            Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
+            Assert.True(result1.Task.Result, "Task-1 completed");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -443,13 +442,13 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("#0 - TaskWorkItem - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(activationScheduler, TaskScheduler.Current, "TaskScheduler.Current #0");
+                    Assert.Equal(activationScheduler, TaskScheduler.Current);  // "TaskScheduler.Current #0"
 
                     t1 = new Task(() =>
                     {
                         output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                             SynchronizationContext.Current, TaskScheduler.Current);
-                        Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                        Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
                         result1.SetResult(true);
                     });
                     t1.Start(scheduler);
@@ -463,14 +462,14 @@ namespace UnitTests.SchedulerTests
             }), context);
 
             result0.Task.Wait(TimeSpan.FromSeconds(1));
-            Assert.IsTrue(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
-            Assert.IsTrue(result0.Task.Result, "Task-0 completed");
+            Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
+            Assert.True(result0.Task.Result, "Task-0 completed");
 
-            Assert.IsNotNull(t1, "Task-1 started");
+            Assert.NotNull(t1); // Task-1 started
             result1.Task.Wait(TimeSpan.FromSeconds(1));
-            Assert.IsTrue(t1.IsCompleted, "Task-1 completed");
-            Assert.IsFalse(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
-            Assert.IsTrue(result1.Task.Result, "Task-1 completed");
+            Assert.True(t1.IsCompleted, "Task-1 completed");
+            Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
+            Assert.True(result1.Task.Result, "Task-1 completed");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -488,15 +487,15 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                    Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
                 });
                 Task t1 = t0.ContinueWith(task =>
                 {
-                    Assert.IsFalse(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
+                    Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
                     output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
+                    Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
                 });
                 t0.Start(scheduler);
                 bool ok = t1.Wait(TimeSpan.FromSeconds(15));
@@ -520,15 +519,15 @@ namespace UnitTests.SchedulerTests
             {
                 output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}", 
                     SynchronizationContext.Current, TaskScheduler.Current);
-                Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
             });
             Task t1 = t0.ContinueWith(task =>
             {
-                Assert.IsFalse(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
+                Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
                 output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-                Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
+                Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
             }, scheduler);
             t0.Start(scheduler);
             bool ok = t1.Wait(TimeSpan.FromSeconds(30));
@@ -548,15 +547,15 @@ namespace UnitTests.SchedulerTests
             {
                 output.WriteLine("#1 - StartNew - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-                Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #1");
+                Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
             }, null, CancellationToken.None, TaskCreationOptions.None, scheduler);
             Task t1 = t0.ContinueWith(task =>
             {
-                Assert.IsFalse(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
+                Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
                 output.WriteLine("#2 - StartNew - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-                Assert.AreEqual(scheduler, TaskScheduler.Current, "TaskScheduler.Current #2");
+                Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #2"
             }, scheduler);
             bool ok = t1.Wait(TimeSpan.FromSeconds(30));
             if (!ok) throw new TimeoutException();
@@ -615,8 +614,8 @@ namespace UnitTests.SchedulerTests
             output.WriteLine("Main-task awake");
 
             // N should be 10, because all tasks should execute serially
-            Assert.IsTrue(n != 0, "Work items did not get executed");
-            Assert.AreEqual(10, n, "Work items executed concurrently");
+            Assert.True(n != 0, "Work items did not get executed");
+            Assert.Equal(10, n);  // "Work items executed concurrently"
             scheduler.Stop();
         }
 
@@ -633,28 +632,28 @@ namespace UnitTests.SchedulerTests
             output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1} Thread={2}",
                 SynchronizationContext.Current, TaskScheduler.Current, Thread.CurrentThread.ManagedThreadId);
 
-            Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get Initial");
+            Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get Initial"
 
             Task t0 = new Task(() =>
             {
                 output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1} Thread={2}",
                     SynchronizationContext.Current, TaskScheduler.Current, Thread.CurrentThread.ManagedThreadId);
 
-                Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #0");
+                Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #0"
 
                 Task t1 = new Task(() =>
                 {
                     output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1} Thread={2}",
                         SynchronizationContext.Current, TaskScheduler.Current, Thread.CurrentThread.ManagedThreadId);
-                    Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #1");
+                    Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #1"
                 });
                 Task t2 = t1.ContinueWith(task =>
                 {
-                    Assert.IsFalse(task.IsFaulted, "Task #1 FAULTED=" + task.Exception);
+                    Assert.False(task.IsFaulted, "Task #1 FAULTED=" + task.Exception);
 
                     output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1} Thread={2}",
                         SynchronizationContext.Current, TaskScheduler.Current, Thread.CurrentThread.ManagedThreadId);
-                    Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #2");
+                    Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
                 t1.Start(scheduler);
                 bool ok = t2.Wait(TimeSpan.FromSeconds(5));
@@ -663,7 +662,7 @@ namespace UnitTests.SchedulerTests
             t0.Start(scheduler);
             bool finished = t0.Wait(TimeSpan.FromSeconds(10));
             if (!finished) throw new TimeoutException();
-            Assert.IsFalse(t0.IsFaulted, "Task #0 FAULTED=" + t0.Exception);
+            Assert.False(t0.IsFaulted, "Task #0 FAULTED=" + t0.Exception);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("TaskScheduler")]
@@ -679,31 +678,31 @@ namespace UnitTests.SchedulerTests
             output.WriteLine("Initial - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                 SynchronizationContext.Current, TaskScheduler.Current);
 
-            Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get Initial");
+            Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get Initial"
 
             Task t0 = Task.Factory.StartNew(() =>
             {
                 output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
 
-                Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #0");
+                Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #0"
 
                 Task t1 = Task.Factory.StartNew(() =>
                 {
                     output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #1");
+                    Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #1"
                 });
                 Task t2 = t1.ContinueWith((_) =>
                 {
                     output.WriteLine("#2 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
-                    Assert.AreEqual(val, RequestContext.Get(key), "RequestContext.Get #2");
+                    Assert.Equal(val, RequestContext.Get(key));  // "RequestContext.Get #2"
                 });
                 t2.Wait(TimeSpan.FromSeconds(5));
             });
             t0.Wait(TimeSpan.FromSeconds(10));
-            Assert.IsTrue(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
+            Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }
 
         private void LogContext(string what)

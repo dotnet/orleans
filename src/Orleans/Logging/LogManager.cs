@@ -109,6 +109,7 @@ namespace Orleans.Runtime
         /// <seealso cref="GrainClient.Initialize()"/>
         /// <seealso cref="Orleans.Host.Azure.Client.AzureClient.Initialize()"/>
         /// <param name="config">Configuration settings to be used for initializing the Logger susbystem state.</param>
+        /// <param name="configChange">Indicates an update to existing config settings.</param>
 #pragma warning restore 1574
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static void Initialize(ITraceConfiguration config, bool configChange = false)
@@ -256,7 +257,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Set the default log level of all Runtime Loggers.
         /// </summary>
-        /// <param name="newTraceLevel">The new log level to use</param>
+        /// <param name="severity">The new log level to use</param>
         public static void SetRuntimeLogLevel(Severity severity)
         {
             runtimeTraceLevel = severity;
@@ -266,7 +267,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Set the default log level of all Grain and Application Loggers.
         /// </summary>
-        /// <param name="newTraceLevel">The new log level to use</param>
+        /// <param name="severity">The new log level to use</param>
         public static void SetAppLogLevel(Severity severity)
         {
             appTraceLevel = severity;
@@ -422,7 +423,12 @@ namespace Orleans.Runtime
         {
             const string dateFormat = "yyyy-MM-dd-HH-mm-ss-fffZ"; // Example: 2010-09-02-09-50-43-341Z
 
-            var thisAssembly = Assembly.GetEntryAssembly() ?? Assembly.GetCallingAssembly();
+            var thisAssembly = Assembly.GetEntryAssembly()
+#if !NETSTANDARD
+                ?? Assembly.GetCallingAssembly()
+#endif
+                ?? typeof(LogManager)
+                .GetTypeInfo().Assembly;
 
             var dumpFileName = $@"{thisAssembly.GetName().Name}-MiniDump-{DateTime.UtcNow.ToString(dateFormat,
                     CultureInfo.InvariantCulture)}.dmp";
@@ -432,8 +438,9 @@ namespace Orleans.Runtime
                 var process = Process.GetCurrentProcess();
 
                 // It is safe to call DangerousGetHandle() here because the process is already crashing.
+                var handle = GetProcessHandle(process);
                 NativeMethods.MiniDumpWriteDump(
-                    process.Handle,
+                    handle,
                     process.Id,
                     stream.SafeFileHandle.DangerousGetHandle(),
                     dumpType,
@@ -443,6 +450,15 @@ namespace Orleans.Runtime
             }
 
             return new FileInfo(dumpFileName);
+        }
+
+        private static IntPtr GetProcessHandle(Process process)
+        {
+#if NETSTANDARD
+            return process.SafeHandle.DangerousGetHandle();
+#else
+            return process.Handle;
+#endif
         }
 
         /// <summary>

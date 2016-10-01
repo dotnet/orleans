@@ -5,7 +5,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 namespace UnitTests
 {

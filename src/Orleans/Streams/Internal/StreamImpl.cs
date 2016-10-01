@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {

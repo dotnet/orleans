@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Core;
@@ -13,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
@@ -47,19 +47,19 @@ namespace UnitTests.Grains
 
         public Task<bool> CheckStateInit()
         {
-            Assert.IsNotNull(State, "Null State");
-            Assert.AreEqual(0, State.Field1, "Field1 = {0}", State.Field1);
-            Assert.IsNull(State.Field2, "Field2 = {0}", State.Field2);
-            //Assert.IsNotNull(State.Field3, "Null Field3");
+            Assert.NotNull(State);
+            Assert.Equal(0, State.Field1);
+            Assert.Null(State.Field2);
+            //Assert.NotNull(State.Field3, "Null Field3");
             //Assert.AreEqual(0, State.Field3.Count, "Field3 = {0}", String.Join("'", State.Field3));
-            Assert.IsNotNull(State.SortedDict, "Null SortedDict");
+            Assert.NotNull(State.SortedDict);
             return Task.FromResult(true);
         }
 
         public Task<string> CheckProviderType()
         {
             var storageProvider = ((ActivationData) Data).StorageProvider;
-            Assert.IsNotNull(storageProvider, "Null storage provider");
+            Assert.NotNull(storageProvider);
             return Task.FromResult(storageProvider.GetType().FullName);
         }
 
@@ -313,6 +313,109 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
     public class AzureStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IAzureStorageTestGrain_GuidExtendedKey, IAzureStorageTestGrain_LongExtendedKey
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task<string> GetExtendedKeyValue()
+        {
+            string extKey;
+            var pk = this.GetPrimaryKey(out extKey);
+            return Task.FromResult(extKey);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageTestGrain : Grain<PersistenceTestGrainState>,
+        IAWSStorageTestGrain, IAWSStorageTestGrain_LongKey
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+        IAWSStorageGenericGrain<T>
+    {
+        public override Task OnActivateAsync()
+        {
+            return TaskDone.Done;
+        }
+
+        public Task<T> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(T val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<T> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+    public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+        IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
     {
         public override Task OnActivateAsync()
         {
@@ -665,12 +768,11 @@ namespace UnitTests.Grains
 
             var context = RuntimeContext.Current.ActivationContext;
             var scheduler = TaskScheduler.Current;
-            var callStack = new StackTrace();
 
             executing = true;
-            Assert.AreEqual(_scheduler, scheduler, "Wrong TaskScheduler {0} Caller:{1}", scheduler, callStack);
-            Assert.IsNotNull(context, "Null ActivationContext -- Expected: {0} Caller:{1}", _context, callStack);
-            Assert.AreEqual(_context, context, "Wrong ActivationContext {0} Caller:{1}", context, callStack);
+            Assert.Equal(_scheduler, scheduler);
+            Assert.Equal(_context, context);
+            Assert.NotNull(context);
             executing = false;
         }
     }
@@ -983,8 +1085,7 @@ namespace UnitTests.Grains
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
                 logger.Verbose("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(func1(val), func2(val), "{0} -- Wrong function after round-trip of {1} with value={2}",
-                    what, func1, val);
+                Assert.Equal(func1(val), func2(val));
             }
         }
 
@@ -997,8 +1098,7 @@ namespace UnitTests.Grains
                 var val in new[] {_staticFilterValue1, _staticFilterValue2, _staticFilterValue3, _staticFilterValue4})
             {
                 logger.Verbose("{0} -- Compare value={1}", what, val);
-                Assert.AreEqual(pred1(val), pred2(val), "{0} -- Wrong predicate after round-trip of {1} with value={2}",
-                    what, pred1, val);
+                Assert.Equal(pred1(val), pred2(val));
             }
         }
 

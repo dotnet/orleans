@@ -2,7 +2,6 @@ namespace Orleans
 {
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Orleans.CodeGeneration;
 
     public interface IGrainInvokeInterceptor

@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{8D937706-F6DA-4D33-B0A9-24A260BD3080}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Orleans.CodeGenerator</RootNamespace>
+    <AssemblyName>OrleansCodeGenerator</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\OrleansCodeGenerator.XML</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\OrleansCodeGenerator.XML</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Bootstrap)' == 'true'">
+    <OutputPath>$(BootstrapOutputPath)</OutputPath>
+    <OutDir>$(BootstrapOutputPath)</OutDir>
+    <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
+    <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\CodeGenerationException.cs">
+      <Link>CodeGenerationException.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\CodeGeneratorCommon.cs">
+      <Link>CodeGeneratorCommon.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\GeneratedSyntax.cs">
+      <Link>GeneratedSyntax.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\GrainMethodInvokerGenerator.cs">
+      <Link>GrainMethodInvokerGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\GrainReferenceGenerator.cs">
+      <Link>GrainReferenceGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\RoslynCodeGenerator.cs">
+      <Link>RoslynCodeGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\SerializerGenerationManager.cs">
+      <Link>SerializerGenerationManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\SerializerGenerator.cs">
+      <Link>SerializerGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\Utilities\StringExtensions.cs">
+      <Link>Utilities\StringExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansCodeGenerator\Utilities\SyntaxFactoryExtensions.cs">
+      <Link>Utilities\SyntaxFactoryExtensions.cs</Link>
+    </Compile>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans\Orleans.csproj">
+      <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="project.json" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

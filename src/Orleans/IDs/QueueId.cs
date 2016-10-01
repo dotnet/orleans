@@ -1,6 +1,6 @@
 using System;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -25,21 +25,6 @@ namespace Orleans.Streams
             queueNamePrefix = queuePrefix;
             queueId = id;
             uniformHashCache = hash;
-        }
-
-        public static QueueId GetQueueId(string queueName)
-        {
-            return FindOrCreateQueueId(queueName, 0, 0);
-        }
-
-        public static QueueId GetQueueId(uint queueId)
-        {
-            return FindOrCreateQueueId(null, queueId, 0);
-        }
-
-        public static QueueId GetQueueId(string queueName, uint queueId)
-        {
-            return FindOrCreateQueueId(queueName, queueId, 0);
         }
 
         public static QueueId GetQueueId(string queueName, uint queueId, uint hash)

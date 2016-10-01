@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.TestHelper;
@@ -33,16 +32,16 @@ namespace UnitTests.AsyncPrimitivesTests
             pipeline.Add(done[0]);
             const int epsilon = 100;
             var elapsed0 = watch.ElapsedMilliseconds;
-            Assert.IsTrue(elapsed0 < epsilon, elapsed0.ToString());
+            Assert.True(elapsed0 < epsilon, elapsed0.ToString());
             pipeline.Add(done[2]);
             var elapsed1 = watch.ElapsedMilliseconds;
-            Assert.IsTrue(elapsed1 < epsilon, elapsed1.ToString());
+            Assert.True(elapsed1 < epsilon, elapsed1.ToString());
             pipeline.Add(done[1]);
             var elapsed2 = watch.ElapsedMilliseconds;
-            Assert.IsTrue(step - epsilon <= elapsed2 && elapsed2 <= step + epsilon);
+            Assert.True(step - epsilon <= elapsed2 && elapsed2 <= step + epsilon);
             pipeline.Wait();
             watch.Stop();
-            Assert.IsTrue(3 * step - epsilon <= watch.ElapsedMilliseconds && watch.ElapsedMilliseconds <= 3 * step + epsilon);
+            Assert.True(3 * step - epsilon <= watch.ElapsedMilliseconds && watch.ElapsedMilliseconds <= 3 * step + epsilon);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -74,9 +73,9 @@ namespace UnitTests.AsyncPrimitivesTests
                 pipeline.Add(async2);
             }
             pipeline.Wait();
-            Assert.AreEqual(numActions, started);
-            Assert.AreEqual(numActions, finished1);
-            Assert.AreEqual(numActions, finished2);
+            Assert.Equal(numActions, started);
+            Assert.Equal(numActions, finished1);
+            Assert.Equal(numActions, finished2);
         }
 
         private static Task[] TimedCompletions(params int[] waits)
@@ -153,7 +152,7 @@ namespace UnitTests.AsyncPrimitivesTests
             await Task.WhenAll(workers);
             pipeline.Wait();
             stopwatch.Stop();
-            Assert.AreEqual(expectedTasksCompleted, tasksCompleted, "The test did not complete the expected number of tasks.");
+            Assert.Equal(expectedTasksCompleted, tasksCompleted); // "The test did not complete the expected number of tasks."
 
             var targetTimeSec = expectedTasksCompleted * delayLength.TotalSeconds / pipelineCapacity;
             var minTimeSec = (1.0 - variance) * targetTimeSec;
@@ -166,21 +165,21 @@ namespace UnitTests.AsyncPrimitivesTests
                 targetTimeSec,
                 variance * 100);
 
-            Assert.IsTrue(capacityReached.IsSet, "Pipeline capacity not reached; the delay length probably is too short to be useful.");
-            Assert.IsTrue(
+            Assert.True(capacityReached.IsSet, "Pipeline capacity not reached; the delay length probably is too short to be useful.");
+            Assert.True(
                 actualSec >= minTimeSec, 
                 string.Format("The unit test completed too early ({0} sec < {1} sec).", actualSec, minTimeSec));
-            Assert.IsTrue(
+            Assert.True(
                 actualSec <= maxTimeSec, 
                 string.Format("The unit test completed too late ({0} sec > {1} sec).", actualSec, maxTimeSec));
         }
 
         private void CheckPipelineState(int size, int capacity, InterlockedFlag capacityReached)
         {
-            Assert.IsTrue(size >= 0);
-            Assert.IsTrue(capacity > 0);
+            Assert.True(size >= 0);
+            Assert.True(capacity > 0);
             // a understood flaw of the current algorithm is that the capacity can be exceeded by one item. we've decided that this is acceptable and we allow it to happen.
-            Assert.IsTrue(size <= capacity, string.Format("size ({0}) must be less than the capacity ({1})", size, capacity));
+            Assert.True(size <= capacity, string.Format("size ({0}) must be less than the capacity ({1})", size, capacity));
             if (capacityReached != null && size == capacity)
                 capacityReached.TrySet();
         }

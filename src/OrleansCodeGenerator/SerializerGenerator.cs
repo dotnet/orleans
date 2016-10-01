@@ -8,16 +8,13 @@ namespace Orleans.CodeGenerator
     using System.Reflection;
     using System.Runtime.Serialization;
     using System.Text.RegularExpressions;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Concurrency;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -62,7 +59,9 @@ namespace Orleans.CodeGenerator
             var attributes = new List<AttributeSyntax>
             {
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                 SF.Attribute(typeof(SerializerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
@@ -128,7 +127,9 @@ namespace Orleans.CodeGenerator
                             SF.AttributeList()
                                 .AddAttributes(
                                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
@@ -286,12 +287,6 @@ namespace Orleans.CodeGenerator
                                 SF.VariableDeclarator("result")
                                     .WithInitializer(SF.EqualsValueClause(GetObjectCreationExpressionSyntax(type))))));
 
-                // Copy all members from the input to the result.
-                foreach (var field in fields)
-                {
-                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
-                }
-
                 // Record this serialization.
                 Expression<Action> recordObject =
                     () => SerializationContext.Current.RecordObject(default(object), default(object));
@@ -306,6 +301,12 @@ namespace Orleans.CodeGenerator
                     SF.ExpressionStatement(
                         recordObject.Invoke(currentSerializationContext)
                             .AddArgumentListArguments(SF.Argument(originalVariable), SF.Argument(resultVariable))));
+
+                // Copy all members from the input to the result.
+                foreach (var field in fields)
+                {
+                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
+                }
 
                 body.Add(SF.ReturnStatement(resultVariable));
             }
@@ -463,7 +464,7 @@ namespace Orleans.CodeGenerator
             {
                 // Create an unformatted object.
                 Expression<Func<object>> getUninitializedObject =
-#if DNXCORE50
+#if NETSTANDARD
                     () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
 #else
                     () => FormatterServices.GetUninitializedObject(default(Type));

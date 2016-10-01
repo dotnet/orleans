@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -32,7 +29,7 @@ namespace UnitTests
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
                 // ReSharper disable AccessToModifiedClosure
-                Assert.AreEqual(counter, funcCounter);
+                Assert.Equal(counter, funcCounter);
                 output.WriteLine("Running for {0} time.", counter);
                 counter++;
                 if (counter == 5)
@@ -60,7 +57,7 @@ namespace UnitTests
             {
                 return;
             }
-            Assert.Fail("Should have thrown");
+            Assert.True(false,"Should have thrown");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -71,7 +68,7 @@ namespace UnitTests
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
 // ReSharper disable AccessToModifiedClosure
-                Assert.AreEqual(counter, funcCounter);
+                Assert.Equal(counter, funcCounter);
                 output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
 // ReSharper restore AccessToModifiedClosure
@@ -83,8 +80,8 @@ namespace UnitTests
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Constants.INFINITE_TIMESPAN);
             int value = promise.Result;
             output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
-            Assert.AreEqual(expectedRetries, value, "Returned value");
-            Assert.AreEqual(counter, value, "Counter == Returned value");
+            Assert.Equal(expectedRetries, value); // "Returned value"
+            Assert.Equal(counter, value); // "Counter == Returned value"
 
             counter = 0;
             maxRetries = 3;
@@ -92,8 +89,8 @@ namespace UnitTests
             promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null);
             value = promise.Result;
             output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
-            Assert.AreEqual(expectedRetries, value, "Returned value");
-            Assert.AreEqual(counter, value, "Counter == Returned value");
+            Assert.Equal(expectedRetries, value); // "Returned value"
+            Assert.Equal(counter, value); // "Counter == Returned value"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -104,14 +101,14 @@ namespace UnitTests
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
                 lastIteration = funcCounter;
-                Assert.AreEqual(counter, funcCounter);
+                Assert.Equal(counter, funcCounter);
                 output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
             });
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
-                Assert.AreEqual(lastIteration, i);
-                Assert.Fail("Should not be called");
+                Assert.Equal(lastIteration, i);
+                Assert.True(false, "Should not be called");
                 return true;
             });
 
@@ -125,8 +122,8 @@ namespace UnitTests
 
             int value = promise.Result;
             output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
-            Assert.AreEqual(counter, value, "Counter == Returned value");
-            Assert.AreEqual(counter, 1, "Counter == Returned value");
+            Assert.Equal(counter, value);
+            Assert.Equal(counter, 1);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -137,7 +134,7 @@ namespace UnitTests
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
                 lastIteration = funcCounter;
-                Assert.AreEqual(counter, funcCounter);
+                Assert.Equal(counter, funcCounter);
                 output.WriteLine("Running FUNC for {0} time.", counter);
                 ++counter;
                 throw new ArgumentException(counter.ToString(CultureInfo.InvariantCulture));
@@ -145,7 +142,7 @@ namespace UnitTests
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
                 output.WriteLine("Running ERROR FILTER for {0} time.", i);
-                Assert.AreEqual(lastIteration, i);
+                Assert.Equal(lastIteration, i);
                 if (i==0 || i==1)
                     return true;
                 else if (i == 2)
@@ -164,14 +161,14 @@ namespace UnitTests
             try
             {
                 int value = promise.Result;
-                Assert.Fail("Should have thrown");
+                Assert.True(false,"Should have thrown");
             }
             catch (Exception exc)
             {
                 Exception baseExc = exc.GetBaseException();
-                Assert.AreEqual(baseExc.GetType(), typeof(ArgumentException));
+                Assert.Equal(baseExc.GetType(), typeof(ArgumentException));
                 output.WriteLine("baseExc.GetType()={0} Counter={1}", baseExc.GetType(), counter);
-                Assert.AreEqual(counter, 3, "Counter == Returned value");
+                Assert.Equal(counter, 3); // "Counter == Returned value"
             }
         }
     }

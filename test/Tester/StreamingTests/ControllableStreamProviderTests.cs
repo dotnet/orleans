@@ -2,15 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Extensions;
-using Tester.TestStreamProviders.Controllable;
 using Tester;
+using Tester.TestStreamProviders.Controllable;
 using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {

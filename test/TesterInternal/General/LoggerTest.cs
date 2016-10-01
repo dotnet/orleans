@@ -5,12 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests
@@ -51,16 +50,13 @@ namespace UnitTests
         public void Logger_ConstructorTest()
         {
             Logger target = LogManager.GetLogger("Test", LoggerType.Runtime);
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with no overrides"
 
             target = LogManager.GetLogger("One", LoggerType.Runtime);
-            Assert.AreEqual(Severity.Warning, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with an override");
+            Assert.Equal(Severity.Warning, target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with an override"
 
             target = LogManager.GetLogger("Two", LoggerType.Grain);
-            Assert.AreEqual(Severity.Verbose3, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with an override");
+            Assert.Equal(Severity.Verbose3, target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with an override"
         }
 
         /// <summary>
@@ -70,12 +66,10 @@ namespace UnitTests
         public void Logger_ConstructorTest1()
         {
             Logger target = LogManager.GetLogger("Test", LoggerType.Application);
-            Assert.AreEqual(Severity.Info, target.SeverityLevel,
-                "Default severity level not calculated correctly for application logger with no override");
+            Assert.Equal(Severity.Info,  target.SeverityLevel);  //  "Default severity level not calculated correctly for application logger with no override"
 
             target = LogManager.GetLogger("Two", LoggerType.Grain);
-            Assert.AreEqual(Severity.Verbose3, target.SeverityLevel,
-                "Default severity level not calculated correctly for grain logger with an override");
+            Assert.Equal(Severity.Verbose3,  target.SeverityLevel);  //  "Default severity level not calculated correctly for grain logger with an override"
         }
 
         /// <summary>
@@ -85,25 +79,20 @@ namespace UnitTests
         public void Logger_SetRuntimeLogLevelTest()
         {
             Logger target = LogManager.GetLogger("Test");
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  //  "Default severity level not calculated correctly for runtime logger with no overrides"
             LogManager.SetRuntimeLogLevel(Severity.Warning);
-            Assert.AreEqual(Severity.Warning, target.SeverityLevel,
-                "Default severity level not re-calculated correctly for runtime logger with no overrides");
+            Assert.Equal(Severity.Warning,  target.SeverityLevel);  //  "Default severity level not re-calculated correctly for runtime logger with no overrides"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SeverityLevelTest()
         {
             LoggerImpl target = LogManager.GetLogger("Test");
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  //  "Default severity level not calculated correctly for runtime logger with no overrides"
             target.SetSeverityLevel(Severity.Verbose2);
-            Assert.AreEqual(Severity.Verbose2, target.SeverityLevel,
-                "Custom severity level was not set properly");
+            Assert.Equal(Severity.Verbose2,  target.SeverityLevel);  //  "Custom severity level was not set properly"
             LogManager.SetRuntimeLogLevel(Severity.Warning);
-            Assert.AreEqual(Severity.Verbose2, target.SeverityLevel,
-                "Severity level was re-calculated even though a custom value had been set");
+            Assert.Equal(Severity.Verbose2,  target.SeverityLevel);  //  "Severity level was re-calculated even though a custom value had been set"
         }
 
 
@@ -111,15 +100,15 @@ namespace UnitTests
         public void Logger_GetLoggerTest()
         {
             Logger logger = LogManager.GetLogger("GetLoggerTest", LoggerType.Runtime);
-            Assert.IsNotNull(logger);
+            Assert.NotNull(logger);
 
             Logger logger2 = LogManager.GetLogger("GetLoggerTest", LoggerType.Runtime);
-            Assert.IsNotNull(logger2);
-            Assert.IsTrue(ReferenceEquals(logger, logger2));
+            Assert.NotNull(logger2);
+            Assert.True(ReferenceEquals(logger, logger2));
 
             Logger logger3 = LogManager.GetLogger("GetLoggerTest", LoggerType.Application);
-            Assert.IsNotNull(logger3);
-            Assert.IsTrue(ReferenceEquals(logger, logger3));
+            Assert.NotNull(logger3);
+            Assert.True(ReferenceEquals(logger, logger3));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -127,9 +116,9 @@ namespace UnitTests
         {
             var dumpFile = LogManager.CreateMiniDump();
             output.WriteLine("Logger.CreateMiniDump dump file = " + dumpFile);
-            Assert.IsNotNull(dumpFile);
-            Assert.IsTrue(dumpFile.Exists, "Mini-dump file exists");
-            Assert.IsTrue(dumpFile.Length > 0, "Mini-dump file has content");
+            Assert.NotNull(dumpFile);
+            Assert.True(dumpFile.Exists, "Mini-dump file exists");
+            Assert.True(dumpFile.Length > 0, "Mini-dump file has content");
             output.WriteLine("Logger.CreateMiniDump dump file location = " + dumpFile.FullName);
         }
 
@@ -142,10 +131,10 @@ namespace UnitTests
             var initialLevel = logger.SeverityLevel;
 
             LogManager.AddTraceLevelOverride(fullName, Severity.Warning);
-            Assert.AreEqual(Severity.Warning, logger.SeverityLevel, "Logger level not reset after override added");
+            Assert.Equal(Severity.Warning,  logger.SeverityLevel);  //  "Logger level not reset after override added"
 
             LogManager.RemoveTraceLevelOverride(fullName);
-            Assert.AreEqual(initialLevel, logger.SeverityLevel, "Logger level not reset after override removed");
+            Assert.Equal(initialLevel,  logger.SeverityLevel);  //  "Logger level not reset after override removed"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -195,16 +184,14 @@ namespace UnitTests
             logger1.Info(logCode1, "Final message to logger1");
             logger2.Info(logCode2, "Final message to logger2");
 
-            Assert.AreEqual(expectedBulkLogMessages1, logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#1", expectedBulkLogMessages1);
-            Assert.AreEqual(expectedBulkLogMessages2, logConsumer.GetEntryCount(logCode2 + LogManager.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#2", expectedBulkLogMessages2);
-            Assert.AreEqual(expectedLogMessages1, logConsumer.GetEntryCount(logCode1),
-                    "Should see {0} real entries in total via logger#1", expectedLogMessages1);
-            Assert.AreEqual(expectedLogMessages2, logConsumer.GetEntryCount(logCode2),
-                    "Should see {0} real entries in total via logger#2", expectedLogMessages2);
-            Assert.AreEqual(0, logConsumer.GetEntryCount(logCode1 - 1), "Should not see any other entries -1");
-            Assert.AreEqual(0, logConsumer.GetEntryCount(logCode2 + 1), "Should not see any other entries +1");
+            Assert.Equal(expectedBulkLogMessages1,
+                logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedBulkLogMessages2,
+                logConsumer.GetEntryCount(logCode2 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedLogMessages1, logConsumer.GetEntryCount(logCode1));
+            Assert.Equal(expectedLogMessages2, logConsumer.GetEntryCount(logCode2));
+            Assert.Equal(0,  logConsumer.GetEntryCount(logCode1 - 1));  //  "Should not see any other entries -1"
+            Assert.Equal(0,  logConsumer.GetEntryCount(logCode2 + 1));  //  "Should not see any other entries +1"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -235,10 +222,8 @@ namespace UnitTests
             logger1.Info(logCode1, "Penultimate message to logger1");
             logger1.Info(logCode1, "Final message to logger1");
 
-            Assert.AreEqual(expectedBulkLogMessages1, logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#1", expectedBulkLogMessages1);
-            Assert.AreEqual(expectedLogMessages1, logConsumer.GetEntryCount(logCode1),
-                    "Should see {0} real entries in total via logger#1", expectedLogMessages1);
+            Assert.Equal(expectedBulkLogMessages1,  logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedLogMessages1, logConsumer.GetEntryCount(logCode1));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -304,14 +289,14 @@ namespace UnitTests
                 sb.Append("1234567890");
             }
             string longString = sb.ToString();
-            Assert.IsTrue(longString.Length > LogManager.MAX_LOG_MESSAGE_SIZE);
+            Assert.True(longString.Length > LogManager.MAX_LOG_MESSAGE_SIZE);
 
             int logCode1 = 1;
 
             logger1.Info(logCode1, longString);
 
-            Assert.AreEqual(1, logConsumer.GetEntryCount(logCode1), "Should see original log message entry");
-            Assert.AreEqual(1, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should also see 'Message truncated' message");
+            Assert.Equal(1,  logConsumer.GetEntryCount(logCode1));  //  "Should see original log message entry"
+            Assert.Equal(1,  logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated));  //  "Should also see 'Message truncated' message"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -342,8 +327,8 @@ namespace UnitTests
 
                 int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);
                 output.WriteLine(count + " stats log message entries written");
-                Assert.IsTrue(count > 1, "Should be some stats log message entries - saw " + count);
-                Assert.AreEqual(0, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should not see any 'Message truncated' message");
+                Assert.True(count > 1, "Should be some stats log message entries - saw " + count);
+                Assert.Equal(0,  logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated));  //  "Should not see any 'Message truncated' message"
             }
             finally
             {
@@ -448,7 +433,7 @@ namespace UnitTests
             stopwatch.Stop();
             var elapsed = stopwatch.Elapsed;
             output.WriteLine(testName + " : Elapsed time = " + elapsed);
-            Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+            Assert.True(elapsed < target.Multiply(timingFactor), $"{testName}: Elapsed time {elapsed} exceeds target time {target}");
         }
 
         private void RunLoggerPerfTest(string testName, int n, int logCode, TimeSpan target, Logger logger)
@@ -470,12 +455,12 @@ namespace UnitTests
 
             output.WriteLine(msg);
             logger.Info(logCode, msg);
-            Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+            Assert.True(elapsed < target.Multiply(timingFactor), $"{testName}: Elapsed time {elapsed} exceeds target time {target}");
         }
 
         private void RunTestForLogFiltering(string testName, int n, int finalLogCode, int mainLogCode, int expectedMainLogMessages, int expectedFinalLogMessages, int expectedBulkLogMessages)
         {
-            Assert.IsTrue(finalLogCode != (mainLogCode - 1), "Test code constraint -1");
+            Assert.True(finalLogCode != (mainLogCode - 1), "Test code constraint -1");
 
             TestLogConsumer logConsumer = new TestLogConsumer(output);
             LogManager.LogConsumers.Add(logConsumer);
@@ -500,16 +485,14 @@ namespace UnitTests
 
             logger.Info(finalLogCode, "Final msg");
 
-            Assert.AreEqual(expectedMainLogMessages, logConsumer.GetEntryCount(mainLogCode),
-                    "Should see {0} real entries in total", expectedMainLogMessages);
+            Assert.Equal(expectedMainLogMessages, logConsumer.GetEntryCount(mainLogCode));
             if (mainLogCode != finalLogCode)
             {
-                Assert.AreEqual(expectedFinalLogMessages, logConsumer.GetEntryCount(finalLogCode),
-                    "Should see {0} final entry", expectedFinalLogMessages);
+                Assert.Equal(expectedFinalLogMessages, logConsumer.GetEntryCount(finalLogCode));
             }
-            Assert.AreEqual(expectedBulkLogMessages, logConsumer.GetEntryCount(mainLogCode + LogManager.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries", expectedBulkLogMessages);
-            Assert.AreEqual(0, logConsumer.GetEntryCount(mainLogCode - 1), "Should not see any other entries -1");
+            Assert.Equal(expectedBulkLogMessages,
+                logConsumer.GetEntryCount(mainLogCode + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(0,  logConsumer.GetEntryCount(mainLogCode - 1));  //  "Should not see any other entries -1"
         }
     }
 

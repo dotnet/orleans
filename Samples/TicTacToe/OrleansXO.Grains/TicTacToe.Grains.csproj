@@ -38,8 +38,8 @@
       <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Orleans">
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.2.0\lib\net451\Orleans.dll</HintPath>
+    <Reference Include="Orleans, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.Core.1.2.3\lib\net451\Orleans.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -68,13 +68,15 @@
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" />
+  <Import Project="$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition="Exists('$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.0\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets'))" />
+    <Error Condition="!Exists('$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets'))" />
   </Target>
+  <Import Project="..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" Condition="Exists('..\packages\Microsoft.Orleans.OrleansCodeGenerator.Build.1.2.3\build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

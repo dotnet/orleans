@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -12,7 +11,6 @@ using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using UnitTests.Tester;
 
 namespace UnitTests.General
 {
@@ -161,7 +159,7 @@ namespace UnitTests.General
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchCpuUsage(110.0f);
 
-            await Xunit.Assert.ThrowsAsync<OrleansException>(() => 
+            await Assert.ThrowsAsync<OrleansException>(() => 
                 this.AddTestGrains(1));
         }
 
@@ -178,10 +176,10 @@ namespace UnitTests.General
             await taintedGrainSecondary.LatchOverloaded();
 
             // OrleansException or GateWayTooBusyException
-            var exception = await Xunit.Assert.ThrowsAnyAsync<Exception>(() => 
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() => 
                 this.AddTestGrains(1));
 
-            Assert.IsTrue(exception is OrleansException || exception is GatewayTooBusyException);
+            Assert.True(exception is OrleansException || exception is GatewayTooBusyException);
         }
 
 
@@ -225,7 +223,7 @@ namespace UnitTests.General
 
         private static void AssertIsInRange(int actual, double expected, int leavy)
         {
-            Assert.IsTrue(expected - leavy <= actual && actual <= expected + leavy,
+            Assert.True(expected - leavy <= actual && actual <= expected + leavy,
                 String.Format("Expecting a value in the range between {0} and {1}, but instead got {2} outside the range.",
                     expected - leavy, expected + leavy, actual));
         }
@@ -270,7 +268,7 @@ namespace UnitTests.General
             }
 
             var unexpected = taintedSilo.SiloAddress.Endpoint;
-            Assert.IsTrue(
+            Assert.True(
                 actual.All(
                     i =>
                         !i.Equals(unexpected)),

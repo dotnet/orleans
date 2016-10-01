@@ -1,7 +1,7 @@
 using System;
+using System.Runtime.Serialization;
 using Orleans.Concurrency;
 using Orleans.Serialization;
-using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {

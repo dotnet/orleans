@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -140,11 +139,11 @@ namespace UnitTests
                 {
                     var fileName = Path.GetFileName(i);
                     // we shouldn't have any blacklisted assemblies in the list.
-                    Assert.IsFalse(exclusionList.Contains(fileName), "Assemblies on an exclusion list should be ignored.");     
+                    Assert.False(exclusionList.Contains(fileName), "Assemblies on an exclusion list should be ignored.");     
                     if (fileName == ExpectedFileName)
                         found = true;
                 }
-                Assert.IsTrue(
+                Assert.True(
                     found, 
                     String.Format(
                         "{0} should have been found by the assembly loader", 

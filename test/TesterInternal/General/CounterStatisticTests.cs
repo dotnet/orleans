@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
@@ -51,7 +50,7 @@ namespace UnitTests.General
                 var counter = CounterStatistic.FindOrCreate(new StatisticName("test" + i));
                 output.WriteLine(""+ counter.GetCurrentValue());
                 
-                Assert.AreEqual(i*Environment.ProcessorCount*numOfIterations, counter.GetCurrentValue());
+                Assert.Equal(i*Environment.ProcessorCount*numOfIterations, counter.GetCurrentValue());
             }
         }
 

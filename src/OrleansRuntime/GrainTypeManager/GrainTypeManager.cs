@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
-using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -67,6 +66,11 @@ namespace Orleans.Runtime
         public Dictionary<string, string> GetGrainInterfaceToClassMap()
         {
             return grainInterfaceMap.GetPrimaryImplementations();
+        }
+
+        internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
+        {
+            return grainInterfaceMap.TryGetPrimaryImplementation(grainInterface, out grainClass);
         }
 
         internal GrainTypeData this[string className]

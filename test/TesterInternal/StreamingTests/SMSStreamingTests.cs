@@ -7,7 +7,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 namespace UnitTests.StreamingTests
 {

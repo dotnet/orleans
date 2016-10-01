@@ -1,10 +1,9 @@
-﻿using System;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
+﻿
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 // ReSharper disable ConvertToConstant.Local
@@ -27,10 +26,10 @@ namespace UnitTests.CodeGeneration
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
             GrainId id1 = ((GrainReference)g1).GrainId;
             UniqueKey k1 = id1.Key;
-            Assert.IsTrue(id1.IsGrain, "GrainReference should be for a grain");
-            Assert.AreEqual(UniqueKey.Category.Grain, k1.IdCategory, "GrainId should be for self-managed type");
-            Assert.AreEqual(g1Key, k1.PrimaryKeyToLong(), "Encoded primary key should match");
-            Assert.AreEqual(1146670029, k1.BaseTypeCode, "Encoded type code data should match");
+            Assert.True(id1.IsGrain, "GrainReference should be for a grain");
+            Assert.Equal(UniqueKey.Category.Grain, k1.IdCategory);  // "GrainId should be for self-managed type"
+            Assert.Equal(g1Key, k1.PrimaryKeyToLong());  // "Encoded primary key should match"
+            Assert.Equal(1146670029, k1.BaseTypeCode);  // "Encoded type code data should match"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey"), TestCategory("ActivationCollector")]
@@ -42,10 +41,10 @@ namespace UnitTests.CodeGeneration
             UniqueKey k1 = id1.Key;
             output.WriteLine("GrainId={0} UniqueKey={1} PK={2} KeyType={3} IdCategory={4}",
                 id1, k1, id1.GetPrimaryKeyLong(), k1.IdCategory, k1.BaseTypeCode);
-            Assert.IsTrue(id1.IsGrain, "GrainReference should be for a grain");
-            Assert.AreEqual(UniqueKey.Category.Grain, k1.IdCategory, "GrainId should be for self-managed type");
-            Assert.AreEqual(g1Key, k1.PrimaryKeyToLong(), "Encoded primary key should match");
-            Assert.AreEqual(1381240679, k1.BaseTypeCode, "Encoded type code data should match");
+            Assert.True(id1.IsGrain, "GrainReference should be for a grain");
+            Assert.Equal(UniqueKey.Category.Grain, k1.IdCategory);  // "GrainId should be for self-managed type"
+            Assert.Equal(g1Key, k1.PrimaryKeyToLong());  // "Encoded primary key should match"
+            Assert.Equal(1381240679, k1.BaseTypeCode);  // "Encoded type code data should match"
         }
     }
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -66,9 +65,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
-            Assert.AreEqual(state.A, data["A"], "A");
-            Assert.AreEqual(state.B, data["B"], "B");
-            Assert.AreEqual(state.C, data["C"], "C");
+            Assert.Equal(state.A,  data["A"]);  // "A"
+            Assert.Equal(state.B,  data["B"]);  // "B"
+            Assert.Equal(state.C,  data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -90,9 +89,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.State.A, data["A"], "A");
-            Assert.AreEqual(state.State.B, data["B"], "B");
-            Assert.AreEqual(state.State.C, data["C"], "C");
+            Assert.Equal(state.State.A,  data["A"]);  // "A"
+            Assert.Equal(state.State.B,  data["B"]);  // "B"
+            Assert.Equal(state.State.C,  data["C"]);  // "C"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -117,17 +116,17 @@ namespace UnitTests.StorageTests
             sw.Restart();
             var storedData = store.ReadRow(keys);
             output.WriteLine("Read returned {0} after {1}", StorageProviderUtils.PrintOneWrite(keys, storedData, eTag), sw.Elapsed);
-            Assert.IsNotNull(data, "Should get some data from Read");
+            Assert.NotNull(data); // Should get some data from Read
 
             sw.Restart();
             bool ok = store.DeleteRow(keys, eTag);
-            Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
+            Assert.True(ok, $"Row deleted OK after {sw.Elapsed}. Etag={eTag} Keys={StorageProviderUtils.PrintKeys(keys)}");
 
             sw.Restart();
             storedData = store.ReadRow(keys); // Try to re-read after delete
             output.WriteLine("Re-Read took {0} and returned {1}", sw.Elapsed, StorageProviderUtils.PrintData(storedData));
-            Assert.IsNotNull(data, "Should not get null data from Re-Read");
-            Assert.IsTrue(storedData.Count == 0, "Should get no data from Re-Read but got: {0}", StorageProviderUtils.PrintData(storedData));
+            Assert.NotNull(data); // Should not get null data from Re-Read
+            Assert.True(storedData.Count == 0, $"Should get no data from Re-Read but got: {StorageProviderUtils.PrintData(storedData)}");
 
             sw.Restart();
             const string oldEtag = null;
@@ -138,7 +137,7 @@ namespace UnitTests.StorageTests
 
             sw.Restart();
             ok = store.DeleteRow(keys, eTag);
-            Assert.IsTrue(ok, "Row deleted OK after {0}. Etag={1} Keys={2}", sw.Elapsed, eTag, StorageProviderUtils.PrintKeys(keys));
+            Assert.True(ok, $"Row deleted OK after {sw.Elapsed}. Etag={eTag} Keys={StorageProviderUtils.PrintKeys(keys)}");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -178,7 +177,7 @@ namespace UnitTests.StorageTests
 
             var results = store.ReadMultiRow(keys);
 
-            Assert.AreEqual(2, results.Count, "Count");
+            Assert.Equal(2,  results.Count);  // "Count"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -204,9 +203,9 @@ namespace UnitTests.StorageTests
             var data = store.ReadRow(keys);
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
-            Assert.AreEqual(state.A, data["A"], "A");
-            Assert.AreEqual(state.B, data["B"], "B");
-            Assert.AreEqual(state.C, data["C"], "C");
+            Assert.Equal(state.A,  data["A"]);  // "A"
+            Assert.Equal(state.B,  data["B"]);  // "B"
+            Assert.Equal(state.C,  data["C"]);  // "C"
         }
 
         // ---------- Utility methods ----------

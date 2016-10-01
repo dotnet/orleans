@@ -1,12 +1,12 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.Tester;
-using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace Tester.CodeGenTests
