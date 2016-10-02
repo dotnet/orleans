@@ -21,17 +21,17 @@ namespace Orleans.Runtime.Scheduler
 
         internal readonly int MaxActiveThreads;
         internal readonly TimeSpan MaxWorkQueueWait;
-        internal readonly bool InjectMoreWorkerThreads;
+        internal readonly bool EnableWorkerThreadInjection;
 
-        internal bool ShouldInjectWorkerThread { get { return InjectMoreWorkerThreads && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
+        internal bool ShouldInjectWorkerThread { get { return EnableWorkerThreadInjection && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
 
-        internal WorkerPool(OrleansTaskScheduler sched, int maxActiveThreads, bool injectMoreWorkerThreads)
+        internal WorkerPool(OrleansTaskScheduler sched, int maxActiveThreads, bool enableWorkerThreadInjection)
         {
             scheduler = sched;
             MaxActiveThreads = maxActiveThreads;
-            InjectMoreWorkerThreads = injectMoreWorkerThreads;
+            EnableWorkerThreadInjection = enableWorkerThreadInjection;
             MaxWorkQueueWait = TimeSpan.FromMilliseconds(50);
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
             {
                 threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
             }
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (WorkerPoolThread t in pool)
                 t.Start();
             
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 longTurnTimer = new SafeTimer(obj => CheckForLongTurns(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 
@@ -85,26 +85,26 @@ namespace Orleans.Runtime.Scheduler
         internal void TakeCpu()
         {
             // maintain the threadLimitingSemaphore ONLY if thread injection is enabled.
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 threadLimitingSemaphore.WaitOne();
         }
 
         internal void PutCpu()
         {
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 threadLimitingSemaphore.Release();
         }
 
         internal void RecordRunningThread()
         {
             // maintain the runningThreadCount ONLY if thread injection is enabled.
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 Interlocked.Increment(ref runningThreadCount);
         }
 
         internal void RecordIdlingThread()
         {
-            if (InjectMoreWorkerThreads)
+            if (EnableWorkerThreadInjection)
                 Interlocked.Decrement(ref runningThreadCount);
         }
 

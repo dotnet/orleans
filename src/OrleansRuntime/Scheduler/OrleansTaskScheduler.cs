@@ -30,13 +30,13 @@ namespace Orleans.Runtime.Scheduler
 
         public OrleansTaskScheduler(int maxActiveThreads)
             : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100),
-            NodeConfiguration.INJECT_MORE_WORKER_THREADS, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+            NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
         public OrleansTaskScheduler(GlobalConfiguration globalConfig, NodeConfiguration config)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+                    config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
