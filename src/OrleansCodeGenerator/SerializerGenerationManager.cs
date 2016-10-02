@@ -48,12 +48,12 @@ namespace Orleans.CodeGenerator
 
         internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
         {
-            if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
+            var typeInfo = t.GetTypeInfo();
+
+            if (!IlBasedSerializerTypeChecker.IsSupportedType(t.GetTypeInfo()))
             {
                 return false;
             }
-
-            var typeInfo = t.GetTypeInfo();
 
             if (typeInfo.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
                 || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
@@ -65,15 +65,7 @@ namespace Orleans.CodeGenerator
                 RecordTypeToGenerate(typeInfo.GetElementType(), module, targetAssembly);
                 return false;
             }
-
-            if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
-            {
-                log.Warn(
-                    ErrorCode.CodeGenIgnoringTypes,
-                    "Skipping serializer generation for nested type {0}. If this type is used frequently, you may wish to consider making it non-nested.",
-                    t.Name);
-            }
-
+            
             if (t.IsConstructedGenericType)
             {
                 var args = t.GetGenericArguments();
@@ -134,6 +126,12 @@ namespace Orleans.CodeGenerator
             processedTypes.Add(next);
 
             return true;
+        }
+        
+        internal IEnumerable<Type> ConsumeTypes()
+        {
+            Type result;
+            while (GetNextTypeToProcess(out result)) yield return result;
         }
     }
 }
