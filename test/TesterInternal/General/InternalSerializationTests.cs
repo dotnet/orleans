@@ -117,7 +117,7 @@ namespace UnitTests.Serialization
                 _ =>
                 {
                     var attr = _.GetCustomAttribute<GrainReferenceAttribute>();
-                    return attr != null && attr.GrainType == grainType;
+                    return attr != null && attr.TargetType == grainType;
                 }).AsType();
 
             if (typeInfo.IsConstructedGenericType)

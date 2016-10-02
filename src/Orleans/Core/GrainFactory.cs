@@ -342,13 +342,13 @@ namespace Orleans
             var invokerAttr = typeInfo.GetCustomAttribute<MethodInvokerAttribute>(false);
             if (invokerAttr != null)
             {
-                GrainToInvokerMapping.TryAdd(invokerAttr.GrainType, type);
+                GrainToInvokerMapping.TryAdd(invokerAttr.TargetType, type);
             }
             
             var grainReferenceAttr = typeInfo.GetCustomAttribute<GrainReferenceAttribute>(false);
             if (grainReferenceAttr != null)
             {
-                GrainToReferenceMapping.TryAdd(grainReferenceAttr.GrainType, type);
+                GrainToReferenceMapping.TryAdd(grainReferenceAttr.TargetType, type);
             }
         }
 

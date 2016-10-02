@@ -530,13 +530,9 @@ namespace Orleans.CodeGenerator
             var results = new HashSet<Type>();
             foreach (var attribute in attributes)
             {
-                if (attribute.GrainType != null)
+                if (attribute.TargetType != null)
                 {
-                    results.Add(attribute.GrainType);
-                }
-                else if (!string.IsNullOrWhiteSpace(attribute.ForGrainType))
-                {
-                    results.Add(Type.GetType(attribute.ForGrainType));
+                    results.Add(attribute.TargetType);
                 }
             }
 

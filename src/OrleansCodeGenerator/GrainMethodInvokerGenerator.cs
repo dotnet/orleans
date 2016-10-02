@@ -56,9 +56,8 @@ namespace Orleans.CodeGenerator
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
                 SF.Attribute(typeof(MethodInvokerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
-                        SF.AttributeArgument(grainType.GetParseableName().GetLiteralExpression()),
-                        SF.AttributeArgument(interfaceIdArgument),
-                        SF.AttributeArgument(grainTypeArgument)),
+                        SF.AttributeArgument(grainTypeArgument),
+                        SF.AttributeArgument(interfaceIdArgument)),
 #if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
 #endif
