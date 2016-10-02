@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class WorkerPoolThread : AsynchAgent
     {
-        private const int MAX_THREAD_COUNT_TO_REPLACE = 500;
+        internal const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
 
         private readonly WorkerPool pool;
@@ -327,7 +327,7 @@ namespace Orleans.Runtime.Scheduler
             // exit when it's done with the turn.
             // Note that we only do this if the current load is reasonably low and the current thread
             // count is reasonably small.
-            if (!pool.InjectMoreWorkerThreads || pool.BusyWorkerCount >= MAX_THREAD_COUNT_TO_REPLACE ||
+            if (!pool.ShouldInjectWorkerThread ||
                 (Silo.CurrentSilo == null || !(Silo.CurrentSilo.Metrics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE))) return;
 
             if (Cts.IsCancellationRequested) return;
