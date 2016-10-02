@@ -749,7 +749,7 @@ namespace Orleans.Serialization
         internal static bool IsGeneratedGrainReference(MemberInfo type)
         {
             var attr = type.GetCustomAttribute<GrainReferenceAttribute>();
-            return attr != null && attr.GrainType != null;
+            return attr?.TargetType != null;
         }
 
         /// <summary>
@@ -761,7 +761,7 @@ namespace Orleans.Serialization
         private static void RegisterGrainReferenceSerializers(Type type)
         {
             var attr = type.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>();
-            if (attr == null || attr.GrainType == null)
+            if (attr?.TargetType != null)
             {
                 return;
             }
