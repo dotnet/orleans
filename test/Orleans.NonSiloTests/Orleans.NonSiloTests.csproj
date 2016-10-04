@@ -11,6 +11,7 @@
     <AssemblyName>Orleans.NonSiloTests</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <TargetFrameworkProfile />
@@ -143,6 +144,14 @@
     <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\Tester\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
+      <Link>OrleansConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\src\SDK\ClientConfiguration.xml">
+      <Link>ClientConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
@@ -191,6 +200,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
