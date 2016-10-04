@@ -604,19 +604,32 @@ namespace UnitTests.SchedulerTests
             {
                 TimeSpan waitCheckTime = TimeSpan.FromMilliseconds(150 * ChainLength * NumChains * waitFactor);
 
-                var timeoutLimit = TimeSpan.FromSeconds(1);
                 try
                 {
                     await resultHandles[i].Task.WithTimeout(waitCheckTime);
                 }
                 catch (TimeoutException)
                 {
-                    Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                    Assert.True(false, "Result did not arrive before timeout " + waitCheckTime);
                 }
 
                 bool ok = resultHandles[i].Task.Result;
-                Assert.False(taskChainEnds[i].IsFaulted, "Task chain " + i + " should not be Faulted: " + taskChainEnds[i].Exception);
+                
+                if (!taskChainEnds[i].IsCompleted)
+                {
+                    try
+                    {
+                        // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
+                        await taskChainEnds[i].WithTimeout(TimeSpan.FromMilliseconds(10));
+                    }
+                    catch (TimeoutException)
+                    {
+                        Assert.True(false, $"Task chain end {i} should complete very shortly after after its resultHandle");
+                    }
+                }
+
                 Assert.True(taskChainEnds[i].IsCompleted, "Task chain " + i + " should be completed");
+                Assert.False(taskChainEnds[i].IsFaulted, "Task chain " + i + " should not be Faulted: " + taskChainEnds[i].Exception);
                 Assert.Equal(ChainLength - 1, stageComplete[i]);  // "Task chain " + i + " should have completed all stages"
                 Assert.True(ok, "Successfully waited for ResultHandle for Task chain " + i);
             }
