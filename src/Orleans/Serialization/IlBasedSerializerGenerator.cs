@@ -190,10 +190,8 @@ namespace Orleans.Serialization
         {
             var result = type.GetAllFields().Where(
                 field =>
-#if !NETSTANDARD
-                !field.IsNotSerialized &&
-#endif
-                !field.IsStatic && IlBasedSerializerTypeChecker.IsSupportedFieldType(field.FieldType.GetTypeInfo())
+                field.GetCustomAttribute<NonSerializedAttribute>() == null
+                && !field.IsStatic && IlBasedSerializerTypeChecker.IsSupportedFieldType(field.FieldType.GetTypeInfo())
                 && (fieldFilter == null || fieldFilter(field))).ToList();
             result.Sort(FieldInfoComparer.Instance);
             return result;

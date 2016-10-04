@@ -554,7 +554,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => !field.IsNotSerialized)
+                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
