@@ -21,10 +21,7 @@ namespace UnitTests.CodeGeneration
             Assert.False(TypeUtils.IsGrainClass(t), t.FullName + " is not grain class");
             t = typeof(Orleans.Runtime.GrainDirectory.RemoteGrainDirectory);
             Assert.False(TypeUtils.IsGrainClass(t), t.FullName + " should not be a grain class");
-#if !NETSTANDARD_TODO
-           //blocked by CachedTypeResolver not coreclr compatible yet
             Assert.True(TypeUtils.IsSystemTargetClass(t), t.FullName + " should be a system target class");
-#endif
         }
 
         [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]

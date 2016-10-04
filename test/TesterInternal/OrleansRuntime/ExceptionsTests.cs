@@ -14,8 +14,7 @@ namespace UnitTests.OrleansRuntime
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.Initialize(null);
         }
-#if !NETSTANDARD_TODO
-        //blocked by Exception serialization not supported in vNext yet
+
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_DotNet()
         {
@@ -43,6 +42,5 @@ namespace UnitTests.OrleansRuntime
             Assert.Equal(original.ActivationToUse, output.ActivationToUse);
             Assert.Equal(original.PrimaryDirectoryForGrain, output.PrimaryDirectoryForGrain);
         }
-#endif
     }
 }
