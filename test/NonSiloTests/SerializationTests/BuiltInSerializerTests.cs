@@ -77,6 +77,58 @@ namespace UnitTests.Serialization
             LogManager.Initialize(new NodeConfiguration());
         }
 
+        [Theory, TestCategory("BVT"), TestCategory("Serialization")]
+        [MemberData(nameof(Serializers))]
+        public void Serialize_ComplexClass(SerializerToUse serializerToUse)
+        {
+            InitializeSerializer(serializerToUse);
+            var expected = OuterClass.GetPrivateClassInstance();
+            expected.Int = 89;
+            expected.String = Guid.NewGuid().ToString();
+            expected.NonSerializedInt = 39;
+            expected.Classes = new SomeAbstractClass[]
+            {
+                expected,
+                new AnotherConcreteClass
+                {
+                    AnotherString = "hi",
+                    Interfaces = new List<ISomeInterface> { expected }
+                }
+            };
+            expected.Enum = SomeAbstractClass.SomeEnum.Something;
+            expected.SetObsoleteInt(38);
+
+            var actual = (SomeAbstractClass)OrleansSerializationLoop(expected);
+
+            Assert.Equal(expected.Int, actual.Int);
+            Assert.Equal(expected.Enum, actual.Enum);
+            Assert.Equal(expected.String, ((OuterClass.SomeConcreteClass)actual).String);
+            Assert.Equal(expected.Classes.Length, actual.Classes.Length);
+            Assert.Equal(expected.String, ((OuterClass.SomeConcreteClass)actual.Classes[0]).String);
+            Assert.Equal(expected.Classes[1].Interfaces[0].Int, actual.Classes[1].Interfaces[0].Int);
+            Assert.Equal(0, actual.NonSerializedInt);
+            Assert.Equal(expected.GetObsoleteInt(), actual.GetObsoleteInt());
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Serialization")]
+        [MemberData(nameof(Serializers))]
+        public void Serialize_ComplexStruct(SerializerToUse serializerToUse)
+        {
+            InitializeSerializer(serializerToUse);
+
+            // Test struct serialization.
+            var expected = new SomeStruct(10) { Id = Guid.NewGuid(), PublicValue = 6, ValueWithPrivateGetter = 7 };
+            expected.SetValueWithPrivateSetter(8);
+            expected.SetPrivateValue(9);
+            var actual = (SomeStruct)OrleansSerializationLoop(expected);
+            Assert.Equal(expected.Id, actual.Id);
+            Assert.Equal(expected.ReadonlyField, actual.ReadonlyField);
+            Assert.Equal(expected.PublicValue, actual.PublicValue);
+            Assert.Equal(expected.ValueWithPrivateSetter, actual.ValueWithPrivateSetter);
+            Assert.Equal(expected.GetPrivateValue(), actual.GetPrivateValue());
+            Assert.Equal(expected.GetValueWithPrivateGetter(), actual.GetValueWithPrivateGetter());
+        }
+
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [MemberData(nameof(Serializers))]
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)

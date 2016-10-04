@@ -49,6 +49,9 @@
     <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
       <Link>StreamLifecycleTestGrains.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\EchoTaskGrain.cs">
+      <Link>EchoTaskGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>

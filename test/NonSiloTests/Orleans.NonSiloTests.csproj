@@ -56,8 +56,10 @@
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
+    <Compile Include="SerializationTests\BuiltInSerializerTests.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
+    <Compile Include="SerializationTests\IlBasedSerializerTests.cs" />
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />

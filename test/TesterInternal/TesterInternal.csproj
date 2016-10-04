@@ -63,7 +63,6 @@
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
     <Compile Include="RemindersTest\PostgreSqlRemindersTableTests.cs" />
-    <Compile Include="Serialization\IlBasedSerializerTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
@@ -144,7 +143,6 @@
     <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
-    <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
     <Compile Include="GrainReferenceCacheTests.cs" />
