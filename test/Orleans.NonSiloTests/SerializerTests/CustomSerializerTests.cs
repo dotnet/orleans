@@ -7,7 +7,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 
-namespace UnitTests.SerializerTests
+namespace NonSiloTests.UnitTests.SerializerTests
 {
     [Serializable]
     public class ClassWithCustomCopier

@@ -9,7 +9,7 @@ using Orleans.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace UnitTests.SerializerTests
+namespace NonSiloTests.UnitTests.SerializerTests
 {
     public class MessageSerializerTests
     {

@@ -271,7 +271,7 @@
       <Name>Orleans</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans.NonSiloTests\Orleans.NonSiloTests.csproj">
-      <Project>{b21ff7d4-93d7-4c1d-a0ad-229db1adc7bb}</Project>
+      <Project>{b9c8ffec-4947-4f04-ba73-1f17b329a55e}</Project>
       <Name>Orleans.NonSiloTests</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
