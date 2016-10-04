@@ -6,6 +6,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
 using Tester;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.ConcurrencyTests
 {
@@ -19,7 +20,7 @@ namespace UnitTests.ConcurrencyTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions();
-                options.ClusterConfiguration.Defaults.MaxActiveThreads = 2;
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 2);
 
                 return new TestCluster(options);
             }

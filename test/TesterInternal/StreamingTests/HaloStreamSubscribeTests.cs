@@ -28,20 +28,16 @@ namespace UnitTests.HaloTests.Streaming
 
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore", new Dictionary<string,string>() { { "NumStorageGrains", "1" } });
 
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage > ("AzureStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" } });
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("PubSubStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" }, { "UseJsonFormat", "false" } });
 
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>("SMSProvider", new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" } });
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>(SmsStreamProviderName, new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" } });
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>("SMSProviderDoNotOptimizeForImmutableData", new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" }, { "OptimizeForImmutableData", "false" } });
 
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>("AzureQueueProvider");
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>(AzureQueueStreamProviderName);
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>("AzureQueueProvider2");
 
-                options.ClusterConfiguration.Globals.MaxResendCount = 0;
-                options.ClusterConfiguration.Globals.UseMessageBatching = false;
                 options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
-                options.ClusterConfiguration.Globals.LivenessType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
-                options.ClusterConfiguration.Globals.ReminderServiceType = Orleans.Runtime.Configuration.GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
 
                 return new TestCluster(options);
             }
