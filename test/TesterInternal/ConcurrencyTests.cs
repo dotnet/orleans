@@ -5,6 +5,7 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
+using Tester;
 
 namespace UnitTests.ConcurrencyTests
 {
@@ -13,20 +14,17 @@ namespace UnitTests.ConcurrencyTests
     /// </summary>
     public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartSecondary = false,
-                    AdjustConfig = config =>
-                    {
-                        config.Overrides["Primary"].MaxActiveThreads = 2;
-                    }
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.Defaults.MaxActiveThreads = 2;
+
+                return new TestCluster(options);
             }
         }
+
 
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public async Task ConcurrencyTest_ReadOnly()

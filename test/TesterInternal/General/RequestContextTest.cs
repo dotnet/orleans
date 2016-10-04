@@ -15,6 +15,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
 
 namespace UnitTests.General
 {
@@ -397,18 +398,20 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    PropagateActivityId = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                },
-                new TestingClientOptions { PropagateActivityId = true });
+                var options = new TestClusterOptions(initialSilosCount: 1);
+
+                options.ClusterConfiguration.Defaults.PropagateActivityId = true;
+
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("Default");
+
+                options.ClientConfiguration.PropagateActivityId = true;
+
+                return new TestCluster(options);
             }
         }
 

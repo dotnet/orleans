@@ -16,6 +16,7 @@ using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -28,21 +29,27 @@ namespace UnitTests.StorageTests
     /// </summary>
     public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-                    StartSecondary = false,
-                });
+                var options = new TestClusterOptions(initialSilosCount: 4);
+                options.ClusterConfiguration.Defaults.MaxActiveThreads = 0;
+                options.ClusterConfiguration.Globals.MaxResendCount = 0;
+
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
+
+                return new TestCluster(options);
             }
         }
 
         const string ErrorInjectorStorageProvider = "ErrorInjector";
         private readonly ITestOutputHelper output;
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {

@@ -11,23 +11,39 @@ using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
+using System.Collections.Generic;
 
 namespace UnitTests.HaloTests.Streaming
 {
     public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = "SMSProvider";
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    // StartSecondary = false,
-                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-                });
+                var options = new TestClusterOptions(initialSilosCount:4);
+
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore", new Dictionary<string,string>() { { "NumStorageGrains", "1" } });
+
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage > ("AzureStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("PubSubStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" }, { "UseJsonFormat", "false" } });
+
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>("SMSProvider", new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" } });
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>("SMSProviderDoNotOptimizeForImmutableData", new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" }, { "OptimizeForImmutableData", "false" } });
+
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>("AzureQueueProvider");
+                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>("AzureQueueProvider2");
+
+                options.ClusterConfiguration.Globals.MaxResendCount = 0;
+                options.ClusterConfiguration.Globals.UseMessageBatching = false;
+                options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+                options.ClusterConfiguration.Globals.LivenessType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+                options.ClusterConfiguration.Globals.ReminderServiceType = Orleans.Runtime.Configuration.GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+                return new TestCluster(options);
             }
 
             public override void Dispose()
@@ -38,7 +54,7 @@ namespace UnitTests.HaloTests.Streaming
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;
