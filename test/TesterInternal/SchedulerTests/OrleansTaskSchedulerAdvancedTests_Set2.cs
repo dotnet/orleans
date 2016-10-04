@@ -615,17 +615,14 @@ namespace UnitTests.SchedulerTests
 
                 bool ok = resultHandles[i].Task.Result;
                 
-                if (!taskChainEnds[i].IsCompleted)
+                try
                 {
-                    try
-                    {
-                        // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
-                        await taskChainEnds[i].WithTimeout(TimeSpan.FromMilliseconds(10));
-                    }
-                    catch (TimeoutException)
-                    {
-                        Assert.True(false, $"Task chain end {i} should complete very shortly after after its resultHandle");
-                    }
+                    // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
+                    await taskChainEnds[i].WithTimeout(TimeSpan.FromMilliseconds(10));
+                }
+                catch (TimeoutException)
+                {
+                    Assert.True(false, $"Task chain end {i} should complete very shortly after after its resultHandle");
                 }
 
                 Assert.True(taskChainEnds[i].IsCompleted, "Task chain " + i + " should be completed");
