@@ -107,7 +107,7 @@ namespace Orleans.CodeGenerator
             // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
             var skipSerialzerGeneration = t.GetAllFields()
                 .Any(
-                    field => !field.IsNotSerialized &&
+                    field => field.GetCustomAttribute<NonSerializedAttribute>() == null &&
                         TypeUtilities.IsTypeIsInaccessibleForSerialization(
                             field.FieldType,
                             module,

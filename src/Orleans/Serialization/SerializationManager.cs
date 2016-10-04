@@ -200,7 +200,7 @@ namespace Orleans.Serialization
             lock (registerBuiltInSerializerLockObj)
             {
                 if (IsBuiltInSerializersRegistered)
-        {
+                {
                     return;
                 }
 
