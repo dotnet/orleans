@@ -56,6 +56,15 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IEchoTaskGrain.cs">
+      <Link>IEchoTaskGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IGenericInterfaces.cs">
+      <Link>IGenericInterfaces.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleGrain.cs">
+      <Link>ISimpleGrain.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
