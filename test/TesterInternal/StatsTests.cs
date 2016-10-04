@@ -55,10 +55,9 @@ namespace UnitTests.Stats
 
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
-            Assert.Equal("MockStats",  silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
+            var siloStatsCollector = Assert.IsType<MockStatsSiloCollector>(silo.TestHook.StatisticsProvider);
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
