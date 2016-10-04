@@ -6,7 +6,7 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
-using Orleans.TestingHost;
+using Tester;
 using UnitTests.StorageTests;
 using Xunit;
 
@@ -50,7 +50,7 @@ namespace Tests.GeoClusterTests
                 ServiceId = globalServiceId,
                 ClusterId = "0",
                 DeploymentId = deploymentId,
-                DataConnectionString = StorageTestConstants.DataConnectionString
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
 
             gossipTable = new AzureTableBasedGossipChannel();

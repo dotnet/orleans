@@ -2,7 +2,7 @@
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
-using Orleans.TestingHost;
+using Tester;
 using UnitTests.StorageTests;
 using Xunit;
 
@@ -27,7 +27,7 @@ namespace UnitTests.RemindersTest
 
         protected override string GetConnectionString()
         {
-            return StorageTestConstants.DataConnectionString;
+            return TestDefaultConfiguration.DataConnectionString;
         }
 
         [Fact, TestCategory("Reminders"), TestCategory("Azure")]

@@ -8,7 +8,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
-using Orleans.TestingHost;
+using Tester;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -923,7 +923,7 @@ namespace UnitTests
             const string filename = "Config_Azure_Default.xml";
 
             string deploymentId = "SiloConfig_Azure_Default" + TestConstants.random.Next();
-            string connectionString = StorageTestConstants.DataConnectionString;
+            string connectionString = TestDefaultConfiguration.DataConnectionString;
 
             var initialConfig = new ClusterConfiguration();
             initialConfig.LoadFromFile(filename);
@@ -977,7 +977,7 @@ namespace UnitTests
             var config = new ClientConfiguration();
 
             config.DeploymentId = deploymentId;
-            config.DataConnectionString = StorageTestConstants.DataConnectionString;
+            config.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
             config.PreferedGatewayIndex = 11;

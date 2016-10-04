@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Tester;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
@@ -116,7 +117,7 @@ namespace UnitTests.GeoClusterTests
             // configuration for cluster
             Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
             {
-                c.AddAzureTableStorageProvider("PubSubStore", deleteOnClear:true, useJsonFormat:false, connectionString: Orleans.TestingHost.StorageTestConstants.DataConnectionString);
+                c.AddAzureTableStorageProvider("PubSubStore", deleteOnClear:true, useJsonFormat:false, connectionString: TestDefaultConfiguration.DataConnectionString);
                 c.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
                 // logging  

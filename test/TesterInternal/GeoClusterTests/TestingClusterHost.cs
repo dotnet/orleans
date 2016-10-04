@@ -154,7 +154,7 @@ namespace Tests.GeoClusterTests
                           new GlobalConfiguration.GossipChannelConfiguration()
                           {
                               ChannelType = GlobalConfiguration.GossipChannelType.AzureTable,
-                              ConnectionString = StorageTestConstants.DataConnectionString
+                              ConnectionString = TestDefaultConfiguration.DataConnectionString
                           }};
 
                     customizer?.Invoke(config);

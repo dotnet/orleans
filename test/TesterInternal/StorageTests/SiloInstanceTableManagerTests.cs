@@ -7,7 +7,6 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
 using Tester;
 using Xunit;
 using Xunit.Abstractions;
@@ -59,7 +58,7 @@ namespace UnitTests.StorageTests
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
             logger.Info("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(deploymentId, StorageTestConstants.DataConnectionString)
+            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 

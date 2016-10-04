@@ -29,12 +29,14 @@ namespace UnitTests.StreamingTests
         public static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName);
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-            EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
-                TimeSpan.FromSeconds(1));
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
+                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private readonly SubscriptionMultiplicityTestRunner runner;
 
@@ -60,7 +62,7 @@ namespace UnitTests.StreamingTests
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
                 ProviderSettings.WriteProperties(settings);
-                EventHubConfig.WriteProperties(settings);
+                EventHubConfig.Value.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting

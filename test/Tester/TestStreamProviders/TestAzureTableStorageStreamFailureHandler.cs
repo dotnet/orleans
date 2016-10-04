@@ -7,7 +7,6 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Streams;
-using Orleans.TestingHost;
 
 namespace Tester.TestStreamProviders
 {
@@ -17,7 +16,7 @@ namespace Tester.TestStreamProviders
         private const string DeploymentId = "TestDeployment";
 
         private TestAzureTableStorageStreamFailureHandler()
-            : base(false, DeploymentId, TableName, StorageTestConstants.DataConnectionString)
+            : base(false, DeploymentId, TableName, TestDefaultConfiguration.DataConnectionString)
         {
         }
 
@@ -30,7 +29,7 @@ namespace Tester.TestStreamProviders
 
         public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(TableName, StorageTestConstants.DataConnectionString);
+            var dataManager = new AzureTableDataManager<TableEntity>(TableName, TestDefaultConfiguration.DataConnectionString);
             dataManager.InitTableAsync().Wait();
             IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
                 await
@@ -41,7 +40,7 @@ namespace Tester.TestStreamProviders
 
         public static async Task DeleteAll()
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(TableName, StorageTestConstants.DataConnectionString);
+            var dataManager = new AzureTableDataManager<TableEntity>(TableName, TestDefaultConfiguration.DataConnectionString);
             await dataManager.InitTableAsync();
             await dataManager.DeleteTableAsync();
         }

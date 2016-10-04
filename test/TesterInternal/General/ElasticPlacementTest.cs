@@ -26,7 +26,7 @@ namespace UnitTests.General
             StartFreshOrleans = true,
             StartPrimary = true,
             StartSecondary = true,
-            DataConnectionString = StorageTestConstants.DataConnectionString,
+            DataConnectionString = TestDefaultConfiguration.DataConnectionString,
             LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
             ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
             SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
@@ -38,7 +38,7 @@ namespace UnitTests.General
             AdjustConfig = config =>
             {
                 config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
-                config.DataConnectionString = StorageTestConstants.DataConnectionString;
+                config.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             },
         };
 

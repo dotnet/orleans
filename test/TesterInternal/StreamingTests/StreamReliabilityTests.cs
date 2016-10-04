@@ -12,6 +12,7 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
@@ -44,7 +45,7 @@ namespace UnitTests.Streaming.Reliability
                 StartSecondary = true,
                 SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
                 LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                 AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
             };
             var clientRunOptions = new TestingClientOptions
@@ -78,7 +79,7 @@ namespace UnitTests.Streaming.Reliability
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
