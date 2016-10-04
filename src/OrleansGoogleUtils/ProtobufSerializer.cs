@@ -133,11 +133,6 @@ namespace Orleans.Serialization
             }
 
             int length = reader.ReadInt();
-            if (length == 0)
-            {
-                // the special null case.
-                return null;
-            }
             byte[] data = reader.ReadBytes(length);
 
             object message = parser.ParseFrom(data);
