@@ -4,21 +4,24 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{B21FF7D4-93D7-4C1D-A0AD-229DB1ADC7BB}</ProjectGuid>
+    <ProjectGuid>{B9C8FFEC-4947-4F04-BA73-1F17B329A55E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Orleans.NonSiloTests</RootNamespace>
-    <AssemblyName>Orleans.NonSiloTests</AssemblyName>
+    <RootNamespace>Tester</RootNamespace>
+    <AssemblyName>Tester</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <TargetFrameworkProfile />
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -26,170 +29,75 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ConfigTests.cs">
-      <Link>ConfigTests.cs</Link>
-    </Compile>
-    <Compile Include="SerializerTests\CustomSerializerTests.cs">
-      <Link>SerializerTests\CustomSerializerTests.cs</Link>
-    </Compile>
-    <Compile Include="StorageTests\MockStorageProvider.cs">
-      <Link>StorageTests\MockStorageProvider.cs</Link>
-    </Compile>
-    <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs">
-      <Link>SerializationTests\ConfigurationTests\SerializationProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
-      <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs</Link>
-    </Compile>
-    <Compile Include="SerializationTests\ExternalSerializerTest.cs">
-      <Link>SerializationTests\ExternalSerializerTest.cs</Link>
-    </Compile>
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs">
-      <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs</Link>
-    </Compile>
-    <Compile Include="SerializationTests\SerializationOrderTests.cs">
-      <Link>SerializationTests\SerializationOrderTests.cs</Link>
-    </Compile>
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs">
-      <Link>SchedulerTests\OrleansTaskSchedulerBasicTests.cs</Link>
-    </Compile>
-    <Compile Include="SerializerTests\MessageSerializerTests.cs">
-      <Link>SerializerTests\MessageSerializerTests.cs</Link>
-    </Compile>
-    <Compile Include="TestConstants.cs">
-      <Link>TestConstants.cs</Link>
-    </Compile>
-    <Compile Include="TestInternalHelper.cs">
-      <Link>TestInternalHelper.cs</Link>
-    </Compile>
-    <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs">
-      <Link>SerializationTests\SerializationTests.DifferentTypes.cs</Link>
-    </Compile>
-    <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs">
-      <Link>SerializationTests\SerializationTests.ImmutableCollections.cs</Link>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
+      <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\..\src\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
+      <Name>OrleansCodeGenerator</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>
+      <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
+      <Project>{eace28ae-f301-472a-b633-02b55434871b}</Project>
+      <Name>TestGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj">
+      <Project>{2ae67055-f38a-45f0-aea7-5754f4814ea5}</Project>
+      <Name>TestInternalGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
+      <Project>{4682abc1-1a51-4794-8012-da8e59ebc72e}</Project>
+      <Name>TestInternalGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
+      <Project>{8fd242b4-eda9-42cd-ba39-e410b98add26}</Project>
+      <Name>TestExtensions</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
-  <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="..\..\src\SDK\ClientConfiguration.xml">
-      <Link>ClientConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_NewAzure.xml">
-      <Link>ClientConfig_NewAzure.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AdditionalAssemblies.xml">
-      <Link>Config_AdditionalAssemblies.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include=".Config_Azure_Default.xml">
-      <Link>Config_Azure_Default.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_Different_Membership_Reminders.xml">
-      <Link>Config_Different_Membership_Reminders.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NewAzure.xml">
-      <Link>Config_NewAzure.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NonTimestampedLogFileNames.xml">
-      <Link>Config_NonTimestampedLogFileNames.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_OldAzure.xml">
-      <Link>Config_OldAzure.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure1.xml">
-      <Link>Config_StorageProvider_Azure1.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure2.xml">
-      <Link>Config_StorageProvider_Azure2.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Memory2.xml">
-      <Link>Config_StorageProvider_Memory2.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_SomeConfig.xml">
-      <Link>Config_StorageProvider_SomeConfig.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_TestSiloConfig.xml">
-      <Link>Config_TestSiloConfig.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestClientConfiguration.xml">
-      <Link>DevTestClientConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestServerConfiguration.xml">
-      <Link>DevTestServerConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\test\Tester\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <Link>OrleansConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

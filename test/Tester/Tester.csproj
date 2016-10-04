@@ -104,13 +104,9 @@
     <Compile Include="ReminderTest.cs" />
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests\BondSerializationTests.cs" />
-    <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
-    <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Counter.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\ProtobufSerializationTests.cs" />
-    <Compile Include="SerializationTests\SerializationOrderTests.cs" />
-    <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="SimpleGrainTests.cs" />
@@ -173,30 +169,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -303,7 +275,6 @@
     <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
-    <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

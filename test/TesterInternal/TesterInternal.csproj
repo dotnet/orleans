@@ -112,7 +112,6 @@
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
     <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConcurrencyTests.cs" />
-    <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterControlProgTests.cs" />
     <Compile Include="CounterTests.cs" />
     <Compile Include="DeadlockDetectionTests.cs" />
@@ -156,10 +155,7 @@
     <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
     <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
-    <Compile Include="SerializerTests\CustomSerializerTests.cs" />
-    <Compile Include="SerializerTests\MessageSerializerTests.cs" />
     <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
@@ -168,14 +164,11 @@
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
     <Compile Include="StorageTests\HierarchicalKeyStoreTests.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
-    <Compile Include="StorageTests\MockStorageProvider.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
     <Compile Include="OrleansHostProgTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
     <Compile Include="PolymorphicInterfaceTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
@@ -218,9 +211,7 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
-    <Compile Include="TestConstants.cs" />
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
-    <Compile Include="TestInternalHelper.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
     <Compile Include="TimerOrleansTest.cs" />
@@ -279,6 +270,10 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Orleans.NonSiloTests\Orleans.NonSiloTests.csproj">
+      <Project>{b21ff7d4-93d7-4c1d-a0ad-229db1adc7bb}</Project>
+      <Name>Orleans.NonSiloTests</Name>
+    </ProjectReference>
     <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
       <Name>TestFSharp</Name>
@@ -329,10 +324,6 @@
       <Link>CreateOrleansTables_PostgreSql.sql</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_AdditionalAssemblies.xml">
-      <SubType>Designer</SubType>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -369,9 +360,6 @@
     <Content Include="ClientConfig_AzureWebRole.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ClientConfig_NewAzure.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="ClientConfig_AzureStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -384,46 +372,13 @@
     <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_Azure_Default.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_BootstrapProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_Different_Membership_Reminders.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NewAzure.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NonTimestampedLogFileNames.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_OldAzure.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_StorageErrors.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure1.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Memory2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_SomeConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_AzureStreamProviders.xml">
@@ -432,21 +387,12 @@
     <Content Include="Config_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_TestSiloConfig.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Data\TestDb.mdf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Data\TestDb_log.ldf">
       <DependentUpon>TestDb.mdf</DependentUpon>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
