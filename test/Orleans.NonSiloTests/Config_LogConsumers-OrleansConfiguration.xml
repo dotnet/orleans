@@ -8,7 +8,7 @@
     <Networking Address="localhost" Port="0" />
     <Scheduler MaxActiveThreads="0" />
     <Tracing DefaultTraceLevel="Info" TraceToConsole="true" TraceToFile="" >
-      <LogConsumer>UnitTests.DummyLogConsumer,TesterInternal</LogConsumer>
+      <LogConsumer>UnitTests.DummyLogConsumer,Orleans.NonSiloTests</LogConsumer>
       <!--
       <TraceLevelOverride LogPrefix="Runtime.MembershipOracle" TraceLevel="Verbose" />
       <TraceLevelOverride LogPrefix="Runtime.Dispatcher" TraceLevel="Verbose2" />

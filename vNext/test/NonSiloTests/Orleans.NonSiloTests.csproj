@@ -36,69 +36,48 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\TesterInternal\ConfigTests.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\ConfigTests.cs">
       <Link>ConfigTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\SerializerTests\CustomSerializerTests.cs">
-      <Link>SerializerTests\CustomSerializerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\StorageTests\MockStorageProvider.cs">
-      <Link>StorageTests\MockStorageProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\SerializationProviderTests.cs">
-      <Link>SerializationTests\ConfigurationTests\SerializationProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\ExternalSerializerTest.cs">
-      <Link>SerializationTests\ExternalSerializerTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationOrderTests.cs">
-      <Link>SerializationTests\SerializationOrderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\SchedulerTests\OrleansTaskSchedulerBasicTests.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SchedulerTests\OrleansTaskSchedulerBasicTests.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerBasicTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\SerializerTests\MessageSerializerTests.cs">
-      <Link>SerializerTests\MessageSerializerTests.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\SerializationProviderTests.cs">
+      <Link>SerializationTests\ConfigurationTests\SerializationProviderTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\TestConstants.cs">
-      <Link>TestConstants.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ExternalSerializerTest.cs">
+      <Link>SerializationTests\ExternalSerializerTest.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\TestInternalHelper.cs">
-      <Link>TestInternalHelper.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\SerializationOrderTests.cs">
+      <Link>SerializationTests\SerializationOrderTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTests.DifferentTypes.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\SerializationTests.DifferentTypes.cs">
       <Link>SerializationTests\SerializationTests.DifferentTypes.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTests.ImmutableCollections.cs">
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\SerializationTests.ImmutableCollections.cs">
       <Link>SerializationTests\SerializationTests.ImmutableCollections.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\CodeGeneratorTests.cs">
-      <Link>CodeGeneratorTests.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializerTests\CustomSerializerTests.cs">
+      <Link>SerializerTests\CustomSerializerTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\CounterTests.cs">
-      <Link>CounterTests.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\SerializerTests\MessageSerializerTests.cs">
+      <Link>SerializerTests\MessageSerializerTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\GatewaySelectionTest.cs">
-      <Link>GatewaySelectionTest.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\StorageTests\MockStorageProvider.cs">
+      <Link>StorageTests\MockStorageProvider.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\ManagementAgentTests.cs">
-      <Link>ManagementAgentTests.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\TestConstants.cs">
+      <Link>TestConstants.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\AsyncSerialExecutorTests.cs">
-      <Link>OrleansRuntime\AsyncSerialExecutorTests.cs</Link>
+    <Compile Include="..\..\..\test\Orleans.NonSiloTests\TestInternalHelper.cs">
+      <Link>TestInternalHelper.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\ExceptionsTests.cs">
-      <Link>OrleansRuntime\ExceptionsTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\OrleansRuntime\Streams\SubscriptionMarkerTests.cs">
-      <Link>OrleansRuntime\Streams\SubscriptionMarkerTests.cs</Link>
-      </Compile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
@@ -112,6 +91,10 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Tester\Tester.csproj">
+      <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55a}</Project>
+      <Name>Tester</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
       <Project>{afd242b4-eda9-42cd-ba39-e410b98add2a}</Project>
@@ -137,102 +120,108 @@
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\..\src\SDK\ClientConfiguration.xml">
-      <Link>ClientConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\TesterInternal\ClientConfig_NewAzure.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\ClientConfig_NewAzure.xml">
       <Link>ClientConfig_NewAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_AdditionalAssemblies.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_AdditionalAssemblies.xml">
       <Link>Config_AdditionalAssemblies.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_Azure_Default.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_Azure_Default.xml">
       <Link>Config_Azure_Default.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_Different_Membership_Reminders.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_Different_Membership_Reminders.xml">
       <Link>Config_Different_Membership_Reminders.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_NewAzure.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_LogConsumers-ClientConfiguration.xml">
+      <Link>Config_LogConsumers-ClientConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_LogConsumers-OrleansConfiguration.xml">
+      <Link>Config_LogConsumers-OrleansConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_NewAzure.xml">
       <Link>Config_NewAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_NonTimestampedLogFileNames.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_NonTimestampedLogFileNames.xml">
       <Link>Config_NonTimestampedLogFileNames.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_OldAzure.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_OldAzure.xml">
       <Link>Config_OldAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_StorageProvider_Azure1.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_StorageProvider_Azure1.xml">
       <Link>Config_StorageProvider_Azure1.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_StorageProvider_Azure2.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_StorageProvider_Azure2.xml">
       <Link>Config_StorageProvider_Azure2.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_StorageProvider_Memory2.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_StorageProvider_Memory2.xml">
       <Link>Config_StorageProvider_Memory2.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_StorageProvider_SomeConfig.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_StorageProvider_SomeConfig.xml">
       <Link>Config_StorageProvider_SomeConfig.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\Config_TestSiloConfig.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\Config_TestSiloConfig.xml">
       <Link>Config_TestSiloConfig.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\DevTestClientConfiguration.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\DevTestClientConfiguration.xml">
       <Link>DevTestClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\TesterInternal\DevTestServerConfiguration.xml">
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\DevTestServerConfiguration.xml">
       <Link>DevTestServerConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\Orleans.NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
+      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\..\test\Tester\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
       <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\Tester\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
-      <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
+    <Content Include="..\..\..\src\SDK\ClientConfiguration.xml">
+      <Link>ClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
