@@ -1228,45 +1228,22 @@ namespace Orleans.Serialization
 
         private static void WriteEnum(object obj, BinaryTokenStreamWriter stream, Type type)
         {
-            var underlyingType = Enum.GetUnderlyingType(type);
-            var size = Marshal.SizeOf(underlyingType);
-            switch (size)
-            {
-                case 1:
-                    stream.Write(Convert.ToByte(obj));
-                    break;
-                case 2:
-                    stream.Write(Convert.ToInt16(obj));
-                    break;
-                case 4:
-                    stream.Write(Convert.ToInt32(obj));
-                    break;
-                case 8:
-                    stream.Write(Convert.ToInt64(obj));
-                    break;
-                default:
-                    throw new NotSupportedException($"Serialization of type {type.GetParseableName()} is not supported.");
-            }
+            var t = Enum.GetUnderlyingType(type).TypeHandle;
+            if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) stream.Write(Convert.ToByte(obj));
+            else if (t.Equals(shortTypeHandle) || t.Equals(ushortTypeHandle)) stream.Write(Convert.ToInt16(obj));
+            else if (t.Equals(intTypeHandle) || t.Equals(uintTypeHandle)) stream.Write(Convert.ToInt32(obj));
+            else if (t.Equals(longTypeHandle) || t.Equals(ulongTypeHandle)) stream.Write(Convert.ToInt64(obj));
+            else throw new NotSupportedException($"Serialization of type {type.GetParseableName()} is not supported.");
         }
 
         private static object ReadEnum(BinaryTokenStreamReader stream, Type type)
         {
-            var underlyingType = Enum.GetUnderlyingType(type);
-            var size = Marshal.SizeOf(underlyingType);
-            switch (size)
-            {
-                case 1:
-                    return Enum.ToObject(type, stream.ReadByte());
-                case 2:
-                    return Enum.ToObject(type, stream.ReadShort());
-                case 4:
-                    return Enum.ToObject(type, stream.ReadInt());
-                case 8:
-                    return Enum.ToObject(type, stream.ReadLong());
-                default:
-                    throw new NotSupportedException(
-                        $"Deserialization of type {type.GetParseableName()} is not supported.");
-            }
+            var t = Enum.GetUnderlyingType(type).TypeHandle;
+            if (t.Equals(byteTypeHandle) || t.Equals(sbyteTypeHandle)) return Enum.ToObject(type, stream.ReadByte());
+            if (t.Equals(shortTypeHandle) || t.Equals(ushortTypeHandle)) return Enum.ToObject(type, stream.ReadShort());
+            if (t.Equals(intTypeHandle) || t.Equals(uintTypeHandle)) return Enum.ToObject(type, stream.ReadInt());
+            if (t.Equals(longTypeHandle) || t.Equals(ulongTypeHandle)) return Enum.ToObject(type, stream.ReadLong());
+            throw new NotSupportedException($"Deserialization of type {type.GetParseableName()} is not supported.");
         }
 
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
