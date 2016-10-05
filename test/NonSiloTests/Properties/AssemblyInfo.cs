@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -18,3 +19,4 @@ using System.Runtime.InteropServices;
 [assembly: Guid("A9F44309-65C6-4D22-BD45-CD6E2184544B")]
 
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: SkipCodeGeneration]

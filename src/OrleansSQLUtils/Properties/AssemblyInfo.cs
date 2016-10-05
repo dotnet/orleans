@@ -21,4 +21,5 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 

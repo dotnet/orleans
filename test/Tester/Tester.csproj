@@ -75,7 +75,6 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="DeactivationTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
-    <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="DuplicateActivationsTests.cs" />
     <Compile Include="ExceptionPropagationTests.cs" />
     <Compile Include="ExternalTypesTests.cs" />
@@ -105,7 +104,6 @@
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="RequestContextTest.cs" />
-    <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Counter.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\ProtobufSerializationTests.cs" />
@@ -144,33 +142,6 @@
   <ItemGroup>
     <Content Include="..\..\src\Build\Version.txt">
       <Link>Version.txt</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\Deployment.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

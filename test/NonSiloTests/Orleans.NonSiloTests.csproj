@@ -48,7 +48,29 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AssemblyLoaderTests.cs" />
+    <Compile Include="AsynchAgentRestartTest.cs" />
+    <Compile Include="AsyncPipelineTests.cs" />
+    <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
+    <Compile Include="Async_TimingTests.cs" />
+    <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConfigTests.cs" />
+    <Compile Include="CounterTests.cs" />
+    <Compile Include="DeploymentTests\DeployTest.cs" />
+    <Compile Include="ErrorInjectionStorageProvider.cs" />
+    <Compile Include="GatewaySelectionTest.cs" />
+    <Compile Include="General\CounterStatisticTests.cs" />
+    <Compile Include="General\Identifiertests.cs" />
+    <Compile Include="General\InterfaceRules.cs" />
+    <Compile Include="General\InternalSerializationTests.cs" />
+    <Compile Include="General\LruTest.cs" />
+    <Compile Include="General\RequestContextTestsNonSiloRequired.cs" />
+    <Compile Include="General\RingTests_Standalone.cs" />
+    <Compile Include="ManagementAgentTests.cs" />
+    <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
+    <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
+    <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -56,13 +78,15 @@
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
-    <Compile Include="SerializationTests\BuiltInSerializerTests.cs" />
+    <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
-    <Compile Include="SerializationTests\IlBasedSerializerTests.cs" />
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
+    <Compile Include="Serialization\BuiltInSerializerTests.cs" />
+    <Compile Include="Serialization\IlBasedSerializerTests.cs" />
+    <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="SerializerTests\CustomSerializerTests.cs" />
     <Compile Include="SerializerTests\MessageSerializerTests.cs" />
     <Compile Include="StorageTests\MockStorageProvider.cs" />
@@ -72,6 +96,10 @@
   <ItemGroup>
     <Content Include="..\..\src\Build\Version.txt">
       <Link>Version.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\src\SDK\OrleansConfiguration.xml">
+      <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ClientConfig_NewAzure.xml">
@@ -119,6 +147,22 @@
     <Content Include="Config_TestSiloConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Data\TestDb.mdf">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\TestDb_log.ldf">
+      <DependentUpon>TestDb.mdf</DependentUpon>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="DeploymentTests\Configuration\Deployment.xml" />
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml" />
     <Content Include="DevTestClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -149,16 +193,16 @@
     <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\Tester\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <Link>OrleansConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="..\..\src\SDK\ClientConfiguration.xml">
       <Link>ClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansBondUtils\OrleansBondUtils.csproj">
+      <Project>{7a6b8051-5d99-483c-b9b7-444ed57918ec}</Project>
+      <Name>OrleansBondUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
       <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
       <Name>OrleansCodeGenerator</Name>
@@ -170,6 +214,10 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
+      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
+      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
@@ -214,7 +262,6 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
