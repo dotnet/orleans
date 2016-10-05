@@ -12,7 +12,7 @@
     </description>
     <projectUrl>https://github.com/dotnet/orleans</projectUrl>
     <tags>Orleans Silo Deployment Cloud-Computing Actor-Model Actors Virtual-Actors Distributed-Systems C# .NET</tags>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <copyright>Copyright (C) 2015 Microsoft Research</copyright>
     <licenseUrl>https://github.com/dotnet/orleans/blob/master/LICENSE</licenseUrl>
