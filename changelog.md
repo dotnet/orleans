@@ -1,6 +1,9 @@
 # Microsoft Orleans Changelog
 All notable end-user facing changes are documented in this file.
 
+### [v1.2.4]
+- Bug fix: Prevent null reference exception after clearing PubSubRendezvousGrain state #2040
+  
 ### [v1.2.3]
 - Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
 - Troubleshooting improvements:
