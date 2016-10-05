@@ -16,7 +16,7 @@ namespace Orleans
             TypeUtils.Method((IAddressable i) => i.AsWeaklyTypedReference());
 
         /// <summary>
-        /// The cached <see cref="MethodInfo"/> for <see cref="Type.IsAssignableFrom"/>.
+        /// The cached <see cref="MethodInfo"/> for checking if one type is assignable from another.
         /// </summary>
         private static readonly MethodInfo IsAssignableFromMethodInfo =
             TypeUtils.Method((Type t) => t.IsAssignableFrom(default(Type)));
