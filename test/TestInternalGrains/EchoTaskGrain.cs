@@ -139,7 +139,7 @@ namespace UnitTests.Grains
             logger.Info("IEchoGrainAsync.PingOtherSilo");
             SiloAddress mySilo = Data.Address.Silo;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
@@ -154,7 +154,7 @@ namespace UnitTests.Grains
             logger.Info("IEchoGrainAsync.PingClusterMemberAsync");
             SiloAddress mySilo = Data.Address.Silo;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();

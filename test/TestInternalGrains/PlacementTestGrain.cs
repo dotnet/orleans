@@ -65,7 +65,7 @@ namespace UnitTests.Grains
         {
             // force the latched statistics to propigate throughout the cluster.
             IManagementGrain mgmtGrain =
-                grainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+                grainFactory.GetGrain<IManagementGrain>(0);
 
             var hosts = await mgmtGrain.GetHosts(true);
             var keys = hosts.Select(kvp => kvp.Key).ToArray();

@@ -232,7 +232,7 @@ namespace UnitTests.StreamingTests
 
         private async Task AddProvidersAndVerify(List<string> streamProviderNames)
         {
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             List<string> names = fixture.HostedCluster.Primary.TestHook.GetStreamProviderNames().ToList();
 
             IDictionary<string, bool> hasNewProvider = new Dictionary<string, bool>();
@@ -270,7 +270,7 @@ namespace UnitTests.StreamingTests
 
         private async Task RemoveProvidersAndVerify(List<string> streamProviderNames)
         {
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             List<string> names = fixture.HostedCluster.Primary.TestHook.GetStreamProviderNames().ToList();
             int Count = names.Count;
             foreach (string name in streamProviderNames)

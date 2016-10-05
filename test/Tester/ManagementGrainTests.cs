@@ -25,7 +25,7 @@ namespace UnitTests.Management
             : base(fixture)
         {
             this.output = output;
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Management")]

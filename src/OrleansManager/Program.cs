@@ -38,7 +38,7 @@ namespace OrleansManager
         {
             GrainClient.Initialize();
 
-            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             Dictionary<string, string> options = args.Skip(1)
                 .Where(s => s.StartsWith("-"))
                 .Select(s => s.Substring(1).Split('='))

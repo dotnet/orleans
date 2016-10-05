@@ -705,7 +705,7 @@ namespace UnitTests.General
             const string PropagateActivityIdConfigKey = @"/OrleansConfiguration/Defaults/Tracing/@PropagateActivityId";
             var changeConfig = new Dictionary<string, string>();
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             IRequestContextTestGrain grain = GrainClient.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
