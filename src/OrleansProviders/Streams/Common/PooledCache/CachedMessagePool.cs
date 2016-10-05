@@ -9,7 +9,6 @@ namespace Orleans.Providers.Streams.Common
     /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed structure.  Struct should contain only value types.</typeparam>
     internal class CachedMessagePool<TQueueMessage, TCachedMessage>
-        where TQueueMessage : class
         where TCachedMessage : struct
     {
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter;
@@ -24,7 +23,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (cacheDataAdapter == null)
             {
-                throw new ArgumentNullException("cacheDataAdapter");
+                throw new ArgumentNullException(nameof(cacheDataAdapter));
             }
             dataAdapter = cacheDataAdapter;
             messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(

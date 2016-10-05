@@ -1,8 +1,9 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Providers.Streams.Memory
+namespace Orleans.Providers
 {
     /// <summary>
     /// Memory stream queue grain. This grain works as a storage queue of event data. Enqueue and Dequeue operations are supported.
@@ -10,15 +11,8 @@ namespace Orleans.Providers.Streams.Memory
     /// </summary>
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
     {
-        /// <summary>
-        /// Type name. Default to the grain name.
-        /// </summary>
-        public const String TypeName = "MemoryStreamQueueGrain";
-
-        /// <summary>
-        /// Event queue. 
-        /// </summary>
-        private Queue<MemoryEventData> eventQueue = new Queue<MemoryEventData>();
+        private readonly Queue<MemoryMessageData> eventQueue = new Queue<MemoryMessageData>();
+        private long sequenceNumber = DateTime.UtcNow.Ticks;
 
         /// <summary>
         /// max event count. 
@@ -26,32 +20,18 @@ namespace Orleans.Providers.Streams.Memory
         private int maxEventCount = 16384;
 
         /// <summary>
-        /// Set the maxEventCount. This member variable sets the limit to the queue size.
-        /// </summary>
-        /// <param name="maxEventCount"></param>
-        /// <returns></returns>
-        public Task SetMaxEventCount(int maxEventCount)
-        {
-            if (maxEventCount <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(maxEventCount), "maxEventCount must be larger than 0");
-            }
-            this.maxEventCount = maxEventCount;
-            return TaskDone.Done;
-        }
-
-        /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
         /// </summary>
-        /// <param name="eventData"></param>
+        /// <param name="data"></param>
         /// <returns></returns>
-        public Task Enqueue(MemoryEventData eventData)
+        public Task Enqueue(MemoryMessageData data)
         {
             if (eventQueue.Count >= maxEventCount)
             {
                 throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of {maxEventCount}");
             }
-            eventQueue.Enqueue(eventData);
+            data.SequenceNumber = sequenceNumber++;
+            eventQueue.Enqueue(data);
             return TaskDone.Done;
         }
 
@@ -60,9 +40,9 @@ namespace Orleans.Providers.Streams.Memory
         /// </summary>
         /// <param name="maxCount"></param>
         /// <returns></returns>
-        public Task<List<MemoryEventData>> Dequeue(int maxCount)
+        public Task<List<MemoryMessageData>> Dequeue(int maxCount)
         {
-            List<MemoryEventData> list = new List<MemoryEventData>();
+            List<MemoryMessageData> list = new List<MemoryMessageData>();
 
             for (int i = 0; i < maxCount && eventQueue.Count > 0; ++i)
             {

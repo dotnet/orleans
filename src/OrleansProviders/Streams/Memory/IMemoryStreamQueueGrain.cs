@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+﻿
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Orleans.Providers.Streams.Memory
+namespace Orleans.Providers
 {
     /// <summary>
     /// Interface for In-memory stream queue grain.
@@ -9,18 +10,13 @@ namespace Orleans.Providers.Streams.Memory
     public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
     {
         /// <summary>
-        /// Set max event count. The total number of events enqueued can not exceed maxEventCount.
-        /// </summary>
-        Task SetMaxEventCount(int maxEventCount);
-
-        /// <summary>
         /// Enqueue an event.
         /// </summary>
-        Task Enqueue(MemoryEventData eventData);
+        Task Enqueue(MemoryMessageData data);
 
         /// <summary>
         /// Dequeue up to maxCount events.
         /// </summary>
-        Task<List<MemoryEventData>> Dequeue(int maxCount);
+        Task<List<MemoryMessageData>> Dequeue(int maxCount);
     }
 }
