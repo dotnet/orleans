@@ -82,7 +82,8 @@
     <Compile Include="Streams\Generator\IStreamGenerator.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterReceiver.cs" />
     <Compile Include="Streams\Memory\MemoryBatchContainer.cs" />
-    <Compile Include="Streams\Memory\MemoryEventData.cs" />
+    <Compile Include="Streams\Memory\MemoryMessageBody.cs" />
+    <Compile Include="Streams\Memory\MemoryMessageData.cs" />
     <Compile Include="Streams\Memory\MemoryPooledCache.cs" />
     <Compile Include="Streams\Memory\MemoryStreamProvider.cs" />
     <Compile Include="Streams\Memory\MemoryStreamQueueGrain.cs" />

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace Orleans.Providers.Streams.Memory
+namespace Orleans.Providers
 {
     /// <summary>
     /// This configuration class is used to configure the MemoryStreamProvider.
