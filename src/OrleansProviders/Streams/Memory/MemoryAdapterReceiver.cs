@@ -1,18 +1,19 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Memory
+namespace Orleans.Providers
 {
-    internal class MemoryAdapterReceiver : IQueueAdapterReceiver
+    internal class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
+        where TSerializer : IMemoryMessageBodySerializer, new()
     { 
-        private IMemoryStreamQueueGrain queueGrain;
-        private long sequenceId;
-        private List<Task> awaitingTasks;
-        private Logger logger;
+        private readonly IMemoryStreamQueueGrain queueGrain;
+        private readonly List<Task> awaitingTasks;
+        private readonly Logger logger;
 
         public MemoryAdapterReceiver(IMemoryStreamQueueGrain queueGrain, Logger logger)
         {
@@ -28,15 +29,14 @@ namespace Orleans.Providers.Streams.Memory
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            IEnumerable<MemoryEventData> eventData;
             List<IBatchContainer> batches;
-            Task<List<MemoryEventData>> task = null;
+            Task<List<MemoryMessageData>> task = null;
             try
             {
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
-                eventData = await task;
-                batches = eventData.Select(data => (IBatchContainer) MemoryBatchContainer.FromMemoryEventData<object>(data, ++sequenceId)).ToList();
+                IEnumerable<MemoryMessageData> eventData = await task;
+                batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data)).ToList<IBatchContainer>();
             }
             catch (Exception exc)
             {

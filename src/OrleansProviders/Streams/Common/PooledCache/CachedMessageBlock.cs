@@ -94,11 +94,11 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dequeueTimeUtc"></param>
         /// <param name="dataAdapter"></param>
         /// <returns>Returns the position of the queued message in the stream</returns>
-        public StreamPosition Add<TQueueMessage>(TQueueMessage queueMessage, DateTime dequeueTimeUtc, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class 
+        public StreamPosition Add<TQueueMessage>(TQueueMessage queueMessage, DateTime dequeueTimeUtc, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             if (queueMessage == null)
             {
-                throw new ArgumentNullException("queueMessage");
+                throw new ArgumentNullException(nameof(queueMessage));
             }
             if (!HasCapacity)
             {
@@ -133,11 +133,11 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="index"></param>
         /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetSequenceToken<TQueueMessage>(int index, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class
+        public StreamSequenceToken GetSequenceToken<TQueueMessage>(int index, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             if (index >= writeIndex || index < readIndex)
             {
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
             return dataAdapter.GetSequenceToken(ref cachedMessages[index]);
         }
@@ -148,7 +148,7 @@ namespace Orleans.Providers.Streams.Common
         /// <typeparam name="TQueueMessage"></typeparam>
         /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetNewestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class
+        public StreamSequenceToken GetNewestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             return GetSequenceToken(NewestMessageIndex, dataAdapter);
         }
@@ -159,7 +159,7 @@ namespace Orleans.Providers.Streams.Common
         /// <typeparam name="TQueueMessage"></typeparam>
         /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetOldestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter) where TQueueMessage : class
+        public StreamSequenceToken GetOldestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             return GetSequenceToken(OldestMessageIndex, dataAdapter);
         }
