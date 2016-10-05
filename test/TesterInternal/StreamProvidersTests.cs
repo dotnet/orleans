@@ -13,32 +13,31 @@ using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Orleans.Runtime.TestHooks;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Streaming
 {
     public class StreamProvidersTests_ProviderConfigNotLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public static Guid ServiceId = Guid.NewGuid();
-            private static readonly FileInfo SiloConfig = new FileInfo("Config_DevStorage.xml");
-            public static TestingSiloOptions SiloOptions = new TestingSiloOptions
-            {
-                SiloConfigFile = SiloConfig,
-                AdjustConfig = config =>
-                {
-                    config.Globals.ServiceId = ServiceId;
-                }
-            };
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(SiloOptions);
+                var options = new TestClusterOptions();
+
+                options.ClusterConfiguration.Globals.ServiceId = ServiceId;
+
+                //the config file loaded does not exist
+                //the test are looking for exceptions to be throw when a particular provider doesnt exist
+
+                return new TestCluster(options);
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
-        private TestingSiloOptions SiloOptions;
+        protected TestCluster HostedCluster { get; private set; }
+        //private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
         public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
@@ -47,7 +46,7 @@ namespace UnitTests.Streaming
         {
             this.output = output;
             HostedCluster = fixture.HostedCluster;
-            SiloOptions = Fixture.SiloOptions;
+            //SiloOptions = Fixture.SiloOptions;
             ServiceId = Fixture.ServiceId;
         }
 
@@ -75,7 +74,7 @@ namespace UnitTests.Streaming
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
         public async Task ServiceId_ProviderRuntime()
         {
-            Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
+            Guid thisRunServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
             Guid serviceId = await siloHandle.TestHook.GetServiceId();
@@ -89,7 +88,7 @@ namespace UnitTests.Streaming
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
         public async Task ServiceId_SiloRestart()
         {
-            Guid configServiceId = this.HostedCluster.Globals.ServiceId;
+            Guid configServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
 
             var initialDeploymentId = this.HostedCluster.DeploymentId;
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, ServiceId);
@@ -98,14 +97,24 @@ namespace UnitTests.Streaming
 
             output.WriteLine("About to reset Silos .....");
             output.WriteLine("Stopping Silos ...");
-            this.HostedCluster.StopDefaultSilos();
+            //this.HostedCluster.StopDefaultSilos();
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            {
+                this.HostedCluster.StopSilo(silo);
+            }
             output.WriteLine("Starting Silos ...");
-            this.HostedCluster.RedeployTestingSiloHost(SiloOptions);
+            //this.HostedCluster.RedeployTestingSiloHost(SiloOptions);
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            {
+                this.HostedCluster.RestartSilo(silo);
+            }
+            this.HostedCluster.InitializeClient();
+
             output.WriteLine("..... Silos restarted");
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
 
-            Assert.Equal(ServiceId, this.HostedCluster.Globals.ServiceId);  // "ServiceId same after restart."
+            Assert.Equal(ServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
             Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
@@ -120,16 +129,26 @@ namespace UnitTests.Streaming
 
     public class StreamProvidersTests_ProviderConfigLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigLoaded.Fixture>
     {
-        private readonly IGrainFactory grainFactory;
-
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml")
-                });
+                var options = new TestClusterOptions(initialSilosCount: 4);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
+                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+                options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+                return new TestCluster(options);
             }
         }
 

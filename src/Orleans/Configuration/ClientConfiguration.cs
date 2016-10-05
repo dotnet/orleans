@@ -397,6 +397,31 @@ namespace Orleans.Runtime.Configuration
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
         }
 
+
+        public void RegisterStatisticsProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStatisticsPublisher, IClientMetricsDataPublisher
+        {
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
+                providerTypeInfo.IsGenericType ||
+                !(
+                typeof(IStatisticsPublisher).IsAssignableFrom(providerTypeInfo) &&
+                typeof(IClientMetricsDataPublisher).IsAssignableFrom(providerTypeInfo)
+                ))
+                throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, IClientMetricsDataPublisher interface", "typeof(T)");
+
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+        }
+
+        public void RegisterStatisticsProvider(string providerTypeFullName, string providerName, IDictionary<string, string> properties = null)
+        {
+            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, providerTypeFullName, providerName, properties);
+        }
+
+
+
+
+
         /// <summary>
         /// Retrieves an existing provider configuration
         /// </summary>

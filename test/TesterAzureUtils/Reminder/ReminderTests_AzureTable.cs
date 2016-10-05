@@ -12,6 +12,7 @@ using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using System.Linq;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -20,22 +21,18 @@ namespace UnitTests.TimerTests
 {
     public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
                 Guid serviceId = Guid.NewGuid();
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
-                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
-                    AdjustConfig = config =>
-                    {
-                        config.Globals.ServiceId = serviceId;
-                    },
-                });
+                var options = new TestClusterOptions();
+
+                options.ClusterConfiguration.Globals.ServiceId = serviceId;
+                options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
+                options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+
+                return new TestCluster(options);
             }
         }
 
@@ -205,7 +202,7 @@ namespace UnitTests.TimerTests
             Thread.Sleep(period.Multiply(failAfter));
             // stop the secondary silo
             log.Info("Stopping secondary silo");
-            this.HostedCluster.StopSilo(this.HostedCluster.Secondary);
+            this.HostedCluster.StopSilo(this.HostedCluster.SecondarySilos.First());
 
             await test; // Block until test completes.
         }

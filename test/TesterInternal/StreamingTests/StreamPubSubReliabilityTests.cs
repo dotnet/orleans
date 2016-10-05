@@ -11,29 +11,38 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
 using Xunit;
+using Tester;
 
 namespace UnitTests.StreamingTests
 {
     public class StreamPubSubReliabilityTests : OrleansTestingBase, IClassFixture<StreamPubSubReliabilityTests.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_StorageErrors.xml"),
-                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-                }, new TestingClientOptions
-                {
-                    ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-                });
+                var options = new TestClusterOptions(initialSilosCount: 4);
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+
+                options.ClusterConfiguration.Globals.MaxResendCount = 0;
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
+
+                options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+                options.ClientConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
+
+                options.ClientConfiguration.MaxMessageBatchingSize = 100;
+                options.ClientConfiguration.ClientSenderBuckets = 8192;
+
+                return new TestCluster(options);
             }
         }
 
         private const string PubSubStoreProviderName = "PubSubStore";
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         public IGrainFactory GrainFactory { get; }
 

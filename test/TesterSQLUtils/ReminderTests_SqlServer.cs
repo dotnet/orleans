@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -19,16 +20,16 @@ namespace UnitTests.TimerTests
 #if USE_SQL_SERVER || DEBUG
     public class ReminderTests_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_SqlServer.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString(),
-                    ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer,
-                    LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Seperate testing of Reminders storage from membership storage
-                });
+                var options = new TestClusterOptions();
+
+                options.ClusterConfiguration.Globals.DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString();
+                options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
+
+                return new TestCluster(options);
             }
         }
 
