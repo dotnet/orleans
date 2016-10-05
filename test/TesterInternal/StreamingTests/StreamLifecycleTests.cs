@@ -15,18 +15,8 @@ namespace UnitTests.StreamingTests
 {
     public class StreamLifecycleTests : HostedTestClusterPerTest
     {
-        protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        };
-
-        protected static readonly TestingClientOptions ClientRunOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-        };
+        public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+        public const string SmsStreamProviderName = "SMSProvider";
 
         protected Guid StreamId;
         protected string StreamProviderName;
@@ -34,12 +24,30 @@ namespace UnitTests.StreamingTests
 
         private readonly ITestOutputHelper output;
         private IActivateDeactivateWatcherGrain watcher;
-        
-        public override TestingSiloHost CreateSiloHost()
+
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+
+            return new TestCluster(options);
         }
-        
+
         public StreamLifecycleTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -48,7 +56,7 @@ namespace UnitTests.StreamingTests
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
         }
-        
+
         public override void Dispose()
         {
             watcher.Clear().WaitWithThrow(TimeSpan.FromSeconds(15));
@@ -147,7 +155,7 @@ namespace UnitTests.StreamingTests
 
                 // These Producers test grains always send first message when they register
                 await StreamTestUtils.CheckPubSubCounts(
-                    output, 
+                    output,
                     string.Format("producer #{0} create - {1}", i, when),
                     i, 1,
                     StreamId, StreamProviderName, StreamNamespace);

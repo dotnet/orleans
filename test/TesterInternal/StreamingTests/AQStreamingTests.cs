@@ -5,42 +5,40 @@ using Orleans.TestingHost;
 using Tester;
 using UnitTests.StreamingTests;
 using Xunit;
+using System.Collections.Generic;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.Streaming
 {
     public class AQStreamingTests : HostedTestClusterPerTest
     {
-        internal static readonly FileInfo SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml");
-        internal static readonly FileInfo ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml");
-
-        private static readonly TestingSiloOptions aqSiloOptions = new TestingSiloOptions
-            {
-                SiloConfigFile = SiloConfigFile,
-            };
-        private static readonly TestingClientOptions aqClientOptions = new TestingClientOptions
-            {
-                ClientConfigFile = ClientConfigFile
-            };
-        //private static readonly TestingSiloOptions aqSiloOption_OnlyPrimary = new TestingSiloOptions
-        //    {
-        //        SiloConfigFile = SiloConfigFile,
-        //        StartSecondary = false,
-        //    };
-        //private static readonly TestingSiloOptions aqSiloOption_NoClient = new TestingSiloOptions
-        //    {
-        //        SiloConfigFile = SiloConfigFile,
-        //        StartClient = false
-        //    };
+        public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+        public const string SmsStreamProviderName = "SMSProvider";
 
         private SingleStreamTestRunner runner;
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(aqSiloOptions, aqClientOptions);
-            //return new TestingSiloHost(aqSiloOption_OnlyPrimary, aqClientOptions);
-            //return new TestingSiloHost(aqSiloOption_NoClient);
+            var options = new TestClusterOptions(initialSilosCount: 4);
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear : true);
+            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+
+            return new TestCluster(options);
         }
-        
+
         public AQStreamingTests()
         {
             runner = new SingleStreamTestRunner(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
