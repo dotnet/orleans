@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Messaging;
-using Orleans.Runtime.Messaging.Channels.Networking.Sockets.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -605,11 +604,11 @@ namespace Orleans.Runtime.Messaging
             readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnIOCompleted);
             Interlocked.Increment(ref supCount);
             Log.Info(1244, supCount.ToString());
-           // var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
+           var pool = BufferPool.GlobalPool.GetMultiBuffer(120*1024);
             readEventArgs.UserToken = new ReceiveCallbackContext(sock, this);
-            readEventArgs.SetBuffer(new byte[1024*255],0, 1024 * 255);
+            //readEventArgs.SetBuffer(0, 1024 * 255); //new byte[1024*455],
             //  readEventArgs.SetBuffer(new Byte[1111], 0, 111); //todo 
-            // readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
+            readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
             return readEventArgs;
         }
 
@@ -679,8 +678,8 @@ namespace Orleans.Runtime.Messaging
                            
 
                                 token.ProcessReceived(e);
-                                e.Dispose();
-                                e = GetSocketAsyncEventArgs(s);
+                                //e.Dispose();
+                                //e = GetSocketAsyncEventArgs(s);
                                 if (!s.ReceiveAsync(e))
                                 {
                                     this.ProcessReceive(e);
@@ -864,43 +863,6 @@ namespace Orleans.Runtime.Messaging
             RecordClosedSocket(sock);
             SocketManager.CloseSocket(sock);
         }
-        internal static SocketAsyncEventArgs GetOrCreateSocketAsyncEventArgs()
-        {
-            var obj = Interlocked.Exchange(ref spare, null);
-            if (obj == null)
-            {
-                obj = new SocketAsyncEventArgs();
-                obj.Completed += OnAsyncCompleted; // only for new, otherwise multi-fire
-            }
-            if (obj.UserToken is Signal)
-            {
-                ((Signal)obj.UserToken).Reset();
-            }
-            else
-            {
-                obj.UserToken = new Signal();
-            }
-            return obj;
-        }
-        private static void OnAsyncCompleted(object sender, SocketAsyncEventArgs e)
-        {
-            try
-            {
-                switch (e.LastOperation)
-                {
-                    case SocketAsyncOperation.Send:
-                    case SocketAsyncOperation.Receive:
-                        ReleasePending(e);
-                        break;
-                }
-            }
-            catch { }
-        }
-        private static void ReleasePending(SocketAsyncEventArgs e)
-        {
-            var pending = (Signal)e.UserToken;
-            pending.Set();
-        }
 #if DISABLE
         private class ReceiveCallbackContext
         {
@@ -1042,7 +1004,8 @@ namespace Orleans.Runtime.Messaging
 #endif
                 try
                 {
-                    _buffer = new IncomingMessageBuffer(IMA.Log, bb: e.Buffer);//  readBuf: e.BufferList
+                    if(_buffer == null)
+                    _buffer = new IncomingMessageBuffer(IMA.Log, readBuf: e.BufferList);//  readBuf: e.BufferList //bb: e.Buffer
                     _buffer.UpdateReceivedData(e.BytesTransferred);
 
                     Message msg;

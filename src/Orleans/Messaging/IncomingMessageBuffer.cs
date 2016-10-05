@@ -1,6 +1,8 @@
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net.Sockets;
 
 namespace Orleans.Runtime
 {
@@ -10,12 +12,13 @@ namespace Orleans.Runtime
         private const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
-        private readonly List<ArraySegment<byte>> readBuffer;
+        private  List<ArraySegment<byte>> readBuffer;//readonly
+        private List<ArraySegment<byte>> tempBuffer;//readonly
         private readonly int maxSustainedBufferSize;
         private int currentBufferSize;
-
+        static ConcurrentQueue<IncomingMessageBuffer>  Tratata = new ConcurrentQueue<IncomingMessageBuffer>();
         private readonly byte[] lengthBuffer;
-
+        private MessagePrefixHolder prefixHolder = new MessagePrefixHolder();
         private int headerLength;
         private int bodyLength;
 
@@ -39,11 +42,12 @@ namespace Orleans.Runtime
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
             wtf = readBuf is List<ArraySegment<byte>> || bb != null;
-            readBuffer = bb != null ? new List<ArraySegment<byte>>{new ArraySegment<byte>(bb)}: BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize); // readBuf as List<ArraySegment<byte>> ??
+            readBuffer = readBuf as List<ArraySegment<byte>> ?? BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize); // readBuf as List<ArraySegment<byte>> ?? bb != null ? new List<ArraySegment<byte>>{new ArraySegment<byte>(bb)}:
             receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
+            Tratata.Enqueue(this);
         }
 
         public List<ArraySegment<byte>> BuildReceiveBuffer()
@@ -56,9 +60,13 @@ namespace Orleans.Runtime
             }
             return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset);
         }
-
         public void UpdateReceivedData(int bytesRead)
         {
+            if (wtf)
+            {
+                receiveOffset = 0;
+                decodeOffset = 0;
+            }
                receiveOffset += bytesRead;
         }
 
@@ -74,9 +82,27 @@ namespace Orleans.Runtime
         {
             msg = null;
 
+            bool prefixUsed = false;
             // Is there enough read into the buffer to continue (at least read the lengths?)
             if (receiveOffset - decodeOffset < CalculateKnownMessageSize())
-                return false;
+            {
+                if (!prefixUsed && wtf && prefixHolder.HasPrefix && prefixHolder.Count + receiveOffset - decodeOffset > CalculateKnownMessageSize())
+                {
+                    var t = readBuffer;
+                    readBuffer = new List<ArraySegment<byte>>();
+                    readBuffer.AddRange(prefixHolder.TryGetPrefix());
+                    readBuffer.AddRange(t);
+                    tempBuffer = t;
+                    receiveOffset += prefixHolder.Count;
+                    prefixUsed = true;
+                }
+                else
+                {
+                    if (wtf)
+                        prefixHolder.HandlePrefix(readBuffer, decodeOffset, receiveOffset - decodeOffset);
+                    return false;
+                }
+            }
 
             // parse lengths if needed
             if (headerLength == 0 || bodyLength == 0)
@@ -95,17 +121,46 @@ namespace Orleans.Runtime
                 // read lengths
                 headerLength = BitConverter.ToInt32(lengthBuffer, 0);
                 bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
-            }
+             }
 
             // If message is too big for current buffer size, grow
-            while (decodeOffset + CalculateKnownMessageSize() > currentBufferSize)
+            while (!wtf && decodeOffset + CalculateKnownMessageSize() > currentBufferSize)
             {
                 GrowBuffer();
             }
 
-            // Is there enough read into the buffer to read full message
+            if (!prefixUsed && wtf && prefixHolder.HasPrefix)
+            {
+                var t = readBuffer;
+                readBuffer = new List<ArraySegment<byte>>();
+                readBuffer.AddRange(prefixHolder.TryGetPrefix());
+                readBuffer.AddRange(t);
+                tempBuffer = t;
+                receiveOffset += prefixHolder.Count;
+                prefixUsed = true;
+            }
+
+                // Is there enough read into the buffer to read full message
+           
             if (receiveOffset - decodeOffset < CalculateKnownMessageSize())
-                return false;
+            {
+                if (!prefixUsed && wtf && prefixHolder.HasPrefix && prefixHolder.Count + receiveOffset - decodeOffset > CalculateKnownMessageSize())
+                {
+                    var t = readBuffer;
+                    readBuffer = new List<ArraySegment<byte>>();
+                    readBuffer.AddRange(prefixHolder.TryGetPrefix());
+                    readBuffer.AddRange(t);
+                    tempBuffer = t;
+                    receiveOffset += prefixHolder.Count;
+                    prefixUsed = true;
+                }
+                else
+                {
+                    if (wtf)
+                        prefixHolder.HandlePrefix(readBuffer, decodeOffset, receiveOffset - decodeOffset);
+                    return false;
+                }
+            }
 
             // decode header
             int headerOffset = decodeOffset + Message.LENGTH_HEADER_SIZE;
@@ -123,6 +178,7 @@ namespace Orleans.Runtime
 
             // build message
             msg = new Message(header, body, !supportForwarding);
+            
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
             if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
@@ -136,7 +192,14 @@ namespace Orleans.Runtime
             decodeOffset = bodyOffset + bodyLength;
             headerLength = 0;
             bodyLength = 0;
+            if (prefixUsed)
+            {
+                receiveOffset -= prefixHolder.Count; decodeOffset -= prefixHolder.Count;
+                readBuffer = tempBuffer;
+                tempBuffer = null;
 
+                prefixHolder.Reset();
+            }
             AdjustBuffer();
 
             return true;
@@ -154,6 +217,7 @@ namespace Orleans.Runtime
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             List < ArraySegment < byte >> segms = new List<ArraySegment<byte>>();
+            if (wtf) return;
             while (readBuffer.Count != 0)
             {
                 ArraySegment<byte> seg = readBuffer[0];
@@ -162,8 +226,10 @@ namespace Orleans.Runtime
                     consumedBytes += seg.Count;
                      segms.Add(seg);
                     readBuffer.Remove(seg);
-                    if(!wtf)
-                  BufferPool.GlobalPool.Release(seg.Array);
+                    if (!wtf)
+                    { 
+                        BufferPool.GlobalPool.Release(seg.Array);
+                    }
                 }
                 else
                 {
@@ -187,6 +253,10 @@ namespace Orleans.Runtime
                 if (backfillBytes > 0)
                 {
                     if (!wtf) readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
+                    else
+                    {
+                       readBuffer.AddRange(segms);
+                    }
                     //readBuffer.AddRange(segms); // segms BufferPool.GlobalPool.GetMultiBuffer(backfillBytes)
                 }
             }
@@ -217,6 +287,79 @@ namespace Orleans.Runtime
             int growBlockSize = Math.Min(currentBufferSize, GROW_MAX_BLOCK_SIZE);
             readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
             currentBufferSize += growBlockSize;
+        }
+
+        class MessagePrefixHolder
+        {
+            private List<ArraySegment<byte>> buf;
+            public bool HasPrefix { get; set; }
+            public int Count { get; set; }
+
+            public void HandlePrefix(List<ArraySegment<byte>> buffer, int offset, int remainingBytesToProcess)
+            {
+                if (remainingBytesToProcess == 0)
+                    return;
+                HasPrefix = true;
+                Count += remainingBytesToProcess;
+                var length = remainingBytesToProcess;
+                buf = buf ?? new List<ArraySegment<byte>>();//BufferPool.GlobalPool.GetMultiBuffer(remainingBytesToProcess);
+                var lengthSoFar = 0;
+                var countSoFar = 0;
+                foreach (var segment in buffer)
+                {
+                    var bytesStillToSkip = offset - lengthSoFar;
+                    lengthSoFar += segment.Count;
+
+                    if (segment.Count <= bytesStillToSkip) // Still skipping past this buffer
+                    {
+                        continue;
+                    }
+                    if (bytesStillToSkip > 0) // This is the first buffer
+                    { //todo : offset
+                        var count = Math.Min(length - countSoFar, segment.Count - bytesStillToSkip);
+                        var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+                        Buffer.BlockCopy(segment.Array, bytesStillToSkip, seg.Array, 0, count);
+                        buf.Add(seg);
+                      // buf.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, Math.Min(length - countSoFar, segment.Count - bytesStillToSkip)));
+                        countSoFar += count;
+                    }
+                    else
+                    {
+                        var count = Math.Min(length - countSoFar, segment.Count);
+                        var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+
+                        Buffer.BlockCopy(segment.Array, 0, seg.Array, 0, count);
+                        buf.Add(seg);
+                        // buf.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, Math.Min(length - countSoFar, segment.Count - bytesStillToSkip)));
+                        countSoFar += count;
+                    }
+
+                    if (countSoFar == length)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            public List<ArraySegment<byte>> TryGetPrefix()
+            {
+                var success = false;
+                if (HasPrefix)
+                {
+                    success = true;
+                    return buf;
+                }
+
+                return null;
+            }
+
+            public void Reset()
+            {
+                Count = 0;
+                HasPrefix = false;
+                BufferPool.GlobalPool.Release(buf);
+                buf = null;
+            }
         }
     }
 }
