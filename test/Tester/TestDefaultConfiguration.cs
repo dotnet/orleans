@@ -33,6 +33,7 @@ namespace Tester
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },
+                { nameof(TestClusterOptions.FallbackOptions.TraceToConsole), "false" },
             });
             builder.AddEnvironmentVariables("Orleans");
 

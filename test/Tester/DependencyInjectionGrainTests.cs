@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -21,7 +20,7 @@ namespace UnitTests.General
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.StartupTypeName = typeof(TestStartup).AssemblyQualifiedName);
+                options.ClusterConfiguration.UseStartupType<TestStartup>();
                 return new TestCluster(options);
             }
         }
