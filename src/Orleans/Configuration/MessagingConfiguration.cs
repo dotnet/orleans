@@ -345,7 +345,7 @@ namespace Orleans.Runtime.Configuration
 
                     var type = ConfigUtilities.ParseFullyQualifiedType(
                         typeName,
-                        "The type specification for the 'type' attribute of the Provider element could not be loaded");
+                        "The type specification for the 'type' attribute of the FallbackSerializationProvider element could not be loaded");
                     this.FallbackSerializationProvider = type.GetTypeInfo();
                 }
             }
