@@ -7,6 +7,7 @@ The idea is to track end-user facing changes as they occur.*
 - Invoker codegen: methods returning Task<object> do not need Box() calls #2221
 - CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
 - Several major performance improvements
+
 ### [v1.3.0-beta2]
 - Support for geo-distributed multi-cluster deployments #1108 #1109 #1800
 - Providers
@@ -40,7 +41,6 @@ The idea is to track end-user facing changes as they occur.*
   - Fix synchronization bug in Orleans/Async/BatchWorker #2133
   - Fix #2119 by allowing full uninitialization in SiloHost #2127
   - Persistent Stream Provider initialization timeout fix. #2065
-  - Fix null reference in StreamPubSub grain. #2040
   - Some EventHub stream provider bug fixes #1760 #1935 #1921 #1922
   - Allow comments in configuration XML #1994
   - Fixed null MethodInfo in Interceptors #1938
@@ -74,6 +74,10 @@ The idea is to track end-user facing changes as they occur.*
   - Can get a list of active grains in Orleans for monitoring #1772 
   - Rename InstanceName to SiloName. #1740
   - Reworked documentation to use DocFX #1970
+
+### [v1.2.4]
+- Bug fix: Prevent null reference exception after clearing PubSubRendezvousGrain state #2040
+  
 ### [v1.2.3]
 - Ability to force creation of Orleans serializers for types not marked with [Serializable] by using GenerateSerializer, KnownType or KnownAssembly.TreatTypesAsSerializable #1888 #1864 #1855
 - Troubleshooting improvements:
