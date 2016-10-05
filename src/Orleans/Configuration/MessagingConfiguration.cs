@@ -321,7 +321,12 @@ namespace Orleans.Runtime.Configuration
                         .Select(e => e.Attributes["type"])
                         .Where(a => a != null)
                         .Select(a => a.Value);
-                    var types = typeNames.Select(t => ConfigUtilities.ParseFullyQualifiedType(t, "The type specification for the 'type' attribute of the Provider element could not be loaded"));
+                    var types =
+                        typeNames.Select(
+                            t =>
+                            ConfigUtilities.ParseFullyQualifiedType(
+                                t,
+                                $"The type specification for the 'type' attribute of the Provider element could not be loaded. Type specification: '{t}'."));
                     foreach (var type in types)
                     {
                         var typeinfo = type.GetTypeInfo();
@@ -345,7 +350,7 @@ namespace Orleans.Runtime.Configuration
 
                     var type = ConfigUtilities.ParseFullyQualifiedType(
                         typeName,
-                        "The type specification for the 'type' attribute of the Provider element could not be loaded");
+                        $"The type specification for the 'type' attribute of the FallbackSerializationProvider element could not be loaded. Type specification: '{typeName}'.");
                     this.FallbackSerializationProvider = type.GetTypeInfo();
                 }
             }
