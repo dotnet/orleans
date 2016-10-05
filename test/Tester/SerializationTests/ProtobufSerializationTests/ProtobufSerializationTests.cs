@@ -16,7 +16,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
-        public void ProtobuffSerializationTest_1_DirectProto()
+        public void ProtobufSerializationTest_1_DirectProto()
         {
             AddressBook book = CreateAddressBook();
             byte[] bytes;
@@ -34,7 +34,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
-        public void ProtobuffSerializationTest_2_RegularOrleansSerializationStillWorks()
+        public void ProtobufSerializationTest_2_RegularOrleansSerializationStillWorks()
         {
             var input = new OrleansType();
             var output = SerializationManager.RoundTripSerializationForTesting(input);
@@ -43,7 +43,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
-        public void ProtobuffSerializationTest_3_ProtoSerialization()
+        public void ProtobufSerializationTest_3_ProtoSerialization()
         {
             var input = CreateAddressBook();
             var output = SerializationManager.RoundTripSerializationForTesting(input);
@@ -52,7 +52,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
-        public void ProtobuffSerializationTest_4_ProtoSerialization()
+        public void ProtobufSerializationTest_4_ProtoSerialization()
         {
             var input = CreateCounter();
             var output = SerializationManager.RoundTripSerializationForTesting(input);
@@ -61,7 +61,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
-        public void ProtobuffSerializationTest_5_DeepCopy()
+        public void ProtobufSerializationTest_5_DeepCopy()
         {
             var input = CreateAddressBook();
             var output = SerializationManager.DeepCopy(input);
@@ -69,7 +69,16 @@ namespace UnitTests.Serialization
             Assert.Equal(input, output); //The serialization didn't preserve the proper value
         }
 
-        private Counter CreateCounter()
+		[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]
+		public void ProtobufSerializationTest_6_DefaultMessageSerialization()
+		{
+			var input = CreateDefaultCounter();
+			var output = SerializationManager.RoundTripSerializationForTesting(input);
+			Assert.NotSame(input, output); //The serializer returned an instance of the same object
+			Assert.Equal(input, output); //The serialization didn't preserve the proper value
+		}
+
+		private Counter CreateCounter()
         {
             Counter counter = new Counter();
             counter.Id = 1;
@@ -77,7 +86,15 @@ namespace UnitTests.Serialization
             return counter;
         }
 
-        private AddressBook CreateAddressBook()
+		private Counter CreateDefaultCounter()
+		{
+			Counter counter = new Counter();
+			counter.Id = 0;
+			counter.Name = "";
+			return counter;
+		}
+
+		private AddressBook CreateAddressBook()
         {
             Person person = new Person
             {
