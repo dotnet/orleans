@@ -38,6 +38,8 @@
     href: Getting-Started-With-Orleans/Debugging.md
 - name: Advanced Concepts
   items:
+  - name: Stateless Worker Grains
+    href: Advanced-Concepts/StatelessWorker.md
   - name: Interceptors
     href: Advanced-Concepts/Interceptors.md
   - name: Reentrant Grains
