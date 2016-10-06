@@ -207,7 +207,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansBenchmarks", "..\tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestServiceFabric", "..\test\TestServiceFabric\TestServiceFabric.csproj", "{B93B3853-FD54-4615-891A-9AFA3D9D32A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.NonSiloTests", "..\test\Orleans.NonSiloTests\Orleans.NonSiloTests.csproj", "{B9C8FFEC-4947-4F04-BA73-1F17B329A55E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{B9C8FFEC-4947-4F04-BA73-1F17B329A55E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
