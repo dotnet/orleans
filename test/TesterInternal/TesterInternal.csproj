@@ -270,7 +270,7 @@
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Orleans.NonSiloTests\Orleans.NonSiloTests.csproj">
+    <ProjectReference Include="..\NonSiloTests\Orleans.NonSiloTests.csproj">
       <Project>{b9c8ffec-4947-4f04-ba73-1f17b329a55e}</Project>
       <Name>Orleans.NonSiloTests</Name>
     </ProjectReference>
