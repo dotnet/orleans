@@ -1,13 +1,13 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Providers;
 using Orleans.Providers.Streams.Generator;
-using Orleans.Providers.Streams.Memory;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using TestGrains;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
@@ -19,20 +19,20 @@ namespace Tester.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = nameof(MemoryStreamProvider);
-            public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
+            public const string StreamNamespace = "StreamNamespace";
 
-            public readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
+            public static readonly SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
             {
                 StreamNamespace = StreamNamespace,
                 EventsInStream = 100
             };
 
-            public readonly static MemoryAdapterConfig AdapterConfig = new MemoryAdapterConfig(StreamProviderName);
+            public static readonly MemoryAdapterConfig AdapterConfig = new MemoryAdapterConfig(StreamProviderName);
 
             protected override TestCluster CreateTestCluster()
             {
                 GrainClient.Uninitialize();
-                var options = new TestClusterOptions(1);
+                var options = new TestClusterOptions(2);
                 AdjustConfig(options.ClusterConfiguration);
                 AdjustConfig(options.ClientConfiguration);
                 return new TestCluster(options);
@@ -42,13 +42,13 @@ namespace Tester.StreamingTests
             {
                 // register stream provider
                 config.AddMemoryStorageProvider("PubSubStore");
-                config.Globals.RegisterStreamProvider<MemoryStreamProvider>(Fixture.StreamProviderName, BuildProviderSettings());
+                config.Globals.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, BuildProviderSettings());
                 config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
             }
 
             private static void AdjustConfig(ClientConfiguration config)
             {
-                config.RegisterStreamProvider<MemoryStreamProvider>(Fixture.StreamProviderName, BuildProviderSettings());
+                config.RegisterStreamProvider<MemoryStreamProvider>(StreamProviderName, BuildProviderSettings());
             }
 
             private static Dictionary<string, string> BuildProviderSettings()
