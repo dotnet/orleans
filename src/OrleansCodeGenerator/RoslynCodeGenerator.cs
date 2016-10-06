@@ -565,6 +565,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        [Serializable]
         private class CachedAssembly : GeneratedAssembly
         {
             public CachedAssembly()
