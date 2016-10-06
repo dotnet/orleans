@@ -242,10 +242,6 @@
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
       <Name>OrleansHost</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansManager\OrleansManager.csproj">
-      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
-      <Name>OrleansManager</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
       <Name>OrleansProviders</Name>

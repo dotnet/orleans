@@ -1003,7 +1003,7 @@ namespace UnitTests.Streaming.Reliability
 #else
             string grainType = typeof(StreamReliabilityTestGrain).FullName;
 #endif
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             SimpleGrainStatistic[] grainStats = await mgmtGrain.GetSimpleGrainStatistics();
             output.WriteLine("Found grains " + Utils.EnumerableToString(grainStats));

@@ -60,7 +60,7 @@ namespace Tests.GeoClusterTests
         {
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer) : base(name, gatewayport, clusterId, customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             }
 
             public int CallGrain(int i)

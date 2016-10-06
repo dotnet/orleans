@@ -57,7 +57,7 @@ namespace UnitTests.StreamingTests
         {
             this.output = output;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
         }
         
         [Fact, TestCategory("Streaming"), TestCategory("Limits")]

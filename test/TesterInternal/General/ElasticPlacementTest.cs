@@ -299,7 +299,7 @@ namespace UnitTests.General
         {
             string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
 
             return this.HostedCluster.GetActiveSilos()
