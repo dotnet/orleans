@@ -55,14 +55,8 @@
     <Compile Include="..\..\..\src\OrleansTestingHost\Extensions\TestConfigurationExtensions.cs">
       <Link>Extensions\TestConfigurationExtensions.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\OrleansTestingHost\OrleansTestSecrets.cs">
-      <Link>OrleansTestSecrets.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\src\OrleansTestingHost\SiloHandle.cs">
       <Link>SiloHandle.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\src\OrleansTestingHost\StorageTestConstants.cs">
-      <Link>StorageTestConstants.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\OrleansTestingHost\TestCluster.cs">
       <Link>TestCluster.cs</Link>
