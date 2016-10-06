@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{B9C8FFEC-4947-4F04-BA73-1F17B329A55E}</ProjectGuid>
+    <ProjectGuid>{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.NonSiloTests</RootNamespace>
