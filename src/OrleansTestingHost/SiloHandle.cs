@@ -52,14 +52,11 @@ namespace Orleans.TestingHost
         {
             if (!this.IsActive) return;
 
+            // Do not attempt to perform expensive blocking operations in the finalizer thread.
+            // Concrete SiloHandle implementations can do have their own cleanup functionality
             if (disposing)
             {
                 StopSilo(true);
-            }
-            else
-            {
-                // Do not attempt to perform expensive blocking operations in the finalizer thread
-                Task.Run(() => StopSilo(false)).Ignore();
             }
         }
 
