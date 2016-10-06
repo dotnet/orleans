@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -49,7 +50,14 @@ namespace Orleans.TestingHost
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         protected virtual void Dispose(bool disposing)
         {
-            this.StopSilo(disposing);
+            if (!this.IsActive) return;
+
+            // Do not attempt to perform expensive blocking operations in the finalizer thread.
+            // Concrete SiloHandle implementations can do have their own cleanup functionality
+            if (disposing)
+            {
+                StopSilo(true);
+            }
         }
 
         /// <inheritdoc />
