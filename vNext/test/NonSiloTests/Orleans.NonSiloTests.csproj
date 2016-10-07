@@ -42,6 +42,12 @@
     <Compile Include="..\..\..\test\NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\SerializationTests\IlBasedSerializerTests.cs">
+      <Link>SerializationTests\IlBasedSerializerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\SerializationTests\BuiltInSerializerTests.cs">
+      <Link>SerializationTests\BuiltInSerializerTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs</Link>
     </Compile>
