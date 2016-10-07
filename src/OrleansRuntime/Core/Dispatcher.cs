@@ -169,8 +169,14 @@ namespace Orleans.Runtime
                     }
                     else
                     {
-                        logger.Warn(ErrorCode.Dispatcher_NoTargetActivation,
-                            "No target activation {0} for response message: {1}", nonExistentActivation, message);
+                        logger.Warn(
+                            ErrorCode.Dispatcher_NoTargetActivation,
+                            nonExistentActivation.Silo.IsClient
+                                ? "No target client {0} for response message: {1}. It's likely that the client recently disconnected."
+                                : "No target activation {0} for response message: {1}",
+                            nonExistentActivation,
+                            message);
+
                         Silo.CurrentSilo.LocalGrainDirectory.InvalidateCacheEntry(nonExistentActivation);
                     }
                 }
