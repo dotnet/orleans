@@ -315,7 +315,7 @@ namespace Orleans.Runtime
                         continue;
                     }
                     if (bytesStillToSkip > 0) // This is the first buffer
-                    { //todo : offset
+                    { 
                         var count = Math.Min(length - countSoFar, segment.Count - bytesStillToSkip);
                         var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
                         Buffer.BlockCopy(segment.Array, bytesStillToSkip, seg.Array, 0, count);
