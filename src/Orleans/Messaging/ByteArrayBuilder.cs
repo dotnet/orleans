@@ -459,6 +459,31 @@ namespace Orleans.Runtime
         public static List<ArraySegment<byte>> BuildSegmentListWithLengthLimit(List<ArraySegment<byte>> buffer, int offset, int length)
         {
             var result = new List<ArraySegment<byte>>();
+            int ignore;
+            BuildSegmentListWithLengthLimit(result, buffer, offset, length, out ignore);
+            return result;
+        }
+
+        public static void BuildSegmentListWithLengthLimit(List<ArraySegment<byte>> target, List<ArraySegment<byte>> buffer,
+            int offset, int length, out int bytesBuilt)
+        {
+            bytesBuilt = 0;
+            if (target == null)
+            {
+                throw new ArgumentNullException(nameof(target));
+            }
+
+            if (buffer == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
+            if (length == 0)
+            {
+                return;
+            }
+
+            var result = target;
             var lengthSoFar = 0;
             var countSoFar = 0;
             foreach (var segment in buffer)
@@ -486,7 +511,8 @@ namespace Orleans.Runtime
                     break;
                 }
             }
-            return result;
+
+            bytesBuilt = countSoFar;
         }
     }
 }
