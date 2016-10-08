@@ -8,8 +8,8 @@ namespace Orleans.Runtime
 {
     internal class IncomingMessageBuffer
     {
+        internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
         private const int Kb = 1024;
-        private const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
         private  List<ArraySegment<byte>> readBuffer;//readonly

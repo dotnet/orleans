@@ -503,6 +503,7 @@ namespace Orleans.Runtime.Messaging
                         else
                         {
                             ima.SafeCloseSocket(sock);
+                            FreeSocketAsyncEventArgs(e);
                         }
 
                     }
@@ -540,9 +541,9 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 // Set up the async receive
-                while (!sock.ReceiveAsync(readEventArgs))
+                if (!sock.ReceiveAsync(readEventArgs))
                 {
-                    ProcessReceive(readEventArgs, true);
+                    ProcessReceive(readEventArgs);
                 }
             }
             catch (Exception exception)
@@ -552,20 +553,26 @@ namespace Orleans.Runtime.Messaging
                     $"Exception on new socket during ReceiveAsync with RemoteEndPoint " +
                     $"{socketException?.SocketErrorCode.ToString() ?? ""}: {sock.RemoteEndPoint}", exception);
                 ima.SafeCloseSocket(sock);
+                FreeSocketAsyncEventArgs(readEventArgs);
             }
         }
 
         private SocketAsyncEventArgs GetSocketAsyncEventArgs(Socket sock)
         {
-            SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs(); // todo: pool
+            SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs();
             readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnReceiveCompleted);
            
-           var pool = BufferPool.GlobalPool.GetMultiBuffer(128*1024);
-            readEventArgs.BufferList = pool; //BufferPool.GlobalPool.GetMultiBuffer(128 * 1024);
+           var pool = BufferPool.GlobalPool.GetMultiBuffer(IncomingMessageBuffer.DEFAULT_RECEIVE_BUFFER_SIZE);
+            readEventArgs.BufferList = pool;
             readEventArgs.UserToken = new ReceiveCallbackContext(sock, this, pool);
-            //readEventArgs.SetBuffer(0, 1024 * 255); //new byte[1024*455],
-            //  readEventArgs.SetBuffer(new Byte[1111], 0, 111); //todo 
             return readEventArgs;
+        }
+
+        private void FreeSocketAsyncEventArgs(SocketAsyncEventArgs args)
+        {
+            var buf = args.BufferList;
+            args.BufferList = null;
+            BufferPool.GlobalPool.Release((List<ArraySegment<byte>>)buf);
         }
 
         private void OnReceiveCompleted(object sender, SocketAsyncEventArgs e)
@@ -576,15 +583,15 @@ namespace Orleans.Runtime.Messaging
             }
 
             if (Log.IsVerbose3) Log.Verbose("Socket receive completed from remote " + e.RemoteEndPoint);
-            ProcessReceive(e, false);
+            ProcessReceive(e);
         }
+
         /// <summary>
         /// This method is invoked when an asynchronous receive operation completes. 
-        /// If the remote host closed the connection, then the socket is closed.  
-        /// If data was received then the data is echoed back to the client.
+        /// If the remote host closed the connection, then the socket is closed. 
         /// </summary>
         /// <param name="e">SocketAsyncEventArg associated with the completed receive operation.</param>
-        private bool ProcessReceive(SocketAsyncEventArgs e, bool receiveCompletedSynchronously)
+        private void ProcessReceive(SocketAsyncEventArgs e)
         {
             var rcc = e.UserToken as ReceiveCallbackContext;
 
@@ -593,7 +600,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (e.SocketError == SocketError.Success)
                 {
-                    Socket sock = rcc.Sock;
+                    Socket sock = rcc.Socket;
                     try
                     {
                         rcc.ProcessReceived(e); // todo if(s.Available == 0)
@@ -605,15 +612,11 @@ namespace Orleans.Runtime.Messaging
                                 rcc.RemoteEndPoint), ex);
 
                         // There was a problem with the buffer, presumably data corruption, so give up
-                        rcc.IMA.SafeCloseSocket(rcc.Sock);
+                        rcc.IMA.SafeCloseSocket(rcc.Socket);
+                        FreeSocketAsyncEventArgs(e);
 
                         // And we're done
-                        return false;
-                    }
-
-                    if (receiveCompletedSynchronously)
-                    {
-                        return true;
+                        return;
                     }
 
                     StartReceiveAsync(sock, e, rcc.IMA);
@@ -622,17 +625,16 @@ namespace Orleans.Runtime.Messaging
                 {
                     Log.Warn(ErrorCode.Messaging_IMA_NewBeginReceiveException,
                      $"Socket error on new socket during ReceiveAsync with RemoteEndPoint: {e.SocketError}");
-                    throw new SocketException((int)e.SocketError);
+                    rcc.IMA.SafeCloseSocket(rcc.Socket);
+                    FreeSocketAsyncEventArgs(e);
                 }
             }
             else
             {
                 if (Log.IsVerbose) Log.Verbose("Closing recieving socket: " + e.RemoteEndPoint);
-                rcc.IMA.SafeCloseSocket(rcc.Sock);
-                return false;
+                rcc.IMA.SafeCloseSocket(rcc.Socket);
+                FreeSocketAsyncEventArgs(e);
             }
-
-            return true;
         }
 #endif
 
@@ -765,6 +767,7 @@ namespace Orleans.Runtime.Messaging
             SocketManager.CloseSocket(sock);
         }
 
+
 #if DISABLE
         private class ReceiveCallbackContext
         {
@@ -866,13 +869,13 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly IncomingMessageBuffer _buffer;
 
-            public Socket Sock { get; private set; }
+            public Socket Socket { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; private set; }
 
             public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima, List<ArraySegment<byte>> buffer)
             {
-                Sock = sock;
+                Socket = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
                 _buffer = new IncomingMessageBuffer(IMA.Log, readBuf: buffer);
@@ -905,7 +908,7 @@ namespace Orleans.Runtime.Messaging
                     while (_buffer.TryDecodeMessage(out msg))
                     {
                         if (IMA.Log.IsVerbose) IMA.Log.Verbose("_buffer.TryDecodeMessage(out msg))");
-                        IMA.HandleMessage(msg, Sock);
+                        IMA.HandleMessage(msg, Socket);
                     }
                 }
                 catch (Exception exc)
@@ -914,9 +917,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         // Log details of receive state machine
                         IMA.Log.Error(ErrorCode.MessagingProcessReceiveBufferException,
-                            string.Format(
-                            "Exception trying to process {0} bytes from endpoint {1}",
-                                1, RemoteEndPoint),
+                            $"Exception trying to process {e.BytesTransferred} bytes from endpoint {RemoteEndPoint}",
                             exc);
                     }
                     catch (Exception) { }
@@ -936,288 +937,7 @@ namespace Orleans.Runtime.Messaging
 #endif
             }
         }
-        
-        }
-    }
-
-#endif
-
-
-
-
-
-// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
-
-// define TRACE_LEAKS to get additional diagnostics that can lead to the leak sources. note: it will
-// make everything about 2-3x slower
-// 
-// #define TRACE_LEAKS
-
-// define DETECT_LEAKS to detect possible leaks
-// #if DEBUG
-// #define DETECT_LEAKS  //for now always enable DETECT_LEAKS in debug.
-// #endif
-
-#if DETECT_LEAKS
-using System.Runtime.CompilerServices;
-
-#endif
-namespace Roslyn.Utilities
-{
-    /// <summary>
-    /// Generic implementation of object pooling pattern with predefined pool size limit. The main
-    /// purpose is that limited number of frequently used objects can be kept in the pool for
-    /// further recycling.
-    /// 
-    /// Notes: 
-    /// 1) it is not the goal to keep all returned objects. Pool is not meant for storage. If there
-    ///    is no space in the pool, extra returned objects will be dropped.
-    /// 
-    /// 2) it is implied that if object was obtained from a pool, the caller will return it back in
-    ///    a relatively short time. Keeping checked out objects for long durations is ok, but 
-    ///    reduces usefulness of pooling. Just new up your own.
-    /// 
-    /// Not returning objects to the pool in not detrimental to the pool's work, but is a bad practice. 
-    /// Rationale: 
-    ///    If there is no intent for reusing the object, do not use pool - just use "new". 
-    /// </summary>
-    internal class ObjectPool<T> where T : class
-    {
-        [DebuggerDisplay("{Value,nq}")]
-        private struct Element
-        {
-            internal T Value;
-        }
-
-        /// <remarks>
-        /// Not using System.Func{T} because this file is linked into the (debugger) Formatter,
-        /// which does not have that type (since it compiles against .NET 2.0).
-        /// </remarks>
-        internal delegate T Factory();
-
-        // Storage for the pool objects. The first item is stored in a dedicated field because we
-        // expect to be able to satisfy most requests from it.
-        private T _firstItem;
-        private readonly Element[] _items;
-
-        // factory is stored for the lifetime of the pool. We will call this only when pool needs to
-        // expand. compared to "new T()", Func gives more flexibility to implementers and faster
-        // than "new T()".
-        private readonly Factory _factory;
-
-#if DETECT_LEAKS
-        private static readonly ConditionalWeakTable<T, LeakTracker> leakTrackers = new ConditionalWeakTable<T, LeakTracker>();
-
-        private class LeakTracker : IDisposable
-        {
-            private volatile bool disposed;
-
-#if TRACE_LEAKS
-            internal volatile object Trace = null;
-#endif
-
-            public void Dispose()
-            {
-                disposed = true;
-                GC.SuppressFinalize(this);
-            }
-
-            private string GetTrace()
-            {
-#if TRACE_LEAKS
-                return Trace == null ? "" : Trace.ToString();
-#else
-                return "Leak tracing information is disabled. Define TRACE_LEAKS on ObjectPool`1.cs to get more info \n";
-#endif
-            }
-
-            ~LeakTracker()
-            {
-                if (!this.disposed && !Environment.HasShutdownStarted)
-                {
-                    var trace = GetTrace();
-
-                    // If you are seeing this message it means that object has been allocated from the pool 
-                    // and has not been returned back. This is not critical, but turns pool into rather 
-                    // inefficient kind of "new".
-                    Debug.WriteLine($"TRACEOBJECTPOOLLEAKS_BEGIN\nPool detected potential leaking of {typeof(T)}. \n Location of the leak: \n {GetTrace()} TRACEOBJECTPOOLLEAKS_END");
-                }
-            }
-        }
-#endif      
-
-        internal ObjectPool(Factory factory)
-            : this(factory, Environment.ProcessorCount * 2)
-        { }
-
-        internal ObjectPool(Factory factory, int size)
-        {
-            Debug.Assert(size >= 1);
-            _factory = factory;
-            _items = new Element[size - 1];
-        }
-
-        private T CreateInstance()
-        {
-            var inst = _factory();
-            return inst;
-        }
-
-        /// <summary>
-        /// Produces an instance.
-        /// </summary>
-        /// <remarks>
-        /// Search strategy is a simple linear probing which is chosen for it cache-friendliness.
-        /// Note that Free will try to store recycled objects close to the start thus statistically 
-        /// reducing how far we will typically search.
-        /// </remarks>
-        internal T Allocate()
-        {
-            // PERF: Examine the first element. If that fails, AllocateSlow will look at the remaining elements.
-            // Note that the initial read is optimistically not synchronized. That is intentional. 
-            // We will interlock only when we have a candidate. in a worst case we may miss some
-            // recently returned objects. Not a big deal.
-            T inst = _firstItem;
-            if (inst == null || inst != Interlocked.CompareExchange(ref _firstItem, null, inst))
-            {
-                inst = AllocateSlow();
-            }
-
-#if DETECT_LEAKS
-            var tracker = new LeakTracker();
-            leakTrackers.Add(inst, tracker);
-
-#if TRACE_LEAKS
-            var frame = CaptureStackTrace();
-            tracker.Trace = frame;
-#endif
-#endif
-            return inst;
-        }
-
-        private T AllocateSlow()
-        {
-            var items = _items;
-
-            for (int i = 0; i < items.Length; i++)
-            {
-                // Note that the initial read is optimistically not synchronized. That is intentional. 
-                // We will interlock only when we have a candidate. in a worst case we may miss some
-                // recently returned objects. Not a big deal.
-                T inst = items[i].Value;
-                if (inst != null)
-                {
-                    if (inst == Interlocked.CompareExchange(ref items[i].Value, null, inst))
-                    {
-                        return inst;
-                    }
-                }
-            }
-
-            return CreateInstance();
-        }
-
-        /// <summary>
-        /// Returns objects to the pool.
-        /// </summary>
-        /// <remarks>
-        /// Search strategy is a simple linear probing which is chosen for it cache-friendliness.
-        /// Note that Free will try to store recycled objects close to the start thus statistically 
-        /// reducing how far we will typically search in Allocate.
-        /// </remarks>
-        internal void Free(T obj)
-        {
-            Validate(obj);
-            ForgetTrackedObject(obj);
-
-            if (_firstItem == null)
-            {
-                // Intentionally not using interlocked here. 
-                // In a worst case scenario two objects may be stored into same slot.
-                // It is very unlikely to happen and will only mean that one of the objects will get collected.
-                _firstItem = obj;
-            }
-            else
-            {
-                FreeSlow(obj);
-            }
-        }
-
-        private void FreeSlow(T obj)
-        {
-            var items = _items;
-            for (int i = 0; i < items.Length; i++)
-            {
-                if (items[i].Value == null)
-                {
-                    // Intentionally not using interlocked here. 
-                    // In a worst case scenario two objects may be stored into same slot.
-                    // It is very unlikely to happen and will only mean that one of the objects will get collected.
-                    items[i].Value = obj;
-                    break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Removes an object from leak tracking.  
-        /// 
-        /// This is called when an object is returned to the pool.  It may also be explicitly 
-        /// called if an object allocated from the pool is intentionally not being returned
-        /// to the pool.  This can be of use with pooled arrays if the consumer wants to 
-        /// return a larger array to the pool than was originally allocated.
-        /// </summary>
-        [Conditional("DEBUG")]
-        internal void ForgetTrackedObject(T old, T replacement = null)
-        {
-#if DETECT_LEAKS
-            LeakTracker tracker;
-            if (leakTrackers.TryGetValue(old, out tracker))
-            {
-                tracker.Dispose();
-                leakTrackers.Remove(old);
-            }
-            else
-            {
-                var trace = CaptureStackTrace();
-                Debug.WriteLine($"TRACEOBJECTPOOLLEAKS_BEGIN\nObject of type {typeof(T)} was freed, but was not from pool. \n Callstack: \n {trace} TRACEOBJECTPOOLLEAKS_END");
-            }
-
-            if (replacement != null)
-            {
-                tracker = new LeakTracker();
-                leakTrackers.Add(replacement, tracker);
-            }
-#endif
-        }
-
-#if DETECT_LEAKS
-        private static Lazy<Type> _stackTraceType = new Lazy<Type>(() => Type.GetType("System.Diagnostics.StackTrace"));
-
-        private static object CaptureStackTrace()
-        {
-            return Activator.CreateInstance(_stackTraceType.Value);
-        }
-#endif
-
-        [Conditional("DEBUG")]
-        private void Validate(object obj)
-        {
-            Debug.Assert(obj != null, "freeing null?");
-
-            Debug.Assert(_firstItem != obj, "freeing twice?");
-
-            var items = _items;
-            for (int i = 0; i < items.Length; i++)
-            {
-                var value = items[i].Value;
-                if (value == null)
-                {
-                    return;
-                }
-
-                Debug.Assert(value != obj, "freeing twice?");
-            }
-        }
     }
 }
+
+#endif
