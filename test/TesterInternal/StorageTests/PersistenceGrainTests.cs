@@ -17,6 +17,7 @@ using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
+using Orleans.Runtime.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -34,7 +35,8 @@ namespace UnitTests.StorageTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions(initialSilosCount: 4);
-                options.ClusterConfiguration.Defaults.MaxActiveThreads = 0;
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
+
                 options.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");

@@ -16,6 +16,7 @@ using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.General
 {
@@ -404,7 +405,7 @@ namespace UnitTests.General
             {
                 var options = new TestClusterOptions(initialSilosCount: 1);
 
-                options.ClusterConfiguration.Defaults.PropagateActivityId = true;
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
 
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("Default");
