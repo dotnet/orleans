@@ -878,7 +878,7 @@ namespace Orleans.Runtime.Messaging
                 Socket = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
-                _buffer = new IncomingMessageBuffer(IMA.Log, readBuf: buffer);
+                _buffer = new IncomingMessageBuffer(IMA.Log, buffer);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)
