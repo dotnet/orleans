@@ -13,12 +13,10 @@ namespace Orleans.Runtime
         protected const int Kb = 1024;
         protected const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         protected const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
-        protected List<ArraySegment<byte>> readBuffer;//readonly
-        private List<ArraySegment<byte>> tempBuffer;//readonly
+        protected readonly List<ArraySegment<byte>> readBuffer;
         protected readonly int maxSustainedBufferSize;
         protected int currentBufferSize;
         protected readonly byte[] lengthBuffer;
-        private readonly MessagePrefixHolder prefixHolder = new MessagePrefixHolder();
         protected int headerLength;
         protected int bodyLength;
 
@@ -27,6 +25,8 @@ namespace Orleans.Runtime
 
         protected readonly bool supportForwarding;
         protected Logger Log;
+
+        private readonly MessagePrefixHolder prefixHolder = new MessagePrefixHolder();
 
         protected IncomingMessageBuffer(Logger logger,
             bool supportForwarding = false,
@@ -55,11 +55,17 @@ namespace Orleans.Runtime
             readBuffer = readBuf;
         }
 
+        private int AvailableReadLength => prefixHolder.Count + receiveOffset - decodeOffset;
+
         public virtual void UpdateReceivedData(int bytesRead)
         {
             receiveOffset = bytesRead;
+
+            // after each recieve buffer gets filed from the begining
             decodeOffset = 0;
-            if (decodeOffset >= prefixHolder.Count && prefixHolder.HasPrefix)
+
+            // Opportunistic reset of the prefix holder
+            if (prefixHolder.HasPrefix && decodeOffset >= prefixHolder.Count)
             {
                 decodeOffset -= prefixHolder.Count;
                 decodeOffset = 0;
@@ -90,6 +96,8 @@ namespace Orleans.Runtime
             if (headerLength == 0 || bodyLength == 0)
             {
                 // get length segments
+                // As building of segment list will consume message prefix it's possible to loose message lengths
+                // stored in it, if they are the only ones that it contains. but they will be ached in local varialbes, so it's ok
                 List<ArraySegment<byte>> lenghts = BuildSegmentListWithLengthLimit(Message.LENGTH_HEADER_SIZE);
 
                 // copy length segment to buffer
@@ -139,6 +147,7 @@ namespace Orleans.Runtime
             return headerLength + bodyLength;
         }
 
+
         protected List<ArraySegment<byte>> DuplicateBuffer(List<ArraySegment<byte>> body)
         {
             var dupBody = new List<ArraySegment<byte>>(body.Count);
@@ -148,6 +157,7 @@ namespace Orleans.Runtime
                 Buffer.BlockCopy(seg.Array, seg.Offset, dupSeg.Array, dupSeg.Offset, seg.Count);
                 dupBody.Add(dupSeg);
             }
+
             return dupBody;
         }
 
@@ -162,6 +172,7 @@ namespace Orleans.Runtime
             }
         }
 
+        // If only part of message has arrived - store it and return true.
         private bool TryHandlePrefix()
         {
             if (AvailableReadLength < CalculateKnownMessageSize())
@@ -173,38 +184,37 @@ namespace Orleans.Runtime
             return false;
         }
 
+        // Composes the result from stored (if any) prefix and recieved buffer.
         private List<ArraySegment<byte>> BuildSegmentListWithLengthLimit(int length)
         {
             if (!prefixHolder.HasPrefix)
             {
+                // just read from socket buffer directly
                 var res = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, decodeOffset, length);
-
                 decodeOffset += length;
                 return res;
             }
 
             int bytesRead;
+
+            // Read from the prefix holder
             var result = new List<ArraySegment<byte>>(readBuffer.Count);
             ByteArrayBuilder.BuildSegmentListWithLengthLimit(
                 result,
-                prefixHolder.TryGetPrefix(),
+                prefixHolder.GetPrefix(),
                 decodeOffset,
                 length,
                 out bytesRead);
 
-            // decrease
             length -= bytesRead;
             decodeOffset += bytesRead;
 
             if (length <= 0)
             {
-                if (length == prefixHolder.Count)
-                {
-                    throw new Exception("q");
-                }
                 return result;
             }
 
+            // we've read past the stored message prefix, so dropping it
             if (bytesRead > 0)
             {
                 decodeOffset = 0;
@@ -218,11 +228,10 @@ namespace Orleans.Runtime
                 length,
                 out bytesRead);
 
+            // adjust the read cursor
             decodeOffset += bytesRead;
             return result;
         }
-
-        private int AvailableReadLength => prefixHolder.Count + receiveOffset - decodeOffset;
 
         private class MessagePrefixHolder
         {
@@ -253,9 +262,9 @@ namespace Orleans.Runtime
                     {
                         var count = Math.Min(length - countSoFar, segment.Count - bytesStillToSkip);
                         var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+                        // Maintaining of the ownership is important, as the source buffer will be refilled after next receive
                         Buffer.BlockCopy(segment.Array, bytesStillToSkip, seg.Array, 0, count);
                         buf.Add(seg);
-                        // buf.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, Math.Min(length - countSoFar, segment.Count - bytesStillToSkip)));
                         countSoFar += count;
                     }
                     else
@@ -275,7 +284,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public List<ArraySegment<byte>> TryGetPrefix()
+            public List<ArraySegment<byte>> GetPrefix()
             {
                 return buf;
             }
@@ -285,7 +294,6 @@ namespace Orleans.Runtime
                 Count = 0;
                 HasPrefix = false;
                 BufferPool.GlobalPool.Release(buf);
-                bufe = new CircularByteBuffer();
                 buf = null;
             }
         }
@@ -400,7 +408,7 @@ namespace Orleans.Runtime
         {
             return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE;
         }
-        protected void GrowBuffer()
+        private void GrowBuffer()
         {
             //TODO: Add configurable max message size for safety
             //TODO: Review networking layer and add max size checks to all dictionaries, arrays, or other variable sized containers.
