@@ -233,6 +233,7 @@ namespace Orleans.Runtime
             return result;
         }
 
+        // Hold parts of incomplete message between recieve calls
         private class MessagePrefixHolder
         {
             private List<ArraySegment<byte>> buf;
