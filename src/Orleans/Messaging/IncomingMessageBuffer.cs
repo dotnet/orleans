@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
 
 namespace Orleans.Runtime
@@ -236,7 +237,7 @@ namespace Orleans.Runtime
                 HasPrefix = true;
                 Count += remainingBytesToProcess;
                 var length = remainingBytesToProcess;
-                buf = buf ?? new List<ArraySegment<byte>>();//BufferPool.GlobalPool.GetMultiBuffer(remainingBytesToProcess);
+                buf = buf ?? new List<ArraySegment<byte>>();
                 var lengthSoFar = 0;
                 var countSoFar = 0;
                 foreach (var segment in buffer)
@@ -284,6 +285,7 @@ namespace Orleans.Runtime
                 Count = 0;
                 HasPrefix = false;
                 BufferPool.GlobalPool.Release(buf);
+                bufe = new CircularByteBuffer();
                 buf = null;
             }
         }
@@ -463,8 +465,8 @@ namespace Orleans.Runtime
         private LinkedListNode<ArraySegment<byte>> CurrentNode;
         private readonly int maxSustainedBufferSize;
         private int currentBufferSize;
-
-        private int decodeOffset;
+        private int writeOffset;
+        private int readOffset;
         private int length;
 
         private readonly bool supportForwarding;
@@ -475,20 +477,18 @@ namespace Orleans.Runtime
         {
             currentBufferSize = bufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
-            FillBufferFromPool(currentBufferSize);
-            decodeOffset = 0;
+            readBuffer = new LinkedList<ArraySegment<byte>>();
+            //FillBufferFromPool(currentBufferSize);
+            CurrentNode = readBuffer.First;
+            writeOffset = 0;
             length = 0;
         }
 
-        public void UpdateReceivedData(int bytesRead)
-        {
-            //  receiveOffset += bytesRead;
-        }
 
         public void Reset()
         {
             // receiveOffset = 0;
-            decodeOffset = 0;
+            writeOffset = 0;
         }
 
 
@@ -497,21 +497,47 @@ namespace Orleans.Runtime
         /// </summary>
         private void AdjustBuffer()
         {
-            while (currentBufferSize > maxSustainedBufferSize && readBuffer.Count != 0 && decodeOffset > readBuffer.First.Value.Count)
+            while (currentBufferSize > maxSustainedBufferSize && readBuffer.Count != 0 && writeOffset > readBuffer.First.Value.Count)
             {
                 var segment = readBuffer.First;
                 readBuffer.RemoveFirst();
+                CurrentNode = readBuffer.First;
                 var sizeToRemove = segment.Value.Count;
                 currentBufferSize -= sizeToRemove;
-                decodeOffset -= sizeToRemove;
+                writeOffset -= sizeToRemove;
                 BufferPool.GlobalPool.Release(segment.Value.Array);
             }
         }
-        public void HandlePrefix(List<ArraySegment<byte>> buffer, int offset, int remainingBytesToProcess)
+
+        public List<ArraySegment<byte>> ReadBuffer(int lengthToRead)
+        {
+            int consumedBytes = 0;
+            List<ArraySegment<byte>> result = new List<ArraySegment<byte>>();
+            var currentSegment = readBuffer.First;
+            while (consumedBytes < lengthToRead)
+            {
+                var segment = currentSegment.Value;
+                if (segment.Count < lengthToRead - consumedBytes)
+                {
+                    result.Add(segment);
+                }
+                else
+                {
+                    result.Add(new ArraySegment<byte>(segment.Array, segment.Offset, lengthToRead - consumedBytes));
+                }
+
+                consumedBytes += segment.Count;
+
+                readBuffer.RemoveFirst();
+            }
+
+            return result;
+        }
+
+        public void PutBuffer(List<ArraySegment<byte>> buffer, int offset, int remainingBytesToProcess)
         {
             if (remainingBytesToProcess == 0)
                 return;
-            length += remainingBytesToProcess;
             var lengthSoFar = 0;
             var countSoFar = 0;
 
@@ -527,35 +553,61 @@ namespace Orleans.Runtime
                     continue;
                 }
 
-                if (bytesStillToSkip > 0) // This is the first buffer
+                var sourceOffset = 0;
+                if (bytesStillToSkip > 0)
                 {
-                    var count = Math.Min(length - countSoFar, sourceSegment.Count - bytesStillToSkip);
-                    var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
-                    Buffer.BlockCopy(sourceSegment.Array, bytesStillToSkip, seg.Array, 0, count);
+                    sourceOffset = bytesStillToSkip;
+                }
+
+                while (sourceSegment.Count - sourceOffset != 0 || countSoFar != remainingBytesToProcess) // This is the first buffer
+                {
+                    if (CurrentNode.Value.Count - writeOffset <= 0)
+                    {
+                        CurrentNode = CurrentNode.Next;
+                        writeOffset = 0;
+                        if (CurrentNode == null)
+                        {
+                            throw new Exception("Tried to advance past the bounds of read buffer");
+                        }
+                    }
+
+                    var currentSegment = CurrentNode.Value;
+                    var count = Math.Min(currentSegment.Count - writeOffset, Math.Min(remainingBytesToProcess - countSoFar, sourceSegment.Count - bytesStillToSkip));
+
+                    // var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+                    Buffer.BlockCopy(sourceSegment.Array, sourceOffset, currentSegment.Array, writeOffset, count);
                     //   buf.Add(seg);
                     // buf.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, Math.Min(length - countSoFar, segment.Count - bytesStillToSkip)));
                     countSoFar += count;
+                    sourceOffset += count;
+                    writeOffset += count;
                 }
-                else
-                {
-                    var count = Math.Min(length - countSoFar, sourceSegment.Count);
-                    var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+                //else
+                //{
+                //    var count = Math.Min(remainingBytesToProcess - countSoFar, sourceSegment.Count);
+                //    var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
 
-                    Buffer.BlockCopy(sourceSegment.Array, 0, seg.Array, 0, count);
-                    //  buf.Add(seg);
-                    countSoFar += count;
-                }
+                //    Buffer.BlockCopy(sourceSegment.Array, 0, seg.Array, 0, count);
+                //    //  buf.Add(seg);
+                //    countSoFar += count;
+                //}
 
-                if (countSoFar == length)
+                if (countSoFar == remainingBytesToProcess)
                 {
                     break;
                 }
             }
+            length += remainingBytesToProcess;
+        }
+
+        private void FillFromSegment(ArraySegment<byte> segment)
+        {
+            //  int bytesToCopy, 
         }
 
         private void EnsureBufferCapacity(int remainingBytesToProcess)
         {
-            while (currentBufferSize - decodeOffset < remainingBytesToProcess)
+            while (currentBufferSize - writeOffset < remainingBytesToProcess)
             {
                 GrowBuffer();
             }
