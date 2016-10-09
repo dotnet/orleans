@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
         {
             base.Stop();
 
-            Log.Info("Disconnecting the listening socket");
+            if (Log.IsVerbose) Log.Verbose("Disconnecting the listening socket");
             SocketManager.CloseSocket(AcceptingSocket);
 
             Socket[] temp;
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (Log.IsVerbose) Log.Verbose(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
+            if (Log.IsVerbose2) Log.Verbose2(ErrorCode.MessageAcceptor_Connection, "Received connection from {0} at source address {1}", client, sock.RemoteEndPoint.ToString());
 
             if (expectProxiedConnection)
             {
