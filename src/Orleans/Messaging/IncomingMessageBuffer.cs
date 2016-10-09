@@ -262,7 +262,10 @@ namespace Orleans.Runtime
                     if (bytesStillToSkip > 0) // This is the first buffer
                     {
                         var count = Math.Min(length - countSoFar, segment.Count - bytesStillToSkip);
+
+                        // Not quite efficient, todo: use local circular buffer instead
                         var seg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), 0, count);
+
                         // Maintaining of the ownership is important, as the source buffer will be refilled after next receive
                         Buffer.BlockCopy(segment.Array, bytesStillToSkip, seg.Array, 0, count);
                         buf.Add(seg);
@@ -427,6 +430,8 @@ namespace Orleans.Runtime
         /// </summary>
         private void AdjustBuffer()
         {
+            // drop buffers consumed by messages and adjust offsets
+            // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             while (readBuffer.Count != 0)
             {

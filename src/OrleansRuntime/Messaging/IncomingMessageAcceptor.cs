@@ -486,7 +486,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                if (Log.IsVerbose) Log.Verbose("Responding to Ping from {0}", msg.SendingSilo);
+                if (Log.IsVerbose2) Log.Verbose2("Responding to Ping from {0}", msg.SendingSilo);
 
                 if (!msg.TargetSilo.Equals(MessageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
@@ -543,7 +543,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(MessageCenter.MyAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                if (Log.IsVerbose) Log.Verbose("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                if (Log.IsVerbose2) Log.Verbose2("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
                 MessageCenter.OutboundQueue.SendMessage(msg);
                 return;
             }
@@ -566,7 +566,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                if (Log.IsVerbose) Log.Verbose("RestartAcceptingSocket");
+                if (Log.IsVerbose) Log.Verbose("Restarting of the accepting socket");
                 SocketManager.CloseSocket(AcceptingSocket);
                 AcceptingSocket = SocketManager.GetAcceptingSocketForEndpoint(listenAddress);
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
@@ -626,7 +626,6 @@ namespace Orleans.Runtime.Messaging
                     Message msg;
                     while (_buffer.TryDecodeMessage(out msg))
                     {
-                        if (IMA.Log.IsVerbose) IMA.Log.Verbose("_buffer.TryDecodeMessage(out msg))");
                         IMA.HandleMessage(msg, Socket);
                     }
                 }
