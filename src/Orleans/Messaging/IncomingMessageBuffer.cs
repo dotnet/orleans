@@ -67,8 +67,6 @@ namespace Orleans.Runtime
             // Opportunistic reset of the prefix holder
             if (prefixHolder.HasPrefix && decodeOffset >= prefixHolder.Count)
             {
-                decodeOffset -= prefixHolder.Count;
-                decodeOffset = 0;
                 prefixHolder.Reset();
             }
         }
@@ -90,14 +88,14 @@ namespace Orleans.Runtime
             }
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
-            if (TryHandlePrefix()) return false;
+            if (TryHandleMessageLengthPrefix()) return false;
 
             // parse lengths if needed
             if (headerLength == 0 || bodyLength == 0)
             {
                 // get length segments
                 // As building of segment list will consume message prefix it's possible to loose message lengths
-                // stored in it, if they are the only ones that it contains. but they will be ached in local varialbes, so it's ok
+                // stored in it, if they are the only ones that it contains. but they will be cached in local varialbes, so it's ok
                 List<ArraySegment<byte>> lenghts = BuildSegmentListWithLengthLimit(Message.LENGTH_HEADER_SIZE);
 
                 // copy length segment to buffer
@@ -114,7 +112,7 @@ namespace Orleans.Runtime
             }
 
             // Is there enough read into the buffer to read full message
-            if (TryHandlePrefix()) return false;
+            if (TryHandleMessageBodyPrefix()) return false;
 
             // decode header
             List<ArraySegment<byte>> header = BuildSegmentListWithLengthLimit(headerLength);
@@ -135,14 +133,14 @@ namespace Orleans.Runtime
 
             LogMessageSize(msg);
 
-            // update parse receiveOffset and clear lengths
+            // clear lengths
             headerLength = 0;
             bodyLength = 0;
 
             return true;
         }
 
-        protected virtual int CalculateKnownMessageSize()
+        private int CalculateKnownMessageSize()
         {
             return headerLength + bodyLength;
         }
@@ -172,10 +170,22 @@ namespace Orleans.Runtime
             }
         }
 
-        // If only part of message has arrived - store it and return true.
-        private bool TryHandlePrefix()
+        // we only care about ability to read headers length, if message body couldn't be fitted in - 
+        // the prefix will be handled on the consequent call
+        private bool TryHandleMessageLengthPrefix()
         {
-            if (AvailableReadLength < CalculateKnownMessageSize())
+            return TryHandlePrefix(Message.LENGTH_HEADER_SIZE);
+        }
+
+        private bool TryHandleMessageBodyPrefix()
+        {
+            return TryHandlePrefix(CalculateKnownMessageSize());
+        }
+
+        // If only part of message has arrived - store it and return true.
+        private bool TryHandlePrefix(int readLength)
+        {
+            if (AvailableReadLength < readLength)
             {
                 prefixHolder.HandlePrefix(readBuffer, decodeOffset, receiveOffset - decodeOffset);
                 return true;
@@ -408,10 +418,11 @@ namespace Orleans.Runtime
             return true;
         }
 
-        protected override int CalculateKnownMessageSize()
+        private int CalculateKnownMessageSize()
         {
             return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE;
         }
+
         private void GrowBuffer()
         {
             //TODO: Add configurable max message size for safety
