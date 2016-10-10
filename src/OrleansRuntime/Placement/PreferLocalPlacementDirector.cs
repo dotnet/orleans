@@ -15,6 +15,10 @@ namespace Orleans.Runtime.Placement
         internal override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
+            // if local silo is not active, revert to random placement
+            if (context.LocalSiloStatus != SiloStatus.Active)
+                return base.OnAddActivation(strategy, grain, context);
+
             var grainType = context.GetGrainTypeName(grain);
             return Task.FromResult( 
                 PlacementResult.SpecifyCreation(context.LocalSilo, strategy, grainType));
