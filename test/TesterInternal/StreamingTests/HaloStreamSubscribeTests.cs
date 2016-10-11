@@ -12,6 +12,7 @@ using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
 using System.Collections.Generic;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -26,16 +27,16 @@ namespace UnitTests.HaloTests.Streaming
             {
                 var options = new TestClusterOptions(initialSilosCount:4);
 
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore", new Dictionary<string,string>() { { "NumStorageGrains", "1" } });
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("PubSubStore", new Dictionary<string, string>() { { "DeleteStateOnClear", "true" }, { "UseJsonFormat", "false" } });
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>(SmsStreamProviderName, new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" } });
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.SimpleMessageStream.SimpleMessageStreamProvider>("SMSProviderDoNotOptimizeForImmutableData", new Dictionary<string, string>() { { "FireAndForgetDelivery", "false" }, { "OptimizeForImmutableData", "false" } });
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
 
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>(AzureQueueStreamProviderName);
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProvider>("AzureQueueProvider2");
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
                 options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
 

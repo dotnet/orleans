@@ -324,7 +324,9 @@
     <None Include="Config_SQSStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <Content Include="Config_DevStorage.xml" />
+    <Content Include="Config_DevStorage.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

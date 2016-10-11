@@ -407,8 +407,8 @@ namespace UnitTests.General
 
                 options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
 
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("Default");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
 
                 options.ClientConfiguration.PropagateActivityId = true;
 
