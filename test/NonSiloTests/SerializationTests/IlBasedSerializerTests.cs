@@ -1,29 +1,19 @@
 namespace UnitTests.Serialization
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Reflection;
-    using Orleans.Serialization;
+    using System.Diagnostics.CodeAnalysis;
 
-    using UnitTests.GrainInterfaces;
+    using Orleans.Serialization;
 
     using Xunit;
 
+    [TestCategory("BVT"), TestCategory("Serialization")]
     public class IlBasedSerializerTests
     {
-        public IlBasedSerializerTests()
-        {
-            SerializationManager.InitializeForTesting(new List<TypeInfo>
-            {
-                typeof(IlBasedFallbackSerializer).GetTypeInfo()
-            });
-        }
-
         /// <summary>
         /// Tests that <see cref="IlBasedSerializerGenerator"/> supports distinct field selection for serialization
         /// versus copy operations.
         /// </summary>
-        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        [Fact]
         public void IlBasedSerializer_AllowCopiedFieldsToDifferFromSerializedFields()
         {
             var input = new FieldTest
@@ -50,53 +40,7 @@ namespace UnitTests.Serialization
             Assert.Equal(3, deserialized.Three);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
-        public void IlBasedSerializer_CanSerializeComplexClassTest()
-        {
-            var input = OuterClass.GetPrivateClassInstance();
-            input.Int = 89;
-            input.String = Guid.NewGuid().ToString();
-            input.NonSerializedInt = 39;
-            input.Classes = new SomeAbstractClass[]
-            {
-                input,
-                new AnotherConcreteClass
-                {
-                    AnotherString = "hi",
-                    Interfaces = new List<ISomeInterface> { input }
-                }
-            };
-            input.Enum = SomeAbstractClass.SomeEnum.Something;
-            input.SetObsoleteInt(38);
-            
-            var output = (SomeAbstractClass)BuiltInSerializerTests.OrleansSerializationLoop(input);
-
-            Assert.Equal(input.Int, output.Int);
-            Assert.Equal(input.Enum, output.Enum);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.Equal(input.Classes.Length, output.Classes.Length);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
-            Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
-            Assert.Equal(0, output.NonSerializedInt);
-            Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
-        public void IlBasedSerializer_CanSerializeStructTest()
-        {
-            // Test struct serialization.
-            var expectedStruct = new SomeStruct(10) { Id = Guid.NewGuid(), PublicValue = 6, ValueWithPrivateGetter = 7 };
-            expectedStruct.SetValueWithPrivateSetter(8);
-            expectedStruct.SetPrivateValue(9);
-            var actualStruct = (SomeStruct)BuiltInSerializerTests.OrleansSerializationLoop(expectedStruct);
-            Assert.Equal(expectedStruct.Id, actualStruct.Id);
-            Assert.Equal(expectedStruct.ReadonlyField, actualStruct.ReadonlyField);
-            Assert.Equal(expectedStruct.PublicValue, actualStruct.PublicValue);
-            Assert.Equal(expectedStruct.ValueWithPrivateSetter, actualStruct.ValueWithPrivateSetter);
-            Assert.Equal(expectedStruct.GetPrivateValue(), actualStruct.GetPrivateValue());
-            Assert.Equal(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
-        }
-
+        [SuppressMessage("ReSharper", "StyleCop.SA1401", Justification = "This is for testing purposes.")]
         private class FieldTest
         {
 #pragma warning disable 169
