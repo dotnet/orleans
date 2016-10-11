@@ -134,6 +134,10 @@ namespace Orleans.Messaging
             {
                 lock (lockable)
                 {
+                    if (config.PreferedGatewayIndex >= 0 && config.PreferedGatewayIndex < count)
+                    {
+                        return live[config.PreferedGatewayIndex];
+                    }
                     // Round-robin through the known gateways and take the next live one, starting from where we last left off
                     roundRobinCounter = (roundRobinCounter + 1) % count;
                     return live[roundRobinCounter];
