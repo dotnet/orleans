@@ -38,7 +38,6 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Serialization\PocoState.cs" />
     <Compile Include="Serialization\SerializationBenchmarkConfig.cs" />
     <Compile Include="MapReduce\MapReduceBenchmarkConfig.cs" />
     <Compile Include="MapReduce\MapReduceBenchmark.cs" />
@@ -51,10 +50,9 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Tester\Tester.csproj">
-      <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55d}</Project>
-      <Name>Tester</Name>
-      <Private>True</Private>
+    <ProjectReference Include="..\..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{3972213F-189B-41D4-90FE-38D513C1106D}</Project>
+      <Name>TestGrainInterfaces</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansBenchmarkGrainInterfaces\OrleansBenchmarkGrainInterfaces.csproj">
       <Project>{936397df-8d11-4244-a493-767d31f9d727}</Project>
