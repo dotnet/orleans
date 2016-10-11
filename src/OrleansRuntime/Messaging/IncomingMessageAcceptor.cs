@@ -14,12 +14,19 @@ namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAcceptor : AsynchAgent
     {
+        private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(CreateSocketReceiveAsyncEventArgsPoolWrapper);
+        private const int SocketBufferSize = 1024 * 128; // 128 kb
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
         private readonly LingerOption receiveLingerOption = new LingerOption(true, 0);
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
+
+        private static readonly CounterStatistic allocatedSocketEventArgsCounter 
+            = CounterStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_ALLOCATED_SOCKET_EVENT_ARGS, false);
+        private readonly CounterStatistic checkedOutSocketEventArgsCounter;
+        private readonly CounterStatistic checkedInSocketEventArgsCounter;
 
         public Action<Message> SniffIncomingMessage
         {
@@ -49,6 +56,12 @@ namespace Orleans.Runtime.Messaging
             OpenReceiveSockets = new HashSet<Socket>();
             OnFault = FaultBehavior.CrashOnFault;
             SocketDirection = socketDirection;
+
+            checkedOutSocketEventArgsCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_CHECKED_OUT_SOCKET_EVENT_ARGS, false);
+            checkedInSocketEventArgsCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_CHECKED_IN_SOCKET_EVENT_ARGS, false);
+
+            IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_ACCEPTOR_IN_USE_SOCKET_EVENT_ARGS,
+                () => checkedOutSocketEventArgsCounter.GetCurrentValue() - checkedInSocketEventArgsCounter.GetCurrentValue());
         }
 
         protected override void Run()
@@ -333,7 +346,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             // Get the socket for the accepted client connection and put it into the 
                             // ReadEventArg object user token.
-                            var readEventArgs = GetSocketAsyncEventArgs(sock);
+                            var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
 
                             StartReceiveAsync(sock, readEventArgs, ima);
                         }
@@ -393,36 +406,51 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private SocketAsyncEventArgs GetSocketAsyncEventArgs(Socket sock)
+        private SocketAsyncEventArgs GetSocketReceiveAsyncEventArgs(Socket sock)
+        {
+            var saea = receiveEventArgsPool.Allocate();
+            var token = ((ReceiveCallbackContext) saea.SocketAsyncEventArgs.UserToken);
+            token.IMA = this;
+            token.Socket = sock;
+            checkedOutSocketEventArgsCounter.Increment();
+            return saea.SocketAsyncEventArgs;
+        }
+
+        private static SaeaPoolWrapper CreateSocketReceiveAsyncEventArgsPoolWrapper()
         {
             SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs();
-            readEventArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnReceiveCompleted);
+            readEventArgs.Completed += OnReceiveCompleted;
 
-            var pool = BufferPool.GlobalPool.GetMultiBuffer(IncomingMessageBuffer.DEFAULT_RECEIVE_BUFFER_SIZE);
+            var buffer = new byte[SocketBufferSize];
 
             // SocketAsyncEventArgs and ReceiveCallbackContext's buffer shares the same buffer list with pinned arrays.
-            readEventArgs.BufferList = pool;
-            readEventArgs.UserToken = new ReceiveCallbackContext(sock, this, pool);
-            return readEventArgs;
+            readEventArgs.SetBuffer(buffer, 0, buffer.Length);
+            var poolWrapper = new SaeaPoolWrapper(readEventArgs);
+
+            // Creates with incomplete state: IMA should be set before using
+            readEventArgs.UserToken = new ReceiveCallbackContext(null, null, poolWrapper);
+            allocatedSocketEventArgsCounter.Increment();
+            return poolWrapper;
         }
 
         private void FreeSocketAsyncEventArgs(SocketAsyncEventArgs args)
         {
-            // Pooling of the args would be nice, but for now only take care of buffers
-            var buf = args.BufferList;
-            args.BufferList = null;
-            BufferPool.GlobalPool.Release((List<ArraySegment<byte>>)buf);
+            var receiveToken = (ReceiveCallbackContext) args.UserToken;
+            args.AcceptSocket = null;
+            checkedInSocketEventArgsCounter.Increment();
+            receiveEventArgsPool.Free(receiveToken.SaeaPoolWrapper);
         }
 
-        private void OnReceiveCompleted(object sender, SocketAsyncEventArgs e)
+        private static void OnReceiveCompleted(object sender, SocketAsyncEventArgs e)
         {
             if (e.LastOperation != SocketAsyncOperation.Receive)
             {
                 throw new ArgumentException("The last operation completed on the socket was not a receive");
             }
 
-            if (Log.IsVerbose3) Log.Verbose("Socket receive completed from remote " + e.RemoteEndPoint);
-            ProcessReceive(e);
+            var rcc = e.UserToken as ReceiveCallbackContext;
+            if (rcc.IMA.Log.IsVerbose3) rcc.IMA.Log.Verbose("Socket receive completed from remote " + e.RemoteEndPoint);
+            rcc.IMA.ProcessReceive(e);
         }
 
         /// <summary>
@@ -466,7 +494,6 @@ namespace Orleans.Runtime.Messaging
                 // There was a problem with the buffer, presumably data corruption, so give up
                 rcc.IMA.SafeCloseSocket(rcc.Socket);
                 FreeSocketAsyncEventArgs(e);
-
                 // And we're done
                 return;
             }
@@ -588,16 +615,17 @@ namespace Orleans.Runtime.Messaging
         private class ReceiveCallbackContext
         {
             private readonly IncomingMessageBuffer _buffer;
-            public Socket Socket { get; }
-            public EndPoint RemoteEndPoint { get; }
-            public IncomingMessageAcceptor IMA { get; }
+            public Socket Socket { get; internal set; }
+            public EndPoint RemoteEndPoint => Socket.RemoteEndPoint;
+            public IncomingMessageAcceptor IMA { get; internal set; }
+            public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima, List<ArraySegment<byte>> buffer)
+            public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima, SaeaPoolWrapper poolWrapper)
             {
                 Socket = sock;
-                RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
-                _buffer = new IncomingMessageBuffer(IMA.Log, buffer);
+                SaeaPoolWrapper = poolWrapper;
+                _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime));
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)
@@ -621,7 +649,7 @@ namespace Orleans.Runtime.Messaging
 #endif
                 try
                 {
-                    _buffer.UpdateReceivedData(e.BytesTransferred);
+                    _buffer.UpdateReceivedData(e.Buffer, e.BytesTransferred);
 
                     Message msg;
                     while (_buffer.TryDecodeMessage(out msg))
@@ -639,8 +667,7 @@ namespace Orleans.Runtime.Messaging
                             exc);
                     }
                     catch (Exception) { }
-                    _buffer.Reset(); // Reset back to a hopefully good base state,
-                                     //  but most likely its going to be disposed
+                    _buffer.Reset(); // Reset back to a hopefully good base state
 
                     throw;
                 }
@@ -654,6 +681,16 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 #endif
+            }
+        }
+
+        private class SaeaPoolWrapper : PooledResource<SaeaPoolWrapper>
+        {
+            public SocketAsyncEventArgs SocketAsyncEventArgs { get; }
+
+            public SaeaPoolWrapper(SocketAsyncEventArgs socketAsyncEventArgs)
+            {
+                SocketAsyncEventArgs = socketAsyncEventArgs;
             }
         }
     }

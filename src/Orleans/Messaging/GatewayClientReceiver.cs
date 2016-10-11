@@ -12,14 +12,14 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : AsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
-        private readonly ClientIncomingMessageBuffer buffer;
+        private readonly IncomingMessageBuffer buffer;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
             : base(gateway.Address.ToString())
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
-            buffer = new ClientIncomingMessageBuffer(Log, true); 
+            buffer = new IncomingMessageBuffer(Log, true); 
         }
 
         protected override void Run()
