@@ -13,6 +13,8 @@ namespace Orleans.Serialization
 
         private readonly ReflectedSerializationMethodInfo methods;
 
+        private readonly ILFieldBuilder fields;
+
         /// <summary>
         /// Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.
         /// </summary>
@@ -21,12 +23,13 @@ namespace Orleans.Serialization
         /// <param name="methodInfo">
         /// The method info for <typeparamref name="TDelegate"/> delegates, used for determining parameter types.
         /// </param>
-        public ILDelegateBuilder(string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
+        public ILDelegateBuilder(ILFieldBuilder fields, string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
         {
+            this.fields = fields;
             this.methods = methods;
             var returnType = methodInfo.ReturnType;
             var parameterTypes = GetParameterTypes(methodInfo);
-            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(ILDelegateBuilder<>).GetTypeInfo().Module, true);
+            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(ILDelegateBuilder<>).Module, true);
             this.il = this.dynamicMethod.GetILGenerator();
         }
 
@@ -75,8 +78,8 @@ namespace Orleans.Serialization
         /// <param name="type">The type to load.</param>
         public void LoadType(Type type)
         {
-            this.il.Emit(OpCodes.Ldtoken, type);
-            this.Call(this.methods.GetTypeFromHandle);
+            var field = this.fields.GetOrCreateStaticField(type);
+            this.il.Emit(OpCodes.Ldsfld, field);
         }
 
         /// <summary>
@@ -133,7 +136,10 @@ namespace Orleans.Serialization
         /// Builds a delegate from the previously emitted instructions.
         /// </summary>
         /// <returns>The delegate.</returns>
-        public TDelegate Build() => this.dynamicMethod.CreateDelegate(typeof(TDelegate)) as TDelegate;
+        public TDelegate CreateDelegate()
+        {
+            return this.dynamicMethod.CreateDelegate(typeof(TDelegate)) as TDelegate;
+        }
 
         /// <summary>
         /// Pushes the specified local variable as a reference onto the stack.

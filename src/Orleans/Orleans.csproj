@@ -135,11 +135,13 @@
     <Compile Include="Core\IGrainFactory.cs" />
     <Compile Include="Runtime\IGrainRuntime.cs" />
     <Compile Include="Serialization\ILBasedSerializer.cs" />
+    <Compile Include="Serialization\ILFieldBuilder.cs" />
     <Compile Include="Serialization\ILGenerationException.cs" />
     <Compile Include="Serialization\ILSerializerGenerator.cs" />
     <Compile Include="Serialization\ILDelegateBuilder.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />

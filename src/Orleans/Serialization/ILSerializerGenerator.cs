@@ -19,6 +19,8 @@ namespace Orleans.Serialization
 
         private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
 
+        private readonly ILFieldBuilder fieldBuilder = new ILFieldBuilder();
+
         /// <summary>
         /// Returns a value indicating whether the provided <paramref name="type"/> is supported.
         /// </summary>
@@ -57,14 +59,14 @@ namespace Orleans.Serialization
                 {
                     copyFields = this.GetFields(type, copyFieldsFilter);
                 }
-
+                
                 SerializationManager.DeepCopier copier;
                 if (type.IsOrleansShallowCopyable()) copier = this.immutableTypeCopier;
-                else copier = this.EmitCopier(type, copyFields).Build();
+                else copier = this.EmitCopier(type, copyFields).CreateDelegate();
 
                 var serializer = this.EmitSerializer(type, serializationFields);
                 var deserializer = this.EmitDeserializer(type, serializationFields);
-                return new SerializationManager.SerializerMethods(copier, serializer.Build(), deserializer.Build());
+                return new SerializationManager.SerializerMethods(copier, serializer.CreateDelegate(), deserializer.CreateDelegate());
             }
             catch (Exception exception)
             {
@@ -74,126 +76,129 @@ namespace Orleans.Serialization
 
         private ILDelegateBuilder<SerializationManager.DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
         {
-            var builder = new ILDelegateBuilder<SerializationManager.DeepCopier>(
+            var il = new ILDelegateBuilder<SerializationManager.DeepCopier>(
+                this.fieldBuilder,
                 type.Name + "DeepCopier",
                 this.methods,
                 this.methods.DeepCopierDelegate);
 
             // Declare local variables.
-            var result = builder.DeclareLocal(type);
-            var typedInput = builder.DeclareLocal(type);
+            var result = il.DeclareLocal(type);
+            var typedInput = il.DeclareLocal(type);
 
             // Set the typed input variable from the method parameter.
-            builder.LoadArgument(0);
-            builder.CastOrUnbox(type);
-            builder.StoreLocal(typedInput);
+            il.LoadArgument(0);
+            il.CastOrUnbox(type);
+            il.StoreLocal(typedInput);
 
             // Construct the result.
-            builder.CreateInstance(type, result);
+            il.CreateInstance(type, result);
 
             // Record the object.
-            builder.Call(this.methods.GetCurrentSerializationContext);
-            builder.LoadArgument(0); // Load 'original' parameter.
-            builder.LoadLocal(result); // Load 'result' local.
-            builder.BoxIfValueType(type);
-            builder.Call(this.methods.RecordObjectWhileCopying);
+            il.Call(this.methods.GetCurrentSerializationContext);
+            il.LoadArgument(0); // Load 'original' parameter.
+            il.LoadLocal(result); // Load 'result' local.
+            il.BoxIfValueType(type);
+            il.Call(this.methods.RecordObjectWhileCopying);
 
             // Copy each field.
             foreach (var field in fields)
             {
                 // Load the field.
-                builder.LoadLocalAsReference(type, result);
-                builder.LoadLocal(typedInput);
-                builder.LoadField(field);
+                il.LoadLocalAsReference(type, result);
+                il.LoadLocal(typedInput);
+                il.LoadField(field);
 
                 // Deep-copy the field if needed, otherwise just leave it as-is.
                 if (!field.FieldType.IsOrleansShallowCopyable())
                 {
-                    builder.BoxIfValueType(field.FieldType);
-                    builder.Call(this.methods.DeepCopyInner);
-                    builder.CastOrUnbox(field.FieldType);
+                    il.BoxIfValueType(field.FieldType);
+                    il.Call(this.methods.DeepCopyInner);
+                    il.CastOrUnbox(field.FieldType);
                 }
 
                 // Store the copy of the field on the result.
-                builder.StoreField(field);
+                il.StoreField(field);
             }
 
-            builder.LoadLocal(result);
-            builder.BoxIfValueType(type);
-            builder.Return();
-            return builder;
+            il.LoadLocal(result);
+            il.BoxIfValueType(type);
+            il.Return();
+            return il;
         }
 
         private ILDelegateBuilder<SerializationManager.Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
         {
-            var builder = new ILDelegateBuilder<SerializationManager.Serializer>(
+            var il = new ILDelegateBuilder<SerializationManager.Serializer>(
+                this.fieldBuilder,
                 type.Name + "Serializer",
                 this.methods,
                 this.methods.SerializerDelegate);
 
             // Declare local variables.
-            var typedInput = builder.DeclareLocal(type);
+            var typedInput = il.DeclareLocal(type);
 
             // Set the typed input variable from the method parameter.
-            builder.LoadArgument(0);
-            builder.CastOrUnbox(type);
-            builder.StoreLocal(typedInput);
+            il.LoadArgument(0);
+            il.CastOrUnbox(type);
+            il.StoreLocal(typedInput);
 
             // Serialize each field
             foreach (var field in fields)
             {
                 // Load the field.
-                builder.LoadLocal(typedInput);
-                builder.LoadField(field);
-                builder.BoxIfValueType(field.FieldType);
+                il.LoadLocal(typedInput);
+                il.LoadField(field);
+                il.BoxIfValueType(field.FieldType);
 
                 // Serialize the field.
-                builder.LoadArgument(1);
-                builder.LoadType(field.FieldType);
-                builder.Call(this.methods.SerializeInner);
+                il.LoadArgument(1);
+                il.LoadType(field.FieldType);
+                il.Call(this.methods.SerializeInner);
             }
 
-            builder.Return();
-            return builder;
+            il.Return();
+            return il;
         }
 
         private ILDelegateBuilder<SerializationManager.Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
         {
-            var builder = new ILDelegateBuilder<SerializationManager.Deserializer>(
+            var il = new ILDelegateBuilder<SerializationManager.Deserializer>(
+                this.fieldBuilder,
                 type.Name + "Deserializer",
                 this.methods,
                 this.methods.DeserializerDelegate);
 
             // Declare local variables.
-            var result = builder.DeclareLocal(type);
+            var result = il.DeclareLocal(type);
 
             // Construct the result.
-            builder.CreateInstance(type, result);
+            il.CreateInstance(type, result);
 
             // Record the object.
-            builder.Call(this.methods.GetCurrentDeserializationContext);
-            builder.LoadLocal(result);
-            builder.BoxIfValueType(type);
-            builder.Call(this.methods.RecordObjectWhileDeserializing);
+            il.Call(this.methods.GetCurrentDeserializationContext);
+            il.LoadLocal(result);
+            il.BoxIfValueType(type);
+            il.Call(this.methods.RecordObjectWhileDeserializing);
 
             // Deserialize each field.
             foreach (var field in fields)
             {
                 // Deserialize the field.
-                builder.LoadLocalAsReference(type, result);
-                builder.LoadType(field.FieldType);
-                builder.LoadArgument(1);
-                builder.Call(this.methods.DeserializeInner);
+                il.LoadLocalAsReference(type, result);
+                il.LoadType(field.FieldType);
+                il.LoadArgument(1);
+                il.Call(this.methods.DeserializeInner);
 
                 // Store the value on the result.
-                builder.CastOrUnbox(field.FieldType);
-                builder.StoreField(field);
+                il.CastOrUnbox(field.FieldType);
+                il.StoreField(field);
             }
 
-            builder.LoadLocal(result);
-            builder.BoxIfValueType(type);
-            builder.Return();
-            return builder;
+            il.LoadLocal(result);
+            il.BoxIfValueType(type);
+            il.Return();
+            return il;
         }
 
         /// <summary>
