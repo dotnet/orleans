@@ -54,6 +54,8 @@ namespace Orleans.Runtime
             set { _maxRetries = value; }
         }
 
+        public int TentativeSentCount { get; set; }
+
         #endregion
 
         /// <summary>

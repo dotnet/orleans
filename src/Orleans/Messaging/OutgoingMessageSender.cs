@@ -81,6 +81,8 @@ namespace Orleans.Messaging
             if (sendError)
                 OnSendFailure(sock, targetSilo);
 
+            msg.TentativeSentCount = msg.TentativeSentCount + 1;
+
             ProcessMessageAfterSend(msg, sendError, sendErrorStr);
         }
 
