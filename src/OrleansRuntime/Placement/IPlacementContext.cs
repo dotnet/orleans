@@ -26,6 +26,8 @@ namespace Orleans.Runtime.Placement
 
         SiloAddress LocalSilo { get; }
 
+        SiloStatus LocalSiloStatus { get; }
+
         /// <summary>
         /// Try to get the transaction state of the activation if it is available on this silo
         /// </summary>
