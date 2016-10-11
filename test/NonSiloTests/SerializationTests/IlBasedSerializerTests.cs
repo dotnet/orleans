@@ -9,6 +9,11 @@ namespace UnitTests.Serialization
     [TestCategory("BVT"), TestCategory("Serialization")]
     public class IlBasedSerializerTests
     {
+        public IlBasedSerializerTests()
+        {
+            SerializationManager.InitializeForTesting();
+        }
+
         /// <summary>
         /// Tests that <see cref="IlBasedSerializerGenerator"/> supports distinct field selection for serialization
         /// versus copy operations.
