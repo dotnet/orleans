@@ -41,8 +41,12 @@
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
+        private readonly Func<FieldInfo, bool> exceptionFieldFilter;
+
         public ILBasedSerializer()
         {
+            this.exceptionFieldFilter = ExceptionFieldFilter;
+
             // Configure the serializer to be used when a concrete type is not known.
             // The serializer will generate and register serializers for concrete types
             // as they are discovered.
@@ -110,8 +114,8 @@
         /// <summary>
         /// Tries to deserialize an item.
         /// </summary>
-        /// <param name="reader">The reader used for binary deserialization</param>
         /// <param name="expectedType">The type that should be deserialzied</param>
+        /// <param name="reader">The reader used for binary deserialization</param>
         /// <returns>The deserialized object</returns>
         public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
         {
@@ -178,13 +182,13 @@
             Func<FieldInfo, bool> fieldFilter = null;
             if (typeof(Exception).IsAssignableFrom(type))
             {
-                fieldFilter = this.ExceptionFieldFilter;
+                fieldFilter = this.exceptionFieldFilter;
             }
 
             return new SerializerBundle(type, this.generator.GenerateSerializer(type, fieldFilter));
         }
 
-        private bool ExceptionFieldFilter(FieldInfo arg)
+        private static bool ExceptionFieldFilter(FieldInfo arg)
         {
             // Any field defined below Exception is acceptable.
             if (arg.DeclaringType != typeof(Exception)) return true;
