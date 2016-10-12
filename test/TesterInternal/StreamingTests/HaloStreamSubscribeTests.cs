@@ -1,9 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
@@ -11,8 +11,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
-using System.Collections.Generic;
-using Orleans.Runtime.Configuration;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -25,7 +23,7 @@ namespace UnitTests.HaloTests.Streaming
 
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions(initialSilosCount:4);
+                var options = new TestClusterOptions();
 
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
@@ -51,7 +49,7 @@ namespace UnitTests.HaloTests.Streaming
             }
         }
 
-        protected TestCluster HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;

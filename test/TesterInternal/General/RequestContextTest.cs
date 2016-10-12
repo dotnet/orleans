@@ -2,21 +2,20 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
-using Orleans.Runtime.Configuration;
 
 namespace UnitTests.General
 {
@@ -406,10 +405,6 @@ namespace UnitTests.General
                 var options = new TestClusterOptions(initialSilosCount: 1);
 
                 options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
-
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-
                 options.ClientConfiguration.PropagateActivityId = true;
 
                 return new TestCluster(options);

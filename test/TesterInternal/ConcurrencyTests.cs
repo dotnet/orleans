@@ -1,12 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
-using Orleans.Runtime.Configuration;
 
 namespace UnitTests.ConcurrencyTests
 {
@@ -25,7 +25,6 @@ namespace UnitTests.ConcurrencyTests
                 return new TestCluster(options);
             }
         }
-
 
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public async Task ConcurrencyTest_ReadOnly()
