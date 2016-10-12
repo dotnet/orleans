@@ -58,7 +58,6 @@
     <Compile Include="CounterTests.cs" />
     <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
-    <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
@@ -101,14 +100,6 @@
     <Content Include="..\..\src\SDK\OrleansConfiguration.xml">
       <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\TesterInternal\Data\TestDb.mdf">
-      <Link>Data\TestDb.mdf</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\TesterInternal\Data\TestDb_log.ldf">
-      <Link>Data\TestDb_log.ldf</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="ClientConfig_NewAzure.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -215,10 +206,6 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
-      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
-      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>

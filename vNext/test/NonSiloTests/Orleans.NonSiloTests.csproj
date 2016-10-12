@@ -60,9 +60,6 @@
     <Compile Include="..\..\..\test\NonSiloTests\ErrorInjectionStorageProvider.cs">
       <Link>ErrorInjectionStorageProvider.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\GatewaySelectionTest.cs">
-      <Link>GatewaySelectionTest.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\General\CounterStatisticTests.cs">
       <Link>General\CounterStatisticTests.cs</Link>
     </Compile>
