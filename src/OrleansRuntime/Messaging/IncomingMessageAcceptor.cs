@@ -354,18 +354,19 @@ namespace Orleans.Runtime.Messaging
                         {
                             ima.SafeCloseSocket(sock);
                         }
-
                     }
                     catch (SocketException ex)
                     {
                         Log.Warn(ErrorCode.Messaging_ExceptionReceiveAsync, "Error when processing data received from {0}:\r\n{1}", "Q", ex, sock.RemoteEndPoint);
+                        RestartAcceptingSocket();
+                        return;
                     }
                     catch (Exception ex)
                     {
-                        this.Log.Warn(ErrorCode.Messaging_ExceptionReceiveAsync, "Exception trying to process accept from endpoint ", ex);
-                        throw;
+                        Log.Warn(ErrorCode.Messaging_ExceptionReceiveAsync, "Exception trying to process accept from endpoint ", ex);
+                        RestartAcceptingSocket();
+                        return;
                     }
-
                 }
 
                 // The next accept will be started in the caller method
@@ -436,6 +437,7 @@ namespace Orleans.Runtime.Messaging
         private void FreeSocketAsyncEventArgs(SocketAsyncEventArgs args)
         {
             var receiveToken = (ReceiveCallbackContext) args.UserToken;
+            receiveToken.Reset();
             args.AcceptSocket = null;
             checkedInSocketEventArgsCounter.Increment();
             receiveEventArgsPool.Free(receiveToken.SaeaPoolWrapper);
@@ -681,6 +683,11 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 #endif
+            }
+
+            public void Reset()
+            {
+                _buffer.Reset();
             }
         }
 
