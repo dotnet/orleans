@@ -80,3 +80,71 @@ public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, I
 ```
 
 If a silo-level interceptor is also present, the grain-level interceptor is invoked inside of silo-level interceptors, during the call to `invoker.Invoke(...)`. Grain-level interceptors will also be invoked for grain extensions (implementations of `IGrainExtension`), not only for method in the current class.
+
+## Use Cases
+
+### Exception Conversion
+
+When an exception which has been thrown from the server is getting deserialized on the client, you may sometimes get the following exception instead of the actual one: `TypeLoadException: Could not find Whatever.dll.`
+
+This happens if the assembly containing the exception is not available to the client. For example, say you are using Entity Framework in your grain implementations; then it is possible that an `EntityException` is thrown. The client on the other hand does not (and should not) reference `EntityFramework.dll` since it has no knowledge about the underlying data access layer.
+
+When the client tries to deserialize the `EntityException`, it will fail due to the missing DLL; as a consequence a `TypeLoadException` is thrown hiding the original `EntityException`.
+
+One may argue that this is pretty okay, since the client would never handle the `EntityException`; otherwise it would have to reference `EntityFramework.dll`.
+
+But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type `Exception` if the exception type is presumably unknown on the client side. This can be done as follows:
+
+```csharp
+private static Task RegisterInterceptors(IProviderRuntime providerRuntime, IProviderConfiguration config)
+{
+    var knownAssemblyNames = GetKnownExceptionTypeAssemblyNames();
+
+    providerRuntime.SetInvokeInterceptor(async (method, request, grain, invoker) =>
+    {
+        try
+        {
+            return await invoker.Invoke(grain, request);
+        }
+        catch (Exception exc)
+        {
+            var type = exc.GetType();
+
+            if (knownAssemblyNames.Contains(type.Assembly.GetName().Name))
+            {
+                throw;
+            }
+
+            // special exception handling
+            throw new Exception(
+                $"Exception of non-public type '{type.FullName}' has been wrapped. Original message: <<<<----{Environment.NewLine}{exc.ToString()}{Environment.NewLine}---->>>>");
+        }
+    });
+
+    return TaskDone.Done;
+}
+
+private static HashSet<string> GetKnownExceptionTypeAssemblyNames()
+    =>
+    new HashSet<string>
+    {
+        typeof(string).Assembly.GetName().Name,
+        "System",
+        "System.ComponentModel.Composition",
+        "System.ComponentModel.DataAnnotations",
+        "System.Configuration",
+        "System.Core",
+        "System.Data",
+        "System.Data.DataSetExtensions",
+        "System.Net.Http",
+        "System.Numerics",
+        "System.Runtime.Serialization",
+        "System.Security",
+        "System.Xml",
+        "System.Xml.Linq",
+
+        "MyCompany.Microservices.DataTransfer",
+        "MyCompany.Microservices.Interfaces",
+        "MyCompany.Microservices.ServiceLayer"
+};
+```
