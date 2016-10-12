@@ -333,39 +333,24 @@ namespace Orleans.Runtime.Messaging
                 Socket sock = e.AcceptSocket;
                 if (sock.Connected)
                 {
-                    try
+                    if (ima.Log.IsVerbose) ima.Log.Verbose("Received a connection from {0}", sock.RemoteEndPoint);
+
+                    // Finally, process the incoming request:
+                    // Prep the socket so it will reset on close
+                    sock.LingerState = receiveLingerOption;
+
+                    // Add the socket to the open socket collection
+                    if (ima.RecordOpenedSocket(sock))
                     {
-                        if (ima.Log.IsVerbose) ima.Log.Verbose("Received a connection from {0}", sock.RemoteEndPoint);
+                        // Get the socket for the accepted client connection and put it into the 
+                        // ReadEventArg object user token.
+                        var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
 
-                        // Finally, process the incoming request:
-                        // Prep the socket so it will reset on close
-                        sock.LingerState = receiveLingerOption;
-
-                        // Add the socket to the open socket collection
-                        if (ima.RecordOpenedSocket(sock))
-                        {
-                            // Get the socket for the accepted client connection and put it into the 
-                            // ReadEventArg object user token.
-                            var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
-
-                            StartReceiveAsync(sock, readEventArgs, ima);
-                        }
-                        else
-                        {
-                            ima.SafeCloseSocket(sock);
-                        }
+                        StartReceiveAsync(sock, readEventArgs, ima);
                     }
-                    catch (SocketException ex)
+                    else
                     {
-                        Log.Warn(ErrorCode.Messaging_ExceptionReceiveAsync, "Error when processing data received from {0}:\r\n{1}", "Q", ex, sock.RemoteEndPoint);
-                        RestartAcceptingSocket();
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warn(ErrorCode.Messaging_ExceptionReceiveAsync, "Exception trying to process accept from endpoint ", ex);
-                        RestartAcceptingSocket();
-                        return;
+                        ima.SafeCloseSocket(sock);
                     }
                 }
 
