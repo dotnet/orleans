@@ -9,15 +9,15 @@ namespace Orleans.Serialization
 
     internal class ILSerializerGenerator
     {
-        private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
-
-        private readonly SerializationManager.DeepCopier immutableTypeCopier = obj => obj;
-
         private static readonly RuntimeTypeHandle IntPtrTypeHandle = typeof(IntPtr).TypeHandle;
 
         private static readonly RuntimeTypeHandle UintPtrTypeHandle = typeof(UIntPtr).TypeHandle;
 
         private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+
+        private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
+
+        private readonly SerializationManager.DeepCopier immutableTypeCopier = obj => obj;
 
         private readonly ILFieldBuilder fieldBuilder = new ILFieldBuilder();
 
