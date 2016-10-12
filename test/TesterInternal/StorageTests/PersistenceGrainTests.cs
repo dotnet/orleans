@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
@@ -34,16 +33,11 @@ namespace UnitTests.StorageTests
         {
             protected override TestCluster CreateTestCluster()
             {
-                var options = new TestClusterOptions();
-                //var options = new TestClusterOptions(initialSilosCount: 4);
-                //options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
-
-                //options.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+                var options = new TestClusterOptions(initialSilosCount: 1);
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test1");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>("ErrorInjector");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("lowercase");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
 
                 return new TestCluster(options);
@@ -52,13 +46,12 @@ namespace UnitTests.StorageTests
 
         const string ErrorInjectorStorageProvider = "ErrorInjector";
         private readonly ITestOutputHelper output;
-        protected TestCluster HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
             HostedCluster = fixture.HostedCluster;
-            SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
             ResetMockStorageProvidersHistory();
         }
