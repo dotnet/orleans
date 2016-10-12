@@ -480,6 +480,16 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
+        public TimeSpan ReadTimeSpan()
+        {
+            return new TimeSpan(ReadLong());
+        }
+
+        internal CorrelationId ReadCorrelationId()
+        {
+            return new CorrelationId(ReadBytes(CorrelationId.SIZE_BYTES));
+        }
+
         internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
         {
             byte val = ReadByte();

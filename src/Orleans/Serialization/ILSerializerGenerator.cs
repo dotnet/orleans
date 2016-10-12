@@ -3,6 +3,8 @@ namespace Orleans.Serialization
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Linq.Expressions;
+    using System.Net;
     using System.Reflection;
 
     using Orleans.Runtime;
@@ -14,12 +16,54 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle UintPtrTypeHandle = typeof(UIntPtr).TypeHandle;
 
         private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+        
+        private readonly Dictionary<RuntimeTypeHandle, SimpleTypeSerializer> directSerializers;
 
         private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
 
         private readonly SerializationManager.DeepCopier immutableTypeCopier = obj => obj;
 
         private readonly ILFieldBuilder fieldBuilder = new ILFieldBuilder();
+        
+        public ILSerializerGenerator()
+        {
+            this.directSerializers = new Dictionary<RuntimeTypeHandle, SimpleTypeSerializer>
+            {
+                [typeof(int).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(int)), r => r.ReadInt()),
+                [typeof(uint).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(uint)), r => r.ReadUInt()),
+                [typeof(short).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(short)), r => r.ReadShort()),
+                [typeof(ushort).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(ushort)), r => r.ReadUShort()),
+                [typeof(long).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(long)), r => r.ReadLong()),
+                [typeof(ulong).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(ulong)), r => r.ReadULong()),
+                [typeof(byte).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(byte)), r => r.ReadByte()),
+                [typeof(sbyte).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(sbyte)), r => r.ReadSByte()),
+                [typeof(float).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(float)), r => r.ReadFloat()),
+                [typeof(double).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(double)), r => r.ReadDouble()),
+                [typeof(decimal).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(decimal)), r => r.ReadDecimal()),
+                [typeof(string).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(string)), r => r.ReadString()),
+                [typeof(char).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(char)), r => r.ReadChar()),
+                [typeof(Guid).TypeHandle] = new SimpleTypeSerializer(w => w.Write(default(Guid)), r => r.ReadGuid()),
+                [typeof(DateTime).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(DateTime)), r => r.ReadDateTime()),
+                [typeof(TimeSpan).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(TimeSpan)), r => r.ReadTimeSpan()),
+                [typeof(GrainId).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(GrainId)), r => r.ReadGrainId()),
+                [typeof(ActivationId).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(ActivationId)), r => r.ReadActivationId()),
+                [typeof(SiloAddress).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(SiloAddress)), r => r.ReadSiloAddress()),
+                [typeof(ActivationAddress).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(ActivationAddress)), r => r.ReadActivationAddress()),
+                [typeof(IPAddress).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(IPAddress)), r => r.ReadIPAddress()),
+                [typeof(IPEndPoint).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(IPEndPoint)), r => r.ReadIPEndPoint()),
+                [typeof(CorrelationId).TypeHandle] =
+                    new SimpleTypeSerializer(w => w.Write(default(CorrelationId)), r => r.ReadCorrelationId())
+            };
+        }
 
         /// <summary>
         /// Returns a value indicating whether the provided <paramref name="type"/> is supported.
@@ -66,7 +110,10 @@ namespace Orleans.Serialization
 
                 var serializer = this.EmitSerializer(type, serializationFields);
                 var deserializer = this.EmitDeserializer(type, serializationFields);
-                return new SerializationManager.SerializerMethods(copier, serializer.CreateDelegate(), deserializer.CreateDelegate());
+                return new SerializationManager.SerializerMethods(
+                    copier,
+                    serializer.CreateDelegate(),
+                    deserializer.CreateDelegate());
             }
             catch (Exception exception)
             {
@@ -112,8 +159,10 @@ namespace Orleans.Serialization
                 // Deep-copy the field if needed, otherwise just leave it as-is.
                 if (!field.FieldType.IsOrleansShallowCopyable())
                 {
+                    var copyMethod = this.methods.DeepCopyInner;
+
                     il.BoxIfValueType(field.FieldType);
-                    il.Call(this.methods.DeepCopyInner);
+                    il.Call(copyMethod);
                     il.CastOrUnbox(field.FieldType);
                 }
 
@@ -146,15 +195,28 @@ namespace Orleans.Serialization
             // Serialize each field
             foreach (var field in fields)
             {
-                // Load the field.
-                il.LoadLocal(typedInput);
-                il.LoadField(field);
-                il.BoxIfValueType(field.FieldType);
+                SimpleTypeSerializer serializer;
+                if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                {
+                    il.LoadArgument(1);
+                    il.LoadLocal(typedInput);
+                    il.LoadField(field);
+                    il.Call(serializer.WriteMethod);
+                }
+                else
+                {
+                    var serializeMethod = this.methods.SerializeInner;
 
-                // Serialize the field.
-                il.LoadArgument(1);
-                il.LoadType(field.FieldType);
-                il.Call(this.methods.SerializeInner);
+                    // Load the field.
+                    il.LoadLocal(typedInput);
+                    il.LoadField(field);
+                    il.BoxIfValueType(field.FieldType);
+
+                    // Serialize the field.
+                    il.LoadArgument(1);
+                    il.LoadType(field.FieldType);
+                    il.Call(serializeMethod);
+                }
             }
 
             il.Return();
@@ -185,14 +247,27 @@ namespace Orleans.Serialization
             foreach (var field in fields)
             {
                 // Deserialize the field.
-                il.LoadLocalAsReference(type, result);
-                il.LoadType(field.FieldType);
-                il.LoadArgument(1);
-                il.Call(this.methods.DeserializeInner);
+                SimpleTypeSerializer serializer;
+                if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                {
+                    il.LoadLocalAsReference(type, result);
+                    il.LoadArgument(1);
+                    il.Call(serializer.ReadMethod);
+                    il.StoreField(field);
+                }
+                else
+                {
+                    var deserializeMethod = this.methods.DeserializeInner;
 
-                // Store the value on the result.
-                il.CastOrUnbox(field.FieldType);
-                il.StoreField(field);
+                    il.LoadLocalAsReference(type, result);
+                    il.LoadType(field.FieldType);
+                    il.LoadArgument(1);
+                    il.Call(deserializeMethod);
+
+                    // Store the value on the result.
+                    il.CastOrUnbox(field.FieldType);
+                    il.StoreField(field);
+                }
             }
 
             il.LoadLocal(result);
@@ -209,11 +284,14 @@ namespace Orleans.Serialization
         /// <returns>A sorted list of the fields of the provided type.</returns>
         private List<FieldInfo> GetFields(Type type, Func<FieldInfo, bool> fieldFilter = null)
         {
-            var result = type.GetAllFields().Where(
-                field =>
-                field.GetCustomAttribute<NonSerializedAttribute>() == null
-                && !field.IsStatic && IsSupportedFieldType(field.FieldType.GetTypeInfo())
-                && (fieldFilter == null || fieldFilter(field))).ToList();
+            var result =
+                type.GetAllFields()
+                    .Where(
+                        field =>
+                        field.GetCustomAttribute<NonSerializedAttribute>() == null && !field.IsStatic
+                        && IsSupportedFieldType(field.FieldType.GetTypeInfo())
+                        && (fieldFilter == null || fieldFilter(field)))
+                    .ToList();
             result.Sort(FieldInfoComparer.Instance);
             return result;
         }
@@ -249,6 +327,21 @@ namespace Orleans.Serialization
             {
                 return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
             }
+        }
+
+        private class SimpleTypeSerializer
+        {
+            public SimpleTypeSerializer(
+                Expression<Action<BinaryTokenStreamWriter>> write,
+                Expression<Action<BinaryTokenStreamReader>> read)
+            {
+                this.WriteMethod = TypeUtils.Method(write);
+                this.ReadMethod = TypeUtils.Method(read);
+            }
+
+            public MethodInfo WriteMethod { get; }
+
+            public MethodInfo ReadMethod { get; }
         }
     }
 }
