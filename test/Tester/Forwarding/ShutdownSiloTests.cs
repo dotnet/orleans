@@ -47,9 +47,9 @@ namespace Tester.Forwarding
             await Task.Delay(500);
             HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
 
-            // One call will fail with SiloUnavailableException
-            await Assert.ThrowsAsync<SiloUnavailableException>(
-                () => Task.WhenAll(grains.Select(g => g.GetRuntimeInstanceId())));
+            // At least one call will try to use the stopped gateway,
+            // causing it to be rerouted
+            await Task.WhenAll(grains.Select(g => g.GetRuntimeInstanceId()));
 
             // Should not raise any exception because response should come from another silo
             await Task.WhenAll(promises);
