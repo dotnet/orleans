@@ -102,7 +102,7 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
-            if (alreadyFired || Message.TentativeSentCount > 0)
+            if (alreadyFired)
                 return;
 
             var msg = Message;
