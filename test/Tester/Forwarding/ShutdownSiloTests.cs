@@ -19,7 +19,6 @@ namespace Tester.Forwarding
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(NumberOfSilos);
-            options.ClientConfiguration.PreferedGatewayIndex = 1; // Not on primary
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
             options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
             options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
@@ -29,21 +28,28 @@ namespace Tester.Forwarding
         [Fact, TestCategory("Functional"), TestCategory("Forward")]
         public async Task SiloGracefulShutdown_NoFailureOnGatewayStop()
         {
-            var grain = await GetLongRunningTaskGrainOnPrimary<bool>();
+            const int numberOfGrains = 5*NumberOfSilos;
+
+            var grains = new List<ILongRunningTaskGrain<bool>>();
+            for (var i = 0; i < numberOfGrains; i++)
+            {
+                grains.Add(await GetLongRunningTaskGrainOnPrimary<bool>());
+            }
 
             // Put some work on a grain which is on Primary silo
-            var promises = new List<Task>
+            var promises = new List<Task>();
+            foreach (var grain in grains)
             {
-                grain.LongRunningTask(true, TimeSpan.FromSeconds(5)),
-                grain.LongRunningTask(true, TimeSpan.FromSeconds(5))
-            };
+                promises.Add(grain.LongRunningTask(true, TimeSpan.FromSeconds(5)));
+            }
 
-            // Shutdown the silo where the gateway we use is
+            // Shutdown the silo where there is a gateway
             await Task.Delay(500);
             HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
 
-            // This call should raise SiloUnavailableException because the gateway is closed
-            await Assert.ThrowsAsync<SiloUnavailableException>(grain.GetRuntimeInstanceId);
+            // One call will fail with SiloUnavailableException
+            await Assert.ThrowsAsync<SiloUnavailableException>(
+                () => Task.WhenAll(grains.Select(g => g.GetRuntimeInstanceId())));
 
             // Should not raise any exception because response should come from another silo
             await Task.WhenAll(promises);
