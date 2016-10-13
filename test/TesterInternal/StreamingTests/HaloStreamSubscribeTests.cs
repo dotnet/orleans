@@ -1,9 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
@@ -16,18 +16,29 @@ namespace UnitTests.HaloTests.Streaming
 {
     public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = "SMSProvider";
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    // StartSecondary = false,
-                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-                });
+                var options = new TestClusterOptions();
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+                options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+                return new TestCluster(options);
             }
 
             public override void Dispose()
@@ -38,7 +49,7 @@ namespace UnitTests.HaloTests.Streaming
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;

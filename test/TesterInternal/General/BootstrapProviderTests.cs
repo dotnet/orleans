@@ -10,6 +10,8 @@ using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
+using Orleans.Runtime.Configuration;
 
 namespace UnitTests.General
 {
@@ -17,25 +19,25 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
-                    StartFreshOrleans = true,
-                    StartPrimary = true,
-                    StartSecondary = true,
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.MockBootstrapProvider>("bootstrap1");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.GrainCallBootstrapper>("bootstrap2");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.LocalGrainInitBootstrapper>("bootstrap3");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.ControllableBootstrapProvider>("bootstrap4");
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default", numStorageGrains: 1);
+
+                return new TestCluster(options);
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+
+        protected TestCluster HostedCluster { get; private set; }
 
         public BootstrapProvidersTests(ITestOutputHelper output, Fixture fixture)
         {

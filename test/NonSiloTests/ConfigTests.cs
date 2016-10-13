@@ -709,6 +709,22 @@ namespace UnitTests
             }
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Providers")]
+        public void Config_BootstrapProviders()
+        {
+            const string filename = "Config_BootstrapProviders.xml";
+            var orleansConfig = new ClusterConfiguration();
+            orleansConfig.LoadFromFile(filename);
+            var providerConfigs = orleansConfig.Globals.ProviderConfigurations["Bootstrap"];
+            ValidateProviderConfigs(providerConfigs, 2);
+
+            var providers = providerConfigs.Providers.Values.Cast<ProviderConfiguration>().ToList();
+            Assert.Equal("bootstrap1", providers[0].Name);
+            Assert.Equal("UnitTests.General.MockBootstrapProvider", providers[0].Type);
+            Assert.Equal("bootstrap2", providers[1].Name);
+            Assert.Equal("UnitTests.General.GrainCallBootstrapper", providers[1].Type);
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AdditionalAssemblyPaths_Config()
         {

@@ -2,15 +2,16 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -397,18 +398,16 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartPrimary = true,
-                    StartSecondary = false,
-                    PropagateActivityId = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                },
-                new TestingClientOptions { PropagateActivityId = true });
+                var options = new TestClusterOptions(initialSilosCount: 1);
+
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
+                options.ClientConfiguration.PropagateActivityId = true;
+
+                return new TestCluster(options);
             }
         }
 
