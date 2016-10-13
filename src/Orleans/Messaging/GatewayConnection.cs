@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 using Orleans.Runtime;
@@ -66,7 +67,6 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
-            RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
             {
@@ -173,6 +173,17 @@ namespace Orleans.Messaging
                 }
                 // Failed too many times -- give up
                 MarkAsDead();
+            }
+        }
+
+        protected override void DrainQueueOnStop(IEnumerable<Message> requests)
+        {
+            // Rerroute all message not yet sent to another GW
+            foreach (var request in requests)
+            {
+                request.TargetActivation = null;
+                request.TargetSilo = null;
+                MsgCenter.SendMessage(request);
             }
         }
 
