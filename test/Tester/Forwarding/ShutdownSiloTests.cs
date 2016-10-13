@@ -43,6 +43,48 @@ namespace Tester.Forwarding
             await promisesAfterShutdown;
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Forward")]
+        public async Task SiloGracefulShutdown_NoFailureOnGatewayShutdown()
+        {
+            const int numberOfGrains = 5 * NumberOfSilos;
+
+            var grains = new List<ILongRunningTaskGrain<bool>>();
+            for (var i = 0; i < numberOfGrains; i++)
+            {
+                grains.Add(await GetLongRunningTaskGrainOnPrimary<bool>());
+            }
+
+            // Put some work on a grain which is on Primary silo
+            var promises = new List<Task>();
+            foreach (var grain in grains)
+            {
+                promises.Add(grain.LongRunningTask(true, TimeSpan.FromSeconds(5)));
+            }
+
+            // Shutdown the silo where there is a gateway
+            await Task.Delay(500);
+            HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+
+            // One call will fail and should be redirected to another gateway
+            await Task.WhenAll(grains.Select(g => g.GetRuntimeInstanceId()));
+
+            // Should not raise any exception because response should come from another silo
+            await Task.WhenAll(promises);
+        }
+
+        private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnPrimary<T>()
+        {
+            while (true)
+            {
+                var grain = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<T>>(Guid.NewGuid());
+                var instanceId = await grain.GetRuntimeInstanceId();
+                if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
+                {
+                    return grain;
+                }
+            }
+        }
+
         private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnSecondary<T>()
         {
             while (true)
