@@ -72,7 +72,7 @@ namespace Orleans.Serialization
         /// <returns>A value indicating whether the provided <paramref name="type"/> is supported.</returns>
         public static bool IsSupportedType(TypeInfo type)
         {
-            return !type.IsAbstract && !type.IsInterface && !type.IsArray && IsSupportedFieldType(type);
+            return !type.IsAbstract && !type.IsInterface && !type.IsArray && !type.IsEnum && IsSupportedFieldType(type);
         }
 
         /// <summary>
@@ -196,11 +196,19 @@ namespace Orleans.Serialization
             foreach (var field in fields)
             {
                 SimpleTypeSerializer serializer;
-                if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                var fieldType = field.FieldType.GetTypeInfo();
+                var typeHandle = field.FieldType.TypeHandle;
+                if (fieldType.IsEnum)
+                {
+                    typeHandle = fieldType.GetEnumUnderlyingType().TypeHandle;
+                }
+                
+                if (this.directSerializers.TryGetValue(typeHandle, out serializer))
                 {
                     il.LoadArgument(1);
                     il.LoadLocal(typedInput);
                     il.LoadField(field);
+
                     il.Call(serializer.WriteMethod);
                 }
                 else
@@ -210,6 +218,7 @@ namespace Orleans.Serialization
                     // Load the field.
                     il.LoadLocal(typedInput);
                     il.LoadField(field);
+
                     il.BoxIfValueType(field.FieldType);
 
                     // Serialize the field.
@@ -248,11 +257,22 @@ namespace Orleans.Serialization
             {
                 // Deserialize the field.
                 SimpleTypeSerializer serializer;
-                if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
+                var fieldType = field.FieldType.GetTypeInfo();
+                if (fieldType.IsEnum)
+                {
+                    var typeHandle = fieldType.GetEnumUnderlyingType().TypeHandle;
+                    il.LoadLocalAsReference(type, result);
+                    
+                    il.LoadArgument(1);
+                    il.Call(this.directSerializers[typeHandle].ReadMethod);
+                    il.StoreField(field);
+                }
+                else if (this.directSerializers.TryGetValue(field.FieldType.TypeHandle, out serializer))
                 {
                     il.LoadLocalAsReference(type, result);
                     il.LoadArgument(1);
                     il.Call(serializer.ReadMethod);
+
                     il.StoreField(field);
                 }
                 else
