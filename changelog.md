@@ -8,6 +8,13 @@ The idea is to track end-user facing changes as they occur.*
 - CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
 - Several major performance improvements
 
+### [v1.3.0]
+- Bug fixes:
+  - Ignore empty deployment Id in Azure #2230 
+  - Remove zero length check in Protobuf serializer #2251 
+  - Make PreferLocalPlacement revert to RandomPlacement on non-active silos #2276 
+- Updated MemoryStreamProvider to support custom message serialization #2271 
+
 ### [v1.3.0-beta2]
 - Support for geo-distributed multi-cluster deployments #1108 #1109 #1800
 - Providers

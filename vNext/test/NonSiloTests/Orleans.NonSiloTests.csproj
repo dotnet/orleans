@@ -139,6 +139,10 @@
       <Link>Config_Azure_Default.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\..\test\NonSiloTests\Config_BootstrapProviders.xml">
+      <Link>Config_BootstrapProviders.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\..\..\test\NonSiloTests\Config_Different_Membership_Reminders.xml">
       <Link>Config_Different_Membership_Reminders.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

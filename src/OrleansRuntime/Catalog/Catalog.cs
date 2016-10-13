@@ -1266,6 +1266,13 @@ namespace Orleans.Runtime
             }
         }
 
+        public SiloStatus LocalSiloStatus
+        {
+            get {
+                return SiloStatusOracle.CurrentStatus;
+            }
+        }
+
 #endregion
 #region Implementation of ICatalog
 

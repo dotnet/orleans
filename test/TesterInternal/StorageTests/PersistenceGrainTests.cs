@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
@@ -16,6 +15,8 @@ using UnitTests.Grains;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
+using Orleans.Runtime.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -28,27 +29,29 @@ namespace UnitTests.StorageTests
     /// </summary>
     public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-                    StartSecondary = false,
-                });
+                var options = new TestClusterOptions(initialSilosCount: 1);
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test1");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>("ErrorInjector");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("lowercase");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+
+                return new TestCluster(options);
             }
         }
 
         const string ErrorInjectorStorageProvider = "ErrorInjector";
         private readonly ITestOutputHelper output;
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
             HostedCluster = fixture.HostedCluster;
-            SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
             ResetMockStorageProvidersHistory();
         }
