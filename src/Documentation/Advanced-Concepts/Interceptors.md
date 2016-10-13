@@ -93,7 +93,11 @@ When the client tries to deserialize the `EntityException`, it will fail due to 
 
 One may argue that this is pretty okay, since the client would never handle the `EntityException`; otherwise it would have to reference `EntityFramework.dll`.
 
-But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type `Exception` if the exception type is presumably unknown on the client side. This can be done as follows:
+But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type `Exception` if the exception type is presumably unknown on the client side.
+
+However, there is one important thing we have to keep in mind: we only want to replace an exception **if the caller is the grain client**. We don't want to replace an exception if the caller is another grain (or the Orleans infrastructure which is making grain calls, too; e.g. on the `GrainBasedReminderTable` grain).
+
+On the server side this can be done with a silo-level interceptor:
 
 ```csharp
 private static Task RegisterInterceptors(IProviderRuntime providerRuntime, IProviderConfiguration config)
@@ -102,27 +106,34 @@ private static Task RegisterInterceptors(IProviderRuntime providerRuntime, IProv
 
     providerRuntime.SetInvokeInterceptor(async (method, request, grain, invoker) =>
     {
-        try
+        if (RequestContext.Get("IsExceptionConversionEnabled") as bool? == true)
         {
-            return await invoker.Invoke(grain, request);
-        }
-        catch (Exception exc)
-        {
-            var type = exc.GetType();
+            RequestContext.Remove("IsExceptionConversionEnabled");
 
-            if (knownAssemblyNames.Contains(type.Assembly.GetName().Name))
+            try
             {
-                throw;
+                return await invoker.Invoke(grain, request);
             }
+            catch (Exception exc)
+            {
+                var type = exc.GetType();
 
-            // special exception handling
-            throw new Exception(
-                $"Exception of non-public type '{type.FullName}' has been wrapped. Original message: <<<<----{Environment.NewLine}{exc.ToString()}{Environment.NewLine}---->>>>");
+                if (knownAssemblyNames.Contains(type.Assembly.GetName().Name))
+                {
+                    throw;
+                }
+
+                // special exception handling
+                throw new Exception(
+                    $"Exception of non-public type '{type.FullName}' has been wrapped. Original message: <<<<----{Environment.NewLine}{exc.ToString()}{Environment.NewLine}---->>>>");
+            }
         }
+
+        return await invoker.Invoke(grain, request);
     });
 
     return TaskDone.Done;
-}
+
 
 private static HashSet<string> GetKnownExceptionTypeAssemblyNames()
     =>
@@ -148,3 +159,11 @@ private static HashSet<string> GetKnownExceptionTypeAssemblyNames()
         "MyCompany.Microservices.ServiceLayer"
 };
 ```
+
+On the client side you have to set up a client-side interceptor:
+
+```csharp
+GrainClient.ClientInvokeCallback = (request, grain) => { RequestContext.Set("IsExceptionConversionEnabled", true); };
+```
+
+This way the client tells the server that it wants to use exception conversion.
