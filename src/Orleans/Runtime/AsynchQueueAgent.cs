@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -66,7 +67,7 @@ namespace Orleans.Runtime
             {
                 if (Cts.IsCancellationRequested)
                 {
-                    return;
+                    break;
                 }
                 T request;
                 try
@@ -97,6 +98,7 @@ namespace Orleans.Runtime
                 }
 #endif
             }
+            DrainQueueOnStop(requestQueue.GetConsumingEnumerable());
         }
 
         public override void Stop()
@@ -109,6 +111,11 @@ namespace Orleans.Runtime
 #endif
             requestQueue.CompleteAdding();
             base.Stop();
+        }
+
+        protected virtual void DrainQueueOnStop(IEnumerable<T> requests)
+        {
+            // Just drop them by default
         }
 
         public virtual int Count
