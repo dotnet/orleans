@@ -115,15 +115,11 @@ namespace Orleans.Runtime
                 {
                     activityIdObj = Guid.Empty;
                 }
-                else
-                {
-#if NETSTANDARD
-                    ActivityId.Value = (Guid) activityIdObj;
-#endif
-                }
 
-#if !NETSTANDARD
-                Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
+#if NETSTANDARD
+                ActivityId.Value = (Guid) activityIdObj;
+#else
+                Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
 #endif
             }
             if (contextData != null && contextData.Count > 0)
