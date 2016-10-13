@@ -761,7 +761,7 @@ namespace Orleans.Serialization
         private static void RegisterGrainReferenceSerializers(Type type)
         {
             var attr = type.GetTypeInfo().GetCustomAttribute<GrainReferenceAttribute>();
-            if (attr?.TargetType != null)
+            if (attr?.TargetType == null)
             {
                 return;
             }
