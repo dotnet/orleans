@@ -7,6 +7,13 @@ $(function () {
   var show = 'show';
   var hide = 'hide';
 
+  // Enable highlight.js
+  (function () {
+    $('pre code').each(function(i, block) {
+      hljs.highlightBlock(block);
+    });
+  })();
+
   // Line highlight for code snippet
   (function () {
     $('pre code[highlight-lines]').each(function (i, block) {
@@ -148,8 +155,8 @@ $(function () {
         var keywords = q.split("%20");
         keywords.forEach(function (keyword) {
           if (keyword !== "") {
-            highlight($('.data-searchable *'), keyword, "<mark>");
-            highlight($('article *'), keyword, "<mark>");
+            $('.data-searchable *').mark(keyword);
+            $('article *').mark(keyword);
           }
         });
       }
@@ -182,19 +189,6 @@ $(function () {
         $('.hide-when-search').hide();
         $('#search-results').show();
       }
-    }
-
-    function highlight(nodes, rgxStr, tag) {
-      var rgx = new RegExp(rgxStr, "gi");
-      nodes.each(function () {
-        $(this).contents().filter(function () {
-          return this.nodeType == 3 && rgx.test(this.nodeValue);
-        }).replaceWith(function () {
-          return (this.nodeValue || "").replace(rgx, function (match) {
-            return $(tag).text(match)[0].outerHTML;
-          });
-        });
-      });
     }
 
     function relativeUrlToAbsoluteUrl(currentUrl, relativeUrl) {
