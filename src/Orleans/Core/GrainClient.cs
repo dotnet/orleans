@@ -312,6 +312,7 @@ namespace Orleans
             }
             outsideRuntimeClient = null;
             grainFactory = null;
+            ClientInvokeCallback = null;
         }
 
         /// <summary>
