@@ -1,5 +1,4 @@
 {
-
   "build": {
     "content": [
       {
@@ -59,9 +58,9 @@
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/dotnet/orleans",
-        "branch": "gh-pages"
-      }
+        "branch": "gh-pages",
+      },
+	  "_gitUrlPattern": "github"
     }
   }
-
 }
