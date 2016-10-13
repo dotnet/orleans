@@ -422,6 +422,7 @@ namespace UnitTests.General
         public void Dispose()
         {
             Trace.CorrelationManager.ActivityId = Guid.Empty;
+            GrainClient.ClientInvokeCallback = null;
             RequestContext.Clear();
         }
 
