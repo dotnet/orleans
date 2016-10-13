@@ -688,6 +688,8 @@ namespace Orleans
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
         Messaging_SimulatedMessageLoss          = MessagingBase + 34,
         Messaging_Dispatcher_ReturnToOriginCluster    = MessagingBase + 35,
+        MessagingAcceptAsyncSocketException     = MessagingBase + 36,
+        Messaging_ExceptionReceiveAsync         = MessagingBase + 37,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
