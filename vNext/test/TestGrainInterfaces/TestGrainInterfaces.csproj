@@ -41,8 +41,17 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\CodegenTestInterfaces.cs">
+      <Link>CodegenTestInterfaces.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IActivateDeactivateWatcherGrain.cs">
       <Link>IActivateDeactivateWatcherGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ICircularStateTestGrain.cs">
+      <Link>ICircularStateTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IJsonEchoGrain.cs">
+      <Link>IJsonEchoGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
       <Link>IPersistenceTestGrains.cs</Link>
@@ -50,17 +59,17 @@
     <Compile Include="..\..\..\test\TestGrainInterfaces\ISerializationGeneratorTests.cs">
       <Link>ISerializationGeneratorTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleObserverableGrain.cs">
+      <Link>ISimpleObserverableGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
       <Link>IStreamLifecycleTestGrains.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ICircularStateTestGrain.cs">
-      <Link>ICircularStateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\CodegenTestInterfaces.cs">
-      <Link>CodegenTestInterfaces.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IValueTypeTestGrain.cs">
       <Link>IValueTypeTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\SerializerExclusions.cs">
+      <Link>SerializerExclusions.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -74,6 +83,7 @@
     <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleGrain.cs">
       <Link>ISimpleGrain.cs</Link>
     </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />

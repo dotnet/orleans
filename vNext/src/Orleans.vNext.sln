@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrainInterfaces", "..\t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "..\test\Tester\Tester.csproj", "{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrains", "..\test\TestGrains\TestGrains.csproj", "{AACE28AE-F301-472A-B633-02B55434871A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,10 @@ Global
 		{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AACE28AE-F301-472A-B633-02B55434871A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AACE28AE-F301-472A-B633-02B55434871A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AACE28AE-F301-472A-B633-02B55434871A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AACE28AE-F301-472A-B633-02B55434871A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -98,5 +104,6 @@ Global
 		{A682ABC1-1A51-4794-8012-DA8E59EBC72A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{A972213F-189B-41D4-90FE-38D513C1106A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{A9C8FFEC-4947-4F04-BA73-1F17B329A55A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
+		{AACE28AE-F301-472A-B633-02B55434871A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal

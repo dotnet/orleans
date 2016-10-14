@@ -39,14 +39,74 @@
     <Compile Include="..\..\..\test\NonSiloTests\ConfigTests.cs">
       <Link>ConfigTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\AsynchAgentRestartTest.cs">
+      <Link>AsynchAgentRestartTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\AsyncPipelineTests.cs">
+      <Link>AsyncPipelineTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\Async_AsyncExecutorWithRetriesTests.cs">
+      <Link>Async_AsyncExecutorWithRetriesTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\Async_TimingTests.cs">
+      <Link>Async_TimingTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\CodeGeneratorTests.cs">
+      <Link>CodeGeneratorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\CounterTests.cs">
+      <Link>CounterTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\ErrorInjectionStorageProvider.cs">
+      <Link>ErrorInjectionStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\CounterStatisticTests.cs">
+      <Link>General\CounterStatisticTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\Identifiertests.cs">
+      <Link>General\Identifiertests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\InterfaceRules.cs">
+      <Link>General\InterfaceRules.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\InternalSerializationTests.cs">
+      <Link>General\InternalSerializationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\LruTest.cs">
+      <Link>General\LruTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\RequestContextTestsNonSiloRequired.cs">
+      <Link>General\RequestContextTestsNonSiloRequired.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\General\RingTests_Standalone.cs">
+      <Link>General\RingTests_Standalone.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\ManagementAgentTests.cs">
+      <Link>ManagementAgentTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\OrleansRuntime\AsyncSerialExecutorTests.cs">
+      <Link>OrleansRuntime\AsyncSerialExecutorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\OrleansRuntime\ExceptionsTests.cs">
+      <Link>OrleansRuntime\ExceptionsTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\OrleansRuntime\Streams\BestFitBalancerTests.cs">
+      <Link>OrleansRuntime\Streams\BestFitBalancerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\OrleansRuntime\Streams\SubscriptionMarkerTests.cs">
+      <Link>OrleansRuntime\Streams\SubscriptionMarkerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\Serialization\BuiltInSerializerTests.cs">
+      <Link>Serialization\BuiltInSerializerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\Serialization\IlBasedSerializerTests.cs">
+      <Link>Serialization\IlBasedSerializerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\Serialization\SerializerGenerationTests.cs">
+      <Link>Serialization\SerializerGenerationTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\SerializationTests\IlBasedSerializerTests.cs">
-      <Link>SerializationTests\IlBasedSerializerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\SerializationTests\BuiltInSerializerTests.cs">
-      <Link>SerializationTests\BuiltInSerializerTests.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs</Link>
@@ -84,6 +144,7 @@
     <Compile Include="..\..\..\test\NonSiloTests\TestInternalHelper.cs">
       <Link>TestInternalHelper.cs</Link>
     </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
@@ -110,6 +171,10 @@
       <Project>{a972213f-189b-41d4-90fe-38d513c1106a}</Project>
       <Name>TestGrainInterfaces</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
+      <Project>{aace28ae-f301-472a-b633-02b55434871a}</Project>
+      <Name>TestGrains</Name>
+    </ProjectReference>
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
       <Project>{a682abc1-1a51-4794-8012-da8e59ebc72a}</Project>
       <Name>TestInternalGrains</Name>
@@ -120,13 +185,15 @@
     <None Include="Orleans.NonSiloTests.xunit.runner.json" />
     <None Include="project.json" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\..\..\src\SDK\OrleansConfiguration.xml">
+      <Link>OrleansConfiguration.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\..\..\test\NonSiloTests\ClientConfig_NewAzure.xml">
       <Link>ClientConfig_NewAzure.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -225,10 +292,6 @@
     </Content>
     <Content Include="..\..\..\test\NonSiloTests\SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\Tester\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <Link>OrleansConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\..\src\SDK\ClientConfiguration.xml">
