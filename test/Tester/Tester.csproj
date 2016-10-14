@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="BaseClusterFixture.cs" />
@@ -144,6 +145,15 @@
       <Link>Version.txt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="DeploymentTests\Configuration\Deployment.xml" />
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml" />
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml" />
+    <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.csproj">

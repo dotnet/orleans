@@ -105,9 +105,6 @@
     <Compile Include="..\..\..\test\NonSiloTests\Serialization\SerializerGenerationTests.cs">
       <Link>Serialization\SerializerGenerationTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\DeploymentTests\DeployTest.cs">
-      <Link>DeploymentTests\DeployTest.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs">
       <Link>SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs</Link>
     </Compile>
@@ -297,34 +294,9 @@
       <Link>SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml">
-      <Link>DeploymentTests\Configuration\TestAbsolutePaths\Deploy-AbsolutePaths.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml">
-      <Link>DeploymentTests\Configuration\TestAbsolutePaths\OrleansConfiguration.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="..\..\..\src\SDK\ClientConfiguration.xml">
       <Link>ClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml">
-      <Link>DeploymentTests\Configuration\TestCleanEmptyOrleans\Clean-EmptyRelativePaths.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml">
-      <Link>DeploymentTests\Configuration\TestCleanEmptyOrleans\OrleansConfiguration.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml">
-      <Link>DeploymentTests\Configuration\TestCleanOrleans\Clean-RelativePaths.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml">
-      <Link>DeploymentTests\Configuration\TestCleanOrleans\OrleansConfiguration.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml">
-      <Link>DeploymentTests\Configuration\TestRelativePaths\Deploy-RelativePaths.xml</Link>
-    </Content>
-    <Content Include="..\..\..\test\NonSiloTests\DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
-      <Link>DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml</Link>
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

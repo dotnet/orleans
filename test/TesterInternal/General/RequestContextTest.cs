@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
