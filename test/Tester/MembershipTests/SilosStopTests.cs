@@ -50,5 +50,26 @@ namespace UnitTests.MembershipTests
                 Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
             }
         }
+
+        [Fact, TestCategory("Functional"), TestCategory("Liveness")]
+        public async Task SiloUngracefulShutdown_ClientOutstandingRequestsBreak()
+        {
+            var grain = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var task = grain.LongRunningTask(true, TimeSpan.FromSeconds(7));
+            await Task.Delay(500);
+
+            HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
+            HostedCluster.KillSilo(HostedCluster.Primary);
+            try
+            {
+                await task;
+                Assert.True(false, "The broken promise exception was not thrown");
+            }
+            catch (Exception ex)
+            {
+                Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
+            }
+        }
+
     }
 }
