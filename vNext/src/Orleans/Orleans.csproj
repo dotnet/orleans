@@ -58,6 +58,9 @@
     <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansRuntime\Messaging\ObjectPool.cs">
+      <Link>Messaging\ObjectPool.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\Orleans\AssemblyLoader\AssemblyLoader.cs">
       <Link>AssemblyLoader\AssemblyLoader.cs</Link>
     </Compile>

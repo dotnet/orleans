@@ -290,8 +290,8 @@ namespace Orleans.Serialization
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
             foreach (var attr in internalsVisibleTo)
             {
-                if (string.Equals(attr.AssemblyName, fullName, StringComparison.InvariantCulture)) return true;
-                if (string.Equals(attr.AssemblyName, shortName, StringComparison.InvariantCulture)) return true;
+                if (string.Equals(attr.AssemblyName, fullName, StringComparison.Ordinal)) return true;
+                if (string.Equals(attr.AssemblyName, shortName, StringComparison.Ordinal)) return true;
             }
 
             return false;

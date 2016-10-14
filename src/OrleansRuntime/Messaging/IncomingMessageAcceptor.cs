@@ -270,7 +270,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (SocketException ex)
             {
-                Log.Warn(ErrorCode.MessagingAcceptAsyncSocketException, "Socket error on accepting socket during AcceptAsync {0}", ex.ErrorCode);
+                Log.Warn(ErrorCode.MessagingAcceptAsyncSocketException, "Socket error on accepting socket during AcceptAsync {0}", ex.SocketErrorCode);
                 RestartAcceptingSocket();
             }
             catch (ObjectDisposedException)
