@@ -67,7 +67,7 @@ namespace Orleans.Runtime
             {
                 if (Cts.IsCancellationRequested)
                 {
-                    break;
+                    return;
                 }
                 T request;
                 try
@@ -98,7 +98,6 @@ namespace Orleans.Runtime
                 }
 #endif
             }
-            DrainQueueOnStop(requestQueue.GetConsumingEnumerable());
         }
 
         public override void Stop()
@@ -113,9 +112,21 @@ namespace Orleans.Runtime
             base.Stop();
         }
 
-        protected virtual void DrainQueueOnStop(IEnumerable<T> requests)
+        protected void DrainQueue(Action<T> action)
         {
-            // Just drop them by default
+            while (true)
+            {
+                T request;
+                try
+                {
+                    request = requestQueue.Take();
+                }
+                catch (InvalidOperationException)
+                {
+                    break; // Queue is empty
+                }
+                action(request);
+            }
         }
 
         public virtual int Count

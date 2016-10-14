@@ -750,18 +750,17 @@ namespace Orleans.Runtime
                         .WaitWithThrow(stopTimeout);
                 }
 
-                if (gracefully)
-                {
-                    // 3: Deactivate all grains
-                    SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
-                }
-
+                // 3: Deactivate all grains
+                SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
 
                 // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-                // 4: Start rejecting all silo to silo application messages
-                SafeExecute(messageCenter.BlockApplicationMessages);
+                if (!gracefully)
+                {
+                    // 4: Start rejecting all silo to silo application messages
+                    SafeExecute(messageCenter.BlockApplicationMessages);
+                }
 
                 // 5: Stop scheduling/executing application turns
                 SafeExecute(scheduler.StopApplicationTurns);

@@ -67,6 +67,8 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
+            DrainQueue(RerouteMessage);
+            RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
             {
@@ -173,17 +175,6 @@ namespace Orleans.Messaging
                 }
                 // Failed too many times -- give up
                 MarkAsDead();
-            }
-        }
-
-        protected override void DrainQueueOnStop(IEnumerable<Message> requests)
-        {
-            // Rerroute all message not yet sent to another GW
-            foreach (var request in requests)
-            {
-                request.TargetActivation = null;
-                request.TargetSilo = null;
-                MsgCenter.SendMessage(request);
             }
         }
 
@@ -300,6 +291,13 @@ namespace Orleans.Messaging
                 Log.Warn(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
+        }
+
+        private void RerouteMessage(Message msg)
+        {
+            msg.TargetActivation = null;
+            msg.TargetSilo = null;
+            MsgCenter.SendMessage(msg);
         }
     }
 }
