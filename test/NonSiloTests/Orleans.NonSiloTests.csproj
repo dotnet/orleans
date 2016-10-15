@@ -37,15 +37,8 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.ServiceModel" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyLoaderTests.cs" />
@@ -56,7 +49,6 @@
     <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterTests.cs" />
-    <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="General\Identifiertests.cs" />
     <Compile Include="General\InterfaceRules.cs" />
@@ -87,8 +79,6 @@
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="SerializerTests\CustomSerializerTests.cs" />
     <Compile Include="SerializerTests\MessageSerializerTests.cs" />
-    <Compile Include="StorageTests\MockStorageProvider.cs" />
-    <Compile Include="TestConstants.cs" />
     <Compile Include="TestInternalHelper.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -204,10 +194,6 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Tester\Tester.csproj">
-      <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55d}</Project>
-      <Name>Tester</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>

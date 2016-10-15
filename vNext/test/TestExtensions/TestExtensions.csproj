@@ -34,22 +34,38 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestExtensions\MockStorageProvider.cs">
+      <Link>MockStorageProvider.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestExtensions\TestCategory.cs">
       <Link>TestCategory.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestConstants.cs">
+      <Link>TestConstants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestDefaultConfiguration.cs">
+      <Link>TestDefaultConfiguration.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestExtensions\TestOutputHelperExtensions.cs">
       <Link>TestOutputHelperExtensions.cs</Link>
     </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
-    <Folder Include="Properties\" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
+      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
+      <Name>OrleansTestingHost</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
+      <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

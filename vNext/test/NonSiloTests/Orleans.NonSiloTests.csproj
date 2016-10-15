@@ -33,7 +33,6 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\..\test\NonSiloTests\ConfigTests.cs">
@@ -56,9 +55,6 @@
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\CounterTests.cs">
       <Link>CounterTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\ErrorInjectionStorageProvider.cs">
-      <Link>ErrorInjectionStorageProvider.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\General\CounterStatisticTests.cs">
       <Link>General\CounterStatisticTests.cs</Link>
@@ -134,12 +130,6 @@
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\SerializerTests\MessageSerializerTests.cs">
       <Link>SerializerTests\MessageSerializerTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\StorageTests\MockStorageProvider.cs">
-      <Link>StorageTests\MockStorageProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\TestConstants.cs">
-      <Link>TestConstants.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\TestInternalHelper.cs">
       <Link>TestInternalHelper.cs</Link>

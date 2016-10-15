@@ -39,22 +39,17 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
-    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data.Services" />
-    <Reference Include="System.Transactions" />
     <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActivationsLifeCycleTests\ActivationCollectorTests.cs" />
     <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
+    <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
@@ -242,10 +237,6 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\NonSiloTests\Orleans.NonSiloTests.csproj">
-      <Project>{b9c8ffec-4947-4f04-ba73-1f17b329a55e}</Project>
-      <Name>Orleans.NonSiloTests</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestFSharp\TestFSharp.fsproj">
       <Project>{ca8dab68-17e9-48bf-afa3-9ccfd4b0a3cd}</Project>
