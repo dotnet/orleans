@@ -35,20 +35,22 @@ namespace UnitTests.StorageTests.Relational
         }
 
 
-        internal async Task PersistenceStorage_WriteReadWriteRead100StatesInParallel()
+        internal async Task PersistenceStorage_WriteReadWriteRead100StatesInParallel(string prefix = nameof(this.PersistenceStorage_WriteReadWriteRead100StatesInParallel))
         {
             //As data is written and read the ETags are as checked for correctness (they change).
             //Additionally the Store_WriteRead tests does its validation.
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             int StartOfRange = 33900;
             const int CountOfRange = 100;
+            string grainIdTemplate = $"{prefix}-" + "{0}";
             var tasks = Enumerable.Range(StartOfRange, CountOfRange).Select(async i =>
             {
                 //Since the version is NULL, storage provider tries to insert this data
                 //as new state. If there is already data with this class, the writing fails
                 //and the storage provider throws. Essentially it means either this range
                 //is ill chosen or the test failed due another problem.
-                var grainData = CommonStorageUtilities.GetTestReferenceAndState(i, null);
+                var grainId = string.Format(grainIdTemplate, i);
+                var grainData = CommonStorageUtilities.GetTestReferenceAndState(grainId, null);
 
                 var firstVersion = grainData.Item2.ETag;
                 Assert.Equal(firstVersion, null);

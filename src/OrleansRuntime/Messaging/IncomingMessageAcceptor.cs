@@ -384,9 +384,10 @@ namespace Orleans.Runtime.Messaging
             catch (Exception exception)
             {
                 var socketException = exception as SocketException;
+                var context = readEventArgs.UserToken as ReceiveCallbackContext;
                 ima.Log.Warn(ErrorCode.Messaging_IMA_NewBeginReceiveException,
                     $"Exception on new socket during ReceiveAsync with RemoteEndPoint " +
-                    $"{socketException?.SocketErrorCode.ToString() ?? ""}: {sock.RemoteEndPoint}", exception);
+                    $"{socketException?.SocketErrorCode}: {context?.RemoteEndPoint}", exception);
                 ima.SafeCloseSocket(sock);
                 FreeSocketAsyncEventArgs(readEventArgs);
             }
@@ -414,7 +415,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(null, null, poolWrapper);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -602,15 +603,21 @@ namespace Orleans.Runtime.Messaging
         private class ReceiveCallbackContext
         {
             private readonly IncomingMessageBuffer _buffer;
-            public Socket Socket { get; internal set; }
-            public EndPoint RemoteEndPoint => Socket.RemoteEndPoint;
+            private Socket socket;
+            public Socket Socket {
+                get { return socket; }
+                internal set
+                {
+                    socket = value;
+                    RemoteEndPoint = socket.RemoteEndPoint;
+                }
+            }
+            public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima, SaeaPoolWrapper poolWrapper)
+            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper)
             {
-                Socket = sock;
-                IMA = ima;
                 SaeaPoolWrapper = poolWrapper;
                 _buffer = new IncomingMessageBuffer(LogManager.GetLogger(nameof(IncomingMessageBuffer), LoggerType.Runtime));
             }
