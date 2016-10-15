@@ -54,9 +54,9 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
-        internal async Task WriteRead100StatesInParallel()
+        internal async Task WriteReadWriteRead100StatesInParallel()
         {
-            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteRead100StatesInParallel();
+            await Relational_WriteReadWriteRead100StatesInParallel();
         }
 
         [SkippableFact]
