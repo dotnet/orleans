@@ -34,12 +34,13 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MockStorageProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestCategory.cs" />
+    <Compile Include="TestConstants.cs" />
+    <Compile Include="TestDefaultConfiguration.cs" />
     <Compile Include="TestOutputHelperExtensions.cs" />
     <Compile Include="TestUtils.cs" />
   </ItemGroup>
@@ -47,6 +48,10 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
+      <Name>OrleansProviders</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>

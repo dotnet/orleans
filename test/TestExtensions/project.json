@@ -1,5 +1,7 @@
-{
+﻿{
   "dependencies": {
+    "Microsoft.Extensions.Configuration.EnvironmentVariables": "1.0.0",
+    "Microsoft.Extensions.Configuration.Json": "1.0.0",
     "xunit.abstractions": "2.0.0",
     "xunit.core": "2.1.0",
     "xunit.extensibility.core": "2.1.0",

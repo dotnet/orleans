@@ -20,3 +20,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("TestExtensions")]
