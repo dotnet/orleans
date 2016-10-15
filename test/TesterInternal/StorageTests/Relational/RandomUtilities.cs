@@ -22,8 +22,14 @@ namespace UnitTests.StorageTests.Relational
         /// "public Category IdCategory { get { return GetCategory(TypeCodeData); } }".
         /// Note that 0L would likely do also.
         /// </summary>
-        private const long NormalGrainTypeCode = 3L;
-        private const long KeyExtensionGrainTypeCode = 6L;
+        public const long NormalGrainTypeCode = 3L;
+
+        /// <summary>
+        /// This type code is consistent with Orleans.Runtime.Category.Grain = 3, used also like
+        /// "public Category IdCategory { get { return GetCategory(TypeCodeData); } }".
+        /// Note that 0L would likely do also.
+        /// </summary>
+        public const long KeyExtensionGrainTypeCode = 6L;
 
         /// <summary>
         /// A rudimentary type switch that is read-only after construction and doesn't take into account inheritance etc. This is to simply
