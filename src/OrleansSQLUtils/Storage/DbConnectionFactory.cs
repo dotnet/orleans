@@ -26,7 +26,7 @@ namespace Orleans.SqlUtils
 
             if (factoryData == null)
             {
-                throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please check the configuration file to see if the provider is configured correctly or the binaries/assemblies are deployed with the application.");
+                throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please check the application configuration file to see if the provider is configured correctly or the configured ADO.NET provider libraries are deployed with the application.");
             }
 
             var factoryName = factoryData["Name"].ToString();
