@@ -1,10 +1,9 @@
-﻿using Orleans.Runtime.Configuration;
-using Orleans.Storage;
+﻿using Orleans.Storage;
 using System;
 using System.Collections.Generic;
 
 
-namespace OrleansSQLUtils
+namespace Orleans.Runtime.Configuration
 {
     /// <summary>
     /// The format in which the data will serialized to the storage.
