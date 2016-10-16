@@ -42,7 +42,7 @@ namespace Orleans.Runtime
         internal const string PING_APPLICATION_HEADER = "Ping";
 
 #if NETSTANDARD
-        private static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
+        public static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
         private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
 #endif
 
