@@ -53,6 +53,8 @@ namespace Orleans.Runtime.Configuration
             connectionString = GetConnectionString(connectionString, config);
             var properties = new Dictionary<string, string> { { AdoNetStorageProvider.DataConnectionStringPropertyName, connectionString } };
 
+            //In the following the call to ToString is documented to return a non-localized string
+            //and internally just a literal so should be quick. See more at https://technet.microsoft.com/fi-fi/library/s802ct92.
             if(serializationFormat == AdoNetSerializationFormat.Json)
             {
                 properties[AdoNetStorageProvider.UseJsonFormatPropertyName] = true.ToString();
