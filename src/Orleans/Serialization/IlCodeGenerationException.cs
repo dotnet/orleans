@@ -1,7 +1,6 @@
 namespace Orleans.Serialization
 {
     using System;
-    using System.Runtime.Serialization;
 
     using Orleans.Runtime;
 

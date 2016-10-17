@@ -1,7 +1,10 @@
 ﻿namespace Orleans.Serialization
 {
     using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
     using System.Reflection;
+    using System.Text;
 
     using Orleans.Runtime;
     
@@ -10,11 +13,40 @@
     /// </summary>
     public class IlBasedFallbackSerializer : IExternalSerializer
     {
-        private readonly IlBasedSerializers serializers;
-        
+        /// <summary>
+        /// The serializer generator.
+        /// </summary>
+        private readonly IlBasedSerializerGenerator generator = new IlBasedSerializerGenerator();
+
+        /// <summary>
+        /// The collection of generated serializers.
+        /// </summary>
+        private readonly ConcurrentDictionary<Type, SerializerBundle> serializers = new ConcurrentDictionary<Type, SerializerBundle>();
+
+        /// <summary>
+        /// The serializer used when a concrete type is not known.
+        /// </summary>
+        private readonly SerializationManager.SerializerMethods thisSerializer;
+
+        private readonly Func<Type, SerializerBundle> generateSerializer;
+
         public IlBasedFallbackSerializer()
         {
-            this.serializers = new IlBasedSerializers();
+            // Configure the serializer to be used when a concrete type is not known.
+            // The serializer will generate and register serializers for concrete types
+            // as they are discovered.
+            this.thisSerializer = new SerializationManager.SerializerMethods(
+                this.DeepCopy,
+                this.Serialize,
+                this.Deserialize);
+
+            this.typeSerializer = new SerializerBundle(
+                typeof(Type),
+                new SerializationManager.SerializerMethods(
+                    original => original,
+                    (original, writer, expected) => { this.WriteNamedType((Type)original, writer); },
+                    (expected, reader) => this.ReadNamedType(reader)));
+            this.generateSerializer = this.GenerateSerializer;
         }
 
         /// <summary>
@@ -30,7 +62,8 @@
         /// </summary>
         /// <param name="t">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
-        public bool IsSupportedType(Type t) => IlBasedSerializerTypeChecker.IsSupportedType(t.GetTypeInfo());
+        public bool IsSupportedType(Type t)
+            => this.serializers.ContainsKey(t) || IlBasedSerializerGenerator.IsSupportedType(t.GetTypeInfo());
 
         /// <summary>
         /// Tries to create a copy of source.
@@ -40,7 +73,8 @@
         public object DeepCopy(object source)
         {
             if (source == null) return null;
-            return this.serializers.Get(source.GetType()).DeepCopy(source);
+            Type type = source.GetType();
+            return this.serializers.GetOrAdd(type, this.generateSerializer).Methods.DeepCopy(source);
         }
 
         /// <summary>
@@ -59,7 +93,7 @@
 
             var actualType = item.GetType();
             this.WriteType(actualType, expectedType, writer);
-            this.serializers.Get(actualType).Serialize(item, writer, expectedType);
+            this.serializers.GetOrAdd(actualType, this.generateSerializer).Methods.Serialize(item, writer, expectedType);
         }
 
         /// <summary>
@@ -73,9 +107,7 @@
             var token = reader.ReadToken();
             if (token == SerializationTokenType.Null) return null;
             var actualType = this.ReadType(token, reader, expectedType);
-            var methods = this.serializers.Get(actualType);
-            var deserializer = methods.Deserialize;
-            return deserializer(expectedType, reader);
+            return this.serializers.GetOrAdd(actualType, this.generateSerializer).Methods.Deserialize(expectedType, reader);
         }
         
         private void WriteType(Type actualType, Type expectedType, BinaryTokenStreamWriter writer)
@@ -101,6 +133,41 @@
                     return Type.GetType(reader.ReadString(), throwOnError: true);
                 default:
                     throw new NotSupportedException($"{nameof(SerializationTokenType)} of {token} is not supported.");
+            }
+        }
+
+        private SerializerBundle GenerateSerializer(Type type)
+        {
+            if (type.GetTypeInfo().IsGenericTypeDefinition) return new SerializerBundle(type, this.thisSerializer);
+
+            Func<FieldInfo, bool> fieldFilter = null;
+            if (typeof(Exception).IsAssignableFrom(type))
+            {
+                fieldFilter = this.ExceptionFieldFilter;
+            }
+
+            return new SerializerBundle(type, this.generator.GenerateSerializer(type, fieldFilter));
+        }
+
+        private bool ExceptionFieldFilter(FieldInfo arg)
+        {
+            // Any field defined below Exception is acceptable.
+            if (arg.DeclaringType != typeof(Exception)) return true;
+
+            // Certain fields from the Exception base class are acceptable.
+            return arg.FieldType == typeof(string) || arg.FieldType == typeof(Exception);
+        }
+
+        public class SerializerBundle
+        {
+            public readonly SerializationManager.SerializerMethods Methods;
+
+            public readonly Type Type;
+
+            public SerializerBundle(Type type, SerializationManager.SerializerMethods methods)
+            {
+                this.Type = type;
+                this.Methods = methods;
             }
         }
     }

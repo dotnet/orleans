@@ -13,6 +13,22 @@ namespace Orleans.Serialization
 
         private readonly SerializationManager.DeepCopier immutableTypeCopier = obj => obj;
 
+        private static readonly RuntimeTypeHandle IntPtrTypeHandle = typeof(IntPtr).TypeHandle;
+
+        private static readonly RuntimeTypeHandle UintPtrTypeHandle = typeof(UIntPtr).TypeHandle;
+
+        private static readonly TypeInfo DelegateTypeInfo = typeof(Delegate).GetTypeInfo();
+
+        /// <summary>
+        /// Returns a value indicating whether the provided <paramref name="type"/> is supported.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>A value indicating whether the provided <paramref name="type"/> is supported.</returns>
+        public static bool IsSupportedType(TypeInfo type)
+        {
+            return !type.IsAbstract && !type.IsInterface && !type.IsArray && IsSupportedFieldType(type);
+        }
+
         /// <summary>
         /// Generates a serializer for the specified type.
         /// </summary>
@@ -191,10 +207,27 @@ namespace Orleans.Serialization
             var result = type.GetAllFields().Where(
                 field =>
                 field.GetCustomAttribute<NonSerializedAttribute>() == null
-                && !field.IsStatic && IlBasedSerializerTypeChecker.IsSupportedFieldType(field.FieldType.GetTypeInfo())
+                && !field.IsStatic && IsSupportedFieldType(field.FieldType.GetTypeInfo())
                 && (fieldFilter == null || fieldFilter(field))).ToList();
             result.Sort(FieldInfoComparer.Instance);
             return result;
+        }
+
+        /// <summary>
+        /// Returns a value indicating whether the provided type is supported as a field by this class.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>A value indicating whether the provided type is supported as a field by this class.</returns>
+        private static bool IsSupportedFieldType(TypeInfo type)
+        {
+            if (type.IsPointer || type.IsByRef) return false;
+
+            var handle = type.AsType().TypeHandle;
+            if (handle.Equals(IntPtrTypeHandle)) return false;
+            if (handle.Equals(UintPtrTypeHandle)) return false;
+            if (DelegateTypeInfo.IsAssignableFrom(type)) return false;
+
+            return true;
         }
 
         /// <summary>
@@ -212,6 +245,5 @@ namespace Orleans.Serialization
                 return string.Compare(x.Name, y.Name, StringComparison.Ordinal);
             }
         }
-
     }
 }
