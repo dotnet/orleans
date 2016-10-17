@@ -7,7 +7,7 @@
     using System.Text;
 
     using Orleans.Runtime;
-    
+
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
@@ -21,12 +21,23 @@
         /// <summary>
         /// The collection of generated serializers.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, SerializerBundle> serializers = new ConcurrentDictionary<Type, SerializerBundle>();
+        private readonly ConcurrentDictionary<Type, SerializerBundle> serializers =
+            new ConcurrentDictionary<Type, SerializerBundle>();
+
+        private readonly ConcurrentDictionary<Type, TypeKey> typeCache = new ConcurrentDictionary<Type, TypeKey>();
+
+        private readonly ConcurrentDictionary<TypeKey, Type> typeKeyCache =
+            new ConcurrentDictionary<TypeKey, Type>(new TypeKey.Comparer());
 
         /// <summary>
         /// The serializer used when a concrete type is not known.
         /// </summary>
         private readonly SerializationManager.SerializerMethods thisSerializer;
+
+        /// <summary>
+        /// The serializer used for implementations of <see cref="Type"/>.
+        /// </summary>
+        private readonly SerializerBundle typeSerializer;
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
@@ -107,9 +118,10 @@
             var token = reader.ReadToken();
             if (token == SerializationTokenType.Null) return null;
             var actualType = this.ReadType(token, reader, expectedType);
-            return this.serializers.GetOrAdd(actualType, this.generateSerializer).Methods.Deserialize(expectedType, reader);
+            return this.serializers.GetOrAdd(actualType, this.generateSerializer)
+                       .Methods.Deserialize(expectedType, reader);
         }
-        
+
         private void WriteType(Type actualType, Type expectedType, BinaryTokenStreamWriter writer)
         {
             if (actualType == expectedType)
@@ -119,7 +131,7 @@
             else
             {
                 writer.Write((byte)SerializationTokenType.NamedType);
-                writer.Write(actualType.AssemblyQualifiedName);
+                this.WriteNamedType(actualType, writer);
             }
         }
 
@@ -130,15 +142,38 @@
                 case SerializationTokenType.ExpectedType:
                     return expectedType;
                 case SerializationTokenType.NamedType:
-                    return Type.GetType(reader.ReadString(), throwOnError: true);
+                    return this.ReadNamedType(reader);
                 default:
                     throw new NotSupportedException($"{nameof(SerializationTokenType)} of {token} is not supported.");
             }
         }
 
+        private Type ReadNamedType(BinaryTokenStreamReader reader)
+        {
+            var hashCode = reader.ReadInt();
+            var count = reader.ReadUShort();
+            var typeName = reader.ReadBytes(count);
+            return this.typeKeyCache.GetOrAdd(
+                new TypeKey(hashCode, typeName),
+                k => Type.GetType(Encoding.UTF8.GetString(k.TypeName), throwOnError: true));
+        }
+
+        private void WriteNamedType(Type type, BinaryTokenStreamWriter writer)
+        {
+            var key = this.typeCache.GetOrAdd(type, t => new TypeKey(Encoding.UTF8.GetBytes(t.AssemblyQualifiedName)));
+            writer.Write(key.HashCode);
+            writer.Write((ushort)key.TypeName.Length);
+            writer.Write(key.TypeName);
+        }
+
         private SerializerBundle GenerateSerializer(Type type)
         {
             if (type.GetTypeInfo().IsGenericTypeDefinition) return new SerializerBundle(type, this.thisSerializer);
+
+            if (typeof(Type).IsAssignableFrom(type))
+            {
+                return this.typeSerializer;
+            }
 
             Func<FieldInfo, bool> fieldFilter = null;
             if (typeof(Exception).IsAssignableFrom(type))
@@ -156,6 +191,63 @@
 
             // Certain fields from the Exception base class are acceptable.
             return arg.FieldType == typeof(string) || arg.FieldType == typeof(Exception);
+        }
+
+        /// <summary>
+        /// Represents a named type for the purposes of serialization.
+        /// </summary>
+        internal struct TypeKey
+        {
+            public readonly int HashCode;
+
+            public readonly byte[] TypeName;
+
+            public TypeKey(int hashCode, byte[] key)
+            {
+                this.HashCode = hashCode;
+                this.TypeName = key;
+            }
+
+            public TypeKey(byte[] key)
+            {
+                this.HashCode = unchecked((int)JenkinsHash.Factory.GetHashGenerator().ComputeHash(key));
+                this.TypeName = key;
+            }
+
+            public bool Equals(TypeKey other)
+            {
+                if (this.HashCode != other.HashCode) return false;
+                var a = this.TypeName;
+                var b = other.TypeName;
+                if (ReferenceEquals(a, b)) return true;
+                if (a.Length != b.Length) return false;
+                var length = a.Length;
+                for (var i = 0; i < length; i++) if (a[i] != b[i]) return false;
+                return true;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TypeKey && this.Equals((TypeKey)obj);
+            }
+
+            public override int GetHashCode()
+            {
+                return this.HashCode;
+            }
+
+            internal class Comparer : IEqualityComparer<TypeKey>
+            {
+                public bool Equals(TypeKey x, TypeKey y)
+                {
+                    return x.Equals(y);
+                }
+
+                public int GetHashCode(TypeKey obj)
+                {
+                    return obj.HashCode;
+                }
+            }
         }
 
         public class SerializerBundle
