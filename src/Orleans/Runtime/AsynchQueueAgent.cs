@@ -114,17 +114,9 @@ namespace Orleans.Runtime
 
         protected void DrainQueue(Action<T> action)
         {
-            while (true)
+            T request;
+            while (requestQueue.TryTake(out request))
             {
-                T request;
-                try
-                {
-                    request = requestQueue.Take();
-                }
-                catch (InvalidOperationException)
-                {
-                    break; // Queue is empty
-                }
                 action(request);
             }
         }
