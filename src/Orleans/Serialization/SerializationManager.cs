@@ -1885,7 +1885,7 @@ namespace Orleans.Serialization
             else
             {
 #if NETSTANDARD
-                serializer = new IlBasedFallbackSerializer();
+                serializer = new ILBasedSerializer();
 #else
                 serializer = new BinaryFormatterSerializer();
 #endif

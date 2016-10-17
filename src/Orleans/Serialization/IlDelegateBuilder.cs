@@ -4,7 +4,7 @@ namespace Orleans.Serialization
     using System.Reflection;
     using System.Reflection.Emit;
 
-    internal class IlDelegateBuilder<TDelegate>
+    internal class ILDelegateBuilder<TDelegate>
         where TDelegate : class
     {
         private readonly DynamicMethod dynamicMethod;
@@ -14,19 +14,19 @@ namespace Orleans.Serialization
         private readonly ReflectedSerializationMethodInfo methods;
 
         /// <summary>
-        /// Creates a new instance of the <see cref="IlDelegateBuilder{TDelegate}"/> class.
+        /// Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.
         /// </summary>
         /// <param name="name">The name of the new delegate.</param>
         /// <param name="methods">The reflected methods used during delegate creation.</param>
         /// <param name="methodInfo">
         /// The method info for <typeparamref name="TDelegate"/> delegates, used for determining parameter types.
         /// </param>
-        public IlDelegateBuilder(string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
+        public ILDelegateBuilder(string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
         {
             this.methods = methods;
             var returnType = methodInfo.ReturnType;
             var parameterTypes = GetParameterTypes(methodInfo);
-            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(IlDelegateBuilder<>).GetTypeInfo().Module, true);
+            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(ILDelegateBuilder<>).GetTypeInfo().Module, true);
             this.il = this.dynamicMethod.GetILGenerator();
         }
 

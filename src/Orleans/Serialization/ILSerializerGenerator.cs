@@ -7,7 +7,7 @@ namespace Orleans.Serialization
 
     using Orleans.Runtime;
 
-    internal class IlBasedSerializerGenerator
+    internal class ILSerializerGenerator
     {
         private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
 
@@ -68,13 +68,13 @@ namespace Orleans.Serialization
             }
             catch (Exception exception)
             {
-                throw new IlCodeGenerationException($"Serializer generation failed for type {type}", exception);
+                throw new ILGenerationException($"Serializer generation failed for type {type}", exception);
             }
         }
 
-        private IlDelegateBuilder<SerializationManager.DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<SerializationManager.DeepCopier> EmitCopier(Type type, List<FieldInfo> fields)
         {
-            var builder = new IlDelegateBuilder<SerializationManager.DeepCopier>(
+            var builder = new ILDelegateBuilder<SerializationManager.DeepCopier>(
                 type.Name + "DeepCopier",
                 this.methods,
                 this.methods.DeepCopierDelegate);
@@ -124,9 +124,9 @@ namespace Orleans.Serialization
             return builder;
         }
 
-        private IlDelegateBuilder<SerializationManager.Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<SerializationManager.Serializer> EmitSerializer(Type type, List<FieldInfo> fields)
         {
-            var builder = new IlDelegateBuilder<SerializationManager.Serializer>(
+            var builder = new ILDelegateBuilder<SerializationManager.Serializer>(
                 type.Name + "Serializer",
                 this.methods,
                 this.methods.SerializerDelegate);
@@ -157,9 +157,9 @@ namespace Orleans.Serialization
             return builder;
         }
 
-        private IlDelegateBuilder<SerializationManager.Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
+        private ILDelegateBuilder<SerializationManager.Deserializer> EmitDeserializer(Type type, List<FieldInfo> fields)
         {
-            var builder = new IlDelegateBuilder<SerializationManager.Deserializer>(
+            var builder = new ILDelegateBuilder<SerializationManager.Deserializer>(
                 type.Name + "Deserializer",
                 this.methods,
                 this.methods.DeserializerDelegate);

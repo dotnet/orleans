@@ -11,12 +11,12 @@
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
-    public class IlBasedFallbackSerializer : IExternalSerializer
+    public class ILBasedSerializer : IExternalSerializer
     {
         /// <summary>
         /// The serializer generator.
         /// </summary>
-        private readonly IlBasedSerializerGenerator generator = new IlBasedSerializerGenerator();
+        private readonly ILSerializerGenerator generator = new ILSerializerGenerator();
 
         /// <summary>
         /// The collection of generated serializers.
@@ -41,7 +41,7 @@
 
         private readonly Func<Type, SerializerBundle> generateSerializer;
 
-        public IlBasedFallbackSerializer()
+        public ILBasedSerializer()
         {
             // Configure the serializer to be used when a concrete type is not known.
             // The serializer will generate and register serializers for concrete types
@@ -74,7 +74,7 @@
         /// <param name="t">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
         public bool IsSupportedType(Type t)
-            => this.serializers.ContainsKey(t) || IlBasedSerializerGenerator.IsSupportedType(t.GetTypeInfo());
+            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t.GetTypeInfo());
 
         /// <summary>
         /// Tries to create a copy of source.

@@ -5,18 +5,18 @@ namespace Orleans.Serialization
     using Orleans.Runtime;
 
     [Serializable]
-    public class IlCodeGenerationException : OrleansException
+    public class ILGenerationException : OrleansException
     {
-        public IlCodeGenerationException()
+        public ILGenerationException()
         {
         }
 
-        public IlCodeGenerationException(string message)
+        public ILGenerationException(string message)
             : base(message)
         {
         }
 
-        public IlCodeGenerationException(string message, Exception innerException)
+        public ILGenerationException(string message, Exception innerException)
             : base(message, innerException)
         {
         }
