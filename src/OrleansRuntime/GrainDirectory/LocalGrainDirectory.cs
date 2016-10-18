@@ -19,8 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// list of silo members sorted by the hash value of their address
         /// </summary>
         private readonly List<SiloAddress> membershipRingList;
-
-        private readonly Func<SiloAddress, int, bool, bool> isSiloNextInTheRing; 
+        
         private readonly HashSet<SiloAddress> membershipCache;
         private readonly AsynchAgent maintainer;
         private readonly Logger log;
@@ -93,8 +92,6 @@ namespace Orleans.Runtime.GrainDirectory
             log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");
 
             MyAddress = silo.LocalMessageCenter.MyAddress;
-            isSiloNextInTheRing = (siloAddr, hash, excludeMySelf) => (siloAddr.GetConsistentHashCode() <= hash) &&
-                                                                     (!excludeMySelf || !siloAddr.Equals(MyAddress));
 
             Scheduler = silo.LocalScheduler;
             membershipRingList = new List<SiloAddress>();
@@ -483,7 +480,7 @@ namespace Orleans.Runtime.GrainDirectory
                 for (var index = membershipRingList.Count - 1; index >= 0; --index)
                 {
                     var item = membershipRingList[index];
-                    if (isSiloNextInTheRing(item, hash, excludeMySelf))
+                    if (IsSiloNextInTheRing(item, hash, excludeMySelf))
                     {
                         siloAddress = item;
                         break;
@@ -1099,6 +1096,11 @@ namespace Orleans.Runtime.GrainDirectory
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
             return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
+        }
+
+        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
+        {
+            return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
         }
 
         private static void RemoveActivations(IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
