@@ -78,8 +78,7 @@ namespace UnitTests.Streaming
             Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, siloHandle.Silo.SiloAddress);
-            Guid serviceId = await testHook.GetServiceId();
+            Guid serviceId = await siloHandle.TestHook.GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config
@@ -110,8 +109,7 @@ namespace UnitTests.Streaming
             Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, siloHandle.Silo.SiloAddress);
-            Guid serviceId = await testHook.GetServiceId();
+            Guid serviceId = await siloHandle.TestHook.GetServiceId();
             Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config

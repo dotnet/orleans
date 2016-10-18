@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests
 {
-    // if we paralellize tests, this should run in isolation
+    // if we parallelize tests, this should run in isolation 
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;

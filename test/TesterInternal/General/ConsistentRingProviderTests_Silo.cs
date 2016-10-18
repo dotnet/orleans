@@ -202,12 +202,12 @@ namespace UnitTests.General
             {
                 double next = random.NextDouble();
                 uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
-                SiloAddress s = this.HostedCluster.Primary.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo(randomKey);
+                SiloAddress s = this.HostedCluster.Primary.TestHook.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
                     return randomKey;
             }
             throw new Exception(String.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
-                responsibleSilo, this.HostedCluster.Primary.TestHook.ConsistentRingProvider));
+                responsibleSilo, this.HostedCluster.Primary.TestHook.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 
         private void VerificationScenario(uint testKey)
@@ -240,7 +240,7 @@ namespace UnitTests.General
 
         private void VerifyKey(uint key, List<SiloAddress> silos)
         {
-            SiloAddress truth = this.HostedCluster.Primary.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo(key); //expected;
+            SiloAddress truth = this.HostedCluster.Primary.TestHook.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
             //if (truth == null) // if the truth isn't passed, we compute it here
             //{
             //    truth = silos.Find(siloAddr => (key <= siloAddr.GetConsistentHashCode()));
@@ -253,7 +253,7 @@ namespace UnitTests.General
             // lookup for 'key' should return 'truth' on all silos
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
-                SiloAddress s = siloHandle.TestHook.ConsistentRingProvider.GetPrimaryTargetSilo((uint)key);
+                SiloAddress s = siloHandle.TestHook.GetConsistentRingPrimaryTargetSilo((uint)key).Result;
                 Assert.Equal(truth, s);
             }
         }

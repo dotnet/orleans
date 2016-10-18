@@ -16,7 +16,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime.TestHooks;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -356,9 +355,8 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
                 string provider = providerType.FullName;
-                List<string> providers = (await testHook.GetStorageProviderNames()).ToList();
+                List<string> providers = (await silo.TestHook.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }

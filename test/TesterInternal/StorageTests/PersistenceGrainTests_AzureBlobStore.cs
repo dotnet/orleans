@@ -118,9 +118,9 @@ namespace UnitTests.StorageTests
 
       
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Azure")]
-        public void Persistence_Silo_StorageProvider_AzureBlobStore()
+        public Task Persistence_Silo_StorageProvider_AzureBlobStore()
         {
-            base.Persistence_Silo_StorageProvider_Azure(typeof(AzureBlobStorage));
+            return base.Persistence_Silo_StorageProvider_Azure(typeof(AzureBlobStorage));
         }
 
     }

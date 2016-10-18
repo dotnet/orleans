@@ -82,7 +82,7 @@ namespace Orleans.TestingHost
                 AppDomain = appDomain,
                 additionalAssemblies = additionalAssemblies,
 #if !NETSTANDARD_TODO
-                TestHook = siloHost.TestHook,
+                AppDomainTestHook = siloHost.AppDomainTestHook,
 #endif
             };
 

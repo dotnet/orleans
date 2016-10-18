@@ -2,10 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.TestHooks;
 
 namespace Orleans.Runtime
 {
@@ -14,6 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationCollector : IActivationCollector
     {
+        internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets;
@@ -322,7 +321,7 @@ namespace Orleans.Runtime
             return result ?? nothing;
         }
 
-        private static void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
+        private void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
         {
             if (null == condemned)
             {
@@ -333,16 +332,7 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            try
-            {
-                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, activation.Address.Silo);
-                testHook?.DecideToCollectActivation(activation.Grain);
-            }
-            catch (Exception exc)
-            {
-
-                throw;
-            }
+            this.Debug_OnDecideToCollectActivation?.Invoke(activation.Grain);
         }
 
         private static void ThrowIfTicketIsInvalid(DateTime ticket, TimeSpan quantum)

@@ -118,9 +118,9 @@ namespace UnitTests.StorageTests
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void Persistence_Silo_StorageProvider_AWSDynamoDBStore()
+        public Task Persistence_Silo_StorageProvider_AWSDynamoDBStore()
         {
-            base.Persistence_Silo_StorageProvider_AWS(typeof(DynamoDBStorageProvider));
+            return base.Persistence_Silo_StorageProvider_AWS(typeof(DynamoDBStorageProvider));
         }
 
         [SkippableFact, TestCategory("Functional")]

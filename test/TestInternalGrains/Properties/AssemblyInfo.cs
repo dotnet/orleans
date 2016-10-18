@@ -18,4 +18,3 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: InternalsVisibleTo("TesterInternal")]

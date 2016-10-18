@@ -67,12 +67,11 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                var testHook = GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, silo.Silo.SiloAddress);
-                List<string> providers = (await testHook.GetStorageProviderNames()).ToList();
+                ICollection<string> providers = await silo.TestHook.GetStorageProviderNames();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
                 const string providerName = "test1";
-                IStorageProvider storageProvider = silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider storageProvider = silo.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(storageProvider);
             }
         }
@@ -84,7 +83,7 @@ namespace UnitTests.StorageTests
             foreach (var silo in silos)
             {
                 const string providerName = "LowerCase";
-                IStorageProvider storageProvider = silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider storageProvider = silo.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(storageProvider);
             }
         }
@@ -97,7 +96,7 @@ namespace UnitTests.StorageTests
             const string providerName = "NotPresent";
             Assert.Throws<KeyNotFoundException>(() =>
             {
-                IStorageProvider store = silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider store = silo.AppDomainTestHook.GetStorageProvider(providerName);
             });
         }
 
@@ -1149,7 +1148,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.TestHook.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 provider.SetValue<TState>(grainType, (GrainReference)grain, "Field1", newValue);
             }
         }
@@ -1159,7 +1158,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.TestHook.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }
@@ -1209,7 +1208,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.TestHook.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(provider);
                 if (provider.ReadCount > 0)
                 {
@@ -1235,7 +1234,7 @@ namespace UnitTests.StorageTests
             {
                 foreach (var providerName in mockStorageProviders)
                 {
-                    MockStorageProvider provider = (MockStorageProvider)siloHandle.TestHook.GetStorageProvider(providerName);
+                    MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                     if (provider != null)
                     {
                         provider.ResetHistory();

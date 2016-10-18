@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.TestHooks;
 
 namespace Orleans.TestingHost
 {
@@ -16,8 +16,11 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the name of the silo </summary>
         public string Name { get; set; }
 
-        /// <summary> Get or set the address of the silo </summary>
+        /// <summary>Get or set the address of the silo</summary>
         public SiloAddress SiloAddress { get; set; }
+
+        /// <summary>Get the proxy address of the silo</summary>
+        public SiloAddress ProxyAddress => SiloAddress.New(this.NodeConfiguration.ProxyGatewayEndpoint, 0);
 
         /// <summary>Gets whether the remote silo is expected to be active</summary>
         public abstract bool IsActive { get; }
@@ -29,10 +32,13 @@ namespace Orleans.TestingHost
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
         public abstract void StopSilo(bool stopGracefully);
 
-        /// <summary>Gets the Silo test hook 
+        /// <summary>Gets the Silo test hook</summary>
+        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.ProxyAddress);
+
+        /// <summary>Gets the Silo test hook that uses AppDomain remoting
         /// (NOTE: this will be removed really soon, and was migrated here temporarily. It does not respect the abstraction
         /// as this only works with AppDomains for now, but we'll be removing TestHooks with AppDomains entirely)</summary>
-        public Silo.TestHooks TestHook { get; set; }
+        internal AppDomainTestHooks AppDomainTestHook { get; set; }
 
         /// <summary> A string that represents the current SiloHandle </summary>
         public override string ToString()

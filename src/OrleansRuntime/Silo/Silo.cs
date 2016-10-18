@@ -12,7 +12,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
-using Orleans.MultiCluster;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -139,7 +138,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Test hook connection for white-box testing of silo.
         /// </summary>
-        private TestHooksSystemTarget testHook;
+        internal TestHooksSystemTarget testHook;
         
         /// <summary>
         /// Creates and initializes the silo from the specified config data.
@@ -337,7 +336,6 @@ namespace Orleans.Runtime
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
-            
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -877,8 +875,6 @@ namespace Orleans.Runtime
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
                 
-                if (testHook != null && !testHook.ExecuteFastKillInProcessExit) return;
-
                 logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
                 FastKill();
             }

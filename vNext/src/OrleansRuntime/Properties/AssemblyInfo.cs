@@ -14,5 +14,6 @@ using System.Runtime.InteropServices;
 // COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
 
+[assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
