@@ -5,7 +5,7 @@ using Orleans.SqlUtils;
 
 namespace UnitTests.General
 {
-    internal class SqlServerStorageForTesting : RelationalStorageForTesting
+    public class SqlServerStorageForTesting : RelationalStorageForTesting
     {
         public SqlServerStorageForTesting(string connectionString)
             : base(AdoNetInvariants.InvariantNameSqlServer, connectionString)

@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Xml;
 using Orleans.Providers;
-using System.Reflection;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -20,12 +21,23 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public enum GatewayProviderType
         {
-            None,               // 
-            AzureTable,         // use Azure, requires SystemStore element
-            SqlServer,          // use SQL, requires SystemStore element
-            ZooKeeper,          // use ZooKeeper, requires SystemStore element
-            Config,             // use Config based static list, requires Config element(s)
-            Custom              // use provider from third-party assembly
+            /// <summary>No provider specified</summary>
+            None,
+
+            /// <summary>use Azure, requires SystemStore element</summary>
+            AzureTable,
+
+            /// <summary>use SQL, requires SystemStore element</summary>
+            SqlServer,
+
+            /// <summary>use ZooKeeper, requires SystemStore element</summary>
+            ZooKeeper,
+
+            /// <summary>use Config based static list, requires Config element(s)</summary>
+            Config,
+
+            /// <summary>use provider from third-party assembly</summary>
+            Custom
         }
 
         /// <summary>
@@ -36,6 +48,7 @@ namespace Orleans.Runtime.Configuration
         private string traceFilePattern;
         private readonly DateTime creationTimestamp;
 
+        /// <summary>Gets the configuration source file path</summary>
         public string SourceFile { get; private set; }
 
         /// <summary>
@@ -81,11 +94,22 @@ namespace Orleans.Runtime.Configuration
 
         public string CustomGatewayProviderAssemblyName { get; set; }
 
+        /// <inheritdoc />
         public Severity DefaultTraceLevel { get; set; }
+
+        /// <inheritdoc />
         public IList<Tuple<string, Severity>> TraceLevelOverrides { get; private set; }
+
+        /// <inheritdoc />
         public bool TraceToConsole { get; set; }
+
+        /// <inheritdoc />
         public int LargeMessageWarningThreshold { get; set; }
+
+        /// <inheritdoc />
         public bool PropagateActivityId { get; set; }
+
+        /// <inheritdoc />
         public int BulkMessageLimit { get; set; }
 
         /// <summary>
@@ -100,9 +124,8 @@ namespace Orleans.Runtime.Configuration
         /// If value is zero, then a random machine-assigned port number will be used.
         /// </summary>
         public int Port { get; private set; }
-        /// <summary>
-        /// </summary>
-        public string DNSHostName { get; private set; } // This is a true host name, no IP address. It is NOT settable, equals Dns.GetHostName().
+        /// <summary>Gets the true host name, no IP address. It equals Dns.GetHostName()</summary>
+        public string DNSHostName { get; private set; }
         /// <summary>
         /// </summary>
         public TimeSpan GatewayListRefreshPeriod { get; set; }
@@ -149,6 +172,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public IDictionary<string, ProviderCategoryConfiguration> ProviderConfigurations { get; set; }
 
+        /// <inheritdoc />
         public string TraceFilePattern
         {
             get { return traceFilePattern; }
@@ -158,10 +182,11 @@ namespace Orleans.Runtime.Configuration
                 ConfigUtilities.SetTraceFileName(this, ClientName, this.creationTimestamp);
             }
         }
+
+        /// <inheritdoc />
         public string TraceFileName { get; set; }
 
-        /// <summary>
-        /// </summary>
+        /// <summary>Initializes a new instance of <see cref="ClientConfiguration"/>.</summary>
         public ClientConfiguration()
             : base(false)
         {
@@ -174,7 +199,7 @@ namespace Orleans.Runtime.Configuration
             NetInterface = null;
             Port = 0;
             DNSHostName = Dns.GetHostName();
-            DeploymentId = Environment.UserName;
+            DeploymentId = "";
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
@@ -268,6 +293,7 @@ namespace Orleans.Runtime.Configuration
                                 }
                             }
                             break;
+
                         case "Tracing":
                             ConfigUtilities.ParseTracing(this, child, ClientName);
                             break;
@@ -351,10 +377,10 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            Type providerTypeInfo = typeof(T).GetTypeInfo();
+            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
             if (providerTypeInfo.IsAbstract ||
                 providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerTypeInfo))
+                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
@@ -403,6 +429,7 @@ namespace Orleans.Runtime.Configuration
             return LoadFromFile(fileName);
         }
 
+        /// <summary>Returns a detailed human readable string that represents the current configuration. It does not contain every single configuration knob.</summary>
         public override string ToString()
         {
             var sb = new StringBuilder();
@@ -412,7 +439,7 @@ namespace Orleans.Runtime.Configuration
 
             sb.AppendLine("Client Configuration:");
             sb.Append("   Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
-            sb.Append("   Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("   Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("   Gateway Provider: ").Append(GatewayProvider);
             if (GatewayProvider == GatewayProviderType.None)
             {
@@ -459,6 +486,15 @@ namespace Orleans.Runtime.Configuration
             sb.Append(ConfigUtilities.IStatisticsConfigurationToString(this));
             sb.Append(LimitManager);
             sb.AppendFormat(base.ToString());
+#if !NETSTANDARD
+            sb.Append("   .NET: ").AppendLine();
+            int workerThreads;
+            int completionPortThreads;
+            ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
+            sb.AppendFormat("       .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+#endif
             sb.AppendFormat("   Providers:").AppendLine();
             sb.Append(ProviderConfigurationUtility.PrintProviderConfigurations(ProviderConfigurations));
             return sb.ToString();

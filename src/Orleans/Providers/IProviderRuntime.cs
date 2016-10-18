@@ -1,8 +1,8 @@
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
@@ -20,9 +20,8 @@ namespace Orleans.Providers
         /// Provides a logger to be used by the provider. 
         /// </summary>
         /// <param name="loggerName">Name of the logger being requested.</param>
-        /// <param name="logType">Type of the logger being requested.</param>
         /// <returns>Object reference to the requested logger.</returns>
-        /// <seealso cref="TraceLogger.LoggerType"/>
+        /// <seealso cref="LoggerType"/>
         Logger GetLogger(string loggerName);
 
         /// <summary>

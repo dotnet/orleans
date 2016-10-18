@@ -4,10 +4,9 @@ namespace Orleans.CodeGeneration
     using System.Collections.Generic;
     using System.IO;
     using System.Reflection;
-
     using Orleans.CodeGenerator;
-    using Orleans.Serialization;
     using Orleans.Runtime;
+    using Orleans.Serialization;
 
     /// <summary>
     /// Generates factory, grain reference, and invoker classes for grain interfaces.
@@ -15,14 +14,14 @@ namespace Orleans.CodeGeneration
     /// </summary>
     public class GrainClientGenerator : MarshalByRefObject
     {
+        private static readonly RoslynCodeGenerator CodeGenerator = new RoslynCodeGenerator();
+
         [Serializable]
         internal class CodeGenOptions
         {
             public FileInfo InputLib;
 
-            public bool LanguageConflict;
-
-            public Language? TargetLanguage;
+            public bool InvalidLanguage;
 
             public List<string> ReferencedAssemblies = new List<string>();
 
@@ -31,7 +30,6 @@ namespace Orleans.CodeGeneration
             public string SourcesDir;
         }
 
-
         [Serializable]
         internal class GrainClientGeneratorFlags
         {
@@ -39,7 +37,6 @@ namespace Orleans.CodeGeneration
 
             internal static bool FailOnPathNotFound = false;
         }
-
 
         private static readonly int[] suppressCompilerWarnings =
         {
@@ -115,13 +112,12 @@ namespace Orleans.CodeGeneration
                 Path.GetFileNameWithoutExtension(options.InputLib.Name) + ".codegen.cs");
             ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
 
-            var codeGenerator = RoslynCodeGenerator.Instance;
             SerializationManager.RegisterBuiltInSerializers();
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
                 DisableWarnings(sourceWriter, suppressCompilerWarnings);
-                sourceWriter.WriteLine(codeGenerator.GenerateSourceForAssembly(grainAssembly));
+                sourceWriter.WriteLine(CodeGenerator.GenerateSourceForAssembly(grainAssembly));
                 RestoreWarnings(sourceWriter, suppressCompilerWarnings);
                 sourceWriter.WriteLine("#endif");
             }
@@ -336,7 +332,7 @@ namespace Orleans.CodeGeneration
                     }
                 }
 
-                if (options.TargetLanguage != Language.CSharp)
+                if (options.InvalidLanguage)
                 {
                     ConsoleText.WriteLine(
                         "ERROR: Compile-time code generation is supported for C# only. "
@@ -383,7 +379,7 @@ namespace Orleans.CodeGeneration
             catch (Exception ex)
             {
                 File.WriteAllText("error.txt", ex.Message + Environment.NewLine + ex.StackTrace);
-                Console.WriteLine("-- Code-gen FAILED -- \n{0}", TraceLogger.PrintException(ex));
+                Console.WriteLine("-- Code-gen FAILED -- \n{0}", LogFormatter.PrintException(ex));
                 return 3;
             }
         }
@@ -391,9 +387,8 @@ namespace Orleans.CodeGeneration
         private static void HandleSourceFile(string arg, CodeGenOptions options)
         {
             AssertWellFormed(arg, true);
-            SetLanguageIfMatchNoConflict(arg, ".cs", Language.CSharp, ref options.TargetLanguage, ref options.LanguageConflict);
-            SetLanguageIfMatchNoConflict(arg, ".vb", Language.VisualBasic, ref options.TargetLanguage, ref options.LanguageConflict);
-            SetLanguageIfMatchNoConflict(arg, ".fs", Language.FSharp, ref options.TargetLanguage, ref options.LanguageConflict);
+            options.InvalidLanguage |= arg.EndsWith(".vb", StringComparison.InvariantCultureIgnoreCase)
+                                       | arg.EndsWith(".fs", StringComparison.InvariantCultureIgnoreCase);
 
             if (arg.EndsWith(CodeGenFileRelativePathCSharp, StringComparison.InvariantCultureIgnoreCase))
             {
@@ -405,29 +400,6 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static void SetLanguageIfMatchNoConflict(
-            string arg,
-            string extension,
-            Language value,
-            ref Language? language,
-            ref bool conflict)
-        {
-            if (conflict) return;
-
-            if (arg.EndsWith(extension, StringComparison.InvariantCultureIgnoreCase))
-            {
-                if (language.HasValue && language != value)
-                {
-                    language = null;
-                    conflict = true;
-                }
-                else
-                {
-                    language = value;
-                }
-            }
-        }
-        
         private static void AssertWellFormed(string path, bool mustExist = false)
         {
             CheckPathNotStartWith(path, ":");

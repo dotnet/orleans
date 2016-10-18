@@ -1,9 +1,7 @@
 using Microsoft.FSharp.Core;
 using Orleans.Serialization;
 using UnitTests.FSharpTypes;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Xunit;
-
 
 namespace UnitTests.Serialization
 {
@@ -20,7 +18,7 @@ namespace UnitTests.Serialization
         void RoundtripSerializationTest<T>(T input)
         {
             var output = SerializationManager.RoundTripSerializationForTesting(input);
-            Assert.AreEqual(input, output);
+            Assert.Equal(input, output);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]

@@ -249,6 +249,22 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="FallbackSerializationProvider" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            Specifies the fallback serialization provider, which is used for objects which can not otherwise be serialized.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="type" type="xs:string">
+            <xs:annotation>
+              <xs:documentation>
+                The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
@@ -297,16 +313,6 @@
           of grain to gateway (messages to the same grain go to the same gateway, while evenly spreading grains across gateways).
           This number should be about 10 to 100 times larger than the expected number of gateway connections.
           If this attribute is not specified, then Math.Pow(2, 13) is used.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="UseStandardSerializer" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-          of the custom Orleans serializer.
-          This parameter is intended for use only for testing and troubleshooting.
-          In production, the custom Orleans serializer should always be used because it performs significantly better.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -478,6 +484,13 @@
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
+    <xs:attribute name="ValidateInitialConnectivity" type="xs:boolean" use="optional">
+      <xs:annotation>
+        <xs:documentation>
+          Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos before being allowed to join the cluster.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
     <xs:attribute name="IAmAliveTablePublishTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
         <xs:documentation>
@@ -522,6 +535,23 @@
     </xs:attribute>
   </xs:complexType>
 
+  <xs:complexType name="AdditionalAssemblyDirectoriesConfig">
+    <xs:annotation>
+      <xs:documentation> 
+        Additional directories for orleans to scan to load DLLs.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Directory" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>
+            Directory to search.  If attribute 'IncludeSubFolders' is true, then all subfolders will be scanned
+          </xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  
   <xs:complexType name="TracingConfiguration">
     <xs:annotation>
       <xs:documentation>
@@ -904,6 +934,65 @@
       <xs:element minOccurs="0" maxOccurs="1" name="Caching" type="tns:CachingConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="Liveness" type="tns:LivenessConfiguration" />
       <xs:element minOccurs="0" maxOccurs="1" name="ReminderService" type="tns:ReminderServiceConfiguration" />
+      <xs:element name="MultiClusterNetwork" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            The optional MultiClusterNetwork element contains information relating to how this cluster is participating in a multi-cluster network.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:annotation>
+              <xs:documentation>
+                Any number of gossip channels to bootstrap the gossip network.
+              </xs:documentation>
+            </xs:annotation>
+            <xs:element name="GossipChannel" type="tns:GossipChannelConfig" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+          <xs:attribute name="ClusterId" type="xs:string" use="required">
+            <xs:annotation>
+              <xs:documentation>
+                A string that uniquely identifies this cluster with the global service.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="MaxMultiClusterGateways" type="xs:positiveInteger" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The maximum number of silos per cluster should be designated to serve as gateways..
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="BackgroundGossipInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between periodic background gossips.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="UseGlobalSingleInstanceByDefault" type="xs:boolean" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                Whether to use the global single instance protocol as the default multicluster registration strategy.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="GlobalSingleInstanceRetryInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between retries for DOUBTFUL activations.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="DefaultMultiCluster" type="xs:string" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                A comma-separated list of cluster ids, to be used if no multicluster configuration is found in gossip channels.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
       <xs:element minOccurs="0" maxOccurs="1" name="Directory">
         <xs:annotation>
           <xs:documentation>
@@ -1022,6 +1111,7 @@
       <xs:element name="Statistics" minOccurs="0" type="tns:StatisticsConfiguration" />
       <xs:element name="Limits" minOccurs="0" type="tns:LimitsConfiguration" />
       <xs:element name="Telemetry" minOccurs="0" maxOccurs="1" type="tns:Telemetry" />
+      <xs:element name="AdditionalAssemblyDirectories" minOccurs="0" maxOccurs="1" type="tns:AdditionalAssemblyDirectoriesConfig" />
     </xs:sequence>
   </xs:complexType>
   <xs:element name="OrleansConfiguration">
@@ -1166,4 +1256,26 @@
       <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
     </xs:sequence>
   </xs:complexType>
+  <xs:complexType name="GossipChannelConfig">
+    <xs:annotation>
+      <xs:documentation>
+        Initialization info for one gossip channel.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Type" use="required" type="xs:string">
+      <xs:annotation>
+        <xs:documentation>
+          The type of this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ConnectionString" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>
+          A connection string for connecting to this gossip channel.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+
 </xs:schema>

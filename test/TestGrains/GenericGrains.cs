@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
-using System.Globalization;
-using Orleans.CodeGeneration;
 
 namespace UnitTests.Grains
 {
@@ -580,9 +581,66 @@ namespace UnitTests.Grains
 
     public class LongRunningTaskGrain<T> : Grain, ILongRunningTaskGrain<T>
     {
+        public Task CancellationTokenCallbackThrow(GrainCancellationToken tc)
+        {
+            tc.CancellationToken.Register(() =>
+            {
+                throw new InvalidOperationException("From cancellation token callback");
+            });
+
+            return TaskDone.Done;
+        }
+
+        public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
+        {
+            var tc = new GrainCancellationTokenSource();
+            var grainTask = target.CancellationTokenCallbackResolve(tc.Token);
+            await Task.Delay(300);
+            await tc.Cancel();
+            return await grainTask;
+        }
+
+        public Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            var orleansTs = TaskScheduler.Current;
+            tc.CancellationToken.Register(() =>
+            {
+                if (TaskScheduler.Current != orleansTs)
+                {
+                    tcs.SetException(new Exception("Callback executed on wrong thread"));
+                }
+                else
+                {
+                    tcs.SetResult(true);
+                }
+            });
+
+            return tcs.Task;
+        }
+
         public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay)
         {
             return await target.LongRunningTask(t, delay);
+        }
+
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay)
+        {
+            await target.LongWait(tc, delay);
+        }
+
+        public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
+        {
+            var tcs = new GrainCancellationTokenSource();
+            var task = target.LongWait(tcs.Token, delay);
+            await Task.Delay(delayBeforeCancel);
+            await tcs.Cancel();
+            await task;
+        }
+
+        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
+        {
+            await Task.Delay(delay, tc.CancellationToken);
         }
 
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
@@ -623,4 +681,115 @@ namespace UnitTests.Grains
             return Task.FromResult(value);
         }
     }
+
+
+    public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
+    {
+        public Task DoSomething() {
+            return TaskDone.Done;
+        }
+
+        public Task<string> Hello() {
+            return Task.FromResult("Hello!");
+        }
+    }
+
+
+    public class GenericCastableGrain<T> : Grain, IGenericCastableGrain<T>, INonGenericCastGrain
+    {
+        public Task<string> Hello() {
+            return Task.FromResult("Hello!");
+        }
+    }
+
+        
+    public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
+    {
+        public Task<string> Hello() {
+            return Task.FromResult("I have been independently concretized!");
+        }
+    }
+
+
+
+
+    namespace Generic.EdgeCases
+    {
+        using System.Linq;
+        using UnitTests.GrainInterfaces.Generic.EdgeCases;
+
+
+        public abstract class BasicGrain : Grain
+        {
+            public Task<string> Hello() {
+                return Task.FromResult("Hello!");
+            }
+
+            public Task<string[]> ConcreteGenArgTypeNames() {
+                var grainType = GetImmediateSubclass(this.GetType());
+
+                return Task.FromResult(
+                                grainType.GetGenericArguments()
+                                            .Select(t => t.FullName)
+                                            .ToArray()
+                                );
+            }
+
+
+            Type GetImmediateSubclass(Type subject) {
+                if(subject.GetTypeInfo().BaseType == typeof(BasicGrain)) {
+                    return subject;
+                }
+
+                return GetImmediateSubclass(subject.GetTypeInfo().BaseType);
+            }
+        }
+
+
+
+        public class PartiallySpecifyingGrain<T> : BasicGrain, IGrainWithTwoGenArgs<string, T>
+        { }
+
+
+        public class GrainWithPartiallySpecifyingInterface<T> : BasicGrain, IPartiallySpecifyingInterface<T>
+        { }
+
+
+        public class GrainSpecifyingSameGenArgTwice<T> : BasicGrain, IGrainReceivingRepeatedGenArgs<T, T>
+        { }
+
+
+        public class SpecifyingRepeatedGenArgsAmongstOthers<T1, T2> : BasicGrain, IReceivingRepeatedGenArgsAmongstOthers<T2, T1, T2>
+        { }
+
+        public class GrainForTestingCastingBetweenInterfacesWithReusedGenArgs : BasicGrain, ISpecifyingGenArgsRepeatedlyToParentInterface<bool>
+        { }
+
+
+        public class SpecifyingSameGenArgsButRearranged<T1, T2> : BasicGrain, IReceivingRearrangedGenArgs<T2, T1>
+        { }
+
+
+        public class GrainForTestingCastingWithRearrangedGenArgs<T1, T2> : BasicGrain, ISpecifyingRearrangedGenArgsToParentInterface<T1, T2>
+        { }
+
+
+        public class GrainWithGenArgsUnrelatedToFullySpecifiedGenericInterface<T1, T2> : BasicGrain, IArbitraryInterface<T1, T2>, IInterfaceUnrelatedToConcreteGenArgs<float>
+        { }
+
+
+        public class GrainSupplyingFurtherSpecializedGenArg<T> : BasicGrain, IInterfaceTakingFurtherSpecializedGenArg<List<T>>
+        { }
+
+        public class GrainSupplyingGenArgSpecializedIntoArray<T> : BasicGrain, IInterfaceTakingFurtherSpecializedGenArg<T[]>
+        { }
+
+
+        public class GrainForCastingBetweenInterfacesOfFurtherSpecializedGenArgs<T>
+            : BasicGrain, IAnotherReceivingFurtherSpecializedGenArg<List<T>>, IYetOneMoreReceivingFurtherSpecializedGenArg<T[]>
+        { }
+
+
+    }
+
 }

@@ -84,7 +84,7 @@ namespace Orleans.Streams
         /// <param name="status">new silo status</param>
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (status.Equals(SiloStatus.Dead))
+            if (status == SiloStatus.Dead)
             {
                 // just clean up garbage from immatureSilos.
                 bool ignore;
@@ -182,7 +182,7 @@ namespace Orleans.Streams
         /// </summary>
         private BestFitBalancer<string, QueueId> GetBalancer()
         {
-            var allSiloNames = deploymentConfig.GetAllSiloInstanceNames();
+            var allSiloNames = deploymentConfig.GetAllSiloNames();
             // rebuild balancer with new list of instance names
             return new BestFitBalancer<string, QueueId>(allSiloNames, allQueues);
         }

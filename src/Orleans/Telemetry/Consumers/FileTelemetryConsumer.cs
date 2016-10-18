@@ -70,13 +70,14 @@ namespace Orleans.Runtime
                         return;
                     }
                     _logOutput.Flush();
-                    _logOutput.Close();
+                    _logOutput.Dispose();
+                    _logOutput = null;
                 }
             }
             catch (Exception exc)
             {
                 var msg = string.Format("Ignoring error closing log file {0} - {1}", _logFileName,
-                    TraceLogger.PrintException(exc));
+                    LogFormatter.PrintException(exc));
                 Console.WriteLine(msg);
             }
             finally

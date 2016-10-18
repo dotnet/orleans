@@ -6,10 +6,8 @@ namespace Orleans.CodeGenerator
     using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
     /// <summary>
@@ -20,52 +18,34 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The logger.
         /// </summary>
-        private readonly TraceLogger Log;
+        private readonly Logger log;
 
         /// <summary>
         /// The types to process.
         /// </summary>
-        private readonly HashSet<Type> TypesToProcess;
+        private readonly HashSet<Type> typesToProcess;
 
         /// <summary>
         /// The processed types.
         /// </summary>
-        private readonly HashSet<Type> ProcessedTypes;
-        
-        /// <summary>
-        /// The generic interface types whose type arguments needs serializators generation
-        /// </summary>
-        internal readonly HashSet<Type> KnownGenericIntefaceTypes;
-
-        /// <summary>
-        /// The generic base types whose type arguments needs serializators generation
-        /// </summary>
-        internal readonly HashSet<Type> KnownGenericBaseTypes;
+        private readonly HashSet<Type> processedTypes;
 
         /// <summary>
         /// Initializes members of the <see cref="SerializerGenerationManager"/> class.
         /// </summary>
         internal SerializerGenerationManager()
         {
-            TypesToProcess = new HashSet<Type>();
-            ProcessedTypes = new HashSet<Type>();
-            KnownGenericIntefaceTypes = new HashSet<Type>
-            {
-                typeof(Streams.IAsyncObserver<>),
-                typeof(Streams.IAsyncStream<>),
-                typeof(Streams.IAsyncObservable<>)
-            };
+            typesToProcess = new HashSet<Type>();
+            processedTypes = new HashSet<Type>();
 
-            KnownGenericBaseTypes = new HashSet<Type>
-            {
-                typeof(Grain<>),
-                typeof(Streams.StreamSubscriptionHandleImpl<>),
-                typeof(Streams.StreamSubscriptionHandle<>)
-            };
-
-            Log = TraceLogger.GetLogger(typeof(SerializerGenerationManager).Name);
+            log = LogManager.GetLogger(typeof(SerializerGenerationManager).Name);
         }
-        
+
+        internal bool IsTypeRecorded(Type type)
+        {
+            return this.typesToProcess.Contains(type) || this.processedTypes.Contains(type);
+        }
+
         internal bool RecordTypeToGenerate(Type t, Module module, Assembly targetAssembly)
         {
             if (TypeUtilities.IsTypeIsInaccessibleForSerialization(t, module, targetAssembly))
@@ -75,7 +55,7 @@ namespace Orleans.CodeGenerator
 
             var typeInfo = t.GetTypeInfo();
 
-            if (typeInfo.IsGenericParameter || ProcessedTypes.Contains(t) || TypesToProcess.Contains(t)
+            if (typeInfo.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
                 || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
                 || typeof (Delegate).GetTypeInfo().IsAssignableFrom(t)
                 || typeof (Task<>).GetTypeInfo().IsAssignableFrom(t)) return false;
@@ -88,13 +68,13 @@ namespace Orleans.CodeGenerator
 
             if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
             {
-                Log.Warn(
+                log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,
                     "Skipping serializer generation for nested type {0}. If this type is used frequently, you may wish to consider making it non-nested.",
                     t.Name);
             }
 
-            if (typeInfo.IsConstructedGenericType)
+            if (t.IsConstructedGenericType)
             {
                 var args = t.GetGenericArguments();
                 foreach (var arg in args)
@@ -106,7 +86,7 @@ namespace Orleans.CodeGenerator
             if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
                 || GrainInterfaceUtils.IsTaskType(t)) return false;
 
-            if (typeInfo.IsConstructedGenericType)
+            if (t.IsConstructedGenericType)
             {
                 return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
             }
@@ -118,40 +98,42 @@ namespace Orleans.CodeGenerator
             {
                 var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
                               + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
-                Log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                log.Warn(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
                 return false;
             }
 
             if (TypeUtils.HasAllSerializationMethods(t)) return false;
 
             // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
-            var skipSerialzerGeneration = t.GetAllFields()
-                .Any(
-                    field => !field.IsNotSerialized &&
-                        TypeUtilities.IsTypeIsInaccessibleForSerialization(
-                            field.FieldType,
-                            module,
-                            targetAssembly));
+            var skipSerialzerGeneration =
+                t.GetAllFields().Any(field => IsFieldInaccessibleForSerialization(module, targetAssembly, field));
             if (skipSerialzerGeneration)
             {
                 return false;
             }
 
-            TypesToProcess.Add(t);
+            typesToProcess.Add(t);
             return true;
+        }
+
+        private static bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
+        {
+            return field.GetCustomAttribute<NonSerializedAttribute>() == null
+                   && !SerializationManager.HasSerializer(field.FieldType)
+                   && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }
 
         internal bool GetNextTypeToProcess(out Type next)
         {
             next = null;
-            if (TypesToProcess.Count == 0) return false;
+            if (typesToProcess.Count == 0) return false;
 
-            var enumerator = TypesToProcess.GetEnumerator();
+            var enumerator = typesToProcess.GetEnumerator();
             enumerator.MoveNext();
             next = enumerator.Current;
 
-            TypesToProcess.Remove(next);
-            ProcessedTypes.Add(next);
+            typesToProcess.Remove(next);
+            processedTypes.Add(next);
 
             return true;
         }

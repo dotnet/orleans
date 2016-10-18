@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainTimer", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
         private readonly ActivationData activationData;
 
@@ -24,7 +24,8 @@ namespace Orleans.Runtime
 
         private GrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.Current.ActivationContext;
+            var ctxt = RuntimeContext.CurrentActivationContext;
+            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
             activationData = (ActivationData) RuntimeClient.Current.CurrentActivationData;
 
             this.Name = name;

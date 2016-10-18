@@ -228,7 +228,7 @@ namespace UnitTests.Grains
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
             var tup = await SiloProviderRuntime.Instance.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(SiloProviderRuntime.Instance));
+                        () => new StreamConsumerExtension(SiloProviderRuntime.Instance, _streamProvider.IsRewindable));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
@@ -518,6 +518,6 @@ namespace UnitTests.Grains
 
     internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
     {
-        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
+        public ClosedTypeStreamSubscriptionHandle() : base(null, null, false) { /* not a subject to the creation */ }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
@@ -13,10 +14,21 @@ namespace Orleans.SqlUtils
 
         private static CachedFactory GetFactory(string invariantName)
         {
+            if (String.IsNullOrWhiteSpace(invariantName))
+            {
+                throw new ArgumentNullException(nameof(invariantName));
+            }
+
             // Seeks for database provider factory classes from GAC or as indicated by
             // the configuration file, see at <see href="https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx">Obtaining a DbProviderFactory</see>.       
 
             DataRow factoryData = DbProviderFactories.GetFactoryClasses().Rows.Find(invariantName);
+
+            if (factoryData == null)
+            {
+                throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please check the application configuration file to see if the provider is configured correctly or the configured ADO.NET provider libraries are deployed with the application.");
+            }
+
             var factoryName = factoryData["Name"].ToString();
             var description = factoryData["Description"].ToString();
             var assemblyQualifiedNameKey = factoryData["AssemblyQualifiedName"].ToString();
@@ -26,8 +38,24 @@ namespace Orleans.SqlUtils
 
         public static DbConnection CreateConnection(string invariantName, string connectionString)
         {
+            if (String.IsNullOrWhiteSpace(invariantName))
+            {
+                throw new ArgumentNullException(nameof(invariantName));
+            }
+
+            if (String.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentNullException(nameof(connectionString));
+            }
+
             var factory = factoryCache.GetOrAdd(invariantName, GetFactory).Factory;
             var connection = factory.CreateConnection();
+
+            if (connection == null)
+            {
+                throw new InvalidOperationException($"Database provider factory: '{invariantName}' did not return a connection object.");
+            }
+
             connection.ConnectionString = connectionString;
             return connection;
         }

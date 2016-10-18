@@ -1,7 +1,6 @@
 using System;
 using System.Net;
-﻿using System.Runtime.InteropServices.WindowsRuntime;
-﻿using System.Threading;
+using System.Threading;
 
 
 namespace Orleans.Runtime.Host
@@ -100,7 +99,7 @@ namespace Orleans.Runtime.Host
 			catch (Exception exc)
 			{
 				SiloHost.ReportStartupError(exc);
-				TraceLogger.CreateMiniDump();
+				LogManager.CreateMiniDump();
 				ok = false;
 			}
 

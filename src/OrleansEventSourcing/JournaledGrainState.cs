@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Orleans.CodeGeneration;
 
 
 namespace Orleans.EventSourcing
@@ -10,7 +9,7 @@ namespace Orleans.EventSourcing
     /// Base class for event-sourced grain state classes.
     /// </summary>
     public abstract class JournaledGrainState<TGrainState>
-        where TGrainState : JournaledGrainState<TGrainState>
+        where TGrainState : JournaledGrainState<TGrainState>, new()
     {
         private List<object> events = new List<object>();
         protected TGrainState State;

@@ -1,9 +1,9 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Runtime.CompilerServices;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -99,12 +99,12 @@ namespace UnitTests.Grains
             return producerTimer != null? Fire(): TaskDone.Done;
         }
 
-        private Task Fire([CallerMemberName] string caller = null)
+        private async Task Fire([CallerMemberName] string caller = null)
         {
+            RequestContext.Set(RequestContextKey, RequestContextValue);
+            await producer.OnNextAsync(numProducedItems);
             numProducedItems++;
             logger.Info("{0} (item={1})", caller, numProducedItems);
-            RequestContext.Set(RequestContextKey, RequestContextValue);
-            return producer.OnNextAsync(numProducedItems);
         }
 
         public override Task OnDeactivateAsync()

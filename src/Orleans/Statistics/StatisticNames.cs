@@ -330,6 +330,12 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
+
+        // Incoming message acceptor
+        public static readonly StatisticName MESSAGE_ACCEPTOR_ALLOCATED_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.AllocatedSocketEventArgs");
+        public static readonly StatisticName MESSAGE_ACCEPTOR_CHECKED_IN_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.CheckedInSocketEventArgs");
+        public static readonly StatisticName MESSAGE_ACCEPTOR_CHECKED_OUT_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.CheckedOutSocketEventArgs");
+        public static readonly StatisticName MESSAGE_ACCEPTOR_IN_USE_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.InUseSocketEventArgs");
     }
 }
  

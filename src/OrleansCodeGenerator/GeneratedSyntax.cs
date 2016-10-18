@@ -2,7 +2,6 @@ namespace Orleans.CodeGenerator
 {
     using System.Collections.Generic;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp.Syntax;
 
     /// <summary>

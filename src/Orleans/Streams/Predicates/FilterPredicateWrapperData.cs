@@ -27,9 +27,6 @@ namespace Orleans.Streams
         [NonSerialized]
         private StreamFilterPredicate predicateFunc;
 
-        // constructor used by serializator
-        private FilterPredicateWrapperData() { }
-
         internal FilterPredicateWrapperData(object filterData, StreamFilterPredicate pred)
         {
             CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
@@ -68,7 +65,7 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            Type funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
+            Type funcClassType = TypeUtils.ResolveType(funcClassName);
             MethodInfo method = funcClassType.GetMethod(funcMethodName);
             StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
 #if DEBUG
@@ -91,7 +88,6 @@ namespace Orleans.Streams
         /// Check that the user-supplied stream predicate function is valid.
         /// Stream predicate functions must be static and not abstract.
         /// </summary>
-        /// <param name="func"></param>
         private static void CheckFilterPredicateFunc(StreamFilterPredicate predicate)
         {
             if (predicate == null)

@@ -1,10 +1,9 @@
 using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
@@ -37,7 +36,7 @@ namespace Orleans.Runtime.Placement
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly bool useLocalCache = true;
         // For: SelectSiloPowerOfK
         private readonly SafeRandom random = new SafeRandom();
@@ -45,7 +44,7 @@ namespace Orleans.Runtime.Placement
         
         public ActivationCountPlacementDirector()
         {
-            logger = TraceLogger.GetLogger(this.GetType().Name);
+            logger = LogManager.GetLogger(this.GetType().Name);
         }
 
         public void Initialize(GlobalConfiguration globalConfig)

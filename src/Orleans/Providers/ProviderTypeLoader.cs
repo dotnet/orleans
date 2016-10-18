@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -15,7 +14,7 @@ namespace Orleans.Providers
 
         private static readonly List<ProviderTypeLoader> managers;
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ProviderTypeLoader", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ProviderTypeLoader", LoggerType.Runtime);
 
         static ProviderTypeLoader()
         {
@@ -58,9 +57,9 @@ namespace Orleans.Providers
             }
         }
 
-        private void ProcessType(Type type)
+        private void ProcessType(TypeInfo typeInfo)
         {
-            var typeInfo = type.GetTypeInfo();
+            var type = typeInfo.AsType();
             if (alreadyProcessed.Contains(type) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(type)) return;
 
             alreadyProcessed.Add(type);
@@ -74,7 +73,7 @@ namespace Orleans.Providers
 
             try
             {
-                foreach (var type in assembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(assembly, logger))
                 {
                     ProcessType(type);
                 }
@@ -95,7 +94,7 @@ namespace Orleans.Providers
                 // We assume that it's better to fetch and iterate through the list of types once,
                 // and the list of TypeManagers many times, rather than the other way around.
                 // Certainly it can't be *less* efficient to do it this way.
-                foreach (var type in args.LoadedAssembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(args.LoadedAssembly, logger))
                 {
                     foreach (var mgr in managers)
                     {

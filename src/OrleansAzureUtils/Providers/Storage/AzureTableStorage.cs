@@ -43,10 +43,11 @@ namespace Orleans.Storage
     /// </example>
     public class AzureTableStorage : IStorageProvider, IRestExceptionDecoder
     {
-        private const string DATA_CONNECTION_STRING = "DataConnectionString";
-        private const string TABLE_NAME_PROPERTY = "TableName";
-        private const string DELETE_ON_CLEAR_PROPERTY = "DeleteStateOnClear";
-        private const string GRAIN_STATE_TABLE_NAME_DEFAULT = "OrleansGrainState";
+        internal const string DataConnectionStringPropertyName = "DataConnectionString";
+        internal const string TableNamePropertyName = "TableName";
+        internal const string DeleteOnClearPropertyName = "DeleteStateOnClear";
+        internal const string UseJsonFormatPropertyName = "UseJsonFormat";
+        internal const string TableNameDefaultValue = "OrleansGrainState";
         private string dataConnectionString;
         private string tableName;
         private string serviceId;
@@ -64,7 +65,6 @@ namespace Orleans.Storage
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
 
-        private const string USE_JSON_FORMAT_PROPERTY = "UseJsonFormat";
 
         private bool useJsonFormat;
         private Newtonsoft.Json.JsonSerializerSettings jsonSettings;
@@ -80,7 +80,7 @@ namespace Orleans.Storage
         /// <summary> Default constructor </summary>
         public AzureTableStorage()
         {
-            tableName = GRAIN_STATE_TABLE_NAME_DEFAULT;
+            tableName = TableNameDefaultValue;
             id = Interlocked.Increment(ref counter);
         }
 
@@ -91,26 +91,26 @@ namespace Orleans.Storage
             Name = name;
             serviceId = providerRuntime.ServiceId.ToString();
 
-            if (!config.Properties.ContainsKey(DATA_CONNECTION_STRING) || string.IsNullOrWhiteSpace(config.Properties[DATA_CONNECTION_STRING]))
+            if (!config.Properties.ContainsKey(DataConnectionStringPropertyName) || string.IsNullOrWhiteSpace(config.Properties[DataConnectionStringPropertyName]))
                 throw new ArgumentException("DataConnectionString property not set");
 
             dataConnectionString = config.Properties["DataConnectionString"];
 
-            if (config.Properties.ContainsKey(TABLE_NAME_PROPERTY))
-                tableName = config.Properties[TABLE_NAME_PROPERTY];
+            if (config.Properties.ContainsKey(TableNamePropertyName))
+                tableName = config.Properties[TableNamePropertyName];
 
-            isDeleteStateOnClear = config.Properties.ContainsKey(DELETE_ON_CLEAR_PROPERTY) &&
-                "true".Equals(config.Properties[DELETE_ON_CLEAR_PROPERTY], StringComparison.OrdinalIgnoreCase);
+            isDeleteStateOnClear = config.Properties.ContainsKey(DeleteOnClearPropertyName) &&
+                "true".Equals(config.Properties[DeleteOnClearPropertyName], StringComparison.OrdinalIgnoreCase);
 
             Log = providerRuntime.GetLogger("Storage.AzureTableStorage." + id);
 
             var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
                 Name, serviceId, tableName, isDeleteStateOnClear);
 
-            if (config.Properties.ContainsKey(USE_JSON_FORMAT_PROPERTY))
-                useJsonFormat = "true".Equals(config.Properties[USE_JSON_FORMAT_PROPERTY], StringComparison.OrdinalIgnoreCase);
+            if (config.Properties.ContainsKey(UseJsonFormatPropertyName))
+                useJsonFormat = "true".Equals(config.Properties[UseJsonFormatPropertyName], StringComparison.OrdinalIgnoreCase);
 
-            this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+            this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
             initMsg = String.Format("{0} UseJsonFormat={1}", initMsg, useJsonFormat);
 
             Log.Info((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, initMsg);
@@ -149,7 +149,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    grainState.State = ConvertFromStorageFormat(entity);
+                    var loadedState = ConvertFromStorageFormat(entity);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
                     grainState.ETag = record.ETag;
                 }
             }
@@ -485,7 +486,7 @@ namespace Orleans.Storage
                 {
                     if (AzureStorageUtils.TableStorageDataNotFound(exc))
                     {
-                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, TraceLogger.PrintException(exc));
+                        if (logger.IsVerbose2) logger.Verbose2((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, LogFormatter.PrintException(exc));
                         return null;  // No data
                     }
                     throw;

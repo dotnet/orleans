@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Counters
 {
-    internal class SiloPerformanceMetrics : MarshalByRefObject, ISiloPerformanceMetrics, IDisposable
+    internal class SiloPerformanceMetrics : ISiloPerformanceMetrics, IDisposable
     {
         internal OrleansTaskScheduler Scheduler { get; set; }
         internal ActivationDirectory ActivationDirectory { get; set; }
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Counters
         private bool overloadValue;
         private readonly RuntimeStatisticsGroup runtimeStats;
         private AsyncTaskSafeTimer tableReportTimer;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("SiloPerformanceMetrics", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("SiloPerformanceMetrics", LoggerType.Runtime);
         private float? cpuUsageLatch;
 
         internal SiloPerformanceMetrics(RuntimeStatisticsGroup runtime, NodeConfiguration cfg = null)

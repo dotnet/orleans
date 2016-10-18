@@ -1,11 +1,11 @@
 ﻿
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Storage;
@@ -26,45 +26,44 @@ namespace UnitTests.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        public static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        public static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-            EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
 
-        private static readonly EventHubCheckpointSettings CheckpointSettings =
-            new EventHubCheckpointSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
-                TimeSpan.FromSeconds(1));
+        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
+                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private readonly SubscriptionMultiplicityTestRunner runner;
 
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-                    AdjustConfig = AdjustClusterConfiguration
-                });
+                var options = new TestClusterOptions(2);
+                AdjustClusterConfiguration(options.ClusterConfiguration);
+                return new TestCluster(options);
             }
 
             public override void Dispose()
             {
                 base.Dispose();
-                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointSettings.TableName, CheckpointSettings.DataConnectionString);
+                var dataManager = new AzureTableDataManager<TableEntity>(CheckpointerSettings.TableName, CheckpointerSettings.DataConnectionString);
                 dataManager.InitTableAsync().Wait();
-                dataManager.DeleteTableAsync().Wait();
+                dataManager.ClearTableAsync().Wait();
             }
 
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
             {
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
-                EventHubConfig.WriteProperties(settings);
-                CheckpointSettings.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
+                EventHubConfig.Value.WriteProperties(settings);
+                CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting
                 settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
@@ -72,11 +71,6 @@ namespace UnitTests.StreamingTests
                 // register stream provider
                 config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, settings);
                 config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
-
-                // Make sure a node config exist for each silo in the cluster.
-                // This is required for the DynamicClusterConfigDeploymentBalancer to properly balance queues.
-                config.GetOrCreateNodeConfigurationForSilo("Primary");
-                config.GetOrCreateNodeConfigurationForSilo("Secondary_1");
             }
         }
 

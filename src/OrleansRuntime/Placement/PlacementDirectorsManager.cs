@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
@@ -55,7 +54,7 @@ namespace Orleans.Runtime.Placement
                 var res = await clientObserversPlacementDirector.OnSelectActivation(strategy, targetGrain, context);
                 if (res == null)
                 {
-                    throw new KeyNotFoundException("No activation for client " + targetGrain);
+                    throw new ClientNotAvailableException(targetGrain);
                 }
                 return res;
             }

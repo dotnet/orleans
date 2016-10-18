@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-
 using Orleans.Runtime.Providers;
 
 namespace Orleans.Runtime
@@ -16,7 +15,7 @@ namespace Orleans.Runtime
         }
 
 
-        public Task<GrainInterfaceMap> GetTypeCodeMap(SiloAddress silo)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(SiloAddress silo)
         {
             return Task.FromResult(grainTypeManager.GetTypeCodeMap());
         }

@@ -184,8 +184,15 @@ namespace UnitTests.GrainInterfaces
     public interface ILongRunningTaskGrain<T> : IGrainWithGuidKey
     {
         Task<string> GetRuntimeInstanceId();
+        Task LongWait(GrainCancellationToken tc, TimeSpan delay);
         Task<T> LongRunningTask(T t, TimeSpan delay);
         Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay);
+        Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay);
+        Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay,
+            TimeSpan delayBeforeCancel);
+        Task<bool> CancellationTokenCallbackResolve(GrainCancellationToken tc);
+        Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target);
+        Task CancellationTokenCallbackThrow(GrainCancellationToken tc);
     }
 
     public interface IGenericGrainWithConstraints<A, B, C> : IGrainWithStringKey
@@ -197,4 +204,106 @@ namespace UnitTests.GrainInterfaces
 
         Task<C> RoundTrip(C value);
     }
+
+    public interface INonGenericCastableGrain : IGrainWithGuidKey
+    {
+        Task DoSomething();
+    }
+
+    
+    public interface IGenericCastableGrain<T> : IGrainWithGuidKey
+    { }
+    
+
+
+    public interface IGrainSayingHello : IGrainWithGuidKey
+    {
+        Task<string> Hello();
+    }
+
+    public interface ISomeGenericGrain<T> : IGrainSayingHello
+    { }
+
+    public interface INonGenericCastGrain : IGrainSayingHello
+    { }
+
+    
+
+    public interface IIndependentlyConcretizedGrain : ISomeGenericGrain<string>
+    { }
+
+    public interface IIndependentlyConcretizedGenericGrain<T> : ISomeGenericGrain<T>
+    { }
+
+
+
+
+    namespace Generic.EdgeCases
+    {
+        public interface IBasicGrain : IGrainWithGuidKey
+        {
+            Task<string> Hello();
+            Task<string[]> ConcreteGenArgTypeNames();
+        }
+
+
+        public interface IGrainWithTwoGenArgs<T1, T2> : IBasicGrain
+        { }
+
+        public interface IGrainWithThreeGenArgs<T1, T2, T3> : IBasicGrain
+        { }
+
+        public interface IGrainReceivingRepeatedGenArgs<T1, T2> : IBasicGrain
+        { }
+
+        
+        public interface IPartiallySpecifyingInterface<T> : IGrainWithTwoGenArgs<T, int>
+        { }
+        
+
+        public interface IReceivingRepeatedGenArgsAmongstOthers<T1, T2, T3> : IBasicGrain
+        { }
+
+
+        public interface IReceivingRepeatedGenArgsFromOtherInterface<T1, T2, T3> : IBasicGrain
+        { }
+
+        public interface ISpecifyingGenArgsRepeatedlyToParentInterface<T> : IReceivingRepeatedGenArgsFromOtherInterface<T, T, T>
+        { }
+
+
+        public interface IReceivingRearrangedGenArgs<T1, T2> : IBasicGrain
+        { }
+
+
+
+        public interface IReceivingRearrangedGenArgsViaCast<T1, T2> : IBasicGrain
+        { }
+
+        public interface ISpecifyingRearrangedGenArgsToParentInterface<T1, T2> : IReceivingRearrangedGenArgsViaCast<T2, T1>
+        { }
+
+
+        public interface IArbitraryInterface<T1, T2> : IBasicGrain
+        { }
+
+        public interface IInterfaceUnrelatedToConcreteGenArgs<T> : IBasicGrain
+        { }
+
+
+        public interface IInterfaceTakingFurtherSpecializedGenArg<T> : IBasicGrain
+        { }
+
+
+        public interface IAnotherReceivingFurtherSpecializedGenArg<T> : IBasicGrain
+        { }
+
+        public interface IYetOneMoreReceivingFurtherSpecializedGenArg<T> : IBasicGrain
+        { }
+
+
+    }
+
+
+
 }

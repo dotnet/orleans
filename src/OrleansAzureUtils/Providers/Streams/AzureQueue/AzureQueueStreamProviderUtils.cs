@@ -1,10 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Orleans.AzureUtils;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -24,7 +21,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             if (deploymentId != null)
             {
-                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.NumQueuesDefaultValue, providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();
@@ -48,7 +45,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             if (deploymentId != null)
             {
-                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.DEFAULT_NUM_QUEUES, providerName);
+                var queueMapper = new HashRingBasedStreamQueueMapper(AzureQueueAdapterFactory.NumQueuesDefaultValue, providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();

@@ -7,16 +7,15 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -46,7 +45,7 @@ namespace UnitTests.Streaming.Reliability
                 StartSecondary = true,
                 SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
                 LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                 AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
             };
             var clientRunOptions = new TestingClientOptions
@@ -80,7 +79,7 @@ namespace UnitTests.Streaming.Reliability
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
@@ -89,7 +88,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
@@ -98,7 +97,7 @@ namespace UnitTests.Streaming.Reliability
         {
             // This test case is just a sanity-check that the silo test config is OK.
             const string testName = "Baseline_StreamRel_RestartSilos";
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
             SiloHandle prim1 = this.HostedCluster.Primary;
@@ -108,8 +107,8 @@ namespace UnitTests.Streaming.Reliability
 
             CheckSilosRunning("After Restart", numExpectedSilos);
 
-            Assert.AreNotEqual(prim1, this.HostedCluster.Primary, "Should be different Primary silos after restart");
-            Assert.AreNotEqual(sec1, this.HostedCluster.Secondary, "Should be different Secondary silos after restart");
+            Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
+            Assert.NotEqual(sec1, this.HostedCluster.Secondary); // Should be different Secondary silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -122,7 +121,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = SMS_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain Consumer
 
@@ -142,7 +141,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -363,7 +362,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -419,7 +418,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -456,7 +455,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
 
@@ -497,7 +496,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             // Grain Producer -> Grain 2 x Consumer
             // Note: PubSub should only count distinct grains, even if a grain has multiple consumer handles
@@ -560,7 +559,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = SMS_STREAM_PROVIDER_NAME;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             var consumerGrain = GrainClient.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
@@ -584,7 +583,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -610,7 +609,7 @@ namespace UnitTests.Streaming.Reliability
             _streamId = Guid.NewGuid();
             _streamProviderName = streamProviderName;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -652,7 +651,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -671,7 +670,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
             SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
@@ -693,7 +692,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -710,7 +709,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the producer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
             SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
@@ -732,7 +731,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -751,7 +750,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
             SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
@@ -772,7 +771,7 @@ namespace UnitTests.Streaming.Reliability
             _streamProviderName = streamProviderName;
             string when;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -790,7 +789,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
             SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
@@ -812,7 +811,7 @@ namespace UnitTests.Streaming.Reliability
 
             const int numLoops = 3;
 
-            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger);
+            StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
             long producerGrainId = random.Next();
@@ -860,9 +859,9 @@ namespace UnitTests.Streaming.Reliability
             //await CheckReceivedCounts(when, consumerGrain, expectedReceived, 0);
 
             // Find a Consumer Grain on the new silo
-            IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.Silo.SiloAddress);
+            IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.SiloAddress);
             await newConsumer.AddConsumer(_streamId, _streamProviderName);
-            output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.Silo.SiloAddress);
+            output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.SiloAddress);
 
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
 
@@ -888,7 +887,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.Silo.SiloAddress, this.HostedCluster.Secondary.Silo.SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.Secondary.SiloAddress);
 
             this.HostedCluster.RestartDefaultSilos();
             
@@ -897,13 +896,13 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.Silo.SiloAddress, this.HostedCluster.Secondary.Silo.SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.Secondary.SiloAddress);
         }
 
         private void StopSilo(SiloHandle silo, bool kill, bool restart)
         {
-            SiloAddress oldSilo = silo.Silo.SiloAddress;
-            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            SiloAddress oldSilo = silo.SiloAddress;
+            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary.SiloAddress);
             string siloType = isPrimary ? "Primary" : "Secondary";
             string action;
             if (restart)    action = kill ? "Kill+Restart" : "Stop+Restart";
@@ -916,19 +915,19 @@ namespace UnitTests.Streaming.Reliability
                 //RestartRuntime(silo, kill);
                 SiloHandle newSilo = this.HostedCluster.RestartSilo(silo);
 
-                logger.Info("Restarted new {0} silo {1}", siloType, newSilo.Silo.SiloAddress);
+                logger.Info("Restarted new {0} silo {1}", siloType, newSilo.SiloAddress);
 
-                Assert.AreNotEqual(oldSilo, newSilo, "Should be different silo address after Restart");
+                Assert.NotEqual(oldSilo, newSilo.SiloAddress); //"Should be different silo address after Restart"
             }
             else if (kill)
             {
                 this.HostedCluster.KillSilo(silo);
-                Assert.IsNull(silo.Silo, "Should be no {0} silo after Kill", siloType);
+               Assert.False(silo.IsActive);
             }
             else
             {
                 this.HostedCluster.StopSilo(silo);
-                Assert.IsNull(silo.Silo, "Should be no {0} silo after Stop", siloType);
+               Assert.False(silo.IsActive);
             }
 
             // WaitForLivenessToStabilize(!kill);
@@ -981,21 +980,21 @@ namespace UnitTests.Streaming.Reliability
 
             bool isProducer = await producerGrain.IsProducer();
             output.WriteLine("Grain {0} IsProducer={1}", producerGrainId, isProducer);
-            Assert.AreEqual(expectedNumProducers > 0, isProducer, "IsProducer {0}", when);
+            Assert.Equal(expectedNumProducers > 0, isProducer);
 
             bool isConsumer = await consumerGrain.IsConsumer();
             output.WriteLine("Grain {0} IsConsumer={1}", consumerGrainId, isConsumer);
-            Assert.AreEqual(expectedNumConsumers > 0, isConsumer, "IsConsumer {0}", when);
+            Assert.Equal(expectedNumConsumers > 0, isConsumer);
 
             int consumerHandleCount = await consumerGrain.GetConsumerHandlesCount();
             int consumerObserverCount = await consumerGrain.GetConsumerHandlesCount();
             output.WriteLine("Grain {0} HandleCount={1} ObserverCount={2}", consumerGrainId, consumerHandleCount, consumerObserverCount);
-            Assert.AreEqual(expectedNumConsumers, consumerHandleCount, "Consumer-HandleCount {0}", when);
-            Assert.AreEqual(expectedNumConsumers, consumerObserverCount, "Consumer-ObserverCount {0}", when);
+            Assert.Equal(expectedNumConsumers, consumerHandleCount);
+            Assert.Equal(expectedNumConsumers, consumerObserverCount);
         }
         private void CheckSilosRunning(string when, int expectedNumSilos)
         {
-            Assert.AreEqual(expectedNumSilos, this.HostedCluster.GetActiveSilos().Count(), "Should have {0} silos running {1}", expectedNumSilos, when);
+            Assert.Equal(expectedNumSilos, this.HostedCluster.GetActiveSilos().Count());
         }
         protected async Task<bool> CheckGrainCounts()
         {
@@ -1004,15 +1003,15 @@ namespace UnitTests.Streaming.Reliability
 #else
             string grainType = typeof(StreamReliabilityTestGrain).FullName;
 #endif
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             SimpleGrainStatistic[] grainStats = await mgmtGrain.GetSimpleGrainStatistics();
             output.WriteLine("Found grains " + Utils.EnumerableToString(grainStats));
 
             var grainLocs = grainStats.Where(gs => gs.GrainType == grainType).ToArray();
 
-            Assert.IsTrue(grainLocs.Length > 0, "Found too few grains");
-            Assert.IsTrue(grainLocs.Length <= 2, "Found too many grains " + grainLocs.Length);
+            Assert.True(grainLocs.Length > 0, "Found too few grains");
+            Assert.True(grainLocs.Length <= 2, "Found too many grains " + grainLocs.Length);
 
             bool sameSilo = grainLocs.Length == 1;
             if (sameSilo)

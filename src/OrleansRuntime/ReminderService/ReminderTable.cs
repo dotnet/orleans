@@ -12,7 +12,7 @@ namespace Orleans.Runtime.ReminderService
         {
             var config = silo.GlobalConfig;
             var serviceType = config.ReminderServiceType;
-            var logger = TraceLogger.GetLogger("ReminderTable");
+            var logger = LogManager.GetLogger("ReminderTable");
 
             switch (serviceType)
             {

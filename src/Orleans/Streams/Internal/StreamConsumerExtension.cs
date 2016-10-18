@@ -30,12 +30,15 @@ namespace Orleans.Streams
         private readonly IStreamProviderRuntime providerRuntime;
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
         private readonly Logger logger;
+        private readonly bool isRewindable;
 
+        private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
 
-        internal StreamConsumerExtension(IStreamProviderRuntime providerRt)
+        internal StreamConsumerExtension(IStreamProviderRuntime providerRt, bool isRewindable)
         {
             providerRuntime = providerRt;
             allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
+            this.isRewindable = isRewindable;
             logger = providerRuntime.GetLogger(GetType().Name);
         }
 
@@ -49,13 +52,13 @@ namespace Orleans.Streams
                 if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter, token);
+                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, isRewindable, filter, token);
                 return allStreamObservers.AddOrUpdate(subscriptionId, handle, (key, old) => handle) as StreamSubscriptionHandleImpl<T>;
             }
             catch (Exception exc)
             {
-                logger.Error((int)ErrorCode.StreamProvider_AddObserverException, String.Format("{0} StreamConsumerExtension.AddObserver({1}) caugth exception.",
-                    providerRuntime.ExecutingEntityIdentity(), stream.StreamId), exc);
+                logger.Error(ErrorCode.StreamProvider_AddObserverException,
+                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.StreamId}) caugth exception.", exc);
                 throw;
             }
         }
@@ -66,13 +69,23 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
-        public Task<StreamHandshakeToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
+            return DeliverMutable(subscriptionId, item.Value, currentToken, handshakeToken);
+        }
+
+        public Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        {
+            if (logger.IsVerbose3)
+            {
+                var itemString = item.ToString();
+                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
+                logger.Verbose3("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
+            }
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
-                return observer.DeliverItem(item.Value, currentToken, handshakeToken);
+                return observer.DeliverItem(item, currentToken, handshakeToken);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);

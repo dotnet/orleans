@@ -26,19 +26,17 @@ namespace Orleans
 
         internal GrainReference GrainReference { get { return Data.GrainReference; } }
 
-        internal IGrainRuntime Runtime
+        internal IGrainRuntime Runtime { get; set; }
+
+        protected IGrainFactory GrainFactory 
         {
-            get { return runtime; }
-            set
-            {
-                runtime = value;
-                GrainFactory = value.GrainFactory;
-            }
+            get { return Runtime.GrainFactory; }
         }
 
-        protected IGrainFactory GrainFactory { get; private set; }
-
-        protected IServiceProvider ServiceProvider { get; private set; }
+        protected IServiceProvider ServiceProvider 
+        {
+            get { return Runtime.ServiceProvider; }
+        }
 
         internal IGrainIdentity Identity;
 
@@ -55,14 +53,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
         {
             Identity = identity;
             Runtime = runtime;
-            GrainFactory = runtime.GrainFactory;
-            ServiceProvider = runtime.ServiceProvider;
         }
 
         
@@ -230,7 +224,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
-            return Runtime.GetLogger(loggerName, TraceLogger.LoggerType.Grain);
+            return Runtime.GetLogger(loggerName);
         }
 
         /// <summary>
@@ -254,7 +248,7 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStatefulGrain
+    public class Grain<TGrainState> : Grain, IStatefulGrain where TGrainState : new()
     {
         private readonly GrainState<TGrainState> grainState;
 
@@ -274,9 +268,6 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        /// <param name="state"></param>
-        /// <param name="identity"></param>
-        /// <param name="runtime"></param>
         protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
             : base(identity, runtime)
         {
@@ -303,16 +294,20 @@ namespace Orleans
             get { return grainState; }
         }
 
+        /// <summary>Clear the current grain state data from backing store.</summary>
         protected virtual Task ClearStateAsync()
         {
             return storage.ClearStateAsync();
         }
 
+        /// <summary>Write of the current grain state data into backing store.</summary>
         protected virtual Task WriteStateAsync()
         {
             return storage.WriteStateAsync();
         }
 
+        /// <summary>Read the current grain state data from backing store.</summary>
+        /// <remarks>Any previous contents of the grain state data will be overwritten.</remarks>
         protected virtual Task ReadStateAsync()
         {
             return storage.ReadStateAsync();

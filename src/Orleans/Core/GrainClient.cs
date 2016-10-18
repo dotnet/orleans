@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
@@ -277,11 +277,22 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Test hook to uninitialize client without cleanup
+        /// </summary>
+        public static void HardKill()
+        {
+            lock (initLock)
+            {
+                InternalUninitialize(false);
+            }
+        }
+
+        /// <summary>
         /// This is the lock free version of uninitilize so we can share 
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>
-        private static void InternalUninitialize()
+        private static void InternalUninitialize(bool cleanup = true)
         {
             // Update this first so IsInitialized immediately begins returning
             // false.  Since this method should be protected externally by 
@@ -293,7 +304,7 @@ namespace Orleans
             {
                 try
                 {
-                    RuntimeClient.Current.Reset();
+                    RuntimeClient.Current.Reset(cleanup);
                 }
                 catch (Exception) { }
 
@@ -301,6 +312,7 @@ namespace Orleans
             }
             outsideRuntimeClient = null;
             grainFactory = null;
+            ClientInvokeCallback = null;
         }
 
         /// <summary>
@@ -353,10 +365,10 @@ namespace Orleans
         /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
         /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings 
         /// such as <c>Orleans.RequestContext</c> will be picked up.
+        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
+        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
         /// </summary>
         /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        /// <param name="request">Details of the method to be invoked, including InterfaceId and MethodId</param>
-        /// <param name="grain">The GrainReference this request is being sent through.</param>
         public static Action<InvokeMethodRequest, IGrain> ClientInvokeCallback { get; set; }
 
         public static IEnumerable<Streams.IStreamProvider> GetStreamProviders()

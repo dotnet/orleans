@@ -19,4 +19,4 @@ To use this sample, you will need to:
    https://dev.twitter.com/
 
 More info on this sample:
-http://dotnet.github.io/orleans/Samples-Overview/Twitter-Sentiment
+http://dotnet.github.io/orleans/Documentation/Samples-Overview/Twitter-Sentiment.html

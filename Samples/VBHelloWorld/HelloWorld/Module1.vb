@@ -1,4 +1,5 @@
 ﻿Imports Interfaces
+Imports Orleans.Runtime.Configuration
 
 Module Module1
 
@@ -7,7 +8,8 @@ Module Module1
         Dim setup = New AppDomainSetup With {.AppDomainInitializer = AddressOf InitSilo, .AppDomainInitializerArguments = args}
         Dim hostDomain As AppDomain = AppDomain.CreateDomain("OrleansHost", Nothing, setup)
 
-        GrainClient.Initialize("DevTestClientConfiguration.xml")
+        Dim config As ClientConfiguration = ClientConfiguration.LocalhostSilo()
+        GrainClient.Initialize(config)
 
         Dim grain = GrainClient.GrainFactory.GetGrain(Of IHello)(0)
 

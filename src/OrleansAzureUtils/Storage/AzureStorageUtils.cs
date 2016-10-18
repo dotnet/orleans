@@ -185,7 +185,7 @@ namespace Orleans.AzureUtils
             string storageConnectionString,
             IRetryPolicy retryPolicy,
             TimeSpan timeout,
-            TraceLogger logger)
+            Logger logger)
         {
             try
             {
@@ -291,13 +291,13 @@ namespace Orleans.AzureUtils
         {
             return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
                     message.Id,
-                    message.NextVisibleTime.HasValue ? TraceLogger.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
+                    message.NextVisibleTime.HasValue ? LogFormatter.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
                     message.DequeueCount,
                     message.PopReceipt,
                     message.AsString);
         }
 
-        internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, TraceLogger logger)
+        internal static bool AnalyzeReadException(Exception exc, int iteration, string tableName, Logger logger)
         {
             bool isLastErrorRetriable;
             var we = exc as WebException;
@@ -305,11 +305,8 @@ namespace Orleans.AzureUtils
             {
                 isLastErrorRetriable = true;
                 var statusCode = we.Status;
-                logger.Warn(ErrorCode.AzureTable_10, String.Format("Intermediate issue reading Azure storage table {0}: HTTP status code={1} Exception Type={2} Message='{3}'",
-                    tableName,
-                    statusCode,
-                    exc.GetType().FullName,
-                    exc.Message),
+                logger.Warn(ErrorCode.AzureTable_10,
+                    $"Intermediate issue reading Azure storage table {tableName}: HTTP status code={statusCode} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                     exc);
             }
             else
@@ -334,23 +331,15 @@ namespace Orleans.AzureUtils
                     {
                         isLastErrorRetriable = IsRetriableHttpError(httpStatusCode, restStatus);
 
-                        logger.Warn(ErrorCode.AzureTable_11, String.Format("Intermediate issue reading Azure storage table {0}:{1} IsRetriable={2} HTTP status code={3} REST status code={4} Exception Type={5} Message='{6}'",
-                                tableName,
-                                iteration == 0 ? "" : (" Repeat=" + iteration),
-                                isLastErrorRetriable,
-                                httpStatusCode,
-                                restStatus,
-                                exc.GetType().FullName,
-                                exc.Message),
+                        logger.Warn(ErrorCode.AzureTable_11,
+                            $"Intermediate issue reading Azure storage table {tableName}:{(iteration == 0 ? "" : (" Repeat=" + iteration))} IsRetriable={isLastErrorRetriable} HTTP status code={httpStatusCode} REST status code={restStatus} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                                 exc);
                     }
                 }
                 else
                 {
-                    logger.Error(ErrorCode.AzureTable_12, string.Format("Unexpected issue reading Azure storage table {0}: Exception Type={1} Message='{2}'",
-                                     tableName,
-                                     exc.GetType().FullName,
-                                     exc.Message),
+                    logger.Error(ErrorCode.AzureTable_12,
+                        $"Unexpected issue reading Azure storage table {tableName}: Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
                                  exc);
                     isLastErrorRetriable = false;
                 }

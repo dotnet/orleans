@@ -3,7 +3,6 @@ using Orleans;
 using TestGrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 
 namespace Tester
 {
@@ -18,40 +17,40 @@ namespace Tester
         public async Task DoSomethingGrainEmptyTest()
         {
             IDoSomethingEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyGrain>();
-            Assert.AreEqual(await doSomething.DoIt(), "DoSomethingEmptyGrain");
+            Assert.Equal(await doSomething.DoIt(), "DoSomethingEmptyGrain");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DoSomethingGrainEmptyWithMoreTest()
         {
             IDoSomethingEmptyWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyWithMoreGrain>();
-            Assert.AreEqual(await doSomething.DoIt(), "DoSomethingEmptyWithMoreGrain");
-            Assert.AreEqual(await doSomething.DoMore(), "DoSomethingEmptyWithMoreGrain");
+            Assert.Equal(await doSomething.DoIt(), "DoSomethingEmptyWithMoreGrain");
+            Assert.Equal(await doSomething.DoMore(), "DoSomethingEmptyWithMoreGrain");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DoSomethingWithMoreEmptyGrainTest()
         {
             IDoSomethingWithMoreEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreEmptyGrain>();
-            Assert.AreEqual(await doSomething.DoIt(), "DoSomethingWithMoreEmptyGrain");
-            Assert.AreEqual(await doSomething.DoMore(), "DoSomethingWithMoreEmptyGrain");
+            Assert.Equal(await doSomething.DoIt(), "DoSomethingWithMoreEmptyGrain");
+            Assert.Equal(await doSomething.DoMore(), "DoSomethingWithMoreEmptyGrain");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DoSomethingWithMoreGrainTest()
         {
             IDoSomethingWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreGrain>();
-            Assert.AreEqual(await doSomething.DoIt(), "DoSomethingWithMoreGrain");
-            Assert.AreEqual(await doSomething.DoThat(), "DoSomethingWithMoreGrain");
+            Assert.Equal(await doSomething.DoIt(), "DoSomethingWithMoreGrain");
+            Assert.Equal(await doSomething.DoThat(), "DoSomethingWithMoreGrain");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DoSomethingCombinedGrainTest()
         {
             IDoSomethingCombinedGrain doSomething = GetHierarchyGrain<IDoSomethingCombinedGrain>();
-            Assert.AreEqual(await doSomething.DoIt(), "DoSomethingCombinedGrain");
-            Assert.AreEqual(await doSomething.DoMore(), "DoSomethingCombinedGrain");
-            Assert.AreEqual(await doSomething.DoThat(), "DoSomethingCombinedGrain");
+            Assert.Equal(await doSomething.DoIt(), "DoSomethingCombinedGrain");
+            Assert.Equal(await doSomething.DoMore(), "DoSomethingCombinedGrain");
+            Assert.Equal(await doSomething.DoThat(), "DoSomethingCombinedGrain");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
@@ -81,14 +80,14 @@ namespace Tester
             await doSomethingCombinedGrain.IncrementB();
             await doSomethingCombinedGrain.IncrementC();
 
-            Assert.AreEqual(await doSomethingEmptyGrain.GetA(), 11);
-            Assert.AreEqual(await doSomethingEmptyWithMoreGrain.GetA(), 11);
-            Assert.AreEqual(await doSomethingWithMoreEmptyGrain.GetA(), 11);
-            Assert.AreEqual(await doSomethingWithMoreGrain.GetA(), 11);
-            Assert.AreEqual(await doSomethingWithMoreGrain.GetB(), 11);
-            Assert.AreEqual(await doSomethingCombinedGrain.GetA(), 11);
-            Assert.AreEqual(await doSomethingCombinedGrain.GetB(), 11);
-            Assert.AreEqual(await doSomethingCombinedGrain.GetC(), 11);
+            Assert.Equal(await doSomethingEmptyGrain.GetA(), 11);
+            Assert.Equal(await doSomethingEmptyWithMoreGrain.GetA(), 11);
+            Assert.Equal(await doSomethingWithMoreEmptyGrain.GetA(), 11);
+            Assert.Equal(await doSomethingWithMoreGrain.GetA(), 11);
+            Assert.Equal(await doSomethingWithMoreGrain.GetB(), 11);
+            Assert.Equal(await doSomethingCombinedGrain.GetA(), 11);
+            Assert.Equal(await doSomethingCombinedGrain.GetB(), 11);
+            Assert.Equal(await doSomethingCombinedGrain.GetC(), 11);
 
         }
     }

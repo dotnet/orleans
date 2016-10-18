@@ -5,7 +5,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class InvokeWorkItem : WorkItemBase
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("InvokeWorkItem", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("InvokeWorkItem", LoggerType.Runtime);
         private readonly ActivationData activation;
         private readonly Message message;
         

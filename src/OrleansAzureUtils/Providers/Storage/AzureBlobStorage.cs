@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
@@ -8,7 +9,6 @@ using Newtonsoft.Json;
 using Orleans.Providers;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using System.Collections.Generic;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 
@@ -44,6 +44,10 @@ namespace Orleans.Storage
     /// </example>
     public class AzureBlobStorage : IStorageProvider
     {
+        internal const string DataConnectionStringPropertyName = AzureTableStorage.DataConnectionStringPropertyName;
+        internal const string ContainerNamePropertyName = "ContainerName";
+        internal const string ContainerNameDefaultValue = "grainstate";
+
         private JsonSerializerSettings jsonSettings;
 
         private CloudBlobContainer container;
@@ -65,13 +69,13 @@ namespace Orleans.Storage
             try
             {
                 this.Name = name;
-                this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
 
-                if (!config.Properties.ContainsKey("DataConnectionString")) throw new BadProviderConfigException("The DataConnectionString setting has not been configured in the cloud role. Please add a DataConnectionString setting with a valid Azure Storage connection string.");
+                if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
 
-                var account = CloudStorageAccount.Parse(config.Properties["DataConnectionString"]);
+                var account = CloudStorageAccount.Parse(config.Properties[DataConnectionStringPropertyName]);
                 var blobClient = account.CreateCloudBlobClient();
-                var containerName = config.Properties.ContainsKey("ContainerName") ? config.Properties["ContainerName"] : "grainstate";
+                var containerName = config.Properties.ContainsKey(ContainerNamePropertyName) ? config.Properties[ContainerNamePropertyName] : ContainerNameDefaultValue;
                 container = blobClient.GetContainerReference(containerName);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
 
@@ -87,13 +91,20 @@ namespace Orleans.Storage
 
         IEnumerable<string> FormatPropertyMessage(IProviderConfiguration config)
         {
-            foreach (var property in new string[] { "ContainerName", "SerializeTypeNames", "PreserveReferencesHandling", "UseFullAssemblyNames", "IndentJSON" })
+            var properties = new[]
+            {
+                ContainerNamePropertyName,
+                "SerializeTypeNames",
+                "PreserveReferencesHandling",
+                OrleansJsonSerializer.UseFullAssemblyNamesProperty,
+                OrleansJsonSerializer.IndentJsonProperty
+            };
+            foreach (var property in properties)
             {
                 if (!config.Properties.ContainsKey(property)) continue;
                 yield return string.Format("{0}={1}", property, config.Properties[property]);
             }
         }
-
 
         /// <summary> Shutdown this storage provider. </summary>
         /// <see cref="IProvider.Close"/>
@@ -152,6 +163,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
                     string.Format("Error reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                     ex);
+
+                throw;
             }
         }
 
@@ -212,6 +225,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
                     string.Format("Error writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                     ex);
+
+                throw;
             }
         }
 
@@ -239,6 +254,8 @@ namespace Orleans.Storage
                 Log.Error((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
                   string.Format("Error clearing: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
                   ex);
+
+                throw;
             }
         }
     }

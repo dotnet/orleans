@@ -7,16 +7,13 @@ namespace Orleans.CodeGenerator
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -59,10 +56,11 @@ namespace Orleans.CodeGenerator
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
                 SF.Attribute(typeof(MethodInvokerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
-                        SF.AttributeArgument(grainType.GetParseableName().GetLiteralExpression()),
-                        SF.AttributeArgument(interfaceIdArgument),
-                        SF.AttributeArgument(grainTypeArgument)),
+                        SF.AttributeArgument(grainTypeArgument),
+                        SF.AttributeArgument(interfaceIdArgument)),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
+#endif
             };
 
             var members = new List<MemberDeclarationSyntax>
@@ -229,23 +227,8 @@ namespace Orleans.CodeGenerator
                         grainArgument,
                         SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                     SF.ThrowStatement(argumentNullException));
-
-            // Wrap everything in a try-catch block.
-            var faulted = (Expression<Func<Task<object>>>)(() => TaskUtility.Faulted(null));
-            const string Exception = "exception";
-            var exception = SF.Identifier(Exception);
-            var body =
-                SF.TryStatement()
-                    .AddBlockStatements(grainArgumentCheck, interfaceIdSwitch)
-                    .AddCatches(
-                        SF.CatchClause()
-                            .WithDeclaration(
-                                SF.CatchDeclaration(typeof(Exception).GetTypeSyntax()).WithIdentifier(exception))
-                            .AddBlockStatements(
-                                SF.ReturnStatement(
-                                    faulted.Invoke().AddArgumentListArguments(SF.Argument(SF.IdentifierName(Exception))))));
-
-            return methodDeclaration.AddBodyStatements(body);
+            
+            return methodDeclaration.AddBodyStatements(grainArgumentCheck, interfaceIdSwitch);
         }
 
         /// <summary>
@@ -292,7 +275,8 @@ namespace Orleans.CodeGenerator
             var grainMethodCall =
                 SF.InvocationExpression(castGrain.Member(method.Name))
                     .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
-
+            
+            // For void methods, invoke the method and return a completed task.
             if (method.ReturnType == typeof(void))
             {
                 var completed = (Expression<Func<Task<object>>>)(() => TaskUtility.Completed());
@@ -300,6 +284,12 @@ namespace Orleans.CodeGenerator
                 {
                     SF.ExpressionStatement(grainMethodCall), SF.ReturnStatement(completed.Invoke())
                 };
+            }
+
+            // For methods which return the expected type, Task<object>, simply return that.
+            if (method.ReturnType == typeof(Task<object>))
+            {
+                return new StatementSyntax[] { SF.ReturnStatement(grainMethodCall) };
             }
 
             // The invoke method expects a Task<object>, so we need to upcast the returned value.

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
@@ -357,7 +356,7 @@ namespace Orleans.Runtime
         private readonly GrainInterfaceMap.GrainInterfaceData interfaceData;
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
-        
+
         private readonly PlacementStrategy placementStrategy;
         private readonly MultiClusterRegistrationStrategy registrationStrategy;
         private readonly bool isGeneric;

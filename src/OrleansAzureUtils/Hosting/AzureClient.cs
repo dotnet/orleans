@@ -74,6 +74,22 @@ namespace Orleans.Runtime.Host
             GrainClient.Uninitialize();
         }
 
+        /// <summary>
+        /// Returns default client configuration object for passing to AzureClient.
+        /// </summary>
+        /// <returns></returns>
+        public static ClientConfiguration DefaultConfiguration()
+        {
+            var config = new ClientConfiguration
+            {
+                GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable,
+                DeploymentId = GetDeploymentId(),
+                DataConnectionString = GetDataConnectionString(),
+            };
+            
+            return config;
+        }
+
         #region Internal implementation of client initialization processing
 
         private static void InitializeImpl_FromFile(FileInfo configFile)
@@ -101,7 +117,7 @@ namespace Orleans.Runtime.Host
             }
             catch (Exception ex)
             {
-                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, TraceLogger.PrintException(ex));
+                var msg = String.Format("Error loading Orleans client configuration file {0} {1} -- unable to continue. {2}", configFile, ex.Message, LogFormatter.PrintException(ex));
                 Trace.TraceError(msg);
                 throw new AggregateException(msg, ex);
             }
@@ -123,12 +139,12 @@ namespace Orleans.Runtime.Host
             InitializeImpl_FromConfig(config);
         }
 
-        private static string GetDeploymentId()
+        internal static string GetDeploymentId()
         {
             return GrainClient.TestOnlyNoConnect ? "FakeDeploymentId" : serviceRuntimeWrapper.DeploymentId;
         }
 
-        private static string GetDataConnectionString()
+        internal static string GetDataConnectionString()
         {
             return GrainClient.TestOnlyNoConnect
                 ? "FakeConnectionString"
@@ -179,7 +195,7 @@ namespace Orleans.Runtime.Host
             OrleansException err;
             err = lastException != null ? new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}. Last exception={1}",
                 deploymentId, lastException.Message), lastException) : new OrleansException(String.Format("Could not Initialize Client for DeploymentId={0}.", deploymentId));
-            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, TraceLogger.PrintException(err));
+            Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
 

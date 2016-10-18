@@ -73,4 +73,27 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
     }
+
+    public class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
+    {
+        private SimpleExtension extender;
+        
+        public Task DoSomething() {
+            return TaskDone.Done;
+        }
+        
+        public override Task OnActivateAsync()
+        {
+            if (extender == null)
+            {
+                extender = new SimpleExtension("A");
+                if (!SiloProviderRuntime.Instance.TryAddExtension(extender))
+                {
+                    throw new SystemException("Unable to add new extension");
+                }
+            }
+
+            return base.OnActivateAsync();
+        }
+    }
 }

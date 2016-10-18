@@ -1,6 +1,6 @@
 using System;
 using System.Net;
-
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace HelloWorld
@@ -79,7 +79,6 @@ namespace HelloWorld
         {
             string deploymentId = null;
 
-            string configFileName = "DevTestServerConfiguration.xml";
             string siloName = Dns.GetHostName(); // Default to machine name
 
             int argPos = 1;
@@ -114,10 +113,6 @@ namespace HelloWorld
                         case "deploymentid":
                             deploymentId = split[1];
                             break;
-                        case "deploymentgroup":
-                            // TODO: Remove this at some point in future
-                            Console.WriteLine("Ignoring deprecated command line argument: " + a);
-                            break;
                         default:
                             Console.WriteLine("Bad command line arguments supplied: " + a);
                             return false;
@@ -129,11 +124,6 @@ namespace HelloWorld
                     siloName = a;
                     argPos++;
                 }
-                else if (argPos == 2)
-                {
-                    configFileName = a;
-                    argPos++;
-                }
                 else
                 {
                     // Too many command line arguments
@@ -142,8 +132,9 @@ namespace HelloWorld
                 }
             }
 
-            siloHost = new SiloHost(siloName);
-            siloHost.ConfigFileName = configFileName;
+            var config = ClusterConfiguration.LocalhostPrimarySilo();
+            siloHost = new SiloHost(siloName, config);
+            
             if (deploymentId != null)
                 siloHost.DeploymentId = deploymentId;
 

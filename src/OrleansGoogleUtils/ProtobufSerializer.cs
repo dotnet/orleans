@@ -11,15 +11,15 @@ namespace Orleans.Serialization
     /// </summary>
     public class ProtobufSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, object> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, object>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, MessageParser>();
 
-        private TraceLogger logger;
+        private Logger logger;
 
         /// <summary>
         /// Initializes the external serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
@@ -35,8 +35,14 @@ namespace Orleans.Serialization
             {
                 if (!Parsers.ContainsKey(itemType.TypeHandle))
                 {
-                    var parser = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
-                    Parsers.TryAdd(itemType.TypeHandle, parser);
+                    var prop = itemType.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static);
+                    if (prop == null)
+                    {
+                        return false;
+                    }
+
+                    var parser = prop.GetValue(null, null);
+                    Parsers.TryAdd(itemType.TypeHandle, parser as MessageParser);
                 }
                 return true;
             }
@@ -120,22 +126,16 @@ namespace Orleans.Serialization
             }
 
             var typeHandle = expectedType.TypeHandle;
-            object parser = null;
+            MessageParser parser = null;
             if (!Parsers.TryGetValue(typeHandle, out parser))
             {
                 throw new ArgumentException("No parser found for the expected type " + expectedType, "expectedType");
             }
 
             int length = reader.ReadInt();
-            if (length == 0)
-            {
-                // the special null case.
-                return null;
-            }
             byte[] data = reader.ReadBytes(length);
 
-            dynamic dynamicParser = parser;
-            object message = dynamicParser.ParseFrom(data);
+            object message = parser.ParseFrom(data);
 
             return message;
         }

@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Messaging
     internal class InboundMessageQueue : IInboundMessageQueue
     {
         private readonly BlockingCollection<Message>[] messageQueues;
-        private readonly TraceLogger log;
+        private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
 
         public int Count
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 i++;
             }
-            log = TraceLogger.GetLogger("Orleans.Messaging.InboundMessageQueue");
+            log = LogManager.GetLogger("Orleans.Messaging.InboundMessageQueue");
         }
 
         public void Stop()

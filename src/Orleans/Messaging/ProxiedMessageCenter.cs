@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -78,7 +78,7 @@ namespace Orleans.Messaging
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference[] grainBuckets;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
@@ -96,7 +96,7 @@ namespace Orleans.Messaging
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
-            logger = TraceLogger.GetLogger("Messaging.ProxiedMessageCenter", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Messaging.ProxiedMessageCenter", LoggerType.Runtime);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, () =>
                 {
@@ -275,7 +275,7 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<GrainInterfaceMap> GetTypeCodeMap(GrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
@@ -307,6 +307,7 @@ namespace Orleans.Messaging
 #endif
                 return msg;
             }
+#if !NETSTANDARD
             catch (ThreadAbortException exc)
             {
                 // Silo may be shutting-down, so downgrade to verbose log
@@ -314,6 +315,7 @@ namespace Orleans.Messaging
                 Thread.ResetAbort();
                 return null;
             }
+#endif
             catch (OperationCanceledException exc)
             {
                 logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
@@ -381,7 +383,7 @@ namespace Orleans.Messaging
             throw new NotImplementedException("Reconnect");
         }
 
-        #region Random IMessageCenter stuff
+#region Random IMessageCenter stuff
 
         public int SendQueueLength
         {
@@ -393,7 +395,7 @@ namespace Orleans.Messaging
             get { return 0; }
         }
 
-        #endregion
+#endregion
 
         private ITypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
         {
@@ -410,6 +412,17 @@ namespace Orleans.Messaging
             }
 
             return gateway.ToSiloAddress();
+        }
+
+        internal void UpdateClientId(GrainId clientId)
+        {
+            if(ClientId.Category != UniqueKey.Category.Client)
+                throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
+
+            if (clientId.Category != UniqueKey.Category.GeoClient)
+                throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
+
+            ClientId = clientId;
         }
     }
 }

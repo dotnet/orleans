@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Placement;
+using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
@@ -90,8 +91,10 @@ namespace TestGrains
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamGuid, State.StreamNamespace);
-
-            await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
+            foreach (StreamSubscriptionHandle<GeneratedEvent> handle in await stream.GetAllSubscriptionHandles())
+            {
+                await handle.ResumeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
+            }
         }
 
         private async Task OnNextAsync(GeneratedEvent evt, StreamSequenceToken sequenceToken)

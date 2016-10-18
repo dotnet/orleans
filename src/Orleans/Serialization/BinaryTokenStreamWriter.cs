@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
-
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -284,7 +284,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if (t.IsGenericType)
+            if (t.GetTypeInfo().IsGenericType)
             {
                 if (typeTokens.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out token))
                 {
@@ -452,7 +452,6 @@ namespace Orleans.Serialization
             // GrainId must not be null
             Write(addr.Grain);
             Write(addr.Activation ?? ActivationId.Zero);
-            Write((byte) addr.Status);
         }
 
         /// <summary> Write a <c>SiloAddress</c> value to the stream. </summary>

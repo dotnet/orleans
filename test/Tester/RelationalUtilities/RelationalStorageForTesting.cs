@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.SqlUtils;
+using Tester.RelationalUtilities;
 
 namespace UnitTests.General
 {
@@ -14,7 +15,8 @@ namespace UnitTests.General
             new Dictionary<string, Func<string, RelationalStorageForTesting>>
             {
                 {AdoNetInvariants.InvariantNameSqlServer, cs => new SqlServerStorageForTesting(cs)},
-                {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)}
+                {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
+                {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
 
         public IRelationalStorage Storage { get; private set; }
@@ -68,7 +70,7 @@ namespace UnitTests.General
         /// <param name="setupScript">the script. usually CreateOrleansTables_xxxx.sql</param>
         protected abstract IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName);
 
-        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName)
+        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string connectionString = null)
         {
             if (string.IsNullOrWhiteSpace(invariantName))
             {
@@ -82,9 +84,17 @@ namespace UnitTests.General
 
             Console.WriteLine("Initializing relational databases...");
 
-            var testStorage = CreateTestInstance(invariantName);
+            RelationalStorageForTesting testStorage;
+            if(connectionString == null)
+            {
+                testStorage = CreateTestInstance(invariantName);
+            }
+            else
+            {
+                testStorage = CreateTestInstance(invariantName, connectionString);
+            }
 
-            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, testStorage.DefaultConnectionString);
+            Console.WriteLine("Dropping and recreating database '{0}' with connectionstring '{1}'", testDatabaseName, connectionString ?? testStorage.DefaultConnectionString);
 
             if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
             {
@@ -99,7 +109,7 @@ namespace UnitTests.General
             Console.WriteLine("Creating database tables...");
 
             var setupScript = File.ReadAllText(testStorage.SetupSqlScriptFileName);
-            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);            
+            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);
             Console.WriteLine("Initializing relational databases done.");
 
             return testStorage;
@@ -114,7 +124,7 @@ namespace UnitTests.General
         {
             return CreateTestInstance(invariantName, CreateTestInstance(invariantName, "notempty").DefaultConnectionString);
         }
-        
+
 
         /// <summary>
         /// Constructor
@@ -127,7 +137,7 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Executes the given script in a test context. 
+        /// Executes the given script in a test context.
         /// </summary>
         /// <param name="setupScript">the script. usually CreateOrleansTables_xxxx.sql</param>
         /// <param name="dataBaseName">the target database to be populated</param>
@@ -174,7 +184,7 @@ namespace UnitTests.General
         {
             return Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
         }
-        
+
         /// <summary>
         /// Creates a new instance of the storage based on the old connection string by changing the database name.
         /// </summary>
@@ -187,6 +197,6 @@ namespace UnitTests.General
             csb["Database"] = newDatabaseName;
             return CreateTestInstance(Storage.InvariantName, csb.ConnectionString);
         }
-        
+
     }
 }

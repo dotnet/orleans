@@ -64,11 +64,7 @@ namespace Orleans.Streams
 
         public Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
-            if (!IsImplicitSubscriber(streamConsumer, streamId))
-            {
-                throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
-            }
-            return Task.FromResult(new List<GuidId> { GuidId.GetGuidId(streamConsumer.GetPrimaryKey()) });
+            return Task.FromResult(new List<GuidId> { CreateSubscriptionId(streamId, streamConsumer) });
         }
 
         internal bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)

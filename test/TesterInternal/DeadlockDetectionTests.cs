@@ -1,33 +1,30 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using Tester;
 using UnitTests.GrainInterfaces;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
+using Tester;
 
 namespace UnitTests.General
 {
     public class DeadlockDetectionTests : OrleansTestingBase, IClassFixture<DeadlockDetectionTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    AdjustConfig = config =>
-                    {
-                        config.Globals.PerformDeadlockDetection = true;
-                    }
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.Globals.PerformDeadlockDetection = true;
+
+                return new TestCluster(options);
             }
         }
+
 
         private const int numIterations = 30;
 
@@ -61,9 +58,9 @@ namespace UnitTests.General
                 {
                     Exception baseExc = exc.GetBaseException();
                     logger.Info(baseExc.Message);
-                    Assert.AreEqual(typeof(DeadlockException), baseExc.GetType());
+                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.AreEqual(callChain.Count, deadlockExc.CallChain.Count());
+                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
                 }
             }
         }
@@ -91,9 +88,9 @@ namespace UnitTests.General
                 {
                     Exception baseExc = exc.GetBaseException();
                     logger.Info(baseExc.Message);
-                    Assert.AreEqual(typeof(DeadlockException), baseExc.GetType());
+                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.AreEqual(callChain.Count, deadlockExc.CallChain.Count());
+                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
                 }
             }
         }
@@ -122,9 +119,9 @@ namespace UnitTests.General
                 {
                     Exception baseExc = exc.GetBaseException();
                     logger.Info(baseExc.Message);
-                    Assert.AreEqual(typeof(DeadlockException), baseExc.GetType());
+                    Assert.Equal(typeof(DeadlockException), baseExc.GetType());
                     DeadlockException deadlockExc = (DeadlockException)baseExc;
-                    Assert.AreEqual(callChain.Count, deadlockExc.CallChain.Count());
+                    Assert.Equal(callChain.Count, deadlockExc.CallChain.Count());
                 }
             }
         }

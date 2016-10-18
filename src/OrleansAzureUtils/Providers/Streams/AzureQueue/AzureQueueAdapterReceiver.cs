@@ -17,7 +17,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private AzureQueueDataManager queue;
         private long lastReadMessage;
         private Task outstandingTask;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public QueueId Id { get; private set; }
 
@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             
             Id = queueId;
             this.queue = queue;
-            logger = TraceLogger.GetLogger(GetType().Name, TraceLogger.LoggerType.Provider);
+            logger = LogManager.GetLogger(GetType().Name, LoggerType.Provider);
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -104,8 +104,8 @@ namespace Orleans.Providers.Streams.AzureQueue
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn((int)ErrorCode.AzureQueue_15,
-                        string.Format("Exception upon DeleteQueueMessage on queue {0}. Ignoring.", Id), exc);
+                    logger.Warn(ErrorCode.AzureQueue_15,
+                        $"Exception upon DeleteQueueMessage on queue {Id}. Ignoring.", exc);
                 }
             }
             finally

@@ -13,7 +13,11 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class ConsistentRingProvider : MarshalByRefObject, IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
+    internal class ConsistentRingProvider :
+#if !NETSTANDARD
+        MarshalByRefObject,
+#endif
+        IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
     {
         // internal, so that unit tests can access them
         internal SiloAddress MyAddress { get; private set; }
@@ -21,7 +25,7 @@ namespace Orleans.Runtime.ConsistentRing
         
         /// list of silo members sorted by the hash value of their address
         private readonly List<SiloAddress> membershipRingList;
-        private readonly TraceLogger log;
+        private readonly Logger log;
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners;
@@ -30,7 +34,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         public ConsistentRingProvider(SiloAddress siloAddr)
         {
-            log = TraceLogger.GetLogger(typeof(ConsistentRingProvider).Name);
+            log = LogManager.GetLogger(typeof(ConsistentRingProvider).Name);
             membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
@@ -300,7 +304,7 @@ namespace Orleans.Runtime.ConsistentRing
                 {
                     RemoveServer(updatedSilo);
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
                 {
                     AddServer(updatedSilo);
                 }

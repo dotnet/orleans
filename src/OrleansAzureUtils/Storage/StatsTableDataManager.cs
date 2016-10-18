@@ -1,6 +1,5 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -60,13 +59,13 @@ namespace Orleans.AzureUtils
 
 
         private AzureTableDataManager<StatsTableData> tableManager;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         private StatsTableDataManager()
         {
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             
         }
 

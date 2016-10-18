@@ -3,12 +3,10 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
 using Tester;
 using Xunit;
 using Xunit.Abstractions;
@@ -35,7 +33,7 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                TraceLogger.Initialize(new NodeConfiguration());
+                LogManager.Initialize(new NodeConfiguration());
                 TestUtils.CheckForAzureStorage();
             }
         }
@@ -45,13 +43,13 @@ namespace UnitTests.StorageTests
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;
         private OrleansSiloInstanceManager manager;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly ITestOutputHelper output;
 
         public SiloInstanceTableManagerTests(ITestOutputHelper output)
         {
             this.output = output;
-            logger = TraceLogger.GetLogger("SiloInstanceTableManagerTests", TraceLogger.LoggerType.Application);
+            logger = LogManager.GetLogger("SiloInstanceTableManagerTests", LoggerType.Application);
 
             deploymentId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
@@ -60,7 +58,7 @@ namespace UnitTests.StorageTests
             logger.Info("DeploymentId={0} Generation={1}", deploymentId, generation);
 
             logger.Info("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(deploymentId, StorageTestConstants.DataConnectionString)
+            manager = OrleansSiloInstanceManager.GetManager(deploymentId, TestDefaultConfiguration.DataConnectionString)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 
@@ -108,7 +106,7 @@ namespace UnitTests.StorageTests
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
                 .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
 
-            Assert.IsTrue(didInsert, "Did insert");
+            Assert.True(didInsert, "Did insert");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
@@ -123,10 +121,10 @@ namespace UnitTests.StorageTests
             SiloInstanceTableEntry siloEntry = data.Item1;
             string eTag = data.Item2;
 
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(siloEntry, "SiloInstanceTableEntry should not be null");
+            Assert.NotNull(eTag); // ETag should not be null
+            Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
 
-            Assert.AreEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_CREATED, siloEntry.Status);
+            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_CREATED, siloEntry.Status);
 
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
             logger.Info("End {0}", testName);
@@ -140,15 +138,15 @@ namespace UnitTests.StorageTests
             manager.ActivateSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
-            Assert.IsNotNull(data, "Data returned should not be null");
+            Assert.NotNull(data); // Data returned should not be null
 
             SiloInstanceTableEntry siloEntry = data.Item1;
             string eTag = data.Item2;
 
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(siloEntry, "SiloInstanceTableEntry should not be null");
+            Assert.NotNull(eTag); // ETag should not be null
+            Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
 
-            Assert.AreEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, siloEntry.Status);
+            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_ACTIVE, siloEntry.Status);
 
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
@@ -164,10 +162,10 @@ namespace UnitTests.StorageTests
             SiloInstanceTableEntry siloEntry = data.Item1;
             string eTag = data.Item2;
 
-            Assert.IsNotNull(eTag, "ETag should not be null");
-            Assert.IsNotNull(siloEntry, "SiloInstanceTableEntry should not be null");
+            Assert.NotNull(eTag); // ETag should not be null
+            Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
 
-            Assert.AreEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_DEAD, siloEntry.Status);
+            Assert.Equal(SiloInstanceTableTestConstants.INSTANCE_STATUS_DEAD, siloEntry.Status);
 
             CheckSiloInstanceTableEntry(myEntry, siloEntry);
         }
@@ -178,16 +176,16 @@ namespace UnitTests.StorageTests
             RegisterSiloInstance();
 
             var gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
-            Assert.AreEqual(0, gateways.Count, "Number of gateways before Silo.Activate");
+            Assert.Equal(0,  gateways.Count);  // "Number of gateways before Silo.Activate"
 
             manager.ActivateSiloInstance(myEntry);
 
             gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
-            Assert.AreEqual(1, gateways.Count, "Number of gateways after Silo.Activate");
+            Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();
-            Assert.AreEqual(myEntry.Address, myGateway.Host.ToString(), "Gateway address");
-            Assert.AreEqual(myEntry.ProxyPort, myGateway.Port.ToString(CultureInfo.InvariantCulture), "Gateway port");
+            Assert.Equal(myEntry.Address,  myGateway.Host.ToString());  // "Gateway address"
+            Assert.Equal(myEntry.ProxyPort,  myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage")]
@@ -209,8 +207,8 @@ namespace UnitTests.StorageTests
 
             output.WriteLine("SiloAddress result = {0} From Row Key string = {1}", fromRowKey, MembershipRowKey);
 
-            Assert.AreEqual(siloAddress, fromRowKey, "Compare SiloAddress");
-            Assert.AreEqual(SiloInstanceTableEntry.ConstructRowKey(siloAddress), SiloInstanceTableEntry.ConstructRowKey(fromRowKey), "SiloInstanceTableEntry.ConstructRowKey");
+            Assert.Equal(siloAddress,  fromRowKey);
+            Assert.Equal(SiloInstanceTableEntry.ConstructRowKey(siloAddress), SiloInstanceTableEntry.ConstructRowKey(fromRowKey));
         }
 
         private void RegisterSiloInstance()
@@ -234,10 +232,10 @@ namespace UnitTests.StorageTests
                 ProxyPort = "30000",
 
                 RoleName = "MyRole",
-                InstanceName = "MyInstance",
+                SiloName = "MyInstance",
                 UpdateZone = "0",
                 FaultZone = "0",
-                StartTime = TraceLogger.PrintDate(DateTime.UtcNow),
+                StartTime = LogFormatter.PrintDate(DateTime.UtcNow),
             };
 
             logger.Info("MyEntry={0}", myEntry);
@@ -260,23 +258,23 @@ namespace UnitTests.StorageTests
 
         private void CheckSiloInstanceTableEntry(SiloInstanceTableEntry referenceEntry, SiloInstanceTableEntry entry)
         {
-            Assert.AreEqual(referenceEntry.DeploymentId, entry.DeploymentId, "DeploymentId");
-            Assert.AreEqual(referenceEntry.Address, entry.Address, "Address");
-            Assert.AreEqual(referenceEntry.Port, entry.Port, "Port");
-            Assert.AreEqual(referenceEntry.Generation, entry.Generation, "Generation");
-            Assert.AreEqual(referenceEntry.HostName, entry.HostName, "HostName");
-            //Assert.AreEqual(referenceEntry.Status, entry.Status, "Status");
-            Assert.AreEqual(referenceEntry.ProxyPort, entry.ProxyPort, "ProxyPort");
-            Assert.AreEqual(referenceEntry.RoleName, entry.RoleName, "RoleName");
-            Assert.AreEqual(referenceEntry.InstanceName, entry.InstanceName, "InstanceName");
-            Assert.AreEqual(referenceEntry.UpdateZone, entry.UpdateZone, "UpdateZone");
-            Assert.AreEqual(referenceEntry.FaultZone, entry.FaultZone, "FaultZone");
-            Assert.AreEqual(referenceEntry.StartTime, entry.StartTime, "StartTime");
-            Assert.AreEqual(referenceEntry.IAmAliveTime, entry.IAmAliveTime, "IAmAliveTime");
-            Assert.AreEqual(referenceEntry.MembershipVersion, entry.MembershipVersion, "MembershipVersion");
+            Assert.Equal(referenceEntry.DeploymentId, entry.DeploymentId);
+            Assert.Equal(referenceEntry.Address, entry.Address);
+            Assert.Equal(referenceEntry.Port, entry.Port);
+            Assert.Equal(referenceEntry.Generation,  entry.Generation);
+            Assert.Equal(referenceEntry.HostName, entry.HostName);
+            //Assert.Equal(referenceEntry.Status, entry.Status);
+            Assert.Equal(referenceEntry.ProxyPort, entry.ProxyPort);
+            Assert.Equal(referenceEntry.RoleName, entry.RoleName);
+            Assert.Equal(referenceEntry.SiloName, entry.SiloName);
+            Assert.Equal(referenceEntry.UpdateZone, entry.UpdateZone);
+            Assert.Equal(referenceEntry.FaultZone, entry.FaultZone);
+            Assert.Equal(referenceEntry.StartTime, entry.StartTime);
+            Assert.Equal(referenceEntry.IAmAliveTime, entry.IAmAliveTime);
+            Assert.Equal(referenceEntry.MembershipVersion, entry.MembershipVersion);
 
-            Assert.AreEqual(referenceEntry.SuspectingTimes, entry.SuspectingTimes, "SuspectingTimes");
-            Assert.AreEqual(referenceEntry.SuspectingSilos, entry.SuspectingSilos, "SuspectingSilos");
+            Assert.Equal(referenceEntry.SuspectingTimes, entry.SuspectingTimes);
+            Assert.Equal(referenceEntry.SuspectingSilos, entry.SuspectingSilos);
         }
     }
 }

@@ -7,14 +7,11 @@ namespace Orleans.CodeGenerator
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -64,8 +61,12 @@ namespace Orleans.CodeGenerator
             var attributes = SF.AttributeList()
                 .AddAttributes(
                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
+                    // we could add Serializable attribute if we want, but that would require that the target
+                    // project depends on System.Runtime.Serialization.Formatters, which is currently in preview
                     SF.Attribute(typeof(SerializableAttribute).GetNameSyntax()),
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                     markerAttribute);
 
             var className = CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix;

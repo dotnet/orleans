@@ -1,11 +1,9 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using UnitTests.Tester;
 
 namespace UnitTests.General
 {
@@ -16,8 +14,7 @@ namespace UnitTests.General
         {
             ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
-            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.True(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+            this.HostedCluster.Primary.TestHook.LatchIsOverloaded(true);
 
             // Do not accept message in overloaded state
             await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
@@ -34,8 +31,7 @@ namespace UnitTests.General
             await grain.SetA(1);
             logger.Info("First set succeeded");
 
-            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(true);
-            Assert.True(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch overload state");
+            this.HostedCluster.Primary.TestHook.LatchIsOverloaded(true);
 
             // Do not accept message in overloaded state
             await Assert.ThrowsAsync<GatewayTooBusyException>(() =>
@@ -43,8 +39,7 @@ namespace UnitTests.General
 
             logger.Info("Second set was shed");
 
-            this.HostedCluster.Primary.Silo.Metrics.LatchIsOverload(false);
-            Assert.False(this.HostedCluster.Primary.Silo.Metrics.IsOverloaded, "Primary silo did not successfully latch non-overload state");
+            this.HostedCluster.Primary.TestHook.LatchIsOverloaded(false);
 
             // Simple request after overload is cleared should succeed
             await grain.SetA(4);

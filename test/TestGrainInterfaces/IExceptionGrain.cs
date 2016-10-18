@@ -1,7 +1,6 @@
 namespace UnitTests.GrainInterfaces
 {
     using System.Threading.Tasks;
-
     using Orleans;
 
     /// <summary>
@@ -22,6 +21,8 @@ namespace UnitTests.GrainInterfaces
         Task GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(long otherGrainId);
 
         Task ThrowsSynchronousInvalidOperationException();
+
+        Task<object> ThrowsSynchronousExceptionObjectTask();
 
         Task ThrowsMultipleExceptionsAggregatedInFaultedTask();
 

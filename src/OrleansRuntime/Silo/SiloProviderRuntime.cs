@@ -2,13 +2,12 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
@@ -88,7 +87,7 @@ namespace Orleans.Runtime.Providers
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public string ExecutingEntityIdentity()
@@ -126,7 +125,7 @@ namespace Orleans.Runtime.Providers
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
-            return new EquallyDevidedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
+            return new EquallyDividedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
         }
 
         public bool InSilo { get { return true; } }
@@ -160,7 +159,7 @@ namespace Orleans.Runtime.Providers
             var currentActivation = GetCurrentActivationData();
             var invoker = TryGetExtensionInvoker(handler.GetType());
             if (invoker == null)
-                throw new SystemException("Extension method invoker was not generated for an extension interface");
+                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
             
             return currentActivation.TryAddExtension(invoker, handler);
         }

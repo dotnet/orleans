@@ -9,7 +9,7 @@ namespace Orleans.Runtime
 {
     internal class ActivationDirectory : IEnumerable<KeyValuePair<ActivationId, ActivationData>>
     {
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ActivationDirectory", TraceLogger.LoggerType.Runtime);
+        private static readonly LoggerImpl logger = LogManager.GetLogger("ActivationDirectory", LoggerType.Runtime);
 
         private readonly ConcurrentDictionary<ActivationId, ActivationData> activations;                // Activation data (app grains) only.
         private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets;                // SystemTarget only.

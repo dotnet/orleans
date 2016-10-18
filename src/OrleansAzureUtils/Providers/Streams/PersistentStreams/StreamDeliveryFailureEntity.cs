@@ -40,7 +40,15 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         public virtual void SetPartitionKey(string deploymentId)
         {
-            PartitionKey = String.Format("DeliveryFailure_{0}_{1}", StreamProviderName, deploymentId);
+            PartitionKey = MakeDefaultPartitionKey(StreamProviderName, deploymentId);
+        }
+
+        /// <summary>
+        /// Default partition key
+        /// </summary>
+        public static string MakeDefaultPartitionKey(string streamProviderName, string deploymentId)
+        {
+            return $"DeliveryFailure_{streamProviderName}_{deploymentId}";
         }
 
         /// <summary>
@@ -48,7 +56,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         public virtual void SetRowkey()
         {
-            RowKey = String.Format("{0:x16}_{1}", ReverseOrderTimestampTicks(), Guid.NewGuid());
+            RowKey = $"{ReverseOrderTimestampTicks():x16}_{Guid.NewGuid()}";
         }
 
         /// <summary>
@@ -79,20 +87,20 @@ namespace Orleans.Providers.Streams.PersistentStreams
         ///  key with some other field (stream namespace?).
         /// </remarks>
         /// <returns></returns>
-        static protected long ReverseOrderTimestampTicks()
+        protected static long ReverseOrderTimestampTicks()
         {
             var now = DateTime.UtcNow;
             return DateTime.MaxValue.Ticks - now.Ticks;
         }
 
-        static private byte[] GetTokenBytes(StreamSequenceToken token)
+        private static byte[] GetTokenBytes(StreamSequenceToken token)
         {
             var bodyStream = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(token, bodyStream);
             return bodyStream.ToByteArray();
         }
 
-        static private StreamSequenceToken TokenFromBytes(byte[] bytes)
+        private static StreamSequenceToken TokenFromBytes(byte[] bytes)
         {
             var stream = new BinaryTokenStreamReader(bytes);
             return SerializationManager.Deserialize<StreamSequenceToken>(stream);

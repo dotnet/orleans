@@ -4,11 +4,11 @@
     <id>Microsoft.Orleans.Client</id>
     <version>$version$</version>
     <title>Microsoft Orleans Client Libraries</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Collection of Microsoft Orleans libraries and files needed on the client.
     </summary>
@@ -24,8 +24,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="ClientConfiguration.xml" target="content" />
     <file src="Configuration\OrleansConfiguration.xsd" target="tools\client" />
-    <file src="ClientInstall.ps1" target="tools\install.ps1" />
   </files>
 </package>

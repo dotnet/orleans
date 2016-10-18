@@ -18,11 +18,24 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
+
+    public interface IPersistenceTestGenericGrain<T> : IPersistenceTestGrain // IGrainWithGuidKey
+    { }
+    //    Task<bool> CheckStateInit();
+    //    Task<string> CheckProviderType();
+    //    Task DoSomething();
+    //    Task DoWrite(int val);
+    //    Task<int> DoRead();
+    //    Task<int> GetValue();
+    //    Task DoDelete();
+    //}
+
     public interface IMemoryStorageTestGrain : IGrainWithGuidKey
     {
         Task<int> GetValue();
         Task DoWrite(int val);
         Task<int> DoRead();
+        Task DoDelete();
     }
 
     public interface IAzureStorageTestGrain : IGrainWithGuidKey
@@ -59,6 +72,48 @@ namespace UnitTests.GrainInterfaces
     }
 
     public interface IAzureStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
+    {
+        Task<string> GetExtendedKeyValue();
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain : IGrainWithGuidKey
+    {
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageGenericGrain<T> : IGrainWithIntegerKey
+    {
+        Task<T> GetValue();
+        Task DoWrite(T val);
+        Task<T> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_GuidExtendedKey : IGrainWithGuidCompoundKey
+    {
+        Task<string> GetExtendedKeyValue();
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_LongKey : IGrainWithIntegerKey
+    {
+        Task<int> GetValue();
+        Task DoWrite(int val);
+        Task<int> DoRead();
+        Task DoDelete();
+    }
+
+    public interface IAWSStorageTestGrain_LongExtendedKey : IGrainWithIntegerCompoundKey
     {
         Task<string> GetExtendedKeyValue();
         Task<int> GetValue();

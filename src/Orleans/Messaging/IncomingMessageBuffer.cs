@@ -7,7 +7,6 @@ namespace Orleans.Runtime
     internal class IncomingMessageBuffer
     {
         private const int Kb = 1024;
-        private const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
         private readonly List<ArraySegment<byte>> readBuffer;
@@ -23,9 +22,11 @@ namespace Orleans.Runtime
         private int decodeOffset;
 
         private readonly bool supportForwarding;
-        private TraceLogger Log;
+        private Logger Log;
 
-        public IncomingMessageBuffer(TraceLogger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
+        internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
+
+        public IncomingMessageBuffer(Logger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = logger;
             this.supportForwarding = supportForwarding;
@@ -48,6 +49,50 @@ namespace Orleans.Runtime
                 receiveOffset = 0;
             }
             return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset);
+        }
+
+        // Copies receive buffer into read buffer for futher processing
+        public void UpdateReceivedData(byte[] receiveBuffer, int bytesRead)
+        {
+            var newReceiveOffset = receiveOffset + bytesRead;
+            while (newReceiveOffset > currentBufferSize)
+            {
+                GrowBuffer();
+            }
+
+            int receiveBufferOffset = 0;
+            var lengthSoFar = 0;
+
+            foreach (var segment in readBuffer)
+            {
+                var bytesStillToSkip = receiveOffset - lengthSoFar;
+                lengthSoFar += segment.Count;
+
+                if (segment.Count <= bytesStillToSkip)
+                {
+                    continue;
+                }
+
+                if(bytesStillToSkip > 0) // This is the first buffer
+                {
+                    var bytesToCopy = Math.Min(segment.Count - bytesStillToSkip, bytesRead - receiveBufferOffset);
+                    Buffer.BlockCopy(receiveBuffer, receiveBufferOffset, segment.Array, bytesStillToSkip, bytesToCopy);
+                    receiveBufferOffset += bytesToCopy;
+                }
+                else
+                {
+                    var bytesToCopy = Math.Min(segment.Count, bytesRead - receiveBufferOffset);
+                    Buffer.BlockCopy(receiveBuffer, receiveBufferOffset, segment.Array, 0, bytesToCopy);
+                    receiveBufferOffset += Math.Min(bytesToCopy, segment.Count);
+                }
+
+                if (receiveBufferOffset == bytesRead)
+                {
+                    break;
+                }
+            }
+
+            receiveOffset += bytesRead;
         }
 
         public void UpdateReceivedData(int bytesRead)

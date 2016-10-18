@@ -5,12 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
-using Xunit;
 using UnitTests.Tester;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests
@@ -27,21 +26,21 @@ namespace UnitTests
         public LoggerTest(ITestOutputHelper output)
         {
             this.output = output;
-            TraceLogger.UnInitialize();
-            TraceLogger.SetRuntimeLogLevel(Severity.Verbose);
-            TraceLogger.SetAppLogLevel(Severity.Info);
+            LogManager.UnInitialize();
+            LogManager.SetRuntimeLogLevel(Severity.Verbose);
+            LogManager.SetAppLogLevel(Severity.Info);
             var overrides = new [] {
                 new Tuple<string, Severity>("Runtime.One", Severity.Warning),
                 new Tuple<string, Severity>("Grain.Two", Severity.Verbose3)
             };
-            TraceLogger.SetTraceLevelOverrides(overrides.ToList());
+            LogManager.SetTraceLevelOverrides(overrides.ToList());
             timingFactor = TestUtils.CalibrateTimings();
         }
 
         public void Dispose()
         {
-            TraceLogger.Flush();
-            TraceLogger.UnInitialize();
+            LogManager.Flush();
+            LogManager.UnInitialize();
         }
 
         /// <summary>
@@ -50,17 +49,14 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest()
         {
-            TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Runtime);
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
+            Logger target = LogManager.GetLogger("Test", LoggerType.Runtime);
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with no overrides"
 
-            target = TraceLogger.GetLogger("One", TraceLogger.LoggerType.Runtime);
-            Assert.AreEqual(Severity.Warning, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with an override");
+            target = LogManager.GetLogger("One", LoggerType.Runtime);
+            Assert.Equal(Severity.Warning, target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with an override"
 
-            target = TraceLogger.GetLogger("Two", TraceLogger.LoggerType.Grain);
-            Assert.AreEqual(Severity.Verbose3, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with an override");
+            target = LogManager.GetLogger("Two", LoggerType.Grain);
+            Assert.Equal(Severity.Verbose3, target.SeverityLevel);  // "Default severity level not calculated correctly for runtime logger with an override"
         }
 
         /// <summary>
@@ -69,13 +65,11 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_ConstructorTest1()
         {
-            TraceLogger target = TraceLogger.GetLogger("Test", TraceLogger.LoggerType.Application);
-            Assert.AreEqual(Severity.Info, target.SeverityLevel,
-                "Default severity level not calculated correctly for application logger with no override");
+            Logger target = LogManager.GetLogger("Test", LoggerType.Application);
+            Assert.Equal(Severity.Info,  target.SeverityLevel);  //  "Default severity level not calculated correctly for application logger with no override"
 
-            target = TraceLogger.GetLogger("Two", TraceLogger.LoggerType.Grain);
-            Assert.AreEqual(Severity.Verbose3, target.SeverityLevel,
-                "Default severity level not calculated correctly for grain logger with an override");
+            target = LogManager.GetLogger("Two", LoggerType.Grain);
+            Assert.Equal(Severity.Verbose3,  target.SeverityLevel);  //  "Default severity level not calculated correctly for grain logger with an override"
         }
 
         /// <summary>
@@ -84,52 +78,47 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SetRuntimeLogLevelTest()
         {
-            TraceLogger target = TraceLogger.GetLogger("Test");
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
-            TraceLogger.SetRuntimeLogLevel(Severity.Warning);
-            Assert.AreEqual(Severity.Warning, target.SeverityLevel,
-                "Default severity level not re-calculated correctly for runtime logger with no overrides");
+            Logger target = LogManager.GetLogger("Test");
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  //  "Default severity level not calculated correctly for runtime logger with no overrides"
+            LogManager.SetRuntimeLogLevel(Severity.Warning);
+            Assert.Equal(Severity.Warning,  target.SeverityLevel);  //  "Default severity level not re-calculated correctly for runtime logger with no overrides"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_SeverityLevelTest()
         {
-            TraceLogger target = TraceLogger.GetLogger("Test");
-            Assert.AreEqual(Severity.Verbose, target.SeverityLevel,
-                "Default severity level not calculated correctly for runtime logger with no overrides");
+            LoggerImpl target = LogManager.GetLogger("Test");
+            Assert.Equal(Severity.Verbose,  target.SeverityLevel);  //  "Default severity level not calculated correctly for runtime logger with no overrides"
             target.SetSeverityLevel(Severity.Verbose2);
-            Assert.AreEqual(Severity.Verbose2, target.SeverityLevel,
-                "Custom severity level was not set properly");
-            TraceLogger.SetRuntimeLogLevel(Severity.Warning);
-            Assert.AreEqual(Severity.Verbose2, target.SeverityLevel,
-                "Severity level was re-calculated even though a custom value had been set");
+            Assert.Equal(Severity.Verbose2,  target.SeverityLevel);  //  "Custom severity level was not set properly"
+            LogManager.SetRuntimeLogLevel(Severity.Warning);
+            Assert.Equal(Severity.Verbose2,  target.SeverityLevel);  //  "Severity level was re-calculated even though a custom value had been set"
         }
 
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_GetLoggerTest()
         {
-            TraceLogger logger = TraceLogger.GetLogger("GetLoggerTest", TraceLogger.LoggerType.Runtime);
-            Assert.IsNotNull(logger);
+            Logger logger = LogManager.GetLogger("GetLoggerTest", LoggerType.Runtime);
+            Assert.NotNull(logger);
 
-            TraceLogger logger2 = TraceLogger.GetLogger("GetLoggerTest", TraceLogger.LoggerType.Runtime);
-            Assert.IsNotNull(logger2);
-            Assert.IsTrue(ReferenceEquals(logger, logger2));
+            Logger logger2 = LogManager.GetLogger("GetLoggerTest", LoggerType.Runtime);
+            Assert.NotNull(logger2);
+            Assert.True(ReferenceEquals(logger, logger2));
 
-            TraceLogger logger3 = TraceLogger.GetLogger("GetLoggerTest", TraceLogger.LoggerType.Application);
-            Assert.IsNotNull(logger3);
-            Assert.IsTrue(ReferenceEquals(logger, logger3));
+            Logger logger3 = LogManager.GetLogger("GetLoggerTest", LoggerType.Application);
+            Assert.NotNull(logger3);
+            Assert.True(ReferenceEquals(logger, logger3));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_CreateMiniDump()
         {
-            var dumpFile = TraceLogger.CreateMiniDump();
+            var dumpFile = LogManager.CreateMiniDump();
             output.WriteLine("Logger.CreateMiniDump dump file = " + dumpFile);
-            Assert.IsNotNull(dumpFile);
-            Assert.IsTrue(dumpFile.Exists, "Mini-dump file exists");
-            Assert.IsTrue(dumpFile.Length > 0, "Mini-dump file has content");
+            Assert.NotNull(dumpFile);
+            Assert.True(dumpFile.Exists, "Mini-dump file exists");
+            Assert.True(dumpFile.Length > 0, "Mini-dump file has content");
             output.WriteLine("Logger.CreateMiniDump dump file location = " + dumpFile.FullName);
         }
 
@@ -138,36 +127,36 @@ namespace UnitTests
         {
             const string name = "LoggerOverrideTest";
             const string fullName = "Runtime." + name;
-            var logger = TraceLogger.GetLogger(name, TraceLogger.LoggerType.Runtime);
+            var logger = LogManager.GetLogger(name, LoggerType.Runtime);
             var initialLevel = logger.SeverityLevel;
 
-            TraceLogger.AddTraceLevelOverride(fullName, Severity.Warning);
-            Assert.AreEqual(Severity.Warning, logger.SeverityLevel, "Logger level not reset after override added");
+            LogManager.AddTraceLevelOverride(fullName, Severity.Warning);
+            Assert.Equal(Severity.Warning,  logger.SeverityLevel);  //  "Logger level not reset after override added"
 
-            TraceLogger.RemoveTraceLevelOverride(fullName);
-            Assert.AreEqual(initialLevel, logger.SeverityLevel, "Logger level not reset after override removed");
+            LogManager.RemoveTraceLevelOverride(fullName);
+            Assert.Equal(initialLevel,  logger.SeverityLevel);  //  "Logger level not reset after override removed"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
         public void Logger_BulkMessageLimit_DifferentLoggers()
         {
             int n = 10000;
-            TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
+            LogManager.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
             int logCode1 = 1;
             int logCode2 = 2;
-            int expectedLogMessages1 = TraceLogger.BulkMessageLimit + 2 + 1;
-            int expectedLogMessages2 = TraceLogger.BulkMessageLimit + 2;
+            int expectedLogMessages1 = LogManager.BulkMessageLimit + 2 + 1;
+            int expectedLogMessages2 = LogManager.BulkMessageLimit + 2;
             int expectedBulkLogMessages1 = 0;
             int expectedBulkLogMessages2 = 1;
 
             TestLogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger logger1 = TraceLogger.GetLogger("logger1");
-            TraceLogger logger2 = TraceLogger.GetLogger("logger2");
+            LogManager.LogConsumers.Add(logConsumer);
+            Logger logger1 = LogManager.GetLogger("logger1");
+            Logger logger2 = LogManager.GetLogger("logger2");
 
             // Write log messages to logger #1
-            for (int i = 0; i < TraceLogger.BulkMessageLimit; i++)
+            for (int i = 0; i < LogManager.BulkMessageLimit; i++)
             {
                 logger1.Warn(logCode1, "Message " + (i + 1) + " to logger1");
             }
@@ -176,7 +165,7 @@ namespace UnitTests
             logger2.Warn(logCode1, "Use same logCode to logger2");
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
-            Thread.Sleep(TraceLogger.BulkMessageInterval);
+            Thread.Sleep(LogManager.BulkMessageInterval);
             Thread.Sleep(1);
 
             // Write log messages to logger #2
@@ -186,7 +175,7 @@ namespace UnitTests
             }
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
-            Thread.Sleep(TraceLogger.BulkMessageInterval);
+            Thread.Sleep(LogManager.BulkMessageInterval);
             Thread.Sleep(1);
 
             logger1.Info(logCode1, "Penultimate message to logger1");
@@ -195,16 +184,14 @@ namespace UnitTests
             logger1.Info(logCode1, "Final message to logger1");
             logger2.Info(logCode2, "Final message to logger2");
 
-            Assert.AreEqual(expectedBulkLogMessages1, logConsumer.GetEntryCount(logCode1 + TraceLogger.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#1", expectedBulkLogMessages1);
-            Assert.AreEqual(expectedBulkLogMessages2, logConsumer.GetEntryCount(logCode2 + TraceLogger.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#2", expectedBulkLogMessages2);
-            Assert.AreEqual(expectedLogMessages1, logConsumer.GetEntryCount(logCode1),
-                    "Should see {0} real entries in total via logger#1", expectedLogMessages1);
-            Assert.AreEqual(expectedLogMessages2, logConsumer.GetEntryCount(logCode2),
-                    "Should see {0} real entries in total via logger#2", expectedLogMessages2);
-            Assert.AreEqual(0, logConsumer.GetEntryCount(logCode1 - 1), "Should not see any other entries -1");
-            Assert.AreEqual(0, logConsumer.GetEntryCount(logCode2 + 1), "Should not see any other entries +1");
+            Assert.Equal(expectedBulkLogMessages1,
+                logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedBulkLogMessages2,
+                logConsumer.GetEntryCount(logCode2 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedLogMessages1, logConsumer.GetEntryCount(logCode1));
+            Assert.Equal(expectedLogMessages2, logConsumer.GetEntryCount(logCode2));
+            Assert.Equal(0,  logConsumer.GetEntryCount(logCode1 - 1));  //  "Should not see any other entries -1"
+            Assert.Equal(0,  logConsumer.GetEntryCount(logCode2 + 1));  //  "Should not see any other entries +1"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -212,15 +199,15 @@ namespace UnitTests
         {
             const string testName = "Logger_BulkMessageLimit_InfoNotFiltered";
             int n = 10000;
-            TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(5);
+            LogManager.BulkMessageInterval = TimeSpan.FromMilliseconds(5);
 
             int logCode1 = 1;
             int expectedLogMessages1 = n + 2;
             int expectedBulkLogMessages1 = 0;
 
             TestLogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger logger1 = TraceLogger.GetLogger(testName);
+            LogManager.LogConsumers.Add(logConsumer);
+            Logger logger1 = LogManager.GetLogger(testName);
 
             // Write log messages to logger #1
             for (int i = 0; i < n; i++)
@@ -229,16 +216,14 @@ namespace UnitTests
             }
 
             // Wait until the BulkMessageInterval time interval expires before writing the final log message - should cause any pending message flush);
-            Thread.Sleep(TraceLogger.BulkMessageInterval);
+            Thread.Sleep(LogManager.BulkMessageInterval);
             Thread.Sleep(1);
 
             logger1.Info(logCode1, "Penultimate message to logger1");
             logger1.Info(logCode1, "Final message to logger1");
 
-            Assert.AreEqual(expectedBulkLogMessages1, logConsumer.GetEntryCount(logCode1 + TraceLogger.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries via logger#1", expectedBulkLogMessages1);
-            Assert.AreEqual(expectedLogMessages1, logConsumer.GetEntryCount(logCode1),
-                    "Should see {0} real entries in total via logger#1", expectedLogMessages1);
+            Assert.Equal(expectedBulkLogMessages1,  logConsumer.GetEntryCount(logCode1 + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(expectedLogMessages1, logConsumer.GetEntryCount(logCode1));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -246,11 +231,11 @@ namespace UnitTests
         {
             const string testName = "Logger_BulkMessageLimit_DifferentFinalLogCode";
             int n = 10000;
-            TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
+            LogManager.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
             int mainLogCode = TestUtils.Random.Next();
             int finalLogCode = mainLogCode + 10;
-            int expectedMainLogMessages = TraceLogger.BulkMessageLimit;
+            int expectedMainLogMessages = LogManager.BulkMessageLimit;
             int expectedFinalLogMessages = 1;
             int expectedBulkLogMessages = 1;
 
@@ -262,11 +247,11 @@ namespace UnitTests
         {
             const string testName = "Logger_BulkMessageLimit_SameFinalLogCode";
             int n = 10000;
-            TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
+            LogManager.BulkMessageInterval = TimeSpan.FromMilliseconds(50);
 
             int mainLogCode = TestUtils.Random.Next(100000);
             int finalLogCode = mainLogCode; // Same as main code
-            int expectedMainLogMessages = TraceLogger.BulkMessageLimit + 1; // == Loop + 1 final
+            int expectedMainLogMessages = LogManager.BulkMessageLimit + 1; // == Loop + 1 final
             int expectedFinalLogMessages = expectedMainLogMessages;
             int expectedBulkLogMessages = 1;
 
@@ -279,7 +264,7 @@ namespace UnitTests
         {
             const string testName = "Logger_BulkMessageLimit_Excludes_100000";
             int n = 1000;
-            TraceLogger.BulkMessageInterval = TimeSpan.FromMilliseconds(1);
+            LogManager.BulkMessageInterval = TimeSpan.FromMilliseconds(1);
 
             int mainLogCode = 100000;
             int finalLogCode = mainLogCode + 1;
@@ -295,23 +280,23 @@ namespace UnitTests
         {
             const string testName = "Logger_MessageSizeLimit";
             TestLogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger logger1 = TraceLogger.GetLogger(testName);
+            LogManager.LogConsumers.Add(logConsumer);
+            Logger logger1 = LogManager.GetLogger(testName);
 
             StringBuilder sb = new StringBuilder();
-            while (sb.Length <= TraceLogger.MAX_LOG_MESSAGE_SIZE)
+            while (sb.Length <= LogManager.MAX_LOG_MESSAGE_SIZE)
             {
                 sb.Append("1234567890");
             }
             string longString = sb.ToString();
-            Assert.IsTrue(longString.Length > TraceLogger.MAX_LOG_MESSAGE_SIZE);
+            Assert.True(longString.Length > LogManager.MAX_LOG_MESSAGE_SIZE);
 
             int logCode1 = 1;
 
             logger1.Info(logCode1, longString);
 
-            Assert.AreEqual(1, logConsumer.GetEntryCount(logCode1), "Should see original log message entry");
-            Assert.AreEqual(1, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should also see 'Message truncated' message");
+            Assert.Equal(1,  logConsumer.GetEntryCount(logCode1));  //  "Should see original log message entry"
+            Assert.Equal(1,  logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated));  //  "Should also see 'Message truncated' message"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Logger")]
@@ -319,8 +304,8 @@ namespace UnitTests
         {
             const string testName = "Logger_Stats_MessageSizeLimit";
             TestLogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger logger1 = TraceLogger.GetLogger(testName);
+            LogManager.LogConsumers.Add(logConsumer);
+            Logger logger1 = LogManager.GetLogger(testName);
 
             const string StatsCounterBaseName = "LoggerTest.Stats.Size";
 
@@ -342,8 +327,8 @@ namespace UnitTests
 
                 int count = logConsumer.GetEntryCount((int)ErrorCode.PerfCounterDumpAll);
                 output.WriteLine(count + " stats log message entries written");
-                Assert.IsTrue(count > 1, "Should be some stats log message entries - saw " + count);
-                Assert.AreEqual(0, logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated), "Should not see any 'Message truncated' message");
+                Assert.True(count > 1, "Should be some stats log message entries - saw " + count);
+                Assert.Equal(0,  logConsumer.GetEntryCount((int)ErrorCode.Logger_LogMessageTruncated));  //  "Should not see any 'Message truncated' message"
             }
             finally
             {
@@ -408,9 +393,9 @@ namespace UnitTests
             int logCode = TestUtils.Random.Next(100000);
 
             ITraceTelemetryConsumer logConsumer = new ConsoleTelemetryConsumer();
-            TraceLogger.TelemetryConsumers.Add(logConsumer);
-            TraceLogger.BulkMessageInterval = target;
-            TraceLogger logger = TraceLogger.GetLogger(testName);
+            LogManager.TelemetryConsumers.Add(logConsumer);
+            LogManager.BulkMessageInterval = target;
+            Logger logger = LogManager.GetLogger(testName);
 
             RunLoggerPerfTest(testName, n, logCode, target, logger);
         }
@@ -424,9 +409,9 @@ namespace UnitTests
             int logCode = TestUtils.Random.Next(100000);
 
             ILogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger.BulkMessageInterval = target;
-            TraceLogger logger = TraceLogger.GetLogger(testName);
+            LogManager.LogConsumers.Add(logConsumer);
+            LogManager.BulkMessageInterval = target;
+            Logger logger = LogManager.GetLogger(testName);
 
             RunLoggerPerfTest(testName, n, logCode, target, logger);
         }
@@ -434,10 +419,10 @@ namespace UnitTests
         private void RunLogWriterPerfTest(string testName, int n, int logCode, TimeSpan target, ITraceTelemetryConsumer log)
         {
             // warm up
-            log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg warm up", logCode), Severity.Info);
+            log.TrackTrace(string.Format( "{0}|{1}|{2}|{3}", LoggerType.Runtime, testName, "msg warm up", logCode), Severity.Info);
 
             var messages = Enumerable.Range(0, n)
-                .Select(i => string.Format("{0}|{1}|{2}|{3}", TraceLogger.LoggerType.Runtime, testName, "msg " + i, logCode))
+                .Select(i => string.Format("{0}|{1}|{2}|{3}", LoggerType.Runtime, testName, "msg " + i, logCode))
                 .ToList();
 
             var stopwatch = Stopwatch.StartNew();
@@ -448,10 +433,10 @@ namespace UnitTests
             stopwatch.Stop();
             var elapsed = stopwatch.Elapsed;
             output.WriteLine(testName + " : Elapsed time = " + elapsed);
-            Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+            Assert.True(elapsed < target.Multiply(timingFactor), $"{testName}: Elapsed time {elapsed} exceeds target time {target}");
         }
 
-        private void RunLoggerPerfTest(string testName, int n, int logCode, TimeSpan target, TraceLogger logger)
+        private void RunLoggerPerfTest(string testName, int n, int logCode, TimeSpan target, Logger logger)
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -463,23 +448,23 @@ namespace UnitTests
             string msg = testName + " : Elapsed time = " + elapsed;
 
             // Wait until the BulkMessageInterval time interval expires before wring the final log message - should cause bulk message flush
-            while (stopwatch.Elapsed <= TraceLogger.BulkMessageInterval)
+            while (stopwatch.Elapsed <= LogManager.BulkMessageInterval)
             {
                 Thread.Sleep(10);
             }
 
             output.WriteLine(msg);
             logger.Info(logCode, msg);
-            Assert.IsTrue(elapsed < target.Multiply(timingFactor), "{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+            Assert.True(elapsed < target.Multiply(timingFactor), $"{testName}: Elapsed time {elapsed} exceeds target time {target}");
         }
 
         private void RunTestForLogFiltering(string testName, int n, int finalLogCode, int mainLogCode, int expectedMainLogMessages, int expectedFinalLogMessages, int expectedBulkLogMessages)
         {
-            Assert.IsTrue(finalLogCode != (mainLogCode - 1), "Test code constraint -1");
+            Assert.True(finalLogCode != (mainLogCode - 1), "Test code constraint -1");
 
             TestLogConsumer logConsumer = new TestLogConsumer(output);
-            TraceLogger.LogConsumers.Add(logConsumer);
-            TraceLogger logger = TraceLogger.GetLogger(testName);
+            LogManager.LogConsumers.Add(logConsumer);
+            Logger logger = LogManager.GetLogger(testName);
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -490,7 +475,7 @@ namespace UnitTests
             }
 
             // Wait until the BulkMessageInterval time interval expires before wring the final log message - should cause bulk message flush);
-            TimeSpan delay = TraceLogger.BulkMessageInterval - stopwatch.Elapsed;
+            TimeSpan delay = LogManager.BulkMessageInterval - stopwatch.Elapsed;
             if (delay > TimeSpan.Zero)
             {
                 output.WriteLine("Sleeping for " + delay);
@@ -500,32 +485,32 @@ namespace UnitTests
 
             logger.Info(finalLogCode, "Final msg");
 
-            Assert.AreEqual(expectedMainLogMessages, logConsumer.GetEntryCount(mainLogCode),
-                    "Should see {0} real entries in total", expectedMainLogMessages);
+            Assert.Equal(expectedMainLogMessages, logConsumer.GetEntryCount(mainLogCode));
             if (mainLogCode != finalLogCode)
             {
-                Assert.AreEqual(expectedFinalLogMessages, logConsumer.GetEntryCount(finalLogCode),
-                    "Should see {0} final entry", expectedFinalLogMessages);
+                Assert.Equal(expectedFinalLogMessages, logConsumer.GetEntryCount(finalLogCode));
             }
-            Assert.AreEqual(expectedBulkLogMessages, logConsumer.GetEntryCount(mainLogCode + TraceLogger.BulkMessageSummaryOffset),
-                    "Should see {0} bulk message entries", expectedBulkLogMessages);
-            Assert.AreEqual(0, logConsumer.GetEntryCount(mainLogCode - 1), "Should not see any other entries -1");
+            Assert.Equal(expectedBulkLogMessages,
+                logConsumer.GetEntryCount(mainLogCode + LogManager.BulkMessageSummaryOffset));
+            Assert.Equal(0,  logConsumer.GetEntryCount(mainLogCode - 1));  //  "Should not see any other entries -1"
         }
     }
 
     class TestLogConsumer : ILogConsumer
     {
         private readonly ITestOutputHelper output;
+        private readonly bool traceToOutput;
 
-        public TestLogConsumer(ITestOutputHelper output)
+        public TestLogConsumer(ITestOutputHelper output, bool traceToOutput = false)
         {
             this.output = output;
+            this.traceToOutput = traceToOutput;
         }
 
         private readonly Dictionary<int,int> entryCounts = new Dictionary<int, int>();
         private int lastLogCode;
 
-        public void Log(Severity severity, TraceLogger.LoggerType loggerType, string caller, string message, System.Net.IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
+        public void Log(Severity severity, LoggerType loggerType, string caller, string message, System.Net.IPEndPoint myIPEndPoint, Exception exception, int eventCode = 0)
         {
             lock (this)
             {
@@ -534,7 +519,7 @@ namespace UnitTests
 
                 if (eventCode != lastLogCode)
                 {
-                    output.WriteLine("{0} {1} - {2}", severity, eventCode, message);
+                    if (traceToOutput) output.WriteLine("{0} {1} - {2}", severity, eventCode, message);
                     lastLogCode = eventCode;
                 }
             }

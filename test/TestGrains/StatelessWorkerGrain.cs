@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -13,9 +11,11 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    [StatelessWorker(1)]
+    [StatelessWorker(MaxLocalWorkers)]
     public class StatelessWorkerGrain : Grain, IStatelessWorkerGrain
     {
+        public const int MaxLocalWorkers = 1;
+
         private Guid activationGuid;
         private readonly List<Tuple<DateTime, DateTime>> calls = new List<Tuple<DateTime, DateTime>>();
         private Logger logger;
@@ -48,8 +48,8 @@ namespace UnitTests.Grains
                 {
                     DateTime stop = DateTime.UtcNow;
                     calls.Add(new Tuple<DateTime, DateTime>(start, stop));
-                    logger.Info(((stop - start).TotalMilliseconds).ToString());
-                    logger.Info("Start {0}, stop {1}, duration {2}. #act {3}", TraceLogger.PrintDate(start), TraceLogger.PrintDate(stop), (stop - start), count);
+                    logger.Info((stop - start).TotalMilliseconds.ToString());
+                    logger.Info($"Start {LogFormatter.PrintDate(start)}, stop {LogFormatter.PrintDate(stop)}, duration {stop - start}. #act {count}");
                 });
         }
 
@@ -60,14 +60,17 @@ namespace UnitTests.Grains
         }
 
 
-        public Task<Tuple<Guid, List<Tuple<DateTime, DateTime>>>> GetCallStats()
+        public Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>> GetCallStats()
         {
             Thread.Sleep(200);
+            string silo = RuntimeIdentity;
+            List<Guid> ids;
             lock (allActivationIds)
             {
-                logger.Info("# allActivationIds {0}: {1}", allActivationIds.Count, Utils.EnumerableToString(allActivationIds));
+                ids = allActivationIds.ToList();
             }
-            return Task.FromResult(new Tuple<Guid, List<Tuple<DateTime, DateTime>>>(activationGuid, calls));
+            logger.Info($"# allActivationIds {ids.Count} for silo {silo}: {Utils.EnumerableToString(ids)}");
+            return Task.FromResult(Tuple.Create(activationGuid, silo, calls));
         }
     }
 }

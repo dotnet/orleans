@@ -21,6 +21,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("OrleansCounterControl")]
+[assembly: InternalsVisibleTo("OrleansTelemetryConsumers.Counters")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("OrleansDependencyInjection")]
+[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]

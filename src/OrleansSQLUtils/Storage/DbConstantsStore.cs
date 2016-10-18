@@ -20,6 +20,11 @@ namespace Orleans.SqlUtils
                                     endEscapeIndicator: '`',
                                     unionAllSelectTemplate: " UNION ALL SELECT ")
                 },
+                {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
+                                    startEscapeIndicator: '"',
+                                    endEscapeIndicator: '"',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
                                     endEscapeIndicator: '\"',
@@ -101,7 +106,7 @@ namespace Orleans.SqlUtils
         public static bool IsSynchronousAdoNetImplementation(string adoNetProvider)
         {
             //Currently the assumption is all but MySQL support DbCommand cancellation.            
-            return !adoNetProvider.Equals(AdoNetInvariants.InvariantNameMySql, StringComparison.OrdinalIgnoreCase);
+            return adoNetProvider.Equals(AdoNetInvariants.InvariantNameMySql, StringComparison.OrdinalIgnoreCase);
         }        
     }
 

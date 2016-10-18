@@ -5,9 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using UnitTests.GrainInterfaces;
-using UnitTests.TestHelper;
 using Xunit;
 
 // ReSharper disable InconsistentNaming
@@ -61,6 +59,12 @@ namespace UnitTests.TimerTests
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
             await Test_Reminders_1J_MultiGrainMultiReminders();
+        }
+
+        [Fact, TestCategory("ReminderService"), TestCategory("SqlServer")]
+        public async Task Rem_Sql_ReminderNotFound()
+        {
+            await Test_Reminders_ReminderNotFound();
         }
     }
 #endif

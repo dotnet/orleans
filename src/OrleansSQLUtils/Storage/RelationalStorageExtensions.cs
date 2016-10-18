@@ -135,6 +135,20 @@ namespace Orleans.SqlUtils
 
 
         /// <summary>
+        /// A simplified version of <see cref="IRelationalStorage.ReadAsync{TResult}"/>
+        /// </summary>
+        /// <param name="storage"></param>
+        /// <param name="query"></param>
+        /// <param name="selector"></param>
+        /// <param name="parameterProvider"></param>
+        /// <typeparam name="TResult"></typeparam>
+        /// <returns></returns>
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand> parameterProvider)
+        {
+            return storage.ReadAsync(query, parameterProvider, (record, i, cancellationToken) => Task.FromResult(selector(record)));
+        }
+
+        /// <summary>
         /// Uses <see cref="IRelationalStorage"/> with <see cref="DbExtensions.ReflectionParameterProvider{T}(IDbCommand, T, IReadOnlyDictionary{string, string})"/>.
         /// </summary>
         /// <typeparam name="TResult">The type of the result.</typeparam>

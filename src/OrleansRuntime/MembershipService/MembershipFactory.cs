@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -8,11 +7,11 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipFactory
     {
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         internal MembershipFactory()
         {
-            logger = TraceLogger.GetLogger("MembershipFactory", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("MembershipFactory", LoggerType.Runtime);
         }
 
         internal Task CreateMembershipTableProvider(Catalog catalog, Silo silo)

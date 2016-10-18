@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.TestingHost;
+using Orleans.TestingHost.Utils;
 using Tester;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
+using Xunit;
 
 namespace UnitTests.StreamingTests
 {
     public class SingleStreamTestRunner
     {
         public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA = "SMSProviderDoNotOptimizeForImmutableData";
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
@@ -21,7 +22,7 @@ namespace UnitTests.StreamingTests
         private ConsumerProxy consumer;
         private const int Many = 3;
         private const int ItemCount = 10;
-        private TraceLogger logger;
+        private Logger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
@@ -30,7 +31,7 @@ namespace UnitTests.StreamingTests
         public SingleStreamTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.streamProviderName = streamProvider;
-            this.logger = TraceLogger.GetLogger("SingleStreamTestRunner", TraceLogger.LoggerType.Application);
+            this.logger = LogManager.GetLogger("SingleStreamTestRunner", LoggerType.Application);
             this.testNumber = testNum;
             this.runFullTest = fullTest;
             this.random = TestConstants.random;
@@ -371,6 +372,56 @@ namespace UnitTests.StreamingTests
             await StopProxies();
         }
 
+        public async Task StreamTest_22_TestImmutabilityDuringStreaming()
+        {
+            Heading("StreamTest_22_TestImmutabilityDuringStreaming");
+
+            IStreamingImmutabilityTestGrain itemProducer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+            string producerSilo = await itemProducer.GetSiloIdentifier();
+
+            // Obtain consumer in silo of item producer
+            IStreamingImmutabilityTestGrain consumerSameSilo = null;
+            do
+            {
+                var itemConsumer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+                var consumerSilo = await itemConsumer.GetSiloIdentifier();
+
+                if (consumerSilo == producerSilo)
+                    consumerSameSilo = itemConsumer;
+            } while (consumerSameSilo == null);
+
+            // Test behavior if immutability is enabled
+            await consumerSameSilo.SubscribeToStream(itemProducer.GetPrimaryKey(), SMS_STREAM_PROVIDER_NAME);
+
+            await itemProducer.SetTestObjectStringProperty("VALUE_IN_IMMUTABLE_STREAM");
+            await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME);
+
+            Assert.Equal("VALUE_IN_IMMUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+
+            // Now violate immutability by updating the property in the consumer.
+            await consumerSameSilo.SetTestObjectStringProperty("ILLEGAL_CHANGE");
+            Assert.Equal("ILLEGAL_CHANGE", await itemProducer.GetTestObjectStringProperty());
+
+            await consumerSameSilo.UnsubscribeFromStream();
+
+            // Test behavior if immutability is disabled
+            itemProducer = GrainClient.GrainFactory.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+
+            await consumerSameSilo.SubscribeToStream(itemProducer.GetPrimaryKey(), SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
+
+            await itemProducer.SetTestObjectStringProperty("VALUE_IN_MUTABLE_STREAM");
+            await itemProducer.SendTestObject(SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
+
+            Assert.Equal("VALUE_IN_MUTABLE_STREAM", await consumerSameSilo.GetTestObjectStringProperty());
+
+            // Modify the items property and check it has no impact
+            await consumerSameSilo.SetTestObjectStringProperty("ALLOWED_CHANGE");
+            Assert.Equal("ALLOWED_CHANGE", await consumerSameSilo.GetTestObjectStringProperty());
+            Assert.Equal("VALUE_IN_MUTABLE_STREAM", await itemProducer.GetTestObjectStringProperty());
+
+            await consumerSameSilo.UnsubscribeFromStream();
+        }
+
         //-----------------------------------------------------------------------------//
 
         public async Task BasicTestAsync(bool fullTest = true)
@@ -406,7 +457,7 @@ namespace UnitTests.StreamingTests
         private async Task<bool> CheckCounters(ProducerProxy producer, ConsumerProxy consumer, bool assertAreEqual = true)
         {
             var consumerCount = await consumer.ConsumerCount;
-            Assert.AreNotEqual(0, consumerCount, "no consumers were detected.");
+            Assert.NotEqual(0,  consumerCount);  // "no consumers were detected."
             var producerCount = await producer.ProducerCount;
             var numProduced = await producer.ExpectedItemsProduced;
             var expectConsumed = numProduced * consumerCount;
@@ -414,7 +465,7 @@ namespace UnitTests.StreamingTests
             logger.Info("Test {0} CheckCounters: numProduced = {1}, expectConsumed = {2}, numConsumed = {3}", testNumber, numProduced, expectConsumed, numConsumed);
             if (assertAreEqual)
             {
-                Assert.AreEqual(expectConsumed, numConsumed, String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
+                Assert.Equal(expectConsumed,  numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
                 return true;
             }
             else
@@ -430,7 +481,7 @@ namespace UnitTests.StreamingTests
             {
                 var actualCount = await StreamTestUtils.GetStreamPubSub().ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
-                Assert.AreEqual(expectedCount, actualCount);
+                Assert.Equal(expectedCount, actualCount);
             }
         }
 
@@ -458,7 +509,7 @@ namespace UnitTests.StreamingTests
             logger.Info("Test {0} CheckGrainsDeactivated: {1}ActivationCount = {2}, Expected{1}ActivationCount = {3}", testNumber, str, activationCount, expectActivationCount);
             if (assertAreEqual)
             {
-                Assert.AreEqual(expectActivationCount, activationCount, String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
+                Assert.Equal(expectActivationCount,  activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
             }
             return expectActivationCount == activationCount;
         }
@@ -529,13 +580,13 @@ namespace UnitTests.StreamingTests
 //    await producer.ProduceSequentialSeries(0, ItemsPerSeries);
 //    var numProduced = await producer.NumberProduced;
 //    logger.Info("numProduced = " + numProduced);
-//    Assert.AreEqual(numProduced, ItemsPerSeries);
+//    Assert.Equal(numProduced, ItemsPerSeries);
 
 //    // note that the value returned from successive calls to Do...Production() methods is a cumulative total.
 //    await producer.ProduceParallelSeries(ItemsPerSeries, ItemsPerSeries);
 //    numProduced = await producer.NumberProduced;
 //    logger.Info("numProduced = " + numProduced);
-//    Assert.AreEqual(numProduced, ItemsPerSeries * 2);
+//    Assert.Equal(numProduced, ItemsPerSeries * 2);
 //}
 
 

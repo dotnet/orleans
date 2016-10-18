@@ -5,16 +5,13 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-
-using Orleans.Runtime.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class Gateway
     {
-        private static readonly TimeSpan TIME_BEFORE_CLIENT_DROP = TimeSpan.FromSeconds(60);
-
         private readonly MessageCenter messageCenter;
         private readonly GatewayAcceptor acceptor;
         private readonly Lazy<GatewaySender>[] senders;
@@ -31,7 +28,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("Orleans.Messaging.Gateway");
+        private static readonly Logger logger = LogManager.GetLogger("Orleans.Messaging.Gateway");
         
         private IMessagingConfiguration MessagingConfiguration { get { return messageCenter.MessagingConfiguration; } }
         
@@ -104,7 +101,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     int gatewayToUse = nextGatewaySenderToUseForRoundRobin % senders.Length;
                     nextGatewaySenderToUseForRoundRobin++; // under Gateway lock
-                    clientState = new ClientState(clientId, gatewayToUse);
+                    clientState = new ClientState(clientId, gatewayToUse, MessagingConfiguration.ClientDropTimeout);
                     clients[clientId] = clientState;
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }
@@ -233,6 +230,7 @@ namespace Orleans.Runtime.Messaging
 
         private class ClientState
         {
+            private readonly TimeSpan clientDropTimeout;
             internal Queue<Message> PendingToSend { get; private set; }
             internal Queue<List<Message>> PendingBatchesToSend { get; private set; }
             internal Socket Socket { get; private set; }
@@ -242,10 +240,11 @@ namespace Orleans.Runtime.Messaging
 
             internal bool IsConnected { get { return Socket != null; } }
 
-            internal ClientState(GrainId id, int gatewaySenderNumber)
+            internal ClientState(GrainId id, int gatewaySenderNumber, TimeSpan clientDropTimeout)
             {
                 Id = id;
                 GatewaySenderNumber = gatewaySenderNumber;
+                this.clientDropTimeout = clientDropTimeout;
                 PendingToSend = new Queue<Message>();
                 PendingBatchesToSend = new Queue<List<Message>>();
             }
@@ -268,7 +267,7 @@ namespace Orleans.Runtime.Messaging
             internal bool ReadyToDrop()
             {
                 return !IsConnected &&
-                       (DateTime.UtcNow.Subtract(DisconnectedSince) >= Gateway.TIME_BEFORE_CLIENT_DROP);
+                       (DateTime.UtcNow.Subtract(DisconnectedSince) >= clientDropTimeout);
             }
         }
 
@@ -290,7 +289,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     gateway.DropDisconnectedClients();
                     gateway.DropExpiredRoutingCachedEntries();
-                    Thread.Sleep(TIME_BEFORE_CLIENT_DROP);
+                    Thread.Sleep(gateway.MessagingConfiguration.ClientDropTimeout);
                 }
             }
 

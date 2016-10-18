@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -23,18 +22,18 @@ namespace UnitTests.General
             long g2Key = GetRandomGrainId();
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
             ITestGrain g2 = GrainClient.GrainFactory.GetGrain<ITestGrain>(g2Key);
-            Assert.AreEqual(g1Key, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(g1Key, g1.GetKey().Result);
-            Assert.AreEqual(g1Key.ToString(), g1.GetLabel().Result);
-            Assert.AreEqual(g2Key, g2.GetKey().Result);
-            Assert.AreEqual(g2Key.ToString(), g2.GetLabel().Result);
+            Assert.Equal(g1Key, g1.GetPrimaryKeyLong());
+            Assert.Equal(g1Key, g1.GetKey().Result);
+            Assert.Equal(g1Key.ToString(), g1.GetLabel().Result);
+            Assert.Equal(g2Key, g2.GetKey().Result);
+            Assert.Equal(g2Key.ToString(), g2.GetLabel().Result);
 
             g1.SetLabel("one").Wait();
-            Assert.AreEqual("one", g1.GetLabel().Result);
-            Assert.AreEqual(g2Key.ToString(), g2.GetLabel().Result);
+            Assert.Equal("one", g1.GetLabel().Result);
+            Assert.Equal(g2Key.ToString(), g2.GetLabel().Result);
 
             ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>(g1Key);
-            Assert.AreEqual("one", g1a.GetLabel().Result);
+            Assert.Equal("one", g1a.GetLabel().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -45,18 +44,18 @@ namespace UnitTests.General
 
             IGuidTestGrain g1 = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
             IGuidTestGrain g2 = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid2);
-            Assert.AreEqual(guid1, g1.GetPrimaryKey());
-            Assert.AreEqual(guid1, g1.GetKey().Result);
-            Assert.AreEqual(guid1.ToString(), g1.GetLabel().Result);
-            Assert.AreEqual(guid2, g2.GetKey().Result);
-            Assert.AreEqual(guid2.ToString(), g2.GetLabel().Result);
+            Assert.Equal(guid1, g1.GetPrimaryKey());
+            Assert.Equal(guid1, g1.GetKey().Result);
+            Assert.Equal(guid1.ToString(), g1.GetLabel().Result);
+            Assert.Equal(guid2, g2.GetKey().Result);
+            Assert.Equal(guid2.ToString(), g2.GetLabel().Result);
 
             g1.SetLabel("one").Wait();
-            Assert.AreEqual("one", g1.GetLabel().Result);
-            Assert.AreEqual(guid2.ToString(), g2.GetLabel().Result);
+            Assert.Equal("one", g1.GetLabel().Result);
+            Assert.Equal(guid2.ToString(), g2.GetLabel().Result);
 
             IGuidTestGrain g1a = GrainClient.GrainFactory.GetGrain<IGuidTestGrain>(guid1);
-            Assert.AreEqual("one", g1a.GetLabel().Result);
+            Assert.Equal("one", g1a.GetLabel().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
@@ -73,11 +72,11 @@ namespace UnitTests.General
             }
             catch (Exception e)
             {
-                Assert.IsInstanceOfType(e.GetBaseException(), typeof(OrleansException));
+                Assert.IsAssignableFrom<OrleansException>(e.GetBaseException()) ;
                 failed = true;
             }
 
-            if (!failed) Assert.Fail("Should have failed, but instead returned " + key);
+            if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -87,18 +86,18 @@ namespace UnitTests.General
             long key1 = (long)key1AsUlong;
 
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
-            Assert.AreEqual(key1, g1.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetKey().Result);
-            Assert.AreEqual(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
+            Assert.Equal(key1, g1.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetKey().Result);
+            Assert.Equal(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
 
             g1.SetLabel("MaxValue").Wait();
-            Assert.AreEqual("MaxValue", g1.GetLabel().Result);
+            Assert.Equal("MaxValue", g1.GetLabel().Result);
 
             ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
-            Assert.AreEqual("MaxValue", g1a.GetLabel().Result);
-            Assert.AreEqual(key1, g1a.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1a.GetKey().Result);
+            Assert.Equal("MaxValue", g1a.GetLabel().Result);
+            Assert.Equal(key1, g1a.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -108,19 +107,19 @@ namespace UnitTests.General
             long key1 = (long)key1AsUlong;
 
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
-            Assert.AreEqual(key1, g1.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetKey().Result);
-            Assert.AreEqual(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
+            Assert.Equal(key1, g1.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetKey().Result);
+            Assert.Equal(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
 
             g1.SetLabel("MinValue").Wait();
-            Assert.AreEqual("MinValue", g1.GetLabel().Result);
+            Assert.Equal("MinValue", g1.GetLabel().Result);
 
             ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
-            Assert.AreEqual("MinValue", g1a.GetLabel().Result);
-            Assert.AreEqual(key1, g1a.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1a.GetKey().Result);
+            Assert.Equal("MinValue", g1a.GetLabel().Result);
+            Assert.Equal(key1, g1a.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -130,18 +129,18 @@ namespace UnitTests.General
             ulong key1AsUlong = (ulong)key1;
 
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
-            Assert.AreEqual(key1, g1.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetKey().Result);
-            Assert.AreEqual(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
+            Assert.Equal(key1, g1.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetKey().Result);
+            Assert.Equal(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
 
             g1.SetLabel("MaxValue").Wait();
-            Assert.AreEqual("MaxValue", g1.GetLabel().Result);
+            Assert.Equal("MaxValue", g1.GetLabel().Result);
 
             ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
-            Assert.AreEqual("MaxValue", g1a.GetLabel().Result);
-            Assert.AreEqual(key1, g1a.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1a.GetKey().Result);
+            Assert.Equal("MaxValue", g1a.GetLabel().Result);
+            Assert.Equal(key1, g1a.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -151,18 +150,18 @@ namespace UnitTests.General
             ulong key1AsUlong = (ulong)key1;
 
             ITestGrain g1 = GrainClient.GrainFactory.GetGrain<ITestGrain>(key1);
-            Assert.AreEqual((long)key1AsUlong, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetPrimaryKeyLong());
-            Assert.AreEqual(key1, g1.GetKey().Result);
-            Assert.AreEqual(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
+            Assert.Equal((long)key1AsUlong, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetPrimaryKeyLong());
+            Assert.Equal(key1, g1.GetKey().Result);
+            Assert.Equal(key1.ToString(CultureInfo.InvariantCulture), g1.GetLabel().Result);
 
             g1.SetLabel("MinValue").Wait();
-            Assert.AreEqual("MinValue", g1.GetLabel().Result);
+            Assert.Equal("MinValue", g1.GetLabel().Result);
 
             ITestGrain g1a = GrainClient.GrainFactory.GetGrain<ITestGrain>((long)key1AsUlong);
-            Assert.AreEqual("MinValue", g1a.GetLabel().Result);
-            Assert.AreEqual(key1, g1a.GetPrimaryKeyLong());
-            Assert.AreEqual((long)key1AsUlong, g1a.GetKey().Result);
+            Assert.Equal("MinValue", g1a.GetLabel().Result);
+            Assert.Equal(key1, g1a.GetPrimaryKeyLong());
+            Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivateDeactivate")]
@@ -221,8 +220,8 @@ namespace UnitTests.General
             Task<Tuple<string, string>> promise1 = g1.TestRequestContext();
             Tuple<string, string> requstContext = promise1.Result;
             logger.Info("Request Context is: " + requstContext);
-            Assert.IsNotNull(requstContext.Item2, "Item2=" + requstContext.Item2);
-            Assert.IsNotNull(requstContext.Item1, "Item1=" + requstContext.Item1);
+            Assert.NotNull(requstContext.Item2);
+            Assert.NotNull(requstContext.Item1);
         }
     }
 }

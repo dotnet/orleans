@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.WindowsAzure.ServiceRuntime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace OrleansXO.WorkerRole
@@ -20,14 +21,15 @@ namespace OrleansXO.WorkerRole
             return base.OnStart();
         }
 
-        public override void OnStop() { 
+        public override void OnStop()
+        {
             silo.Stop();
-            base.Stop();
+            base.OnStop();
         }
         
-        public override void Run() { 
-            var config = new ClusterConfiguration();
-            config.StandardLoad();
+        public override void Run()
+        {
+            var config = AzureSilo.DefaultConfiguration();
             
             // It is IMPORTANT to start the silo not in OnStart but in Run. 
             // Azure may not have the firewalls open yet (on the remote silos) at the OnStart phase.

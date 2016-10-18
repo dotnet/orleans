@@ -8,6 +8,7 @@ set NUGET_EXE=%~dp0..\.nuget\nuget.exe
 set BASE_PATH=%1
 set VERSION=%2
 set SRC_DIR=%3
+set PRERELEASE_BUILD=%4
 IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
 
 @echo CreateOrleansNugetPackages running in directory = %1
@@ -36,14 +37,24 @@ if EXIST "%VERSION%" (
     GOTO Usage
 )
 
-if not "%VERSION_BETA%" == "" ( set VERSION=%VERSION%-%VERSION_BETA% )
+if not "%VERSION_BETA%" == "" (
+    @echo VERSION_BETA=!VERSION_BETA!
+    set VERSION=%VERSION%-!VERSION_BETA!
+)
 
-@echo VERSION_BETA=%VERSION_BETA%
-@echo VERSION=%VERSION%
+if "%PRERELEASE_BUILD%" == "true" (
+    if "%VERSION_BETA%" == "" (set VERSION_TYPE=Dev) else (set VERSION_TYPE=)
+    for /f %%i in ('powershell -NoProfile -ExecutionPolicy ByPass Get-Date -format "{yyyyMMddHHmm}"') do set VERSION_TIMESTAMP=%%i
+    @echo VERSION_TYPE = !VERSION_TYPE!
+    @echo VERSION_TIMESTAMP = !VERSION_TIMESTAMP!
+    set VERSION=%VERSION%-!VERSION_TYPE!!VERSION_TIMESTAMP!
+)
 
-@echo CreateOrleansNugetPackages: Version = %VERSION% -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
+@echo VERSION=!VERSION!
 
-@set NUGET_PACK_OPTS= -Version %VERSION%
+@echo CreateOrleansNugetPackages: Version = !VERSION! -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
+
+@set NUGET_PACK_OPTS= -Version !VERSION!
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
 REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed

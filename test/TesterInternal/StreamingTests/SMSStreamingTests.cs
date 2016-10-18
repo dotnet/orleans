@@ -7,7 +7,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.Tester;
 using Xunit;
-using Tester;
 
 namespace UnitTests.StreamingTests
 {
@@ -197,6 +196,12 @@ namespace UnitTests.StreamingTests
         public async Task SMS_21_GenericConsumerImplicitlySubscribedToProducerGrain()
         {
             await runner.StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain();
+        }
+
+        [Fact, TestCategory("Streaming"), TestCategory("Functional")]
+        public async Task StreamTest_22_TestImmutabilityDuringStreaming()
+        {
+            await runner.StreamTest_22_TestImmutabilityDuringStreaming();
         }
 
         #endregion Simple Message Stream Tests

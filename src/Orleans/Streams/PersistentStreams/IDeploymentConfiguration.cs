@@ -11,6 +11,6 @@ namespace Orleans.Streams
         /// Get the silo instance names for all configured silos
         /// </summary>
         /// <returns></returns>
-        IList<string> GetAllSiloInstanceNames();
+        IList<string> GetAllSiloNames();
     }
 }

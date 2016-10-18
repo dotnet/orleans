@@ -1,5 +1,7 @@
 using System;
+using Host;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Test.Interfaces;
 
 namespace Test.Client
@@ -20,7 +22,8 @@ namespace Test.Client
                 AppDomainInitializerArguments = args,
             });
 
-            GrainClient.Initialize("DevTestClientConfiguration.xml");
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             var grain = GrainClient.GrainFactory.GetGrain<IPerson>(0);
 

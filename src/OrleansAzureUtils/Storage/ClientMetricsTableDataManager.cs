@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Services.Common;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -62,12 +61,12 @@ namespace Orleans.AzureUtils
         private string myHostName;
 
         private AzureTableDataManager<ClientMetricsData> storage;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
 
         public ClientMetricsTableDataManager()
         {
-            logger = TraceLogger.GetLogger(this.GetType().Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
         }
 
         async Task IClientMetricsDataPublisher.Init(ClientConfiguration config, IPAddress address, string clientId)

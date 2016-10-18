@@ -1,11 +1,9 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
+using Tester;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
-using System;
 using Xunit;
 
 namespace UnitTests.Streaming
@@ -52,7 +50,7 @@ namespace UnitTests.Streaming
         {
             var deploymentId = HostedCluster.DeploymentId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         ////------------------------ One to One ----------------------//

@@ -1,5 +1,4 @@
-﻿using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
-using Orleans.Serialization;
+﻿using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
@@ -21,10 +20,10 @@ namespace UnitTests
             data.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
             object obj = SerializationManager.DeepCopy(data);
-            Assert.IsInstanceOfType(obj, typeof(LargeTestData), "Copied result is of wrong type");
+            Assert.IsAssignableFrom<LargeTestData>(obj);
 
             object copy = SerializationManager.RoundTripSerializationForTesting(obj);
-            Assert.IsInstanceOfType(copy, typeof(LargeTestData), "Deserialized result is of wrong type");
+            Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -34,8 +33,8 @@ namespace UnitTests
 
             object obj = SerializationManager.DeepCopy(data);
 
-            Assert.IsInstanceOfType(obj, typeof(ValueTypeTestData), "Deserialized result is of wrong type");
-            Assert.AreEqual<int>(4, ((ValueTypeTestData)obj).GetValue(), "Deserialized result is incorrect");
+            Assert.IsAssignableFrom<ValueTypeTestData>(obj);
+            Assert.Equal<int>(4, ((ValueTypeTestData)obj).GetValue());
         }
 
         [Fact, TestCategory("Serialization")]
@@ -45,8 +44,8 @@ namespace UnitTests
 
             object copy = SerializationManager.RoundTripSerializationForTesting(data);
 
-            Assert.IsInstanceOfType(copy, typeof(ValueTypeTestData), "Deserialized result is of wrong type");
-            Assert.AreEqual<int>(4, ((ValueTypeTestData)copy).GetValue(), "Deserialized result is incorrect");
+            Assert.IsAssignableFrom<ValueTypeTestData>(copy);
+            Assert.Equal<int>(4, ((ValueTypeTestData)copy).GetValue());
         }
     }
 }

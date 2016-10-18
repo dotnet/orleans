@@ -20,7 +20,6 @@ src/SDK/VSIX/
 Binaries/
 x64/
 x86/
-build/
 bld/
 [Bb]in/
 [Oo]bj/
@@ -147,6 +146,9 @@ publish/
 #!**/packages/repositories.config
 # Auto-downloaded nuget.exe
 **/[Nn]u[Gg]et.exe
+*.lock.json
+*.nuget.props
+*.nuget.targets
 
 # Windows Azure Build Output
 csx/
@@ -195,5 +197,4 @@ FakesAssemblies/
 # Temporary working files
 **/pingme.txt
 .vs/
-**/project.lock.json
 src/SetupTestScriptOutput.txt

@@ -34,7 +34,7 @@ namespace Orleans.Runtime.Host
     /// </remarks>
     public class ZooKeeperBasedMembershipTable : IMembershipTable, IGatewayListProvider
     {
-        private TraceLogger logger;
+        private Logger Logger;
 
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
 
@@ -55,9 +55,14 @@ namespace Orleans.Runtime.Host
 
         private TimeSpan maxStaleness;
 
-        public Task InitializeGatewayListProvider(ClientConfiguration config, TraceLogger traceLogger)
+        /// <summary>
+        /// Initializes the ZooKeeper based gateway provider
+        /// </summary>
+        /// <param name="config">The given client configuration.</param>
+        /// <param name="logger">The logger to be used by this instance</param>
+        public Task InitializeGatewayListProvider(ClientConfiguration config, Logger logger)
         {
-            InitConfig(traceLogger,config.DataConnectionString, config.DeploymentId);
+            InitConfig(logger,config.DataConnectionString, config.DeploymentId);
             maxStaleness = config.GatewayListRefreshPeriod;
             return TaskDone.Done;
         }
@@ -67,11 +72,11 @@ namespace Orleans.Runtime.Host
         /// </summary>
         /// <param name="config">The configuration for this instance.</param>
         /// <param name="tryInitPath">if set to true, we'll try to create a node named "/DeploymentId"</param>
-        /// <param name="traceLogger">The logger to be used by this instance</param>
+        /// <param name="logger">The logger to be used by this instance</param>
         /// <returns></returns>
-        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath, TraceLogger traceLogger)
+        public async Task InitializeMembershipTable(GlobalConfiguration config, bool tryInitPath, Logger logger)
         {
-            InitConfig(traceLogger, config.DataConnectionString, config.DeploymentId);
+            InitConfig(logger, config.DataConnectionString, config.DeploymentId);
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
             // so we always have the path, before this silo starts working.
@@ -92,15 +97,23 @@ namespace Orleans.Runtime.Host
             });
         }
 
-        private void InitConfig(TraceLogger traceLogger, string dataConnectionString, string deploymentId)
+        private void InitConfig(Logger logger, string dataConnectionString, string deploymentId)
         {
-            watcher = new ZooKeeperWatcher(traceLogger);
-            logger = traceLogger;
+            watcher = new ZooKeeperWatcher(logger);
+            Logger = logger;
             deploymentPath = "/" + deploymentId;
             deploymentConnectionString = dataConnectionString + deploymentPath;
             rootConnectionString = dataConnectionString;
         }
 
+        /// <summary>
+        /// Atomically reads the Membership Table information about a given silo.
+        /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
+        /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
+        /// </summary>
+        /// <param name="siloAddress">The address of the silo whose membership information needs to be read.</param>
+        /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
+        /// TableVersion, read atomically.</returns>
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
         {
             return UsingZookeeper(async zk =>
@@ -124,6 +137,13 @@ namespace Orleans.Runtime.Host
             }, true);
         }
 
+        /// <summary>
+        /// Atomically reads the full content of the Membership Table.
+        /// The returned MembershipTableData includes all MembershipEntry entry for all silos in the table and the 
+        /// TableVersion for this table. The MembershipEntries and the TableVersion have to be read atomically.
+        /// </summary>
+        /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
+        /// TableVersion, all read atomically.</returns>
         public Task<MembershipTableData> ReadAll()
         {
             return UsingZookeeper(async zk =>
@@ -140,7 +160,22 @@ namespace Orleans.Runtime.Host
                 return new MembershipTableData(childrenTaskResults.ToList(), tableVersion);
             }, true);
         }
-       
+
+        /// <summary>
+        /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
+        /// If operation succeeds, the following changes would be made to the table:
+        /// 1) New MembershipEntry will be added to the table.
+        /// 2) The newly added MembershipEntry will also be added with the new unique automatically generated eTag.
+        /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
+        /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
+        /// All those changes to the table, insert of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
+        /// The operation should fail in each of the following conditions:
+        /// 1) A MembershipEntry for a given silo already exist in the table
+        /// 2) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
+        /// </summary>
+        /// <param name="entry">MembershipEntry to be inserted.</param>
+        /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
+        /// <returns>True if the insert operation succeeded and false otherwise.</returns>
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             string rowPath = ConvertToRowPath(entry.SiloAddress);
@@ -156,6 +191,23 @@ namespace Orleans.Runtime.Host
                 .create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT));
         }
 
+        /// <summary>
+        /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
+        /// If operation succeeds, the following changes would be made to the table:
+        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substitued by the new entry) 
+        /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
+        /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
+        /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
+        /// All those changes to the table, update of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
+        /// The operation should fail in each of the following conditions:
+        /// 1) A MembershipEntry for a given silo does not exist in the table
+        /// 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag.
+        /// 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
+        /// </summary>
+        /// <param name="entry">MembershipEntry to be updated.</param>
+        /// <param name="etag">The etag  for the given MembershipEntry.</param>
+        /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
+        /// <returns>True if the update operation succeeded and false otherwise.</returns>
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             string rowPath = ConvertToRowPath(entry.SiloAddress);
@@ -172,6 +224,18 @@ namespace Orleans.Runtime.Host
                 .setData(rowIAmAlivePath, newRowIAmAliveData));
         }
 
+        /// <summary>
+        /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
+        /// This operation should only update the IAmAlive collumn and not change other columns.
+        /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
+        /// With regards to eTags update:
+        /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
+        /// With regards to TableVersion:
+        /// this operation should not change the TableVersion of the table. It should leave it untouched.
+        /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
+        /// </summary>
+        /// <param name="entry">The target MembershipEntry tp update</param>
+        /// <returns>Task representing the successful execution of this operation. </returns>
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
@@ -180,6 +244,10 @@ namespace Orleans.Runtime.Host
             return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData));
         }
 
+        /// <summary>
+        /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
+        /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
+        /// </summary>
         public async Task<IList<Uri>> GetGateways()
         {
             var membershipTableData = await ReadAll();
@@ -192,16 +260,26 @@ namespace Orleans.Runtime.Host
                                             }).ToList();
         }
 
+        /// <summary>
+        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
+        /// </summary>
         public TimeSpan MaxStaleness
         {
             get { return maxStaleness; }
         }
 
+        /// <summary>
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
+        /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
+        /// </summary>
         public bool IsUpdatable
         {
             get { return true; }
         }
 
+        /// <summary>
+        /// Deletes all table entries of the given deploymentId
+        /// </summary>
         public Task DeleteMembershipTableEntries(string deploymentId)
         {
             string pathToDelete = "/" + deploymentId;
@@ -298,10 +376,10 @@ namespace Orleans.Runtime.Host
         /// </summary>
         private class ZooKeeperWatcher : Watcher
         {
-            private readonly TraceLogger logger;
-            public ZooKeeperWatcher(TraceLogger traceLogger)
+            private readonly Logger logger;
+            public ZooKeeperWatcher(Logger logger)
             {
-                logger = traceLogger;
+                this.logger = logger;
             }
 
             public override Task process(WatchedEvent @event)

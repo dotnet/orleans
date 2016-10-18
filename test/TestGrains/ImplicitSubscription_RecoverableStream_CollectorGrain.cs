@@ -3,6 +3,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers;
+using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;

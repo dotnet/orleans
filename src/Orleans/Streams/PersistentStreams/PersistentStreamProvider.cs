@@ -41,14 +41,43 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
         private PersistentStreamProviderConfig myConfig;
-        private const string STARTUP_STATE = "StartupState";
+        internal const string StartupStatePropertyName = "StartupState";
+        internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
         private PersistentStreamProviderState startupState;
+        private ProviderStateManager stateManager = new ProviderStateManager();
 
-        public string                   Name { get; private set; }
+        public string Name { get; private set; }
+
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
+
+        // this is a workaround until an IServiceProvider instance is used in the Orleans client
+        private class GrainFactoryServiceProvider : IServiceProvider
+        {
+            private IStreamProviderRuntime providerRuntime;
+            public GrainFactoryServiceProvider(IStreamProviderRuntime providerRuntime)
+            {
+                this.providerRuntime = providerRuntime;
+            }
+            public object GetService(Type serviceType)
+            {
+                var service = providerRuntime.ServiceProvider?.GetService(serviceType);
+                if (service != null)
+                {
+                    return service;
+                }
+
+                if (serviceType == typeof(IGrainFactory))
+                {
+                    return providerRuntime.GrainFactory;
+                }
+
+                return null;
+            }
+        }
 
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
+            if(!stateManager.PresetState(ProviderState.Initialized)) return;
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
             if (providerUtilitiesManager == null) throw new ArgumentNullException("providerUtilitiesManager");
             if (config == null) throw new ArgumentNullException("config");
@@ -57,29 +86,33 @@ namespace Orleans.Providers.Streams.Common
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
             logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
+            // Temporary change, but we need GrainFactory inside ServiceProvider for now, 
+            // so will change it back as soon as we have an action item to add GrainFactory to ServiceProvider.
+            adapterFactory.Init(config, Name, logger, new GrainFactoryServiceProvider(providerRuntime));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             string startup;
-            if (config.Properties.TryGetValue(STARTUP_STATE, out startup))
+            if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {
                 if(!Enum.TryParse(startup, true, out startupState))
                     throw new ArgumentException(
-                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, STARTUP_STATE, config.Name));
+                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, StartupStatePropertyName, config.Name));
             }
             else
-                startupState = PersistentStreamProviderState.AgentsStarted;
+                startupState = StartupStateDefaultValue;
 
             logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, Adapter {2} and config {3}, {4} = {5}.",
                 typeof(TAdapterFactory).Name, 
                 Name, 
                 queueAdapter.Name,
                 myConfig,
-                STARTUP_STATE, startupState);
+                StartupStatePropertyName, startupState);
+            stateManager.CommitState();
         }
 
         public async Task Start()
         {
+            if (!stateManager.PresetState(ProviderState.Started)) return;
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
@@ -93,15 +126,18 @@ namespace Orleans.Providers.Streams.Common
                         await pullingAgentManager.StartAgents();
                 }
             }
+            stateManager.CommitState();
         }
 
         public async Task Close()
         {
+            if (!stateManager.PresetState(ProviderState.Closed)) return;
             var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
             {
                 await pullingAgentManager.Stop();
             }
+            stateManager.CommitState();
         }
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)

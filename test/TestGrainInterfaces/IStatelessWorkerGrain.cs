@@ -8,6 +8,6 @@ namespace UnitTests.GrainInterfaces
     public interface IStatelessWorkerGrain : IGrainWithIntegerKey
     {
         Task LongCall();
-        Task<Tuple<Guid, List<Tuple<DateTime, DateTime>>>> GetCallStats();
+        Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>> GetCallStats();
     }
 }

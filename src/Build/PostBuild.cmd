@@ -1,4 +1,5 @@
 @echo Begin Post-Build script
+@setlocal EnableExtensions EnableDelayedExpansion
 
 if "%BuildingInsideVisualStudio%" == "true" (
     set PKG_DIR=%SolutionDir%NuGet.Packages
@@ -16,10 +17,11 @@ copy /y "%SolutionDir%SDK\OrleansConfiguration.xml" "%TargetDir%"
 copy /y "%SolutionDir%SDK\ClientConfiguration.xml" "%TargetDir%"
 
 if "%BuildOrleansNuGet%" == "" (
+    set BuildOrleansNuGet=true
     if "%Configuration%" == "Release" (
-        set BuildOrleansNuGet=true
+        set BuildOrleansNuGetPrerelease=false
     ) else (
-        set BuildOrleansNuGet=false
+        set BuildOrleansNuGetPrerelease=true
     )
 )
 
@@ -41,7 +43,7 @@ if "%BuildOrleansChocolatey%" == "" (
     )
 )
 
-@echo BuildingInsideVisualStudio = %BuildingInsideVisualStudio% BuildOrleansNuGet = %BuildOrleansNuGet% BuildOrleansChocolatey = %BuildOrleansChocolatey%
+@echo BuildingInsideVisualStudio = %BuildingInsideVisualStudio% BuildOrleansNuGet = %BuildOrleansNuGet% BuildOrleansNuGetPrerelease = %BuildOrleansNuGetPrerelease% BuildOrleansChocolatey = %BuildOrleansChocolatey%
 
 copy /y "%SolutionDir%NuGet\*.props" "%TargetDir%"
 copy /y "%SolutionDir%NuGet\EmptyFile.cs" "%TargetDir%"
@@ -54,12 +56,19 @@ if not "%BuildingInsideVisualStudio%" == "true" (
         del /q *.nupkg
 
         @echo ===== Build Orleans NuGet packages from %TargetDir%
-        call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt %SolutionDir%
+        call "%SolutionDir%NuGet\CreateOrleansPackages.bat" . .\Version.txt %SolutionDir% %BuildOrleansNuGetPrerelease%
         if ERRORLEVEL 1 EXIT /B 1
     
-        @echo == Copying Orleans NuGet packages to %PKG_DIR%
-        if not exist "%PKG_DIR%" (md "%PKG_DIR%") else (del /s/q "%PKG_DIR%\*")
-        xcopy /y *.nupkg "%PKG_DIR%\"
+        if "%BuildOrleansNuGetPrerelease%" == "true" (
+            set PackageDir=%PKG_DIR%\Prerelease
+        ) else (
+            set PackageDir=%PKG_DIR%
+        )
+        
+        @echo == Copying Orleans NuGet packages to !PackageDir!
+        if not exist "!PackageDir!" (md "!PackageDir!") else (del /q "!PackageDir!\*")
+        xcopy /y *.nupkg "!PackageDir!\"
+        
         @echo == Clean transient generated Orleans NuGet packages from %TargetDir%
         del /q *.nupkg
     ) else (

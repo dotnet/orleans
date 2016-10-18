@@ -6,6 +6,7 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Optimization;
 using System.Web.Routing;
+using Orleans.Runtime.Configuration;
 
 namespace TwitterWebApplication
 {
@@ -13,7 +14,8 @@ namespace TwitterWebApplication
     {
         protected void Application_Start()
         {
-            GrainClient.Initialize(Server.MapPath("ClientConfiguration.xml"));
+            var config = ClientConfiguration.LocalhostSilo();
+            GrainClient.Initialize(config);
 
             AreaRegistration.RegisterAllAreas();
             FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);

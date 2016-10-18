@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Assert = Microsoft.VisualStudio.TestTools.UnitTesting.Assert;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
@@ -14,7 +13,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.TestingHost;
+using Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -34,14 +33,14 @@ namespace UnitTests.StorageTests
         {
             this.output = output;
             this.deploymentId = MakeDeploymentId();
-            TraceLogger.Initialize(new NodeConfiguration());
+            LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
             SerializationManager.InitializeForTesting();
         }
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
@@ -49,19 +48,18 @@ namespace UnitTests.StorageTests
         {
             var properties = new Dictionary<string, string>
                 {
-                    {AzureQueueAdapterFactory.DATA_CONNECTION_STRING, StorageTestConstants.DataConnectionString},
-                    {AzureQueueAdapterFactory.DEPLOYMENT_ID, deploymentId}
+                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
+                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
             var adapterFactory = new AzureQueueAdapterFactory();
-            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, TraceLogger.GetLogger("AzureQueueAdapter", TraceLogger.LoggerType.Application), new DefaultServiceProvider());
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
         private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config)
         {
-            Guid agentId = Guid.NewGuid();
             IQueueAdapter adapter = await adapterFactory.CreateAdapter();
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
@@ -77,7 +75,7 @@ namespace UnitTests.StorageTests
             Guid streamId2 = Guid.NewGuid();
 
             int receivedBatches = 0;
-            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<Guid>>();
+            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<IStreamIdentity>>();
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
@@ -98,18 +96,16 @@ namespace UnitTests.StorageTests
                         foreach (AzureQueueBatchContainer message in messages.Cast<AzureQueueBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<Guid> { message.StreamGuid },
+                                id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },
                                 (id, set) =>
                                 {
-                                    set.Add(message.StreamGuid);
+                                    set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
                                     return set;
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
-                            Assert.AreEqual(NumMessagesPerBatch / 2, message.GetEvents<int>().Count(),
-                                "Half the events were ints");
-                            Assert.AreEqual(NumMessagesPerBatch / 2, message.GetEvents<string>().Count(),
-                                "Half the events were strings");
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                         }
                         Interlocked.Add(ref receivedBatches, messages.Length);
                         qCache.AddToCache(messages);
@@ -129,19 +125,19 @@ namespace UnitTests.StorageTests
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
-            Assert.AreEqual(NumBatches, receivedBatches);
+            Assert.Equal(NumBatches, receivedBatches);
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceToken(0);
-            foreach (KeyValuePair<QueueId, HashSet<Guid>> kvp in streamsPerQueue)
+            foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
                 var qCache = caches[kvp.Key];
 
-                foreach (Guid streamGuid in kvp.Value)
+                foreach (IStreamIdentity streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
-                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, streamGuid.ToString(), firstInCache);
+                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                     int messageCount = 0;
                     StreamSequenceToken tenthInCache = null;
                     StreamSequenceToken lastToken = firstInCache;
@@ -151,7 +147,7 @@ namespace UnitTests.StorageTests
                         messageCount++;
                         IBatchContainer batch = cursor.GetCurrent(out ex);
                         output.WriteLine("Token: {0}", batch.SequenceToken);
-                        Assert.IsTrue(batch.SequenceToken.CompareTo(lastToken) >= 0, "order check for event {0}", messageCount);
+                        Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
                         if (messageCount == 10)
                         {
@@ -159,11 +155,11 @@ namespace UnitTests.StorageTests
                         }
                     }
                     output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    Assert.AreEqual(NumBatches / 2, messageCount);
-                    Assert.IsNotNull(tenthInCache);
+                    Assert.Equal(NumBatches / 2, messageCount);
+                    Assert.NotNull(tenthInCache);
 
                     // read all messages from the 10th
-                    cursor = qCache.GetCacheCursor(streamGuid, streamGuid.ToString(), tenthInCache);
+                    cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
                     messageCount = 0;
                     while (cursor.MoveNext())
                     {
@@ -171,7 +167,7 @@ namespace UnitTests.StorageTests
                     }
                     output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
-                    Assert.AreEqual(expected, messageCount);
+                    Assert.Equal(expected, messageCount);
                 }
             }
         }

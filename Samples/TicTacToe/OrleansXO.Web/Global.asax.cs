@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Runtime.Host;
 using System.Web.Mvc;
 using System.Web.Routing;
+using Orleans.Runtime.Configuration;
 
 namespace OrleansXO.Web
 {
@@ -15,12 +16,12 @@ namespace OrleansXO.Web
             if (RoleEnvironment.IsAvailable)
             {
                 // running in Azure
-                AzureClient.Initialize(Server.MapPath(@"~/AzureConfiguration.xml"));
+                AzureClient.Initialize(AzureClient.DefaultConfiguration());
             }
             else
             {
                 // not running in Azure
-                GrainClient.Initialize(Server.MapPath(@"~/LocalConfiguration.xml"));
+                GrainClient.Initialize(ClientConfiguration.LocalhostSilo());
             }
 
             AreaRegistration.RegisterAllAreas();

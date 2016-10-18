@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -7,7 +6,7 @@ namespace Orleans.Runtime.Placement
 {
     internal interface IPlacementContext
     {
-        TraceLogger Logger { get; }
+        Logger Logger { get; }
 
         /// <summary>
         /// Lookup locally known directory information for a target grain
@@ -19,11 +18,15 @@ namespace Orleans.Runtime.Placement
 
         Task<AddressesAndTag> FullLookup(GrainId grain);
 
+        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
+
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 
         List<SiloAddress> AllActiveSilos { get; }
 
         SiloAddress LocalSilo { get; }
+
+        SiloStatus LocalSiloStatus { get; }
 
         /// <summary>
         /// Try to get the transaction state of the activation if it is available on this silo

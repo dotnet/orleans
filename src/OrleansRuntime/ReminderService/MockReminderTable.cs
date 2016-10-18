@@ -14,7 +14,7 @@ namespace Orleans.Runtime.ReminderService
             this.delay = delay;
         }
 
-        public Task Init(GlobalConfiguration config,TraceLogger logger)
+        public Task Init(GlobalConfiguration config, Logger logger)
         {
             return TaskDone.Done;
         }

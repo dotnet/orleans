@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Streams;
-
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers
 {
@@ -55,19 +54,22 @@ namespace Orleans.Providers
             return streamDirectory;
         }
 
-        public async Task Reset()
+        public async Task Reset(bool cleanup = true)
         {
             if (streamDirectory != null)
             {
                 var tmp = streamDirectory;
                 streamDirectory = null; // null streamDirectory now, just to make sure we call cleanup only once, in all cases.
-                await tmp.Cleanup(true, true);
+                if (cleanup)
+                {
+                    await tmp.Cleanup(true, true);
+                }
             }
         }
 
         public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, TraceLogger.LoggerType.Provider);
+            return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
         public Guid ServiceId
@@ -134,9 +136,9 @@ namespace Orleans.Providers
                 else
                 { 
                     extension = newExtensionFunc();
-                    var obj = ((Orleans.GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
+                    var obj = ((GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
 
-                    addressable = (IAddressable) await (Task<TExtensionInterface>) obj;
+                    addressable = obj;
 
                     if (null == addressable)
                     {
