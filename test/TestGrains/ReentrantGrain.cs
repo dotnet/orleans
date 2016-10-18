@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Streams;
+
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -93,6 +95,26 @@ namespace UnitTests.Grains
         {
             return Self.One("err");
         }
+
+        public async Task SubscribeToStream()
+        {
+            var stream = GetStream();
+
+            await stream.SubscribeAsync((item, _) =>
+            {
+                var logger = GetLogger();
+                logger.Info("Received stream item:" + item);
+                return TaskDone.Done;
+            });
+        }
+
+        public Task PushToStream(string item)
+        {
+            return GetStream().OnNextAsync(item);
+        }
+
+        IAsyncStream<string> GetStream() => 
+            GetStreamProvider("sms").GetStream<string>(Guid.Empty, "test-stream-interleave");
 
         public Task SetSelf(INonReentrantGrainWithMessageInterleavePredicate self)
         {

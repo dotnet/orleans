@@ -142,8 +142,10 @@ namespace Orleans.Runtime
 
         public bool IsMessageAllowedToInterleave(Message message)
         {
-            var request = message.BodyObject as InvokeMethodRequest;
-            return request != null && IsMessageAllowedToInterleavePredicate(request);
+            if (message.Direction != Message.Directions.Request)
+                return IsReentrant;
+
+            return IsMessageAllowedToInterleavePredicate((InvokeMethodRequest)message.BodyObject);
         }
     }
 }

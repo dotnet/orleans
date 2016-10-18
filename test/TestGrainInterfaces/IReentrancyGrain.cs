@@ -28,10 +28,12 @@ namespace UnitTests.GrainInterfaces
         Task<string> One(string arg); // this interleaves only when arg == "reentrant"
 
         Task<string> Two();
-
         Task<string> TwoReentrant();
 
         Task Exceptional();
+
+        Task SubscribeToStream();
+        Task PushToStream(string item);
 
         Task SetSelf(INonReentrantGrainWithMessageInterleavePredicate self);
     }
