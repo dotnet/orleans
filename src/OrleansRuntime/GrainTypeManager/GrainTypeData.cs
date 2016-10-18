@@ -138,9 +138,9 @@ namespace Orleans.Runtime
             IsMessageInterleavesPredicate = predicate;
         }
 
-        public bool IsMessageInterleaves(Message message)
+        public bool IsMessageAllowedToInterleave(Message message)
         {
-            return IsReentrant || IsMessageInterleavesPredicate(message.BodyObject.GetType());
+            return IsMessageInterleavesPredicate(message.BodyObject.GetType());
         }
     }
 }
