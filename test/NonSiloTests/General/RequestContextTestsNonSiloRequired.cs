@@ -69,7 +69,6 @@ namespace UnitTests.General
             await Task.WhenAll(promises);
         }
 
-        //failed in vNext due to RequestContext is not fully upgraded to coreclr yet
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
@@ -86,7 +85,11 @@ namespace UnitTests.General
             Assert.False(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "ActivityId should not be be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = activityId;
+#else
+            RequestContext.ActivityId.Value = activityId;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
@@ -97,10 +100,18 @@ namespace UnitTests.General
             object result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
             Assert.NotNull(result);// ActivityId #1 should not be null
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
+#if !NETSTANDARD
             Assert.Equal(activityId, Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #1 should not have changed"
+#else
+            Assert.Equal(activityId, RequestContext.ActivityId.Value);  // "Original E2E ActivityId #1 should not have changed"
+#endif
             TestCleanup();
 
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#else
+            RequestContext.ActivityId.Value = nullActivityId;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
@@ -110,7 +121,11 @@ namespace UnitTests.General
             Assert.False(headers.ContainsKey(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER), "Null ActivityId should not be present " + headers.ToStrings(separator: ","));
             TestCleanup();
 
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = activityId2;
+#else
+            RequestContext.ActivityId.Value = activityId2;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             foreach (var kvp in msg.RequestContextData)
@@ -121,11 +136,14 @@ namespace UnitTests.General
             result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
             Assert.NotNull(result); // ActivityId #2 should not be null
             Assert.Equal(activityId2, result);  // "E2E ActivityId #2 not propagated correctly"
+#if !NETSTANDARD
             Assert.Equal(activityId2, Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #2 should not have changed"
+#else
+            Assert.Equal(activityId2, RequestContext.ActivityId.Value);  // "Original E2E ActivityId #2 should not have changed"
+#endif
             TestCleanup();
         }
 
-        //failed in vNext due to RequestContext is not fully upgraded to coreclr yet
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
@@ -140,8 +158,11 @@ namespace UnitTests.General
             var actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
             Assert.Null(actId);
             TestCleanup();
-
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = activityId;
+#else
+            RequestContext.ActivityId.Value = activityId;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             RequestContext.Clear();
@@ -155,10 +176,18 @@ namespace UnitTests.General
             object result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
             Assert.NotNull(result);// "ActivityId #1 should not be null"
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
+#if !NETSTANDARD
             Assert.Equal(activityId, Trace.CorrelationManager.ActivityId);  // "Original E2E ActivityId #1 should not have changed"
+#else
+            Assert.Equal(activityId, RequestContext.ActivityId.Value);  // "Original E2E ActivityId #1 should not have changed"
+#endif
             TestCleanup();
 
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = nullActivityId;
+#else
+            RequestContext.ActivityId.Value = nullActivityId;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             RequestContext.Clear();
@@ -167,7 +196,11 @@ namespace UnitTests.General
             Assert.Null(actId);
             TestCleanup();
 
+#if !NETSTANDARD
             Trace.CorrelationManager.ActivityId = activityId2;
+#else
+            RequestContext.ActivityId.Value = activityId2;
+#endif
             msg = new Message();
             msg.RequestContextData = RequestContext.Export();
             RequestContext.Clear();
@@ -181,7 +214,11 @@ namespace UnitTests.General
             result = headers[RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER];
             Assert.NotNull(result); // "ActivityId #2 should not be null"
             Assert.Equal(activityId2, result);// "E2E ActivityId #2 not propagated correctly
+#if !NETSTANDARD
             Assert.Equal(activityId2, Trace.CorrelationManager.ActivityId); // "Original E2E ActivityId #2 should not have changed"
+#else
+            Assert.Equal(activityId2, RequestContext.ActivityId.Value); // "Original E2E ActivityId #2 should not have changed"
+#endif
             TestCleanup();
         }
 
