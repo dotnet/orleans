@@ -23,6 +23,19 @@ namespace UnitTests.GrainInterfaces
         Task SetSelf(INonReentrantGrain self);
     }
 
+    public interface INonReentrantGrainWithMessageInterleavePredicate : IGrainWithIntegerKey
+    {
+        Task<string> One(string arg); // this interleaves only when arg == "reentrant"
+
+        Task<string> Two();
+
+        Task<string> TwoReentrant();
+
+        Task Exceptional();
+
+        Task SetSelf(INonReentrantGrainWithMessageInterleavePredicate self);
+    }
+
     [Unordered]
     public interface IUnorderedNonReentrantGrain : IGrainWithIntegerKey
     {

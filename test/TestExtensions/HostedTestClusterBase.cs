@@ -13,7 +13,7 @@ namespace TestExtensions
     {
         protected TestCluster HostedCluster { get; private set; }
 
-        public HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
+        public HostedTestClusterEnsureDefaultStarted(BaseTestClusterFixture fixture)
         {
             this.HostedCluster = fixture.HostedCluster;
         }

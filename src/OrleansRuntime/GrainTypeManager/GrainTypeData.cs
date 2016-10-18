@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+
+using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
@@ -21,7 +23,7 @@ namespace Orleans.Runtime
         internal Type StateObjectType { get; private set; }
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
-        Func<object, bool> IsMessageInterleavesPredicate { get; set; }
+        Func<InvokeMethodRequest, bool> IsMessageAllowedToInterleavePredicate { get; set; }
    
         public GrainTypeData(Type type, Type stateObjectType)
         {
@@ -33,7 +35,7 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
-            IsMessageInterleavesPredicate = _ => false;
+            IsMessageAllowedToInterleavePredicate = _ => false;
         }
 
         /// <summary>
@@ -130,17 +132,18 @@ namespace Orleans.Runtime
         }
 
         // used by Orleankka's bootstrapper
-        internal void SetMessageAlwaysInterleaves(Func<object, bool> predicate)
+        internal void SetMessageAllowedToInterleavePredicate(Func<InvokeMethodRequest, bool> predicate)
         {
             if (predicate == null)
                 throw new ArgumentNullException(nameof(predicate));
 
-            IsMessageInterleavesPredicate = predicate;
+            IsMessageAllowedToInterleavePredicate = predicate;
         }
 
         public bool IsMessageAllowedToInterleave(Message message)
         {
-            return IsMessageInterleavesPredicate(message.BodyObject.GetType());
+            var request = message.BodyObject as InvokeMethodRequest;
+            return request != null && IsMessageAllowedToInterleavePredicate(request);
         }
     }
 }

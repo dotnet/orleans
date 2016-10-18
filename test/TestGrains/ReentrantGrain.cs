@@ -68,6 +68,39 @@ namespace UnitTests.Grains
         }
     }
 
+    public class NonReentrantGrainWithMessageInterleavePredicate : Grain, INonReentrantGrainWithMessageInterleavePredicate
+    {
+        private INonReentrantGrainWithMessageInterleavePredicate Self { get; set; }
+
+        // this interleaves only when arg == "reentrant" 
+        // and test predicate will throw when arg = "err"
+        public Task<string> One(string arg)
+        {
+            return Task.FromResult("one");
+        }
+
+        public async Task<string> Two()
+        {
+            return await Self.One("") + " two";
+        }
+
+        public async Task<string> TwoReentrant()
+        {
+            return await Self.One("reentrant") + " two";
+        }
+
+        public Task Exceptional()
+        {
+            return Self.One("err");
+        }
+
+        public Task SetSelf(INonReentrantGrainWithMessageInterleavePredicate self)
+        {
+            Self = self;
+            return TaskDone.Done;
+        }
+    }
+
     public class UnorderedNonRentrantGrain : Grain, IUnorderedNonReentrantGrain
     {
         private IUnorderedNonReentrantGrain Self { get; set; }
