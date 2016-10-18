@@ -45,14 +45,14 @@ configuration.UseStartupType<MyApplication.Configuration.MyStartup>();
 
 ## Configuring via XML
 
-To register your `Startup` class with Orleans you've to add a `Startup` element to the `Globals` section and in the `Type` attribute you've to specify the assembly qualified name for the type.
+To register your `Startup` class with Orleans you've to add a `Startup` element to the `Defaults` section and in the `Type` attribute you've to specify the assembly qualified name for the type.
 
 ``` XML
 <?xml version="1.0" encoding="utf-8" ?>
 <tns:OrleansConfiguration xmlns:tns="urn:orleans">
-  <tns:Globals>
+  <tns:Defaults>
     <tns:Startup Type="MyApplication.Configuration.Startup,MyApplication" />
-  </tns:Globals>
+  </tns:Defaults>
 </tns:OrleansConfiguration>
 ```
 # Example
