@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    internal class ClientTableStatistics : MarshalByRefObject, IClientPerformanceMetrics
+    internal class ClientTableStatistics : IClientPerformanceMetrics
     {
         private readonly IMessageCenter mc;
         private readonly IClientMetricsDataPublisher metricsDataPublisher;

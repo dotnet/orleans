@@ -139,6 +139,12 @@ namespace Orleans.Runtime
             set { Headers.IsUnordered = value; }
         }
 
+        public bool IsReturnedFromRemoteCluster
+        {
+            get { return Headers.IsReturnedFromRemoteCluster; }
+            set { Headers.IsReturnedFromRemoteCluster = value; }
+        }
+
         public CorrelationId Id
         {
             get { return Headers.Id; }
@@ -296,6 +302,8 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
+
+ 
 
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
@@ -651,6 +659,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
+            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
@@ -819,6 +828,7 @@ namespace Orleans.Runtime
                 TARGET_OBSERVER = 1 << 22,
                 IS_UNORDERED = 1 << 23,
                 REQUEST_CONTEXT = 1 << 24,
+                IS_RETURNED_FROM_REMOTE_CLUSTER = 1 << 25,
                 // Do not add over int.MaxValue of these.
             }
 
@@ -827,6 +837,7 @@ namespace Orleans.Runtime
             private bool _isReadOnly;
             private bool _isAlwaysInterleave;
             private bool _isUnordered;
+            private bool _isReturnedFromRemoteCluster;
             private CorrelationId _id;
             private int _resendCount;
             private int _forwardCount;
@@ -890,6 +901,15 @@ namespace Orleans.Runtime
                 set
                 {
                     _isUnordered = value;
+                }
+            }
+
+            public bool IsReturnedFromRemoteCluster
+            {
+                get { return _isReturnedFromRemoteCluster; }
+                set
+                {
+                    _isReturnedFromRemoteCluster = value;
                 }
             }
 

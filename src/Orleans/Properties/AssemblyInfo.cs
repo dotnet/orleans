@@ -27,6 +27,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("OrleansAWSUtils")]
 [assembly: InternalsVisibleTo("OrleansManager")]
+[assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
@@ -35,3 +36,5 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("OrleansBenchmarks")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("TestExtensions")]

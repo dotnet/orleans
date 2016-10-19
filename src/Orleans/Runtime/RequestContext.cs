@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+#if !NETSTANDARD
 using System.Runtime.Remoting.Messaging;
+#endif
 using Orleans.Serialization;
-
 
 namespace Orleans.Runtime
 {
@@ -38,6 +40,11 @@ namespace Orleans.Runtime
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
         internal const string PING_APPLICATION_HEADER = "Ping";
+
+#if NETSTANDARD
+        public static readonly AsyncLocal<Guid> ActivityId = new AsyncLocal<Guid>();
+        private static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new AsyncLocal<Dictionary<string, object>>();
+#endif
 
         /// <summary>
         /// Retrieve a value from the RequestContext key-value bag.
@@ -108,7 +115,12 @@ namespace Orleans.Runtime
                 {
                     activityIdObj = Guid.Empty;
                 }
-                Trace.CorrelationManager.ActivityId = (Guid) activityIdObj;
+
+#if NETSTANDARD
+                ActivityId.Value = (Guid) activityIdObj;
+#else
+                Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
+#endif
             }
             if (contextData != null && contextData.Count > 0)
             {
@@ -130,7 +142,11 @@ namespace Orleans.Runtime
 
             if (PropagateActivityId)
             {
-                Guid activityId = Trace.CorrelationManager.ActivityId;
+#if !NETSTANDARD
+                var activityId = Trace.CorrelationManager.ActivityId;
+#else
+                var activityId = ActivityId.Value;
+#endif
                 if (activityId != Guid.Empty)
                 {
                     values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
@@ -147,17 +163,29 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
+#if !NETSTANDARD
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
+#else
+            CallContextData.Value = null;
+#endif
         }
 
         private static void SetContextData(Dictionary<string, object> values)
         {
+#if !NETSTANDARD
             CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
+#else
+            CallContextData.Value = values;
+#endif
         }
 
         private static Dictionary<string, object> GetContextData()
         {
+#if !NETSTANDARD
             return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
+#else
+            return CallContextData.Value;
+#endif
         }
     }
 }

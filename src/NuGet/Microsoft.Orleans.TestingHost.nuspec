@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.TestingHost</id>
     <version>$version$</version>
     <title>Microsoft Orleans Testing Host Library</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
@@ -19,8 +19,9 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />      
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+      <dependency id="Microsoft.Extensions.Configuration.Binder" version="1.0.0" />
     </dependencies>
   </metadata>
   <files>

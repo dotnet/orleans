@@ -16,7 +16,7 @@
         /// <param name="generatedAssembly">
         /// The generated assembly.
         /// </param>
-        void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly);
+        void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly);
 
         /// <summary>
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
@@ -25,6 +25,6 @@
         /// <remarks>
         /// The key of the returned dictionary is the name of the assembly which the value targets.
         /// </remarks>
-        IDictionary<string, byte[]> GetGeneratedAssemblies();
+        IDictionary<string, GeneratedAssembly> GetGeneratedAssemblies();
     }
 }

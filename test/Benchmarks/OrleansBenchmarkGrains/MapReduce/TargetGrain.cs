@@ -8,12 +8,10 @@ namespace OrleansBenchmarkGrains.MapReduce
     public class TargetGrain<TInput> : DataflowGrain, ITargetGrain<TInput>
     {
         private ITargetProcessor<TInput> _processor;
-        private bool _initialized;
 
         public Task Init(ITargetProcessor<TInput> processor)
         {
             _processor = processor;
-            _initialized = true;
             return TaskDone.Done;
         }
 

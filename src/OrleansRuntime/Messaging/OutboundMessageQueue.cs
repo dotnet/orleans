@@ -103,6 +103,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
                     messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
+                    return;
                 }
 
                 // Prioritize system messages

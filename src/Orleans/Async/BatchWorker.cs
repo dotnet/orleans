@@ -13,7 +13,7 @@ namespace Orleans
     /// </summary>
     public abstract class BatchWorker
     {
-        // Subclass overrides this to define what constitutes a work cycle
+        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
 
         /// <summary>

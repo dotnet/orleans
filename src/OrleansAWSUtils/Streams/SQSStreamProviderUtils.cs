@@ -6,8 +6,18 @@ using System.Threading.Tasks;
 
 namespace OrleansAWSUtils.Streams
 {
+    /// <summary>
+    /// SQS utility functions
+    /// </summary>
     public class SQSStreamProviderUtils
     {
+        /// <summary>
+        /// Async method to delete all used queques, for specific provider and deploymentId
+        /// </summary>
+        /// <param name="providerName"></param>
+        /// <param name="deploymentId"></param>
+        /// <param name="storageConnectionString"></param>
+        /// <returns> Task object for this async method </returns>
         public static async Task DeleteAllUsedQueues(string providerName, string deploymentId, string storageConnectionString)
         {
             if (deploymentId != null)

@@ -452,7 +452,6 @@ namespace Orleans.Serialization
             // GrainId must not be null
             Write(addr.Grain);
             Write(addr.Activation ?? ActivationId.Zero);
-            Write((byte) addr.Status);
         }
 
         /// <summary> Write a <c>SiloAddress</c> value to the stream. </summary>

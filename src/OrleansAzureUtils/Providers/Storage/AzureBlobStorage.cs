@@ -69,7 +69,7 @@ namespace Orleans.Storage
             try
             {
                 this.Name = name;
-                this.jsonSettings = SerializationManager.UpdateSerializerSettings(SerializationManager.GetDefaultJsonSerializerSettings(), config);
+                this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(), config);
 
                 if (!config.Properties.ContainsKey(DataConnectionStringPropertyName)) throw new BadProviderConfigException($"The {DataConnectionStringPropertyName} setting has not been configured in the cloud role. Please add a {DataConnectionStringPropertyName} setting with a valid Azure Storage connection string.");
 
@@ -91,13 +91,20 @@ namespace Orleans.Storage
 
         IEnumerable<string> FormatPropertyMessage(IProviderConfiguration config)
         {
-            foreach (var property in new string[] { ContainerNamePropertyName, "SerializeTypeNames", "PreserveReferencesHandling", "UseFullAssemblyNames", "IndentJSON" })
+            var properties = new[]
+            {
+                ContainerNamePropertyName,
+                "SerializeTypeNames",
+                "PreserveReferencesHandling",
+                OrleansJsonSerializer.UseFullAssemblyNamesProperty,
+                OrleansJsonSerializer.IndentJsonProperty
+            };
+            foreach (var property in properties)
             {
                 if (!config.Properties.ContainsKey(property)) continue;
                 yield return string.Format("{0}={1}", property, config.Properties[property]);
             }
         }
-
 
         /// <summary> Shutdown this storage provider. </summary>
         /// <see cref="IProvider.Close"/>

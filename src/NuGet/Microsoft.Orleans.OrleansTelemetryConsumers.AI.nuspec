@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.OrleansTelemetryConsumers.AI</id>
     <version>$version$</version>
     <title>Microsoft Orleans Telemetry Consumer - Azure Application Insights</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>

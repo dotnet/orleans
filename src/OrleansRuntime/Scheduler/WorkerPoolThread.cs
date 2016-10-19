@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class WorkerPoolThread : AsynchAgent
     {
-        private const int MAX_THREAD_COUNT_TO_REPLACE = 500;
+        internal const int MAX_THREAD_COUNT_TO_REPLACE = 500;
         private const int MAX_CPU_USAGE_TO_REPLACE = 50;
 
         private readonly WorkerPool pool;
@@ -175,6 +175,7 @@ namespace Orleans.Runtime.Scheduler
 #endif
                                 todo.Execute();
                             }
+#if !NETSTANDARD
                             catch (ThreadAbortException ex)
                             {
                                 // The current turn was aborted (indicated by the exception state being set to true).
@@ -184,6 +185,7 @@ namespace Orleans.Runtime.Scheduler
                                 else
                                     Log.Error(ErrorCode.Runtime_Error_100029, "Caught thread abort exception, allowing it to propagate outwards", ex);
                             }
+#endif
                             catch (Exception ex)
                             {
                                 var errorStr = String.Format("Worker thread caught an exception thrown from task {0}.", todo);
@@ -229,6 +231,7 @@ namespace Orleans.Runtime.Scheduler
                             noWorkCount++;
                         }
                     }
+#if !NETSTANDARD
                     catch (ThreadAbortException tae)
                     {
                         // Can be reported from RunQueue.Get when Silo is being shutdown, so downgrade to verbose log
@@ -236,6 +239,7 @@ namespace Orleans.Runtime.Scheduler
                         Thread.ResetAbort();
                         break;
                     }
+#endif
                     catch (Exception ex)
                     {
                         Log.Error(ErrorCode.Runtime_Error_100031, "Exception bubbled up to worker thread", ex);
@@ -323,7 +327,7 @@ namespace Orleans.Runtime.Scheduler
             // exit when it's done with the turn.
             // Note that we only do this if the current load is reasonably low and the current thread
             // count is reasonably small.
-            if (!pool.InjectMoreWorkerThreads || pool.BusyWorkerCount >= MAX_THREAD_COUNT_TO_REPLACE ||
+            if (!pool.ShouldInjectWorkerThread ||
                 (Silo.CurrentSilo == null || !(Silo.CurrentSilo.Metrics.CpuUsage < MAX_CPU_USAGE_TO_REPLACE))) return;
 
             if (Cts.IsCancellationRequested) return;

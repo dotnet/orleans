@@ -47,11 +47,11 @@ namespace Orleans.Runtime.Startup
 
         private static void RegisterSystemTypes(IServiceCollection serviceCollection)
         {
-            // Register the system classes and grains in this method.
-            // Note: this method will probably have to be moved out into the Silo class to include internal runtime types.
-
-            serviceCollection.AddTransient<GrainBasedMembershipTable>();
-            serviceCollection.AddTransient<GrainBasedReminderTable>();
+            // add system types
+            // Note: you can replace IGrainFactory with your own implementation, but 
+            // we don't recommend it, in the aspect of performance and usability
+            serviceCollection.AddSingleton<GrainFactory>((_sp) => new GrainFactory());
+            serviceCollection.AddSingleton<IGrainFactory>((sp) => sp.GetService<GrainFactory>());
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)

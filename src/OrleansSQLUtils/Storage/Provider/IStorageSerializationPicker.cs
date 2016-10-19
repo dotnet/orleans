@@ -5,6 +5,9 @@ using System.Collections.Generic;
 
 namespace Orleans.Storage
 {
+    /// <summary>
+    /// Struct contains choice on streaming, storage deserializer and storage serializer
+    /// </summary>
     public struct SerializationChoice
     {
         /// <summary>

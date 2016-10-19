@@ -52,7 +52,7 @@ namespace Orleans.Storage
         /// <param name="restStatus">REST status for the error</param>
         /// <param name="getExtendedErrors">Whether or not to extract REST error code</param>
         /// <returns></returns>
-        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false);
+        bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false);
     }
 
     /// <summary>
@@ -69,9 +69,11 @@ namespace Orleans.Storage
         public BadProviderConfigException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 
     /// <summary>
@@ -94,9 +96,11 @@ namespace Orleans.Storage
         public InconsistentStateException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {}
+#endif
 
         public InconsistentStateException(
           string errorMsg,

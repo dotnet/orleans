@@ -64,7 +64,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
+            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
@@ -98,7 +98,7 @@ namespace UnitTests
                     Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
                 }
             }
-            if (this.HostedCluster.Primary.Silo.GlobalConfig.PerformDeadlockDetection)
+            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }

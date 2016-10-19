@@ -39,7 +39,7 @@ namespace UnitTests.MembershipTests
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
@@ -49,7 +49,7 @@ namespace UnitTests.MembershipTests
             }
             Assert.Equal(3, statuses.Count);
 
-            IPEndPoint address = silo3.Endpoint;
+            IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
             this.HostedCluster.StopSilo(silo3);
 
@@ -92,7 +92,7 @@ namespace UnitTests.MembershipTests
             else
                 silo2KillHandle = this.HostedCluster.SecondarySilos[silo2Kill - 1];
 
-            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.Endpoint);
+            logger.Info("\n\n\n\nAbout to kill {0}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
                 this.HostedCluster.RestartSilo(silo2KillHandle);
@@ -118,7 +118,7 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            List<SiloHandle> moreSilos = this.HostedCluster.StartAdditionalSilos(1);
+            var moreSilos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();
@@ -240,7 +240,7 @@ namespace UnitTests.MembershipTests
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.DataConnectionString;
+            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -369,7 +369,7 @@ namespace UnitTests.MembershipTests
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.DataConnectionString = StorageTestConstants.GetZooKeeperConnectionString();
+            options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.ZooKeeper;
             options.ClusterConfiguration.PrimaryNode = null;
             options.ClusterConfiguration.Globals.SeedNodes.Clear();
@@ -454,6 +454,58 @@ namespace UnitTests.MembershipTests
             await Do_Liveness_OracleTest_2(2, false, true);
         }
     }
+
+
+
+    public class LivenessTests_PostgreSql : LivenessTestsBase
+    {
+        public const string TestDatabaseName = "orleanstest";
+        public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
+        {
+        }
+        public override TestCluster CreateTestCluster()
+        {
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
+            var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
+            options.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
+            options.ClusterConfiguration.PrimaryNode = null;
+            options.ClusterConfiguration.Globals.SeedNodes.Clear();
+            return new TestCluster(options);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_1()
+        {
+            await Do_Liveness_OracleTest_1();
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_2_Restart_Primary()
+        {
+            await Do_Liveness_OracleTest_2(0);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_3_Restartl_GW()
+        {
+            await Do_Liveness_OracleTest_2(1);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_4_Restart_Silo_1()
+        {
+            await Do_Liveness_OracleTest_2(2);
+        }
+
+        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+        public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
+        {
+            await Do_Liveness_OracleTest_2(2, false, true);
+        }
+    }
+
 
     public class LivenessTests_MySql : LivenessTestsBase
     {

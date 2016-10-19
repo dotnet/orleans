@@ -18,23 +18,16 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         private interface ITestGrainGenericWithIntegerKey<T>: IGrainWithIntegerKey { }
         private class TestGrainWithIntegerKey: Grain, ITestGrainWithIntegerKey { }
         private class TestGrainGenericWithIntegerKey<T>: Grain, ITestGrainGenericWithIntegerKey<T> { }
-        private class TestGrainStateWithIntegerKey<TState>: Grain<TState>, ITestGrainWithIntegerKey { }
-        private class TestGrainStateGenericWithIntegerKey<T, TState>: Grain<TState>, ITestGrainGenericWithIntegerKey<T> { }
 
         private interface ITestGrainWithGuidKey: IGrainWithGuidKey { }
         private interface ITestGrainGenericWithGuidKey<T>: IGrainWithGuidKey { }
         private class TestGrainWithGuidKey: Grain, ITestGrainWithGuidKey { }
         private class TestGrainGenericWithGuidKey<T>: Grain, ITestGrainGenericWithGuidKey<T> { }
-        private class TestGrainStateWithGuidKey<TState>: Grain<TState>, ITestGrainWithGuidKey { }
-        private class TestGrainStateGenericWithGuidKey<T, TState>: Grain<TState>, ITestGrainGenericWithGuidKey<T> { }
 
         private interface ITestGrainWithStringKey: IGrainWithStringKey { }
         private interface ITestGrainGenericWithStringKey<T>: IGrainWithStringKey { }
         private class TestGrainWithStringKey: Grain, ITestGrainWithStringKey { }
         private class TestGrainGenericWithStringKey<T>: Grain, ITestGrainGenericWithStringKey<T> { }
-        private class TestGrainStateWithStringKey<TState>: Grain<TState>, ITestGrainWithStringKey { }
-        private class TestGrainStateGenericWithStringKey<T, TState>: Grain<TState>, ITestGrainGenericWithStringKey<T> { }
-
 
         private static Dictionary<Type, Func<Type, Type, Type>> GrainTypeSwitch { get; } = new Dictionary<Type, Func<Type, Type, Type>>
         {

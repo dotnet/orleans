@@ -22,6 +22,7 @@ namespace Orleans.Runtime
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
+            GeoClient = 7,
         }
 
         public UInt64 N0 { get; private set; }
@@ -59,7 +60,11 @@ namespace Orleans.Runtime
 
         public bool HasKeyExt
         {
-            get { return IdCategory == Category.KeyExtGrain; }
+            get {
+                var category = IdCategory;
+                return category == Category.KeyExtGrain       
+                    || category == Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
+            }
         }
 
         internal static readonly UniqueKey Empty =
@@ -111,7 +116,7 @@ namespace Orleans.Runtime
             // 0x0 and not useful for identification of the grain.
             if (n1 == 0 && n1 != 0)
                 throw new ArgumentException("n0 cannot be zero unless n1 is non-zero.", "n0");
-            if (category != Category.KeyExtGrain && keyExt != null)
+            if (category != Category.KeyExtGrain && category != Category.GeoClient && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
 
             var typeCodeData = ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
@@ -219,6 +224,16 @@ namespace Orleans.Runtime
             return PrimaryKeyToGuid(out unused);
         }
 
+        public string ClusterId
+        {
+            get
+            {
+                if (IdCategory != Category.GeoClient)
+                    throw new InvalidOperationException("ClusterId is only defined for geo clients");
+                return this.KeyExt;
+            }
+        }
+
         public override bool Equals(object o)
         {
             return o is UniqueKey && Equals((UniqueKey)o);
@@ -319,7 +334,7 @@ namespace Orleans.Runtime
                     }
                 }
             }
-            else if (null != keyExt)
+            else if (category != Category.GeoClient && null != keyExt)
             {
                 throw new ArgumentException("Extended key field is not null in non-extended UniqueIdentifier.");
             }

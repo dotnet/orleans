@@ -74,9 +74,7 @@ namespace UnitTests.Streaming
             Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
-            Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId in Silo config"
-            serviceId = siloHandle.Silo.TestHook.ServiceId;
+            Guid serviceId = siloHandle.TestHook.ServiceId;
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config
@@ -107,9 +105,7 @@ namespace UnitTests.Streaming
             Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
-            Assert.Equal(ServiceId, serviceId);  // "ServiceId in Silo config"
-            serviceId = siloHandle.Silo.TestHook.ServiceId;
+            Guid serviceId = siloHandle.TestHook.ServiceId;
             Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config

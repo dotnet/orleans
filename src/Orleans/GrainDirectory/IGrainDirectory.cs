@@ -35,8 +35,9 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="address">The address of the activation to remove.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
+        /// <param name="cause">The reason for unregistration</param>
         /// <returns>An acknowledgement that the unregistration has completed.</returns>
-        Task UnregisterAsync(ActivationAddress address, bool force = true, int hopCount = 0);
+        Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount = 0);
 
         /// <summary>
         /// Unregister a batch of addresses at once
@@ -44,8 +45,9 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="addresses"></param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
+        /// <param name="cause">The reason for unregistration</param>
         /// <returns>An acknowledgement that the unregistration has completed.</returns>
-        Task UnregisterManyAsync(List<ActivationAddress> addresses, int hopCount = 0);
+        Task UnregisterManyAsync(List<ActivationAddress> addresses, UnregistrationCause cause, int hopCount = 0);
 
         /// <summary>
         /// Removes all directory information about a grain.
@@ -62,7 +64,7 @@ namespace Orleans.GrainDirectory
         /// If there is no local information, then this method will query the appropriate remote directory node.
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
+        /// <param name="grainId">The ID of the grain to look up.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
         Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
@@ -82,5 +84,27 @@ namespace Orleans.GrainDirectory
     {
         public List<ActivationAddress> Addresses;
         public int VersionTag;
+    }
+
+    /// <summary>
+    /// Indicates the reason for removing activations from the directory.
+    /// This influences the conditions that are applied when determining whether or not to remove an entry.
+    /// </summary>
+    internal enum UnregistrationCause : byte
+    {
+        /// <summary>
+        /// Remove the directory entry forcefully, without any conditions
+        /// </summary>
+        Force,
+
+        /// <summary>
+        /// Remove the directory entry only if it points to an activation in a different cluster
+        /// </summary>
+        CacheInvalidation,
+
+        /// <summary>
+        /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
+        /// </summary>
+        NonexistentActivation
     }
 }

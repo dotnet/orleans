@@ -166,8 +166,8 @@ namespace Orleans.Streams
             int cmp1 = Guid.CompareTo(other.Guid);
             if (cmp1 == 0)
             {
-                int cmp2 = string.Compare(ProviderName, other.ProviderName, StringComparison.InvariantCulture);
-                return cmp2 == 0 ? string.Compare(Namespace, other.Namespace, StringComparison.InvariantCulture) : cmp2;
+                int cmp2 = string.Compare(ProviderName, other.ProviderName, StringComparison.Ordinal);
+                return cmp2 == 0 ? string.Compare(Namespace, other.Namespace, StringComparison.Ordinal) : cmp2;
             }
             
             return cmp1;

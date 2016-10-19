@@ -34,7 +34,6 @@ namespace Orleans.Runtime
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
         /// <param name="threadName">Name used for logging the collected stastistics</param>
-        /// <param name="storage"></param>
         public ThreadTrackingStatistic(string threadName)
         {
             
@@ -181,7 +180,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Call once after processing multiple requests as a batch or a single request, must be called from the thread being tracked
         /// </summary>
-        /// <param name="num">Number of processed requests</param>
         public void OnStopProcessing()
         {
             // Only once a client has connected do we start tracking statistics
@@ -210,6 +208,8 @@ namespace Orleans.Runtime
 
         private void TrackContextSwitches()
         {
+#if !NETSTANDARD_TODO
+            // TODO: this temporary exclusion should be resolved by #2147
             PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
             PerformanceCounter[] performanceCountersForThisThread = null;
 
@@ -239,6 +239,7 @@ namespace Orleans.Runtime
                     FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
                 }
             }
+#endif
         }
     }
 }

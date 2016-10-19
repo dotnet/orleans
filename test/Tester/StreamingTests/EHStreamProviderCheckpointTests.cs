@@ -13,6 +13,7 @@ using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
@@ -21,6 +22,7 @@ using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(EventHubStreamProvider).FullName;
@@ -30,15 +32,17 @@ namespace UnitTests.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-            EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
+
+        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.EventHubConnectionString,
+                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName) { CacheSizeMb = 3 };
-
-        private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
-                TimeSpan.FromSeconds(1));
 
         public override TestCluster CreateTestCluster()
         {
@@ -48,14 +52,14 @@ namespace UnitTests.StreamingTests
             return new TestCluster(options);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact]
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
             await ReloadFromCheckpointTest(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
@@ -181,7 +185,7 @@ namespace UnitTests.StreamingTests
 
             // get initial settings from configs
             ProviderSettings.WriteProperties(settings);
-            EventHubConfig.WriteProperties(settings);
+            EventHubConfig.Value.WriteProperties(settings);
             CheckpointerSettings.WriteProperties(settings);
 
             // add queue balancer setting

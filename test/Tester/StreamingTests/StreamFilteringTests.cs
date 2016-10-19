@@ -304,7 +304,7 @@ namespace Tester.StreamingTests
             {
                 var deploymentId = this.HostedCluster.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString)
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString)
                     .Wait();
             }
         }
@@ -320,7 +320,7 @@ namespace Tester.StreamingTests
                 AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
                     streamProviderName,
                     this.deploymentId,
-                    StorageTestConstants.DataConnectionString).Wait();
+                    TestDefaultConfiguration.DataConnectionString).Wait();
             }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters"), TestCategory("Azure")]

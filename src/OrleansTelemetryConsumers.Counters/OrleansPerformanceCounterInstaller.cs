@@ -40,6 +40,10 @@ namespace OrleansTelemetryConsumers.Counters
             }
         }
 
+        /// <summary>
+        /// Installs predefined performance counters logged by this telemetry consumer.
+        /// </summary>
+        /// <param name="stateSaver">An <see cref="T:System.Collections.IDictionary" /> used to save information needed to perform a commit, rollback, or uninstall operation. </param>
         public override void Install(IDictionary stateSaver)
         {
             consumer.InstallCounters();
@@ -51,6 +55,10 @@ namespace OrleansTelemetryConsumers.Counters
             base.Install(stateSaver);
         }
 
+        /// <summary>
+        /// Removes performance counters installed by this telemetry consumers.
+        /// </summary>
+        /// <param name="savedState">An <see cref="T:System.Collections.IDictionary" /> that contains the state of the computer after the installation was complete. </param>
         public override void Uninstall(IDictionary savedState)
         {
             if (!OrleansPerfCounterTelemetryConsumer.AreWindowsPerfCountersAvailable())

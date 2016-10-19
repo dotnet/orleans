@@ -7,6 +7,9 @@ using System.Linq;
 
 namespace OrleansTelemetryConsumers.Counters
 {
+    /// <summary>
+    /// Telemetry consumer that writes metrics to predefined performance counters.
+    /// </summary>
     public class OrleansPerfCounterTelemetryConsumer : IMetricTelemetryConsumer
     {
         internal const string CATEGORY_NAME = "OrleansRuntime";
@@ -57,6 +60,9 @@ namespace OrleansTelemetryConsumers.Counters
             }
         }, true);
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
         public OrleansPerfCounterTelemetryConsumer()
         {
             if (!AreWindowsPerfCountersAvailable())
@@ -67,6 +73,10 @@ namespace OrleansTelemetryConsumers.Counters
 
         #region Counter Management methods
 
+        /// <summary>
+        /// Checks to see if windows perf counters as supported by OS.
+        /// </summary>
+        /// <returns></returns>
         public static bool AreWindowsPerfCountersAvailable()
         {
             try
@@ -153,20 +163,56 @@ namespace OrleansTelemetryConsumers.Counters
 
         #region IMetricTelemetryConsumer Methods
 
+        /// <summary>
+        /// Increment metric.
+        /// </summary>
+        /// <param name="name">metric name</param>
         public void IncrementMetric(string name) => WriteMetric(name, UpdateMode.Increment);
 
+        /// <summary>
+        /// Increment metric by value.
+        /// </summary>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
         public void IncrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Increment, value);
 
+        /// <summary>
+        /// Track metric value
+        /// </summary>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
+        /// <param name="properties">related properties</param>
         public void TrackMetric(string name, double value, IDictionary<string, string> properties = null) => WriteMetric(name, UpdateMode.Set, value);
 
+        /// <summary>
+        /// Track metric value
+        /// </summary>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
+        /// <param name="properties">related properties</param>
         public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null) => WriteMetric(name, UpdateMode.Set, value.Ticks);
 
+        /// <summary>
+        /// Decrement metric
+        /// </summary>
+        /// <param name="name">metric name</param>
         public void DecrementMetric(string name) => WriteMetric(name, UpdateMode.Decrement);
 
+        /// <summary>
+        /// Decrement metric by value
+        /// </summary>
+        /// <param name="name">metric name</param>
+        /// <param name="value">metric value</param>
         public void DecrementMetric(string name, double value) => WriteMetric(name, UpdateMode.Decrement, value);
 
+        /// <summary>
+        /// Write all pending metrics
+        /// </summary>
         public void Flush() { }
 
+        /// <summary>
+        /// Close telemetry consumer
+        /// </summary>
         public void Close() { }
 
         private void WriteMetric(string name, UpdateMode mode = UpdateMode.Increment, double? value = null)

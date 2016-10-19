@@ -11,8 +11,14 @@ namespace Orleans.Runtime
     /// <seealso cref="AsyncPipeline"/>   
     public interface IPipeline
     {
-        void Add(Task t);
+        /// <summary>Adds a new task to the pipeline</summary>
+        /// <param name="task">The task to add</param>
+        void Add(Task task);
+
+        /// <summary>Waits until all currently queued asynchronous operations are done. Blocks the calling thread.</summary>
         void Wait();
+
+        /// <summary>The number of items currently enqueued into this pipeline.</summary>
         int Count { get; }
     }
 
@@ -78,7 +84,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Adds a collection of tasks to this AsyncPipeline.
         /// </summary>
-        /// <param name="task">A collection of tasks to add to this AsyncPipeline.</param>
+        /// <param name="tasks">A collection of tasks to add to this AsyncPipeline.</param>
         public void AddRange(IEnumerable<Task> tasks)
         {
             foreach (var i in tasks)
@@ -88,7 +94,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Adds a collection of tasks to this AsyncPipeline.
         /// </summary>
-        /// <param name="task">A collection of tasks to add to this AsyncPipeline.</param>
+        /// <param name="tasks">A collection of tasks to add to this AsyncPipeline.</param>
         public void AddRange<T>(IEnumerable<Task<T>> tasks)
         {
             foreach (var i in tasks)
@@ -99,7 +105,6 @@ namespace Orleans.Runtime
         /// Waits until all currently queued asynchronous operations are done.
         /// Blocks the calling thread.
         /// </summary>
-        /// <param name="task">A task to add to this AsyncPipeline.</param>
         public void Wait()
         {
             Wait(null);

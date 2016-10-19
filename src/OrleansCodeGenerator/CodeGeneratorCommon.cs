@@ -9,6 +9,7 @@ namespace Orleans.CodeGenerator
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
+
     using Orleans;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
@@ -45,20 +46,23 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblyName">
         /// The name for the generated assembly.
         /// </param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static byte[] CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
 
             // Reference everything which can be referenced.
             var assemblies =
-                AppDomain.CurrentDomain.GetAssemblies()
+                System.AppDomain.CurrentDomain.GetAssemblies()
                     .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
@@ -87,9 +91,12 @@ namespace Orleans.CodeGenerator
                     .AddSyntaxTrees(code.SyntaxTree)
                     .AddReferences(assemblies)
                     .WithOptions(options);
-            using (var stream = new MemoryStream())
+
+            var outputStream = new MemoryStream();
+            var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
+            try
             {
-                var compilationResult = compilation.Emit(stream);
+                var compilationResult = compilation.Emit(outputStream, symbolStream);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
@@ -102,9 +109,21 @@ namespace Orleans.CodeGenerator
                         source);
                     throw new CodeGenerationException(errors);
                 }
-                
-                logger.Verbose(ErrorCode.CodeGenCompilationSucceeded, "Compilation of assembly {0} succeeded.", assemblyName);
-                return stream.ToArray();
+
+                logger.Verbose(
+                    ErrorCode.CodeGenCompilationSucceeded,
+                    "Compilation of assembly {0} succeeded.",
+                    assemblyName);
+                return new GeneratedAssembly
+                {
+                    RawBytes = outputStream.ToArray(),
+                    DebugSymbolRawBytes = symbolStream?.ToArray()
+                };
+            }
+            finally
+            {
+                outputStream.Dispose();
+                symbolStream?.Dispose();
             }
         }
 

@@ -11,7 +11,11 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Allows programmatically hosting an Orleans silo in the curent app domain.
     /// </summary>
-    public class SiloHost : MarshalByRefObject, IDisposable
+    public class SiloHost :
+#if !NETSTANDARD_TODO
+        MarshalByRefObject,
+# endif
+        IDisposable
     {
         /// <summary> Name of this silo. </summary>
         public string Name { get; set; }
@@ -112,7 +116,7 @@ namespace Orleans.Runtime.Host
         /// </summary>
         public void InitializeOrleansSilo()
         {
-#if DEBUG
+#if DEBUG && !NETSTANDARD
             AssemblyLoaderUtils.EnableAssemblyLoadTracing();
 #endif
 

@@ -75,6 +75,8 @@ namespace UnitTests.MessageCenterTests
         }
 
 #if USE_SQL_SERVER || DEBUG
+#if !NETSTANDARD_TODO
+        //block by sqlMembership not ported over to vNext yet
         [Fact, TestCategory("Gateway"), TestCategory("SqlServer")]
         public async Task GatewaySelection_SqlServer()
         {
@@ -132,6 +134,7 @@ namespace UnitTests.MessageCenterTests
 
             Test_GatewaySelection(listProvider);
         }
+#endif
 #endif
 
         private void Test_GatewaySelection(IGatewayListProvider listProvider)

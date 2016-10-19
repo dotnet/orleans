@@ -10,11 +10,7 @@ namespace Orleans
         /// Shortcut to create HashSet from IEnumerable that supports type inference
         /// (which the standard constructor does not)
         /// </summary>
-        /// <typeparam name="TK"></typeparam>
-        /// <typeparam name="TV"></typeparam>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The element type</typeparam>
         public static HashSet<T> ToSet<T>(this IEnumerable<T> values)
         {
             if (values == null)
@@ -123,7 +119,6 @@ namespace Orleans
         /// <typeparam name="TValue">Value type</typeparam>
         /// <param name="a">Dictionary</param>
         /// <param name="b">Dictionary</param>
-        /// <param name="copy">Return a copy of a value</param>
         /// <param name="sync">Synchronize two immutable values</param>
         private static void Synchronize2<TKey, TKey2, TValue>(this Dictionary<TKey, Dictionary<TKey2, TValue>> a, Dictionary<TKey, Dictionary<TKey2, TValue>> b, Func<TValue, TValue, TValue> sync)
         {
@@ -154,7 +149,7 @@ namespace Orleans
         /// <typeparam name="T"></typeparam>
         /// <param name="list"></param>
         /// <param name="toString">Can supply null to use Object.ToString()</param>
-        /// <param name="before">Before each element, or space if unspecified</param>
+        /// <param name="separator">Before each element, or space if unspecified</param>
         /// <returns></returns>
         public static string ToStrings<T>(this IEnumerable<T> list, Func<T, object> toString = null, string separator = " ")
         {

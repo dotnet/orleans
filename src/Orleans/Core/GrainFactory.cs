@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
-using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace Orleans
 {
@@ -16,12 +13,6 @@ namespace Orleans
     /// </summary>
     public class GrainFactory : IGrainFactory
     {
-        /// <summary>
-        /// The cached <see cref="MethodInfo"/> for <see cref="GrainReference.CastInternal"/>.
-        /// </summary>
-        private static readonly MethodInfo GrainReferenceCastInternalMethodInfo =
-            TypeUtils.Method(() => GrainReference.CastInternal(default(Type), null, default(IAddressable), 0));
-
         /// <summary>
         /// The mapping between grain types and the corresponding type for the <see cref="IGrainMethodInvoker"/> implementation.
         /// </summary>
@@ -57,7 +48,7 @@ namespace Orleans
         /// </summary>
         /// <param name="existingReference">The existing <see cref="IAddressable"/> reference.</param>
         /// <returns>The concrete <see cref="GrainReference"/> implementation.</returns>
-        private delegate object GrainReferenceCaster(IAddressable existingReference);
+        internal delegate object GrainReferenceCaster(IAddressable existingReference);
 
         /// <summary>
         /// Gets a reference to a grain.
@@ -272,12 +263,18 @@ namespace Orleans
                                            ? typeInfo.GetGenericTypeDefinition()
                                            : interfaceType;
 
+            if (!typeof(IAddressable).IsAssignableFrom(interfaceType))
+            {
+                throw new InvalidCastException(
+                    $"Target interface must be derived from Orleans.IAddressable - cannot handle {interfaceType}");
+            }
+
             // Try to find the correct GrainReference type for this interface.
             Type grainReferenceType;
             if (!GrainToReferenceMapping.TryGetValue(genericInterfaceType, out grainReferenceType))
             {
                 throw new InvalidOperationException(
-                    string.Format("Cannot find generated GrainReference class for interface '{0}'", interfaceType));
+                    $"Cannot find generated GrainReference class for interface '{interfaceType}'");
             }
 
             if (interfaceType.IsConstructedGenericType)
@@ -285,44 +282,16 @@ namespace Orleans
                 grainReferenceType = grainReferenceType.MakeGenericType(typeInfo.GenericTypeArguments);
             }
 
-            // Get the grain reference constructor.
-            var constructor =
-                grainReferenceType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-                    .Where(
-                        _ =>
-                        {
-                            var parameters = _.GetParameters();
-                            return parameters.Length == 1 && parameters[0].ParameterType == typeof(GrainReference);
-                        }).FirstOrDefault();
-
-            if (constructor == null)
+            if (!typeof(IAddressable).IsAssignableFrom(grainReferenceType))
             {
-                throw new InvalidOperationException(
-                    string.Format(
-                        "Cannot find suitable constructor on generated reference type for interface '{0}'",
-                        interfaceType));
+                // This represents an internal programming error.
+                throw new InvalidCastException(
+                    $"Target reference type must be derived from Orleans.IAddressable - cannot handle {grainReferenceType}");
             }
 
-            // Construct an expression to construct a new instance of this grain reference when given another grain
-            // reference.
-            var createLambdaParameter = Expression.Parameter(typeof(GrainReference), "gr");
-            var createLambda =
-                Expression.Lambda<Func<GrainReference, IAddressable>>(
-                    Expression.New(constructor, createLambdaParameter),
-                    createLambdaParameter);
-            var grainRefParameter = Expression.Parameter(typeof(IAddressable), "grainRef");
-            var body =
-                Expression.Call(
-                    GrainReferenceCastInternalMethodInfo,
-                    Expression.Constant(interfaceType),
-                    createLambda,
-                    grainRefParameter,
-                    Expression.Constant(GrainInterfaceUtils.GetGrainInterfaceId(interfaceType)));
-
-            // Compile and return the reference casting lambda.
-            var lambda = Expression.Lambda<GrainReferenceCaster>(body, grainRefParameter);
-            return lambda.Compile();
+            return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
         }
+
         #endregion
 
         #region SystemTargets
@@ -373,13 +342,13 @@ namespace Orleans
             var invokerAttr = typeInfo.GetCustomAttribute<MethodInvokerAttribute>(false);
             if (invokerAttr != null)
             {
-                GrainToInvokerMapping.TryAdd(invokerAttr.GrainType, type);
+                GrainToInvokerMapping.TryAdd(invokerAttr.TargetType, type);
             }
             
             var grainReferenceAttr = typeInfo.GetCustomAttribute<GrainReferenceAttribute>(false);
             if (grainReferenceAttr != null)
             {
-                GrainToReferenceMapping.TryAdd(grainReferenceAttr.GrainType, type);
+                GrainToReferenceMapping.TryAdd(grainReferenceAttr.TargetType, type);
             }
         }
 

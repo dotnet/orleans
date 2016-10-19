@@ -68,6 +68,11 @@ namespace Orleans.Runtime.Host
             logger = LogManager.GetLogger("OrleansAzureSilo", LoggerType.Runtime);
         }
 
+        /// <summary>
+        /// Async method to validate specific cluster configuration
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns>Task object of boolean type for this async method </returns>
         public async Task<bool> ValidateConfiguration(ClusterConfiguration config)
         {
             if (config.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.AzureTable)
@@ -94,6 +99,10 @@ namespace Orleans.Runtime.Host
             return true;
         }
 
+        /// <summary>
+        /// Default cluster configuration
+        /// </summary>
+        /// <returns>Default ClusterConfiguration </returns>
         public static ClusterConfiguration DefaultConfiguration()
         {
             return DefaultConfiguration(new ServiceRuntimeWrapper());
@@ -192,7 +201,9 @@ namespace Orleans.Runtime.Host
             // If deploymentId was not direclty provided, take the value in the config. If it is not 
             // in the config too, just take the DeploymentId from Azure
             if (deploymentId == null)
-                deploymentId = host.Config.Globals.DeploymentId ?? serviceRuntimeWrapper.DeploymentId;
+                deploymentId = string.IsNullOrWhiteSpace(host.Config.Globals.DeploymentId)
+                    ? serviceRuntimeWrapper.DeploymentId
+                    : host.Config.Globals.DeploymentId;
 
             myEntry = new SiloInstanceTableEntry
             {

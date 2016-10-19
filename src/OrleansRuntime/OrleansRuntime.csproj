@@ -59,6 +59,7 @@
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\CounterConfigData.cs" />
+    <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Startup\ConfigureServicesBuilder.cs" />
     <Compile Include="Startup\StartupBuilder.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
@@ -67,6 +68,11 @@
     <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
     <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
     <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceActivationMaintainer.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceResponseTracker.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceRegistrar.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\MultiClusterUtils.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />

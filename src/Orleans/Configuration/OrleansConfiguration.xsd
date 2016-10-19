@@ -249,6 +249,22 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="FallbackSerializationProvider" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            Specifies the fallback serialization provider, which is used for objects which can not otherwise be serialized.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="type" type="xs:string">
+            <xs:annotation>
+              <xs:documentation>
+                The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
@@ -297,16 +313,6 @@
           of grain to gateway (messages to the same grain go to the same gateway, while evenly spreading grains across gateways).
           This number should be about 10 to 100 times larger than the expected number of gateway connections.
           If this attribute is not specified, then Math.Pow(2, 13) is used.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="UseStandardSerializer" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-          of the custom Orleans serializer.
-          This parameter is intended for use only for testing and troubleshooting.
-          In production, the custom Orleans serializer should always be used because it performs significantly better.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -961,6 +967,20 @@
             <xs:annotation>
               <xs:documentation>
                 The time between periodic background gossips.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="UseGlobalSingleInstanceByDefault" type="xs:boolean" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                Whether to use the global single instance protocol as the default multicluster registration strategy.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="GlobalSingleInstanceRetryInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between retries for DOUBTFUL activations.
               </xs:documentation>
             </xs:annotation>
           </xs:attribute>

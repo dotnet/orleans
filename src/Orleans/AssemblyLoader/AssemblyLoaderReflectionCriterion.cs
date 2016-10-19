@@ -1,3 +1,4 @@
+#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,7 +29,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Create a new criterion that filters assemblies by predicate. 
         /// </summary>
-        /// <param name="assemblyPredicate">A predicate which accepts a reflection-only type as an argument. If this predicate returns true, the assembly that provides the specified type will loaded and further inspection of the assembly with halt. If this predicate returns false, the predicate may provide a complaint explaining why the assembly does not meet the criterion described by the predicate.</param>
+        /// <param name="typePredicate">A predicate which accepts a reflection-only type as an argument. If this predicate returns true, the assembly that provides the specified type will loaded and further inspection of the assembly with halt. If this predicate returns false, the predicate may provide a complaint explaining why the assembly does not meet the criterion described by the predicate.</param>
         /// <param name="defaultComplaints">If no predicate provides a complaint, then these default complaints are logged instead.</param>
         /// <returns></returns>
         /// <exception cref="System.ArgumentNullException">assemblyPredicate is null.</exception>
@@ -39,10 +40,10 @@ namespace Orleans.Runtime
             return NewCriterion(
                     (Assembly assembly, out IEnumerable<string> assemblyComplaints) =>
                     {
-                        Type[] types;
+                        TypeInfo[] types;
                         try
                         {
-                            types = assembly.DefinedTypes.ToArray();
+                            types = TypeUtils.GetDefinedTypes(assembly, null).ToArray();
                         }
                         catch (ReflectionTypeLoadException e)
                         {
@@ -82,8 +83,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Create a new criterion that filters assemblies by predicate. 
         /// </summary>
-        /// <param name="assemblyPredicate">A predicate which accepts a reflection-only type as an argument. If this predicate returns true, the assembly that provides the specified type will loaded and further inspection of the assembly with halt. If this predicate returns false, the predicate may provide a complaint explaining why the assembly does not meet the criterion described by the predicate.</param>
-        /// <param name="defaultComplaints">If no predicate provides a complaint, then this default complaint is logged instead.</param>
+        /// <param name="typePredicate">A predicate which accepts a reflection-only type as an argument. If this predicate returns true, the assembly that provides the specified type will loaded and further inspection of the assembly with halt. If this predicate returns false, the predicate may provide a complaint explaining why the assembly does not meet the criterion described by the predicate.</param>
+        /// <param name="defaultComplaint">If no predicate provides a complaint, then this default complaint is logged instead.</param>
         /// <returns></returns>
         /// <exception cref="System.ArgumentNullException">assemblyPredicate is null.</exception>        
         internal static AssemblyLoaderReflectionCriterion NewCriterion(TypePredicate typePredicate, string defaultComplaint)
@@ -142,3 +143,4 @@ namespace Orleans.Runtime
         }
     }
 }
+#endif

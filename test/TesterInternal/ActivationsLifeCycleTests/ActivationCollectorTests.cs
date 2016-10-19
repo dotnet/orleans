@@ -194,7 +194,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             TimeSpan everything = TimeSpan.FromMinutes(10);
             logger.Info("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {0} sec).",  everything.TotalSeconds);
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.ForceActivationCollection(everything);
             
 

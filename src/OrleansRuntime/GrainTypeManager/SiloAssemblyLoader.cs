@@ -45,6 +45,7 @@ namespace Orleans.Runtime
 
         private void LoadApplicationAssemblies()
         {
+#if !NETSTANDARD_TODO
             AssemblyLoaderPathNameCriterion[] excludeCriteria =
                 {
                     AssemblyLoaderCriteria.ExcludeResourceAssemblies,
@@ -60,6 +61,7 @@ namespace Orleans.Runtime
                 };
 
             discoveredAssemblyLocations = AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadCriteria, logger);
+#endif
         }
 
         public IDictionary<string, GrainTypeData> GetGrainClassTypes(bool strict)
@@ -90,7 +92,7 @@ namespace Orleans.Runtime
                         if (definition == typeof(Grain<>))
                         {
                             var stateArg = parentType.GetGenericArguments()[0];
-                            if (stateArg.GetTypeInfo().IsClass)
+                            if (stateArg.GetTypeInfo().IsClass || stateArg.GetTypeInfo().IsValueType)
                             {
                                 grainStateType = stateArg;
                                 break;

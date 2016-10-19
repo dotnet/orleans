@@ -678,6 +678,22 @@ namespace UnitTests.General
             Assert.Equal(1, result);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Generic_GrainWithValueTypeState()
+        {
+            Guid id = Guid.NewGuid();
+            var grain = GrainClient.GrainFactory.GetGrain<IValueTypeTestGrain>(id);
+
+            var initial = await grain.GetStateData();
+            Assert.Equal(new ValueTypeTestData(0), initial);
+
+            var expectedValue = new ValueTypeTestData(42);
+
+            await grain.SetStateData(expectedValue);
+
+            Assert.Equal(expectedValue, await grain.GetStateData());
+        }
+
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastToGenericInterfaceAfterActivation() 
         {

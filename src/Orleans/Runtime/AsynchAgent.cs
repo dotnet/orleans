@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent : MarshalByRefObject, IDisposable
+    internal abstract class AsynchAgent : IDisposable
     {
         public enum FaultBehavior
         {

@@ -13,7 +13,6 @@ namespace Orleans.Providers.Streams.Common
     /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage"></typeparam>
     public interface ICacheDataAdapter<in TQueueMessage, TCachedMessage>
-        where TQueueMessage : class
         where TCachedMessage : struct
     {
         /// <summary>

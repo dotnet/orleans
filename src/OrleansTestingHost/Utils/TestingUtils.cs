@@ -8,8 +8,13 @@ using System.Threading.Tasks;
 
 namespace Orleans.TestingHost.Utils
 {
+    /// <summary> Collection of test utilities </summary>
     public static class TestingUtils
     {
+        /// <summary> Run the predicate until it succeed or times out </summary>
+        /// <param name="predicate">The predicate to run</param>
+        /// <param name="timeout">The timeout value</param>
+        /// <returns>True if the predicate succeed, false otherwise</returns>
         public static async Task WaitUntilAsync(Func<bool,Task<bool>> predicate, TimeSpan timeout)
         {
             var keepGoing = new[] { true };
@@ -37,6 +42,7 @@ namespace Orleans.TestingHost.Utils
             await task;
         }
 
+        /// <summary> Multipy a timeout by a value </summary>
         public static TimeSpan Multiply(TimeSpan time, double value)
         {
             double ticksD = checked(time.Ticks * value);
@@ -44,6 +50,7 @@ namespace Orleans.TestingHost.Utils
             return TimeSpan.FromTicks(ticks);
         }
 
+        /// <summary> Configure the ThreadPool and the ServicePointManager for tests </summary>
         public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200)
         {
             ThreadPool.SetMinThreads(numDotNetPoolThreads, numDotNetPoolThreads);
@@ -52,6 +59,11 @@ namespace Orleans.TestingHost.Utils
             ServicePointManager.UseNagleAlgorithm = false;
         }
 
+        /// <summary> Try to complete the task in a given time </summary>
+        /// <param name="taskToComplete">The task to run</param>
+        /// <param name="timeout">The timeout value</param>
+        /// <param name="message">The message to put in the TimeoutException if the task didn't complete in the given time</param>
+        /// <exception cref="TimeoutException">If the task didn't complete in the given time</exception>
         public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout, string message)
         {
             if (taskToComplete.IsCompleted)
@@ -75,6 +87,10 @@ namespace Orleans.TestingHost.Utils
             throw new TimeoutException(message);
         }
 
+        /// <summary> Serialize and deserialize the input </summary>
+        /// <typeparam name="T">The type of the input</typeparam>
+        /// <param name="input">The input to serialize and deserialize</param>
+        /// <returns>Input that have been serialized and then deserialized</returns>
         public static T RoundTripDotNetSerializer<T>(T input)
         {
             IFormatter formatter = new BinaryFormatter();

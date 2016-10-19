@@ -285,9 +285,16 @@ namespace Orleans.Serialization
             }
 
             // Check InternalsVisibleTo attributes on the from-assembly, pointing to the to-assembly.
-            var serializationAssemblyName = toAssembly.GetName().FullName;
+            var fullName = toAssembly.GetName().FullName;
+            var shortName = toAssembly.GetName().Name;
             var internalsVisibleTo = fromAssembly.GetCustomAttributes<InternalsVisibleToAttribute>();
-            return internalsVisibleTo.Any(_ => _.AssemblyName == serializationAssemblyName);
+            foreach (var attr in internalsVisibleTo)
+            {
+                if (string.Equals(attr.AssemblyName, fullName, StringComparison.Ordinal)) return true;
+                if (string.Equals(attr.AssemblyName, shortName, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
         }
 
         private static bool IsSpecialClass(Type type)

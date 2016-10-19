@@ -11,6 +11,7 @@
     <AssemblyName>Tester</AssemblyName>
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <TargetFrameworkProfile />
@@ -36,23 +37,22 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Runtime.Serialization" />
-    <Reference Include="System.ServiceModel" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="DeploymentTests\DeployTest.cs" />
+    <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="BaseClusterFixture.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="PSClientTests\PSClientTests.cs" />
+    <Compile Include="RelationalUtilities\PostgreSqlStorageForTesting.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SiloInitializationTests.cs" />
@@ -72,7 +72,6 @@
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="DeactivationTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
-    <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="DuplicateActivationsTests.cs" />
     <Compile Include="ExceptionPropagationTests.cs" />
     <Compile Include="ExternalTypesTests.cs" />
@@ -102,14 +101,9 @@
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="RequestContextTest.cs" />
-    <Compile Include="SerializationTests\BondSerializationTests.cs" />
-    <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
-    <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Counter.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\ProtobufSerializationTests.cs" />
-    <Compile Include="SerializationTests\SerializationOrderTests.cs" />
-    <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.FSharpTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.JsonTypes.cs" />
     <Compile Include="SimpleGrainTests.cs" />
@@ -125,6 +119,7 @@
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs" />
     <Compile Include="StreamingTests\SampleStreamingTests.cs" />
+    <Compile Include="GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs" />
     <Compile Include="StreamingTests\SMSClientStreamTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
@@ -133,7 +128,6 @@
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="StreamingTests\TimePurgePredicateTests.cs" />
     <Compile Include="TestStreamProviders\AzureQueue\TestAzureQueueStreamProvider.cs" />
-    <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\StreamPerPartitionEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
@@ -173,30 +167,6 @@
     <Content Include="DeploymentTests\Configuration\TestRelativePaths\OrleansConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer3.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer4.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer5.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer6.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer7.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="SerializationTests\ConfigurationTests\ClientConfigurationForSerializer8.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.csproj">
@@ -222,10 +192,6 @@
     <ProjectReference Include="..\..\src\OrleansGoogleUtils\OrleansGoogleUtils.csproj">
       <Project>{b9196cb5-d356-4228-b73f-143f2eb80c64}</Project>
       <Name>OrleansGoogleUtils</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansManager\OrleansManager.csproj">
-      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
-      <Name>OrleansManager</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
@@ -301,7 +267,6 @@
     <None Include="SerializationTests\ProtobufSerializationTests\addressbook.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\counter.proto" />
     <None Include="SerializationTests\ProtobufSerializationTests\GenerateProtos.cmd" />
-    <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
     <None Include="Tester.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

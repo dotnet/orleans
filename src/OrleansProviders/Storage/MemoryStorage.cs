@@ -32,7 +32,13 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{Name}")]
     public class MemoryStorage : IStorageProvider
     {
+        /// <summary>
+        /// Default number of queue storage grains.
+        /// </summary>
         public const int NumStorageGrainsDefaultValue = 10;
+        /// <summary>
+        /// Config string name for number of queue storage grains.
+        /// </summary>
         public const string NumStorageGrainsPropertyName = "NumStorageGrains";
         private int numStorageGrains;
         private static int counter;

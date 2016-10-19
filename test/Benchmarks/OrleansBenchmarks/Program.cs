@@ -7,6 +7,8 @@ using OrleansBenchmarks.MapReduce;
 
 namespace OrleansBenchmarks
 {
+    using OrleansBenchmarks.Serialization;
+
     class Program
     {
         private static readonly Dictionary<string, Action> _benchmarks = new Dictionary<string, Action>
@@ -30,7 +32,7 @@ namespace OrleansBenchmarks
             },
             ["Serialization"] = () =>
             {
-                var summary = BenchmarkRunner.Run<SerializationBenchmarks.SerializationBenchmarks>();
+                BenchmarkRunner.Run<SerializationBenchmarks>();
             }
         };
 
@@ -56,8 +58,6 @@ namespace OrleansBenchmarks
             }
 
             _benchmarks[args[0]]();
-
-            Console.Read();
         }
 
         private static void RunBenchmark<T>(string name, Func<T> init, Action<T> benchmarkAction, Action<T> tearDown)

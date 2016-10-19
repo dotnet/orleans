@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -9,53 +10,58 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class ClusterLocalRegistrar : IGrainRegistrar
     {
-        private GrainDirectoryPartition DirectoryPartition;
+        private readonly GrainDirectoryPartition directoryPartition;
 
         public ClusterLocalRegistrar(GrainDirectoryPartition partition)
         {
-            DirectoryPartition = partition;
+            directoryPartition = partition;
         }
 
         public bool IsSynchronous { get { return true; } }
 
-        public virtual AddressAndTag Register(ActivationAddress address, bool singleActivation)
+        public AddressAndTag Register(ActivationAddress address, bool singleActivation)
         {
             if (singleActivation)
             {
-                var result = DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo);
+                var result = directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, GrainDirectoryEntryStatus.ClusterLocal);
                 return result;
             }
             else
             {
-                var tag = DirectoryPartition.AddActivation(address.Grain, address.Activation, address.Silo);
+                var tag = directoryPartition.AddActivation(address.Grain, address.Activation, address.Silo);
                 return new AddressAndTag() { Address = address, VersionTag = tag };
             }
         }
   
-        public virtual void Unregister(ActivationAddress address, bool force)
+        public void Unregister(ActivationAddress address, UnregistrationCause cause)
         {
-            DirectoryPartition.RemoveActivation(address.Grain, address.Activation, force);
+            directoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
         }
 
-        public virtual void Delete(GrainId gid)
+        public void Delete(GrainId gid)
         {
-            DirectoryPartition.RemoveGrain(gid);
+            directoryPartition.RemoveGrain(gid);
         }
 
 
-        public virtual Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
+        public Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual Task UnregisterAsync(ActivationAddress address, bool force)
+        public Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
             throw new InvalidOperationException();
         }
 
-        public virtual Task DeleteAsync(GrainId gid)
+        public Task DeleteAsync(GrainId gid)
         {
             throw new InvalidOperationException();
+        }
+
+        public void InvalidateCache(ActivationAddress address)
+        {
+            // no need to do anything since the directory does not cache activations in remote clusters
         }
     }
 }

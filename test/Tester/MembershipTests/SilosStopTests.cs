@@ -34,7 +34,7 @@ namespace UnitTests.MembershipTests
             var isOnSameSilo = instanceId == targetInstanceId;
             Assert.False(isOnSameSilo, "Activations must be placed on different silos");
 
-            var promise = instanceId.Contains(HostedCluster.Primary.Endpoint.ToString()) ?
+            var promise = instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()) ?
                 grain.CallOtherLongRunningTask(target, true, TimeSpan.FromSeconds(7))
                 : target.CallOtherLongRunningTask(grain, true, TimeSpan.FromSeconds(7));
 

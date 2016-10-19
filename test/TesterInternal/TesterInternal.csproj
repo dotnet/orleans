@@ -39,28 +39,27 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System" />
-    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Data.Services" />
-    <Reference Include="System.Transactions" />
     <Reference Include="System.Web.Extensions" />
-    <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActivationsLifeCycleTests\ActivationCollectorTests.cs" />
     <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
+    <Compile Include="ErrorInjectionStorageProvider.cs" />
+    <Compile Include="GatewaySelectionTest.cs" />
+    <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="General\TimerWheelTest.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
-    <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
+    <Compile Include="MembershipTests\PostgreSqlMembershipTableTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
+    <Compile Include="RemindersTest\PostgreSqlRemindersTableTests.cs" />
+    <Compile Include="SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />
@@ -98,38 +97,26 @@
     <Compile Include="StorageTests\Relational\TestDataSets\TestStateGeneric1.cs" />
     <Compile Include="StorageTests\Relational\TestEnvironmentInvariant.cs" />
     <Compile Include="StreamingTests\AQStreamingTests.cs" />
-    <Compile Include="AssemblyLoaderTests.cs" />
-    <Compile Include="AsynchAgentRestartTest.cs" />
-    <Compile Include="AsyncPipelineTests.cs" />
-    <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
-    <Compile Include="Async_TimingTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
-    <Compile Include="CodeGeneratorTests.cs" />
     <Compile Include="ConcurrencyTests.cs" />
-    <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterControlProgTests.cs" />
-    <Compile Include="CounterTests.cs" />
     <Compile Include="DeadlockDetectionTests.cs" />
     <Compile Include="EchoTaskGrainTests.cs" />
     <Compile Include="ErrorGrainTest.cs" />
-    <Compile Include="ErrorInjectionStorageProvider.cs" />
-    <Compile Include="GatewaySelectionTest.cs" />
-    <Compile Include="General\RingTests_Standalone.cs" />
     <Compile Include="General\ConsistentRingProviderTests_Silo.cs" />
     <Compile Include="General\BootstrapProviderTests.cs" />
-    <Compile Include="General\CounterStatisticTests.cs" />
     <Compile Include="General\ElasticPlacementTest.cs" />
     <Compile Include="General\GrainPlacementTests.cs" />
     <Compile Include="General\LoadSheddingTest.cs" />
     <Compile Include="General\LoggerTest.cs" />
-    <Compile Include="General\LruTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
     <Compile Include="GeoClusterTests\AzureGossipTableTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
+    <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
     <Compile Include="GeoClusterTests\MultiClusterNetworkTests.cs" />
     <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
@@ -140,21 +127,14 @@
     <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
-    <Compile Include="Serialization\BuiltInSerializerTests.cs" />
-    <Compile Include="General\Identifiertests.cs" />
-    <Compile Include="General\InterfaceRules.cs" />
     <Compile Include="GrainReferenceCacheTests.cs" />
     <Compile Include="GrainReferenceCastTests.cs" />
     <Compile Include="GrainReferenceTest.cs" />
     <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
     <Compile Include="LocalErrorGrain.cs" />
-    <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
     <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
-    <Compile Include="SerializerTests\CustomSerializerTests.cs" />
-    <Compile Include="SerializerTests\MessageSerializerTests.cs" />
     <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
@@ -163,14 +143,8 @@
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
     <Compile Include="StorageTests\HierarchicalKeyStoreTests.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
-    <Compile Include="StorageTests\MockStorageProvider.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
     <Compile Include="OrleansHostProgTests.cs" />
-    <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
-    <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
-    <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
-    <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
     <Compile Include="PolymorphicInterfaceTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
@@ -180,8 +154,6 @@
     <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
     <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
-    <Compile Include="General\InternalSerializationTests.cs" />
-    <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="StatsTests.cs" />
     <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
     <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
@@ -213,9 +185,7 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
-    <Compile Include="TestConstants.cs" />
-    <Compile Include="TestInternalHelper.cs" />
-    <Compile Include="TestUtils.cs" />
+    <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TimeoutTests.cs" />
     <Compile Include="TimerOrleansTest.cs" />
     <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
@@ -244,10 +214,6 @@
     <ProjectReference Include="..\..\src\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
       <Name>OrleansHost</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansManager\OrleansManager.csproj">
-      <Project>{60498b15-9700-4623-bda0-365238f2c1ad}</Project>
-      <Name>OrleansManager</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
@@ -319,8 +285,8 @@
     <None Include="ClientConfig_SQSStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <Content Include="Config_AdditionalAssemblies.xml">
-      <SubType>Designer</SubType>
+    <Content Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
+      <Link>CreateOrleansTables_PostgreSql.sql</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_AWS_DynamoDB_Storage.xml">
@@ -350,15 +316,13 @@
     <Content Include="..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
       <Link>ClientConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml">
       <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ClientConfig_AzureWebRole.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_NewAzure.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ClientConfig_AzureStreamProviders.xml">
@@ -373,55 +337,16 @@
     <Content Include="Config_AzureTableStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_Azure_Default.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_BootstrapProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_Different_Membership_Reminders.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_LogConsumers-OrleansConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NewAzure.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_NonTimestampedLogFileNames.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_OldAzure.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_StorageErrors.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure1.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Azure2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_Memory2.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageProvider_SomeConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_AzureStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_StreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_TestSiloConfig.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Data\TestDb.mdf">
@@ -431,12 +356,6 @@
       <DependentUpon>TestDb.mdf</DependentUpon>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="DevTestClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="DevTestServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="MockStats_ClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -444,7 +363,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
     <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->

@@ -71,15 +71,14 @@ namespace Orleans
             this.SetAllInternal(values);
         }
 
-        /// <summary>
-        /// Constructs a new grain state object for a grain.
-        /// </summary>
-        /// <param name="reference">The type of the associated grains that use this GrainState object. Used to initialize the <c>GrainType</c> property.</param>
+        /// <summary>Initializes a new instance of <see cref="GrainState"/>.</summary>
+        /// <param name="grainTypeFullName">The type of the associated grains that use this GrainState object. Used to initialize the <c>GrainType</c> property.</param>
         protected GrainState(string grainTypeFullName)
         {
             // TODO: remove after removing support for state interfaces
         }
 
+        /// <summary>Initializes a new instance of <see cref="GrainState"/>.</summary>
         protected GrainState() { }
 
         /// <summary>

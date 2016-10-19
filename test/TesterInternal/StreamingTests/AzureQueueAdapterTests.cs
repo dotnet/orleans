@@ -13,7 +13,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.TestingHost;
+using Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -40,7 +40,7 @@ namespace UnitTests.StorageTests
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AZURE_QUEUE_STREAM_PROVIDER_NAME, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Halo"), TestCategory("Azure"), TestCategory("Streaming")]
@@ -48,7 +48,7 @@ namespace UnitTests.StorageTests
         {
             var properties = new Dictionary<string, string>
                 {
-                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, StorageTestConstants.DataConnectionString},
+                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
                     {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId}
                 };
             var config = new ProviderConfiguration(properties, "type", "name");

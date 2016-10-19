@@ -1,39 +1,39 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Memory
+namespace Orleans.Providers
 {
-    public class MemoryPooledCache : IQueueCache
+    /// <summary>
+    /// Pooled cache for memory stream provider
+    /// </summary>
+    public class MemoryPooledCache<TSerializer> : IQueueCache
+        where TSerializer : IMemoryMessageBodySerializer, new()
     {
-        private readonly PooledQueueCache<MemoryBatchContainer, CachedMessage> cache;
+        private readonly PooledQueueCache<MemoryMessageData, MemoryMessageData> cache;
 
+        /// <summary>
+        /// Pooled cache for memory stream provider
+        /// </summary>
+        /// <param name="bufferPool"></param>
+        /// <param name="logger"></param>
         public MemoryPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, Logger logger)
         {
             var dataAdapter = new CacheDataAdapter(bufferPool);
-            cache = new PooledQueueCache<MemoryBatchContainer, CachedMessage>(dataAdapter, CacheDataComparer.Instance, logger);
+            cache = new PooledQueueCache<MemoryMessageData, MemoryMessageData>(dataAdapter, CacheDataComparer.Instance, logger);
             dataAdapter.PurgeAction = cache.Purge;
         }
 
-        // For fast GC this struct should contain only value types. 
-        private struct CachedMessage
+        private class CacheDataComparer : ICacheDataComparer<MemoryMessageData>
         {
-            public Guid StreamGuid;
-            public uint StreamNamespaceHash;
-            public long SequenceNumber;
-            public ArraySegment<byte> Payload;
-        }
+            public static readonly ICacheDataComparer<MemoryMessageData> Instance = new CacheDataComparer();
 
-        private class CacheDataComparer : ICacheDataComparer<CachedMessage>
-        {
-            public static readonly ICacheDataComparer<CachedMessage> Instance = new CacheDataComparer();
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
-
-            public int Compare(CachedMessage cachedMessage, StreamSequenceToken token)
+            public int Compare(MemoryMessageData cachedMessage, StreamSequenceToken token)
             {
                 var realToken = (EventSequenceToken)token;
                 return cachedMessage.SequenceNumber != realToken.SequenceNumber
@@ -41,19 +41,17 @@ namespace Orleans.Providers.Streams.Memory
                     : 0 - realToken.EventIndex;
             }
 
-            public bool Equals(CachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public bool Equals(MemoryMessageData cachedMessage, IStreamIdentity streamIdentity)
             {
                 int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                jenkinsHash.ComputeHash(streamIdentity.Namespace);
-                return results != 0 ? false : cachedMessage.StreamNamespaceHash == jenkinsHash.ComputeHash(streamIdentity.Namespace);
+                return results == 0 && cachedMessage.StreamNamespace == streamIdentity.Namespace;
             }
         }
 
-        private class CacheDataAdapter : ICacheDataAdapter<MemoryBatchContainer, CachedMessage>
+        private class CacheDataAdapter : ICacheDataAdapter<MemoryMessageData, MemoryMessageData>
         {
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
             private FixedSizeBuffer currentBuffer;
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
 
             public Action<IDisposable> PurgeAction { private get; set; }
 
@@ -61,28 +59,25 @@ namespace Orleans.Providers.Streams.Memory
             {
                 if (bufferPool == null)
                 {
-                    throw new ArgumentNullException("bufferPool");
+                    throw new ArgumentNullException(nameof(bufferPool));
                 }
                 this.bufferPool = bufferPool;
             }
              
-            public StreamPosition QueueMessageToCachedMessage(ref CachedMessage cachedMessage,
-                MemoryBatchContainer queueMessage, DateTime dequeueTimeUtc)
+            public StreamPosition QueueMessageToCachedMessage(ref MemoryMessageData cachedMessage,
+                MemoryMessageData queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition setreamPosition = GetStreamPosition(queueMessage);
-                cachedMessage.StreamGuid = setreamPosition.StreamIdentity.Guid;
-                cachedMessage.StreamNamespaceHash = jenkinsHash.ComputeHash(setreamPosition.StreamIdentity.Namespace);
-                cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
+                cachedMessage = queueMessage;
                 cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
                 return setreamPosition;
             }
 
             // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
-            private ArraySegment<byte> SerializeMessageIntoPooledSegment(MemoryBatchContainer queueMessage)
+            private ArraySegment<byte> SerializeMessageIntoPooledSegment(MemoryMessageData queueMessage)
             {
                 // serialize payload
-                byte[] serializedPayload = SerializationManager.SerializeToByteArray(queueMessage.EventData);
-                int size = serializedPayload.Length;
+                int size = queueMessage.Payload.Count;
 
                 // get segment from current block
                 ArraySegment<byte> segment;
@@ -99,30 +94,29 @@ namespace Orleans.Providers.Streams.Memory
                         throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }
                 }
-                Buffer.BlockCopy(serializedPayload, 0, segment.Array, segment.Offset, size);
+                Buffer.BlockCopy(queueMessage.Payload.Array, queueMessage.Payload.Offset, segment.Array, segment.Offset, queueMessage.Payload.Count);
                 return segment;
             }
 
-            public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
+            public IBatchContainer GetBatchContainer(ref MemoryMessageData cachedMessage)
             {
-                //Deserialize payload
-                var stream = new BinaryTokenStreamReader(cachedMessage.Payload);
-                MemoryEventData eventData = (MemoryEventData)SerializationManager.Deserialize(stream);
-                return new MemoryBatchContainer(eventData, cachedMessage.SequenceNumber);
+                MemoryMessageData messageData = cachedMessage;
+                messageData.Payload = new ArraySegment<byte>(cachedMessage.Payload.ToArray());
+                return new MemoryBatchContainer<TSerializer>(messageData);
             }
 
-            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
+            public StreamSequenceToken GetSequenceToken(ref MemoryMessageData cachedMessage)
             {
                 return new EventSequenceToken(cachedMessage.SequenceNumber);
             }
 
-            public StreamPosition GetStreamPosition(MemoryBatchContainer queueMessage)
+            public StreamPosition GetStreamPosition(MemoryMessageData queueMessage)
             {
                 return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace),
-                    queueMessage.SequenceToken);
+                    new EventSequenceToken(queueMessage.SequenceNumber));
             }
 
-            public bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
+            public bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
             {
                 var purgedResource = (FixedSizeBuffer) purgeRequest;
                 // if we're purging our current buffer, don't use it any more
@@ -136,11 +130,11 @@ namespace Orleans.Providers.Streams.Memory
 
         private class Cursor : IQueueCacheCursor
         {
-            private readonly PooledQueueCache<MemoryBatchContainer, CachedMessage> cache;
+            private readonly PooledQueueCache<MemoryMessageData, MemoryMessageData> cache;
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(PooledQueueCache<MemoryBatchContainer, CachedMessage> cache, IStreamIdentity streamIdentity,
+            public Cursor(PooledQueueCache<MemoryMessageData, MemoryMessageData> cache, IStreamIdentity streamIdentity,
                 StreamSequenceToken token)
             {
                 this.cache = cache;
@@ -178,31 +172,54 @@ namespace Orleans.Providers.Streams.Memory
             }
         }
 
+        /// <summary>
+        /// The limit of the maximum number of items that can be added
+        /// </summary>
         public int GetMaxAddCount()
         {
             return 100;
         }
 
+        /// <summary>
+        /// Add messages to the cache
+        /// </summary>
+        /// <param name="messages"></param>
         public void AddToCache(IList<IBatchContainer> messages)
         {
             DateTime dequeueTimeUtc = DateTime.UtcNow;
             foreach (IBatchContainer container in messages)
             {
-                cache.Add(container as MemoryBatchContainer, dequeueTimeUtc);
+                MemoryBatchContainer<TSerializer> memoryBatchContainer = (MemoryBatchContainer<TSerializer>) container;
+                cache.Add(memoryBatchContainer.MessageData, dequeueTimeUtc);
             }
         }
 
+        /// <summary>
+        /// Ask the cache if it has items that can be purged from the cache 
+        /// (so that they can be subsequently released them the underlying queue).
+        /// </summary>
+        /// <param name="purgedItems"></param>
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
             return false;
         }
 
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retrieve messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
         public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             return new Cursor(cache, streamIdentity, token);
         }
 
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
         public bool IsUnderPressure()
         {
             return false;

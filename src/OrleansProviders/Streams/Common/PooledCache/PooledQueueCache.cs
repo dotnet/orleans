@@ -25,7 +25,6 @@ namespace Orleans.Providers.Streams.Common
     /// <typeparam name="TQueueMessage">Queue specific data</typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed cached structure.  Should only contain value types.</typeparam>
     public class PooledQueueCache<TQueueMessage, TCachedMessage>
-        where TQueueMessage : class
         where TCachedMessage : struct
     {
         // linked list of message bocks.  First is newest.

@@ -12,15 +12,8 @@ namespace Orleans
     /// </summary>
     public class AsyncSerialExecutor
     {
-        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions;
-        private readonly InterlockedExchangeLock locker;
-        
-
-        public AsyncSerialExecutor()
-        {
-            actions = new ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>>();
-            locker = new InterlockedExchangeLock();
-        }
+        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions = new ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>>();
+        private readonly InterlockedExchangeLock locker = new InterlockedExchangeLock();
 
         /// <summary>
         /// Submit the next function for execution. It will execute after all previously submitted functions have finished, without interleaving their executions.

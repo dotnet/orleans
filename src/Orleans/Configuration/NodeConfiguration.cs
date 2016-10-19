@@ -111,7 +111,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan TurnWarningLengthThreshold { get; set; }
 
-        internal bool InjectMoreWorkerThreads { get; set; }
+        internal bool EnableWorkerThreadInjection { get; set; }
 
         /// <summary>
         /// The LoadShedding element specifies the gateway load shedding configuration for the node.
@@ -197,15 +197,6 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public StatisticsLevel StatisticsCollectionLevel { get; set; }
 
-        private string workingStoreDir;
-        /// <summary>
-        /// </summary>
-        internal string WorkingStorageDirectory
-        {
-            get { return workingStoreDir ?? (workingStoreDir = GetDefaultWorkingStoreDirectory()); }
-            set { workingStoreDir = value; }
-        }
-
         /// <summary>
         /// </summary>
         public int MinDotNetThreadPoolSize { get; set; }
@@ -233,7 +224,7 @@ namespace Orleans.Runtime.Configuration
         private const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
         private static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
         private static readonly TimeSpan DEFAULT_ACTIVATION_SCHEDULING_QUANTUM = TimeSpan.FromMilliseconds(100);
-        internal const bool INJECT_MORE_WORKER_THREADS = false;
+        internal const bool ENABLE_WORKER_THREAD_INJECTION = false;
 
         public NodeConfiguration()
         {
@@ -251,7 +242,7 @@ namespace Orleans.Runtime.Configuration
             DelayWarningThreshold = TimeSpan.FromMilliseconds(10000); // 10,000 milliseconds
             ActivationSchedulingQuantum = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
             TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(200);
-            InjectMoreWorkerThreads = INJECT_MORE_WORKER_THREADS;
+            EnableWorkerThreadInjection = ENABLE_WORKER_THREAD_INJECTION;
 
             LoadSheddingEnabled = false;
             LoadSheddingLimit = 95;
@@ -298,7 +289,7 @@ namespace Orleans.Runtime.Configuration
             DelayWarningThreshold = other.DelayWarningThreshold;
             ActivationSchedulingQuantum = other.ActivationSchedulingQuantum;
             TurnWarningLengthThreshold = other.TurnWarningLengthThreshold;
-            InjectMoreWorkerThreads = other.InjectMoreWorkerThreads;
+            EnableWorkerThreadInjection = other.EnableWorkerThreadInjection;
 
             LoadSheddingEnabled = other.LoadSheddingEnabled;
             LoadSheddingLimit = other.LoadSheddingLimit;
@@ -358,14 +349,16 @@ namespace Orleans.Runtime.Configuration
             sb.Append("      ").Append("   Delay Warning Threshold: ").Append(DelayWarningThreshold).AppendLine();
             sb.Append("      ").Append("   Activation Scheduling Quantum: ").Append(ActivationSchedulingQuantum).AppendLine();
             sb.Append("      ").Append("   Turn Warning Length Threshold: ").Append(TurnWarningLengthThreshold).AppendLine();
-            sb.Append("      ").Append("   Inject More Worker Threads: ").Append(InjectMoreWorkerThreads).AppendLine();
+            sb.Append("      ").Append("   Inject More Worker Threads: ").Append(EnableWorkerThreadInjection).AppendLine();
             sb.Append("      ").Append("   MinDotNetThreadPoolSize: ").Append(MinDotNetThreadPoolSize).AppendLine();
+#if !NETSTANDARD_TODO
             int workerThreads;
             int completionPortThreads;
             ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
             sb.Append("      ").AppendFormat("   .NET thread pool sizes - Min: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
             ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
             sb.Append("      ").AppendFormat("   .NET thread pool sizes - Max: Worker Threads={0} Completion Port Threads={1}", workerThreads, completionPortThreads).AppendLine();
+#endif
             sb.Append("      ").AppendFormat("   .NET ServicePointManager - DefaultConnectionLimit={0} Expect100Continue={1} UseNagleAlgorithm={2}", DefaultConnectionLimit, Expect100Continue, UseNagleAlgorithm).AppendLine();
             sb.Append("   Load Shedding Enabled: ").Append(LoadSheddingEnabled).AppendLine();
             sb.Append("   Load Shedding Limit: ").Append(LoadSheddingLimit).AppendLine();
@@ -498,13 +491,6 @@ namespace Orleans.Runtime.Configuration
 
                 }
             }
-        }
-
-        private string GetDefaultWorkingStoreDirectory()
-        {
-            string workingStoreLocation = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
-            string cacheDirBase = Path.Combine(workingStoreLocation, "OrleansData");
-            return cacheDirBase;
         }
     }
 }

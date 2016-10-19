@@ -102,7 +102,7 @@ Community
 
 * [Chat on Gitter](https://gitter.im/dotnet/orleans)
 
-* Follow the [@ProjectOrleans](https://twitter.com/ProjectOrleans) Twitter account for Orleans announcements.
+* Follow the [@MSFTOrleans](https://twitter.com/MSFTOrleans) Twitter account for Orleans announcements.
 
 * [OrleansContrib - Repository of community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Orleans Monitoring, Design Patterns, Storage Provider, etc.
 

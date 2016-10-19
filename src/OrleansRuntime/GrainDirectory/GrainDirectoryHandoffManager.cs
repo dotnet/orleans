@@ -35,7 +35,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var partition in directoryPartitionsMap.Values)
                 {
-                    var result = partition.LookUpGrain(grain);
+                    var result = partition.LookUpActivations(grain);
                     if (result.Addresses != null)
                         return result.Addresses;
                 }
@@ -93,7 +93,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory.SchedulingContext);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -139,6 +139,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // adjust copy for the predecessor of the failed silo
                     directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
                 }
+                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
             }
@@ -213,7 +214,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListSingle.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
 
                     if (splitPartListMulti.Count > 0)
@@ -225,7 +226,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListMulti.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
                 }
                 else
@@ -285,6 +286,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 directoryPartitionsMap[source].Update(partition);
             }
+
+            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
         }
 
         internal void RemoveHandoffPartition(SiloAddress source)
@@ -309,7 +312,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
         }
     }
 }

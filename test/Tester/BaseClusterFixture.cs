@@ -1,4 +1,7 @@
 ﻿using System;
+using System.IO;
+using System.Threading;
+using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
@@ -7,9 +10,11 @@ namespace Tester
 {
     public abstract class BaseTestClusterFixture : IDisposable
     {
+        private static int defaultsAreInitialized = 0;
+
         static BaseTestClusterFixture()
         {
-            TestClusterOptions.DefaultTraceToConsole = false;
+            TestDefaultConfiguration.InitializeDefaults();
         }
 
         protected BaseTestClusterFixture()

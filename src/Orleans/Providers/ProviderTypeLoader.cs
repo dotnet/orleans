@@ -73,7 +73,7 @@ namespace Orleans.Providers
 
             try
             {
-                foreach (var type in assembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(assembly, logger))
                 {
                     ProcessType(type);
                 }
@@ -94,7 +94,7 @@ namespace Orleans.Providers
                 // We assume that it's better to fetch and iterate through the list of types once,
                 // and the list of TypeManagers many times, rather than the other way around.
                 // Certainly it can't be *less* efficient to do it this way.
-                foreach (var type in args.LoadedAssembly.DefinedTypes)
+                foreach (var type in TypeUtils.GetDefinedTypes(args.LoadedAssembly, logger))
                 {
                     foreach (var mgr in managers)
                     {

@@ -1,6 +1,6 @@
-{
+﻿{
   "dependencies": {
-    "Microsoft.CodeAnalysis.CSharp": "1.0.0"
+    "Microsoft.CodeAnalysis.CSharp": "1.3.2"
   },
   "frameworks": {
     "net451": {}

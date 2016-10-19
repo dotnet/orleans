@@ -12,7 +12,11 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class VirtualBucketsRingProvider : MarshalByRefObject, IConsistentRingProvider, ISiloStatusListener
+    internal class VirtualBucketsRingProvider :
+#if !NETSTANDARD
+        MarshalByRefObject,
+#endif
+        IConsistentRingProvider, ISiloStatusListener
     {
         private readonly List<IRingRangeListener> statusListeners;
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap;

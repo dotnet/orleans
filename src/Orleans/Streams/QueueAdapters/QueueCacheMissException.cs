@@ -33,6 +33,7 @@ namespace Orleans.Streams
             High = high;
         }
 
+#if !NETSTANDARD
         public QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -48,5 +49,6 @@ namespace Orleans.Streams
             info.AddValue("High", High);
             base.GetObjectData(info, context);
         }
+#endif
     }
 }

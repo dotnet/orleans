@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -6,13 +7,22 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class SimpleDIGrain : Grain, ISimpleDIGrain
+    public class DIGrainWithInjectedServices : Grain, IDIGrainWithInjectedServices
     {
         private readonly IInjectedService injectedService;
+        private readonly IGrainFactory injectedGrainFactory;
+        private readonly long grainFactoryId;
+        public static readonly ObjectIDGenerator ObjectIdGenerator = new ObjectIDGenerator();
 
-        public SimpleDIGrain(IInjectedService injectedService)
+        public DIGrainWithInjectedServices(IInjectedService injectedService, IGrainFactory injectedGrainFactory)
         {
             this.injectedService = injectedService;
+            this.injectedGrainFactory = injectedGrainFactory;
+            bool set;
+            // get the object Id for injected GrainFactory, 
+            // object Id will be the same if the underlying object is the same,
+            // this is one way to prove that this GrainFactory is injected from DI
+            this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out set);
         }
 
         public Task<long> GetTicksFromService()
@@ -23,6 +33,11 @@ namespace UnitTests.Grains
         public Task<string> GetStringValue()
         {
             return Task.FromResult(this.injectedService.GetInstanceValue());
+        }
+
+        public Task<long> GetGrainFactoryId()
+        {
+            return Task.FromResult(this.grainFactoryId);
         }
     }
 

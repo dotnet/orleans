@@ -22,7 +22,7 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            bool usingLocalWAS = StorageTestConstants.UsingAzureLocalStorageEmulator;
+            bool usingLocalWAS = string.Equals(TestDefaultConfiguration.DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
 
             if (!usingLocalWAS)
             {
@@ -94,7 +94,7 @@ namespace Tester
         {
             int result = 0;
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
             foreach (var stat in stats)
             {

@@ -480,10 +480,10 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
-        internal MultiClusterStatus ReadMultiClusterStatus()
+        internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
         {
             byte val = ReadByte();
-            return (MultiClusterStatus)val;
+            return (GrainDirectoryEntryStatus)val;
         }
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
@@ -493,7 +493,6 @@ namespace Orleans.Serialization
             var silo = ReadSiloAddress();
             var grain = ReadGrainId();
             var act = ReadActivationId();
-            var mcstatus = ReadMultiClusterStatus();
 
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
@@ -501,7 +500,7 @@ namespace Orleans.Serialization
             if (act.Equals(ActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act, mcstatus);
+            return ActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>

@@ -2,10 +2,9 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
-using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
@@ -281,9 +280,10 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        directory.InvalidateCacheEntry(address);
+                        directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
                     }
                 }
+   
 #if false
                 //// 1:
                 //// Also record sending activation address for responses only in the cache.
@@ -448,14 +448,25 @@ namespace Orleans.Runtime
         }
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy = 
-            new Lazy<Func<Exception, Exception>>(() =>
-            {
-                ParameterExpression exceptionParameter = Expression.Parameter(typeof(Exception));
-                MethodCallExpression prepForRemotingCall = Expression.Call(exceptionParameter, "PrepForRemoting", Type.EmptyTypes);
-                Expression<Func<Exception, Exception>> lambda = Expression.Lambda<Func<Exception, Exception>>(prepForRemotingCall, exceptionParameter);
-                Func<Exception, Exception> func = lambda.Compile();
-                return func;
-            });
+            new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
+
+        private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
+        {
+            var methodInfo = typeof(Exception).GetMethod(
+                "PrepForRemoting",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var method = new DynamicMethod(
+                "PrepForRemoting",
+                typeof(Exception),
+                new[] { typeof(Exception) },
+                typeof(SerializationManager).GetTypeInfo().Module,
+                true);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, methodInfo);
+            il.Emit(OpCodes.Ret);
+            return (Func<Exception, Exception>)method.CreateDelegate(typeof(Func<Exception, Exception>));
+        }
 
         private static Exception PrepareForRemoting(Exception exception)
         {

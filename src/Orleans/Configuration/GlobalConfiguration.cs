@@ -98,8 +98,10 @@ namespace Orleans.Runtime.Configuration
         [Serializable]
         public class GossipChannelConfiguration
         {
+            /// <summary>Gets or sets the gossip channel type.</summary>
             public GossipChannelType ChannelType { get; set; }
 
+            /// <summary>Gets or sets the credential information used by the channel implementation.</summary>
             public string ConnectionString { get; set; }
         }
   
@@ -237,10 +239,27 @@ namespace Orleans.Runtime.Configuration
         public int MaxMultiClusterGateways { get; set; }
 
         /// <summary>
-        /// The number of seconds between background gossips.
+        /// The time between background gossips.
         /// </summary>
         public TimeSpan BackgroundGossipInterval { get; set; }
 
+        /// <summary>
+        /// Whether to use the global single instance protocol as the default
+        /// multicluster registration strategy.
+        /// </summary>
+        public bool UseGlobalSingleInstanceByDefault { get; set; }
+        
+       /// <summary>
+        /// The number of quick retries before going into DOUBTFUL state.
+        /// </summary>
+        public int GlobalSingleInstanceNumberRetries { get; set; }
+
+        /// <summary>
+        /// The time between the slow retries for DOUBTFUL activations.
+        /// </summary>
+        public TimeSpan GlobalSingleInstanceRetryInterval { get; set; }
+
+ 
         /// <summary>
         /// A list of connection strings for gossip channels.
         /// </summary>
@@ -399,8 +418,6 @@ namespace Orleans.Runtime.Configuration
 
         public string DefaultPlacementStrategy { get; set; }
 
-        public string DefaultMultiClusterRegistrationStrategy { get; set; }
-
         public TimeSpan DeploymentLoadPublisherRefreshTime { get; set; }
 
         public int ActivationCountBasedPlacementChooseOutOf { get; set; }
@@ -460,7 +477,10 @@ namespace Orleans.Runtime.Configuration
         private const bool DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP = true;
         private const bool DEFAULT_VALIDATE_INITIAL_CONNECTIVITY = true;
         private const int DEFAULT_MAX_MULTICLUSTER_GATEWAYS = 10;
+        private const bool DEFAULT_USE_GLOBAL_SINGLE_INSTANCE = true;
         private static readonly TimeSpan DEFAULT_BACKGROUND_GOSSIP_INTERVAL = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL = TimeSpan.FromSeconds(30);
+        private const int DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES = 10;
         private const int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
         private const int DEFAULT_CACHE_SIZE = 1000000;
         private static readonly TimeSpan DEFAULT_INITIAL_CACHE_TTL = TimeSpan.FromSeconds(30);
@@ -474,7 +494,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
         public const bool DEFAULT_PERFORM_DEADLOCK_DETECTION = false;
         public static readonly string DEFAULT_PLACEMENT_STRATEGY = typeof(RandomPlacement).Name;
-        public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(ClusterLocalRegistration).Name;
+        public static readonly string DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY = typeof(GlobalSingleInstanceRegistration).Name;
         private static readonly TimeSpan DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME = TimeSpan.FromSeconds(1);
         private const int DEFAULT_ACTIVATION_COUNT_BASED_PLACEMENT_CHOOSE_OUT_OF = 2;
 
@@ -504,9 +524,12 @@ namespace Orleans.Runtime.Configuration
             MaxJoinAttemptTime = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
             MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
             BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
+            UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
+            GlobalSingleInstanceRetryInterval = DEFAULT_GLOBAL_SINGLE_INSTANCE_RETRY_INTERVAL;
+            GlobalSingleInstanceNumberRetries = DEFAULT_GLOBAL_SINGLE_INSTANCE_NUMBER_RETRIES;
             ExpectedClusterSizeConfigValue = new ConfigValue<int>(DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE, true);
             ServiceId = Guid.Empty;
-            DeploymentId = Environment.UserName;
+            DeploymentId = "";
             DataConnectionString = "";
 
             // Assume the ado invariant is for sql server storage if not explicitly specified
@@ -525,7 +548,6 @@ namespace Orleans.Runtime.Configuration
             PerformDeadlockDetection = DEFAULT_PERFORM_DEADLOCK_DETECTION;
             reminderServiceType = ReminderServiceProviderType.NotSpecified;
             DefaultPlacementStrategy = DEFAULT_PLACEMENT_STRATEGY;
-            DefaultMultiClusterRegistrationStrategy = DEFAULT_MULTICLUSTER_REGISTRATION_STRATEGY;
             DeploymentLoadPublisherRefreshTime = DEFAULT_DEPLOYMENT_LOAD_PUBLISHER_REFRESH_TIME;
             ActivationCountBasedPlacementChooseOutOf = DEFAULT_ACTIVATION_COUNT_BASED_PLACEMENT_CHOOSE_OUT_OF;
             UseVirtualBucketsConsistentRing = DEFAULT_USE_VIRTUAL_RING_BUCKETS;
@@ -579,6 +601,9 @@ namespace Orleans.Runtime.Configuration
                 sb.AppendFormat("      DefaultMultiCluster: {0}", DefaultMultiCluster != null ? string.Join(",", DefaultMultiCluster) : "null").AppendLine();
                 sb.AppendFormat("      MaxMultiClusterGateways: {0}", MaxMultiClusterGateways).AppendLine();
                 sb.AppendFormat("      BackgroundGossipInterval: {0}", BackgroundGossipInterval).AppendLine();
+                sb.AppendFormat("      UseGlobalSingleInstanceByDefault: {0}", UseGlobalSingleInstanceByDefault).AppendLine();
+                sb.AppendFormat("      GlobalSingleInstanceRetryInterval: {0}", GlobalSingleInstanceRetryInterval).AppendLine();
+                sb.AppendFormat("      GlobalSingleInstanceNumberRetries: {0}", GlobalSingleInstanceNumberRetries).AppendLine();
                 sb.AppendFormat("      GossipChannels: {0}", string.Join(",", GossipChannels.Select(conf => conf.ChannelType.ToString() + ":" + conf.ConnectionString))).AppendLine();
             }
             else
@@ -724,7 +749,7 @@ namespace Orleans.Runtime.Configuration
                         if (child.HasAttribute("SystemStoreType"))
                         {
                             var sst = child.GetAttribute("SystemStoreType");
-                            if (!"None".Equals(sst, StringComparison.InvariantCultureIgnoreCase))
+                            if (!"None".Equals(sst, StringComparison.OrdinalIgnoreCase))
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
                                 ReminderServiceProviderType reminderServiceProviderType;
@@ -840,10 +865,25 @@ namespace Orleans.Runtime.Configuration
                             BackgroundGossipInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("BackgroundGossipInterval"),
                                 "Invalid time value for the BackgroundGossipInterval attribute on the MultiClusterNetwork element");
                         }
+                        if (child.HasAttribute("UseGlobalSingleInstanceByDefault"))
+                        {
+                            UseGlobalSingleInstanceByDefault = ConfigUtilities.ParseBool(child.GetAttribute("UseGlobalSingleInstanceByDefault"),
+                                "Invalid boolean for the UseGlobalSingleInstanceByDefault attribute on the MultiClusterNetwork element");
+                        }
+                        if (child.HasAttribute("GlobalSingleInstanceRetryInterval"))
+                        {
+                            GlobalSingleInstanceRetryInterval = ConfigUtilities.ParseTimeSpan(child.GetAttribute("GlobalSingleInstanceRetryInterval"),
+                                "Invalid time value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
+                        }
+                        if (child.HasAttribute("GlobalSingleInstanceNumberRetries"))
+                        {
+                            GlobalSingleInstanceNumberRetries = ConfigUtilities.ParseInt(child.GetAttribute("GlobalSingleInstanceNumberRetries"),
+                                "Invalid value for the GlobalSingleInstanceRetryInterval attribute on the MultiClusterNetwork element");
+                        }
                         if (child.HasAttribute("MaxMultiClusterGateways"))
                         {
                             MaxMultiClusterGateways = ConfigUtilities.ParseInt(child.GetAttribute("MaxMultiClusterGateways"),
-                                "Invalid time value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
+                                "Invalid value for the MaxMultiClusterGateways attribute on the MultiClusterNetwork element");
                         }
                         var channels = new List<GossipChannelConfiguration>();
                         foreach (XmlNode childchild in child.ChildNodes)

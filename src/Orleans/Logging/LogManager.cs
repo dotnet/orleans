@@ -109,6 +109,7 @@ namespace Orleans.Runtime
         /// <seealso cref="GrainClient.Initialize()"/>
         /// <seealso cref="Orleans.Host.Azure.Client.AzureClient.Initialize()"/>
         /// <param name="config">Configuration settings to be used for initializing the Logger susbystem state.</param>
+        /// <param name="configChange">Indicates an update to existing config settings.</param>
 #pragma warning restore 1574
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public static void Initialize(ITraceConfiguration config, bool configChange = false)
@@ -256,7 +257,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Set the default log level of all Runtime Loggers.
         /// </summary>
-        /// <param name="newTraceLevel">The new log level to use</param>
+        /// <param name="severity">The new log level to use</param>
         public static void SetRuntimeLogLevel(Severity severity)
         {
             runtimeTraceLevel = severity;
@@ -266,7 +267,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Set the default log level of all Grain and Application Loggers.
         /// </summary>
-        /// <param name="newTraceLevel">The new log level to use</param>
+        /// <param name="severity">The new log level to use</param>
         public static void SetAppLogLevel(Severity severity)
         {
             appTraceLevel = severity;

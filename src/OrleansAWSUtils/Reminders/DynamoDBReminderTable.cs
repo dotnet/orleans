@@ -10,6 +10,9 @@ using Amazon.DynamoDBv2;
 
 namespace OrleansAWSUtils.Reminders
 {
+    /// <summary>
+    /// Implementation for IRemiderTable using DynamoDB as underlying  strorage 
+    /// </summary>
     public class DynamoDBReminderTable : IReminderTable
     {
         private const string DEPLOYMENT_ID_PROPERTY_NAME = "DeploymentId";
@@ -31,6 +34,12 @@ namespace OrleansAWSUtils.Reminders
         private string deploymentId;
         private Guid serviceId;
 
+        /// <summary>
+        /// Initialize current instance with specific global configuration and logger
+        /// </summary>
+        /// <param name="config"> Global configuration to initialize with </param>
+        /// <param name="logger"> Specific logger to use in current instance </param>
+        /// <returns></returns>
         public Task Init(GlobalConfiguration config, Logger logger)
         {
             deploymentId = config.DeploymentId;
@@ -67,6 +76,13 @@ namespace OrleansAWSUtils.Reminders
                 new List<GlobalSecondaryIndex> { secondaryIndex });
         }
 
+        /// <summary>
+        /// Reads a reminder for a grain reference by reminder name.
+        /// Read a row from the remider table
+        /// </summary>
+        /// <param name="grainRef"> grain ref to locate the row </param>
+        /// <param name="reminderName"> remider name to locate the row </param>
+        /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
             var reminderId = ConstructReminderId(serviceId, grainRef, reminderName);
@@ -89,6 +105,11 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Read one row from the remider table
+        /// </summary>
+        /// <param name="grainRef">grain ref to locate the row </param>
+        /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(GrainReference grainRef)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
@@ -112,6 +133,12 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Reads reminder table data for a given hash range.
+        /// </summary>
+        /// <param name="beginHash"></param>
+        /// <param name="endHash"></param>
+        /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
@@ -157,6 +184,13 @@ namespace OrleansAWSUtils.Reminders
             };
         }
 
+        /// <summary>
+        /// Remove one row from the reminder table 
+        /// </summary>
+        /// <param name="grainRef"> specific grain ref to locate the row </param>
+        /// <param name="reminderName"> remider name to locate the row </param>
+        /// <param name="eTag"> e tag </param>
+        /// <returns> Return true if the row was removed </returns>
         public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
             var reminderId = ConstructReminderId(serviceId, grainRef, reminderName);
@@ -181,6 +215,10 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Test hook to clear reminder table data.
+        /// </summary>
+        /// <returns></returns>
         public async Task TestOnlyClearTable()
         {
             var expressionValues = new Dictionary<string, AttributeValue>
@@ -220,6 +258,11 @@ namespace OrleansAWSUtils.Reminders
             }
         }
 
+        /// <summary>
+        /// Async method to put an entry into the remider table
+        /// </summary>
+        /// <param name="entry"> The entry to put </param>
+        /// <returns> Return the entry ETag if entry was upsert successfully </returns>
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
             var reminderId = ConstructReminderId(serviceId, entry.GrainRef, entry.ReminderName);
