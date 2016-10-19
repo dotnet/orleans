@@ -54,12 +54,6 @@ namespace UnitTests
         public virtual void Dispose()
         {
             HostedCluster?.StopAllSilos();
-
-            //foreach (var silo in HostedCluster.GetActiveSilos())
-            //{
-            //    HostedCluster.KillSilo(silo);
-            //}
-
         }
     }
 }

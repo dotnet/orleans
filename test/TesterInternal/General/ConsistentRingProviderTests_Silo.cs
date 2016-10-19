@@ -169,7 +169,7 @@ namespace UnitTests.General
             this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             //List<SiloHandle> failures = getSilosToFail(Fail.Random, 1);
-            SiloHandle fail = this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle fail = this.HostedCluster.SecondarySilos.First();
             uint keyToCheck = PickKey(fail.SiloAddress); //fail.SiloAddress.GetConsistentHashCode();
             List<SiloHandle> joins = null;
 

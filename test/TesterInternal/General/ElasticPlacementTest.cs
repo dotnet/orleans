@@ -29,10 +29,7 @@ namespace UnitTests.General
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
             options.ClusterConfiguration.AddMemoryStorageProvider("Default");
 
-            //options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
-
-            //options.ClientConfiguration.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
 
             return new TestCluster(options);
@@ -54,7 +51,7 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.Info("-----------------------------------------------------------------");
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.GetActiveSilos().Skip(1).First()], perSilo, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, leavy);
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -71,7 +68,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             double expected = (6.0 * perSilo) / 3.0;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.GetActiveSilos().Skip(1).First()], expected, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.Info("\n\n\n----- Phase 3 -----\n\n");
@@ -85,7 +82,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             expected = (9.0 * perSilo) / 3.0;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.GetActiveSilos().Skip(1).First()], expected, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.Info("-----------------------------------------------------------------");
@@ -113,7 +110,7 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.Info("-----------------------------------------------------------------");
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.GetActiveSilos().Skip(1).First()], perSilo, stopLeavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[0]], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], perSilo, stopLeavy);
 
@@ -127,7 +124,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             double expected = perSilo * 1.33;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.GetActiveSilos().Skip(1).First()], expected, stopLeavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], expected, stopLeavy);
 
             logger.Info("-----------------------------------------------------------------");
@@ -141,7 +138,7 @@ namespace UnitTests.General
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchCpuUsage(110.0f);
@@ -157,7 +154,7 @@ namespace UnitTests.General
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchOverloaded();

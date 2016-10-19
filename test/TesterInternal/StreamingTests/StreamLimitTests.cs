@@ -37,7 +37,7 @@ namespace UnitTests.StreamingTests
 
         public override TestCluster CreateTestCluster()
         {
-            var options = new TestClusterOptions(initialSilosCount: 4);
+            var options = new TestClusterOptions();
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 

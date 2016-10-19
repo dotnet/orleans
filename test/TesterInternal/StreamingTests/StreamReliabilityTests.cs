@@ -110,14 +110,14 @@ namespace UnitTests.Streaming.Reliability
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
             SiloHandle prim1 = this.HostedCluster.Primary;
-            SiloHandle sec1 = this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle sec1 = this.HostedCluster.SecondarySilos.First();
 
             RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
 
             Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
-            Assert.NotEqual(sec1, this.HostedCluster.GetActiveSilos().Skip(1).First()); // Should be different Secondary silos after restart
+            Assert.NotEqual(sec1, this.HostedCluster.SecondarySilos.First()); // Should be different Secondary silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -680,7 +680,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Kill the silo containing the consumer grain
             bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -719,7 +719,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Kill the silo containing the producer grain
             bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -760,7 +760,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Restart the silo containing the consumer grain
             bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -799,7 +799,7 @@ namespace UnitTests.Streaming.Reliability
 
             // Restart the silo containing the consumer grain
             bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.GetActiveSilos().Skip(1).First();
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -896,7 +896,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.SecondarySilos.First().SiloAddress);
 
             //this.HostedCluster.RestartDefaultSilos();
             foreach (var silo in this.HostedCluster.GetActiveSilos())
@@ -910,7 +910,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.SecondarySilos.First().SiloAddress);
         }
 
         private void StopSilo(SiloHandle silo, bool kill, bool restart)

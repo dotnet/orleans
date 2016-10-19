@@ -206,7 +206,7 @@ namespace UnitTests.General
             }
             else
             {
-                targetSilo = HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -261,7 +261,7 @@ namespace UnitTests.General
             }
             else
             {
-                targetSilo = HostedCluster.GetActiveSilos().Skip(1).First().SiloAddress.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
