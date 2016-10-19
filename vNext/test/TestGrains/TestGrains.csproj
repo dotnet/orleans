@@ -47,8 +47,56 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestGrains\ActivateDeactivateWatcherGrain.cs">
+      <Link>ActivateDeactivateWatcherGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ClusterTestGrains.cs">
+      <Link>ClusterTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ExceptionGrain.cs">
+      <Link>ExceptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ExternalTypeGrain.cs">
+      <Link>ExternalTypeGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GenericGrains.cs">
+      <Link>GenericGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GetGrainGrains.cs">
+      <Link>GetGrainGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GrainInterfaceHierarchyGrains.cs">
+      <Link>GrainInterfaceHierarchyGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\InitialStateGrain.cs">
+      <Link>InitialStateGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrains\JsonEchoGrain.cs">
       <Link>JsonEchoGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\KeyExtensionTestGrain.cs">
+      <Link>KeyExtensionTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MethodInterceptionGrain.cs">
+      <Link>MethodInterceptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleConstructorsSimpleGrain.cs">
+      <Link>MultipleConstructorsSimpleGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ReminderTestGrain.cs">
+      <Link>ReminderTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleGenericGrain.cs">
+      <Link>SimpleGenericGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleGrain.cs">
+      <Link>SimpleGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimplePersistentGrain.cs">
+      <Link>SimplePersistentGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\StatelessWorkerGrain.cs">
+      <Link>StatelessWorkerGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
