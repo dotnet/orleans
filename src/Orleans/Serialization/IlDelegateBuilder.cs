@@ -29,7 +29,12 @@ namespace Orleans.Serialization
             this.methods = methods;
             var returnType = methodInfo.ReturnType;
             var parameterTypes = GetParameterTypes(methodInfo);
-            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(ILDelegateBuilder<>).Module, true);
+            this.dynamicMethod = new DynamicMethod(
+                name,
+                returnType,
+                parameterTypes,
+                typeof(ILDelegateBuilder<>).GetTypeInfo().Module,
+                true);
             this.il = this.dynamicMethod.GetILGenerator();
         }
 

@@ -90,7 +90,7 @@ namespace Orleans.Serialization
             il.Emit(OpCodes.Ret);
 
             // Build the type.
-            var declaringType = typeBuilder.CreateType();
+            var declaringType = typeBuilder.CreateTypeInfo();
 
             // Invoke the initializer method using reflection, passing the provided value to initialize the new field.
             declaringType.GetMethod(MethodName, BindingFlags.Static | BindingFlags.NonPublic)
