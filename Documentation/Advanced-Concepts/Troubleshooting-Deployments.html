@@ -121,7 +121,18 @@ role recycling. Check the logs for more information. Visual Studio provides some
 </ul>
 <p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="59" sourceendlinenumber="59">In the <code>diagnostics.wadcfgx</code> file for the web and worker roles, make sure to set the <code>scheduledTransferLogLevelFilter</code> attribute in the <code>Logs</code> element to <code>Information</code>, as this is an additional layer of trace filtering that defines which traces are sent to the <code>WADLogsTable</code> in Azure Storage.</p>
 <p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="61" sourceendlinenumber="61">You can find more information about this in the <a href="../Orleans-Configuration-Guide/index.html" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="61" sourceendlinenumber="61">Orleans Configuration Guide</a>.</p>
-
+<h2 id="compatibility-with-aspnet" sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="63" sourceendlinenumber="63">Compatibility with ASP.NET</h2>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="65" sourceendlinenumber="65">The razor view engine included in ASP.NET uses the same code generation assemblies as Orleans (<code>Microsoft.CodeAnalysis</code> and <code>Microsoft.CodeAnalysis.CSharp</code>). This can present a version compatibility problem at runtime.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="67" sourceendlinenumber="67">To resolve this, try upgrading <code>Microsoft.CodeDom.Providers.DotNetCompilerPlatform</code> (this is the nuget package ASP.NET uses to include the above assemblies) to the latest version, and setting binding redirects like this:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Troubleshooting-Deployments.md" sourcestartlinenumber="69" sourceendlinenumber="78"><code class="lang-xml">&lt;dependentAssembly&gt;
+  &lt;assemblyIdentity name=&quot;Microsoft.CodeAnalysis.CSharp&quot; publicKeyToken=&quot;31bf3856ad364e35&quot; culture=&quot;neutral&quot; /&gt;
+  &lt;bindingRedirect oldVersion=&quot;0.0.0.0-2.0.0.0&quot; newVersion=&quot;1.3.1.0&quot; /&gt;
+&lt;/dependentAssembly&gt;
+&lt;dependentAssembly&gt;
+  &lt;assemblyIdentity name=&quot;Microsoft.CodeAnalysis&quot; publicKeyToken=&quot;31bf3856ad364e35&quot; culture=&quot;neutral&quot; /&gt;
+  &lt;bindingRedirect oldVersion=&quot;0.0.0.0-2.0.0.0&quot; newVersion=&quot;1.3.1.0&quot; /&gt;
+&lt;/dependentAssembly&gt;
+</code></pre>
             </article>
           </div>
           

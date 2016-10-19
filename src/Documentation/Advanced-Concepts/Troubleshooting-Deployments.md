@@ -59,3 +59,20 @@ Declarative configuration:
 In the `diagnostics.wadcfgx` file for the web and worker roles, make sure to set the `scheduledTransferLogLevelFilter` attribute in the `Logs` element to `Information`, as this is an additional layer of trace filtering that defines which traces are sent to the `WADLogsTable` in Azure Storage.
 
 You can find more information about this in the [Orleans Configuration Guide] (../Orleans-Configuration-Guide/index.md).
+
+## Compatibility with ASP.NET
+
+The razor view engine included in ASP.NET uses the same code generation assemblies as Orleans (`Microsoft.CodeAnalysis` and `Microsoft.CodeAnalysis.CSharp`). This can present a version compatibility problem at runtime.
+
+To resolve this, try upgrading `Microsoft.CodeDom.Providers.DotNetCompilerPlatform` (this is the nuget package ASP.NET uses to include the above assemblies) to the latest version, and setting binding redirects like this:
+
+```xml
+<dependentAssembly>
+  <assemblyIdentity name="Microsoft.CodeAnalysis.CSharp" publicKeyToken="31bf3856ad364e35" culture="neutral" />
+  <bindingRedirect oldVersion="0.0.0.0-2.0.0.0" newVersion="1.3.1.0" />
+</dependentAssembly>
+<dependentAssembly>
+  <assemblyIdentity name="Microsoft.CodeAnalysis" publicKeyToken="31bf3856ad364e35" culture="neutral" />
+  <bindingRedirect oldVersion="0.0.0.0-2.0.0.0" newVersion="1.3.1.0" />
+</dependentAssembly>
+```

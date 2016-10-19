@@ -94,12 +94,12 @@ Previously DI configuration was specified at the cluster node level, this was ch
 
 configuration.UseStartupType&lt;MyApplication.Configuration.MyStartup&gt;();
 </code></pre><h2 id="configuring-via-xml" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="46" sourceendlinenumber="46">Configuring via XML</h2>
-<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="48" sourceendlinenumber="48">To register your <code>Startup</code> class with Orleans you&#39;ve to add a <code>Startup</code> element to the <code>Globals</code> section and in the <code>Type</code> attribute you&#39;ve to specify the assembly qualified name for the type.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="48" sourceendlinenumber="48">To register your <code>Startup</code> class with Orleans you&#39;ve to add a <code>Startup</code> element to the <code>Defaults</code> section and in the <code>Type</code> attribute you&#39;ve to specify the assembly qualified name for the type.</p>
 <pre sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="50" sourceendlinenumber="57"><code class="lang-XML">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
 &lt;tns:OrleansConfiguration xmlns:tns=&quot;urn:orleans&quot;&gt;
-  &lt;tns:Globals&gt;
+  &lt;tns:Defaults&gt;
     &lt;tns:Startup Type=&quot;MyApplication.Configuration.Startup,MyApplication&quot; /&gt;
-  &lt;/tns:Globals&gt;
+  &lt;/tns:Defaults&gt;
 &lt;/tns:OrleansConfiguration&gt;
 </code></pre><h1 id="example" sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="58" sourceendlinenumber="58">Example</h1>
 <p sourcefile="Documentation/Advanced-Concepts/Dependency-Injection.md" sourcestartlinenumber="60" sourceendlinenumber="60">Here is a complete <code>Startup</code> class example:</p>
