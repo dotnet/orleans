@@ -41,6 +41,7 @@
     <Compile Include="TestCategory.cs" />
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestDefaultConfiguration.cs" />
+    <Compile Include="TesterUtils.cs" />
     <Compile Include="TestOutputHelperExtensions.cs" />
     <Compile Include="TestUtils.cs" />
   </ItemGroup>

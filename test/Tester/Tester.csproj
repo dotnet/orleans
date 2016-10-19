@@ -133,7 +133,6 @@
     <Compile Include="TestStreamProviders\EventHub\TestEventHubStreamProvider.cs" />
     <Compile Include="TestStreamProviders\FailureInjectionStreamProvider.cs" />
     <Compile Include="TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs" />
-    <Compile Include="TestUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\src\Build\Version.txt">

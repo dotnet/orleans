@@ -55,6 +55,9 @@
     <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
       <Link>StreamLifecycleTestGrains.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\TestGrain.cs">
+      <Link>TestGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>

@@ -65,6 +65,9 @@
     <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
       <Link>IStreamLifecycleTestGrains.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ITestGrain.cs">
+      <Link>ITestGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IValueTypeTestGrain.cs">
       <Link>IValueTypeTestGrain.cs</Link>
     </Compile>

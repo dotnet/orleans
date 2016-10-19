@@ -391,7 +391,6 @@ namespace UnitTests.General
             Assert.Equal(data1, result0[name1]);  // "LCC.GetData-Main-Final"
         }
 
-        //failed in vNext due to RequestContext is not fully upgraded to coreclr yet
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_CrossThread()
         {
