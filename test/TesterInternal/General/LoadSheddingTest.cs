@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -9,6 +10,11 @@ namespace UnitTests.General
 {
     public class LoadSheddingTest : HostedTestClusterPerTest
     {
+        public override TestCluster CreateTestCluster()
+        {
+            return new TestCluster(new TestClusterOptions(1));
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingBasic()
         {

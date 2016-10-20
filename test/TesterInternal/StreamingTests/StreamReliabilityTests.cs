@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +40,7 @@ namespace UnitTests.Streaming.Reliability
         {
             this.numExpectedSilos = 2;
             var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
 
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
@@ -49,21 +49,17 @@ namespace UnitTests.Streaming.Reliability
 
             options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
-            //options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
             options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
             options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
             options.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
 
-
-            //options.ClientConfiguration.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
 
             return new TestCluster(options);
         }
-
 
         public StreamReliabilityTests(ITestOutputHelper output)
         {
@@ -898,14 +894,13 @@ namespace UnitTests.Streaming.Reliability
                             "\n-----------------------------------------------------\n\n\n",
                             this.HostedCluster.Primary.SiloAddress, this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            //this.HostedCluster.RestartDefaultSilos();
-            foreach (var silo in this.HostedCluster.GetActiveSilos())
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
                 this.HostedCluster.RestartSilo(silo);
             }
 
             // Note: Needed to reinitialize client in this test case to connect to new silos
-            this.HostedCluster.InitializeClient();
+            // this.HostedCluster.InitializeClient();
 
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Primary={0} Secondary={1}" +
