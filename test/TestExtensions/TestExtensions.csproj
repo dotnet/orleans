@@ -46,7 +46,6 @@
     <Compile Include="TestConstants.cs" />
     <Compile Include="TestDefaultConfiguration.cs" />
     <Compile Include="TestOutputHelperExtensions.cs" />
-    <Compile Include="TestUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />

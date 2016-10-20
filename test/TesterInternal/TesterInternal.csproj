@@ -185,6 +185,7 @@
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
+    <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
     <Compile Include="TimerOrleansTest.cs" />
     <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
