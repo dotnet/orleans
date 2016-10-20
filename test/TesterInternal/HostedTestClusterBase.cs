@@ -27,33 +27,4 @@ namespace UnitTests
             HostedCluster?.StopAllSilos();
         }
     }
-
-    public abstract class HostedTestClusterPerTest : OrleansTestingBase, IDisposable
-    {
-        protected TestCluster HostedCluster { get; private set; }
-
-        public HostedTestClusterPerTest()
-        {
-            TestDefaultConfiguration.InitializeDefaults();
-
-            GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
-            var testCluster = CreateTestCluster();
-            if (testCluster.Primary == null)
-            {
-                testCluster.Deploy();
-            }
-            this.HostedCluster = testCluster;
-        }
-
-        public virtual TestCluster CreateTestCluster()
-        {
-            return new TestCluster();
-        }
-
-        public virtual void Dispose()
-        {
-            HostedCluster?.StopAllSilos();
-        }
-    }
 }

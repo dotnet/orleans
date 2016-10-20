@@ -4,12 +4,13 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.StreamingTests;
+using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.Streaming
 {
     [TestCategory("Streaming"), TestCategory("Azure"), TestCategory("AzureQueue")]
-    public class AQStreamingTests : HostedTestClusterPerTest
+    public class AQStreamingTests : TestClusterPerTest
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;

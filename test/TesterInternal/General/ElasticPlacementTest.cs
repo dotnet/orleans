@@ -11,11 +11,12 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.General
 {
-    public class ElasticPlacementTests : HostedTestClusterPerTest
+    public class ElasticPlacementTests : TestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
         private const int leavy = 300;

@@ -10,13 +10,14 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
     [TestCategory("Streaming"), TestCategory("Limits")]
-    public class StreamLimitTests : HostedTestClusterPerTest
+    public class StreamLimitTests : TestClusterPerTest
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;

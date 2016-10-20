@@ -15,6 +15,7 @@ using Tester;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -24,7 +25,7 @@ using Xunit.Abstractions;
 namespace UnitTests.Streaming.Reliability
 {
     [TestCategory("Streaming"), TestCategory("Reliability")]
-    public class StreamReliabilityTests : HostedTestClusterPerTest
+    public class StreamReliabilityTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
         public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;

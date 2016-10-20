@@ -51,7 +51,7 @@ namespace UnitTests.Tester
 
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
+            this.HostedCluster?.StopAllSilos();
         }
     }
 }

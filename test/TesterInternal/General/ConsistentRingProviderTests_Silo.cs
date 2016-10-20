@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,13 +8,14 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using UnitTests.Tester;
 using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Sdk;
 
 namespace UnitTests.General
 {
-    public class ConsistentRingProviderTests_Silo : HostedTestClusterPerTest
+    public class ConsistentRingProviderTests_Silo : TestClusterPerTest
     {
         private const int numAdditionalSilos = 3;
         private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(30);
