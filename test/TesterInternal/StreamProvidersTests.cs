@@ -6,6 +6,7 @@ using Orleans;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.StreamingTests;
 using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,7 +37,7 @@ namespace UnitTests.Streaming
         protected TestingSiloHost HostedCluster { get; private set; }
         private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
-        public static readonly string STREAM_PROVIDER_NAME = "SMSProvider";
+        public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
 
         public StreamProvidersTests_ProviderConfigNotLoaded(ITestOutputHelper output, Fixture fixture)

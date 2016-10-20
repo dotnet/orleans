@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans;
@@ -13,10 +12,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
+    [TestCategory("Streaming"), TestCategory("Cleanup")]
     public class StreamLifecycleTests : HostedTestClusterPerTest
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        public const string SmsStreamProviderName = "SMSProvider";
+        public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
         protected Guid StreamId;
         protected string StreamProviderName;
@@ -63,31 +63,31 @@ namespace UnitTests.StreamingTests
             base.Dispose();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, true);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, true);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
             string testName = "Stream_Lifecycle_AddRemoveProducers";
