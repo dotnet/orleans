@@ -127,6 +127,7 @@
     <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="StreamingTests\TimePurgePredicateTests.cs" />
+    <Compile Include="TestUtils.cs" />
     <Compile Include="TestStreamProviders\AzureQueue\TestAzureQueueStreamProvider.cs" />
     <Compile Include="TestStreamProviders\Controllable\ControllableTestStreamProvider.cs" />
     <Compile Include="TestStreamProviders\EventHub\StreamPerPartitionEventHubStreamProvider.cs" />

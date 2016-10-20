@@ -90,6 +90,9 @@
     <Compile Include="..\..\..\test\Tester\OrleansTestingBase.cs">
       <Link>OrleansTestingBase.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\TestUtils.cs">
+      <Link>TestUtils.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

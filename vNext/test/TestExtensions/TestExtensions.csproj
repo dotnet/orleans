@@ -48,9 +48,6 @@
     <Compile Include="..\..\..\test\TestExtensions\TestDefaultConfiguration.cs">
       <Link>TestDefaultConfiguration.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TestExtensions\TesterUtils.cs">
-      <Link>TesterUtils.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\TestExtensions\TestOutputHelperExtensions.cs">
       <Link>TestOutputHelperExtensions.cs</Link>
     </Compile>
