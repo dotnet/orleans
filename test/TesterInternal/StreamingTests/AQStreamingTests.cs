@@ -12,7 +12,7 @@ namespace UnitTests.Streaming
     public class AQStreamingTests : HostedTestClusterPerTest
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        public const string SmsStreamProviderName = "SMSProvider";
+        public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
         private SingleStreamTestRunner runner;
 
