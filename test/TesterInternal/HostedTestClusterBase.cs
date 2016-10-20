@@ -30,7 +30,7 @@ namespace UnitTests
 
     public abstract class HostedTestClusterPerTest : OrleansTestingBase, IDisposable
     {
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
 
         public HostedTestClusterPerTest()
         {
@@ -38,12 +38,17 @@ namespace UnitTests
 
             GrainClient.Uninitialize();
             SerializationManager.InitializeForTesting();
-            this.HostedCluster = this.CreateSiloHost();
+            var testCluster = CreateTestCluster();
+            if (testCluster.Primary == null)
+            {
+                testCluster.Deploy();
+            }
+            this.HostedCluster = testCluster;
         }
 
-        public virtual TestingSiloHost CreateSiloHost()
+        public virtual TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(true);
+            return new TestCluster();
         }
 
         public virtual void Dispose()

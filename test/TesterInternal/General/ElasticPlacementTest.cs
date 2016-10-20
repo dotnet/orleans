@@ -21,31 +21,18 @@ namespace UnitTests.General
         private const int leavy = 300;
         private const int perSilo = 1000;
 
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            StartPrimary = true,
-            StartSecondary = true,
-            DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-            LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-        };
-
-        private static readonly TestingClientOptions clientOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-            AdjustConfig = config =>
-            {
-                config.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
-                config.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-            },
-        };
-
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
             TestUtils.CheckForAzureStorage();
-            return new TestingSiloHost(siloOptions, clientOptions);
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+            options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
+
+            return new TestCluster(options);
         }
 
         /// <summary>
@@ -64,7 +51,7 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.Info("-----------------------------------------------------------------");
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.Secondary], perSilo, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, leavy);
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
@@ -81,7 +68,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             double expected = (6.0 * perSilo) / 3.0;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.Secondary], expected, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.Info("\n\n\n----- Phase 3 -----\n\n");
@@ -95,7 +82,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             expected = (9.0 * perSilo) / 3.0;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.Secondary], expected, leavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.Info("-----------------------------------------------------------------");
@@ -123,7 +110,7 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.Info("-----------------------------------------------------------------");
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.Secondary], perSilo, stopLeavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[0]], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], perSilo, stopLeavy);
 
@@ -137,7 +124,7 @@ namespace UnitTests.General
             logger.Info("-----------------------------------------------------------------");
             double expected = perSilo * 1.33;
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.Secondary], expected, stopLeavy);
+            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], expected, stopLeavy);
 
             logger.Info("-----------------------------------------------------------------");
@@ -151,7 +138,7 @@ namespace UnitTests.General
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchCpuUsage(110.0f);
@@ -167,7 +154,7 @@ namespace UnitTests.General
         public async Task ElasticityTest_AllSilosOverloaded()
         {
             var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.Secondary.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchOverloaded();

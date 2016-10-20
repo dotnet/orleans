@@ -17,23 +17,20 @@ namespace UnitTests.General
 {
     public class ConsistentRingProviderTests_Silo : HostedTestClusterPerTest
     {
-        private static readonly TestingSiloOptions siloOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain,
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-            SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml"),
-        };
-
         private const int numAdditionalSilos = 3;
         private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(30);
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
         enum Fail { First, Random, Last }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(siloOptions);
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+
+            return new TestCluster(options);
         }
 
         #region Tests
@@ -172,7 +169,7 @@ namespace UnitTests.General
             this.HostedCluster.StartAdditionalSilos(numAdditionalSilos);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             //List<SiloHandle> failures = getSilosToFail(Fail.Random, 1);
-            SiloHandle fail = this.HostedCluster.Secondary;
+            SiloHandle fail = this.HostedCluster.SecondarySilos.First();
             uint keyToCheck = PickKey(fail.SiloAddress); //fail.SiloAddress.GetConsistentHashCode();
             List<SiloHandle> joins = null;
 
@@ -267,7 +264,7 @@ namespace UnitTests.General
             int count = 0, index = 0;
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
-            bool usingReminderGrain = this.HostedCluster.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
+            bool usingReminderGrain = this.HostedCluster.ClusterConfiguration.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
             IReminderTable tableGrain = GrainClient.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;

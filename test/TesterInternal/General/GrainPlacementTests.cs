@@ -24,22 +24,17 @@ namespace UnitTests.General
             output.WriteLine("GrainPlacementTests - constructor");
         }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                }, new TestingClientOptions
-                {
-                    ProxiedGateway = true,
-                    Gateways = new List<IPEndPoint>(new[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
-                    PreferedGatewayIndex = -1,
-                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-                });
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+
+            return new TestCluster(options);
         }
-        
+
+
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
@@ -211,7 +206,7 @@ namespace UnitTests.General
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.SiloAddress.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -266,7 +261,7 @@ namespace UnitTests.General
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.SiloAddress.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
