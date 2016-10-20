@@ -78,6 +78,9 @@
     <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
       <Link>BasicActivationTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
