@@ -223,7 +223,6 @@ namespace UnitTests.General
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test {0} ******************************", name);
             var taintedSilo = this.HostedCluster.StartAdditionalSilo();
-            TestSilosStarted(3);
 
             const long sampleSize = 10;
 

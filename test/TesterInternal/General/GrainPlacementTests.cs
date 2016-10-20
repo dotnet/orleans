@@ -290,5 +290,20 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain is now located on silo {0}", newActual);
             Assert.Equal(expected, newActual);  // "PreferLocalPlacement strategy should not move activations when other non-hosting silo fails."
         }
+
+        private void TestSilosStarted(int expected)
+        {
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+
+            Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
+            foreach (var pair in statuses)
+            {
+                logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                Assert.Equal(
+                    SiloStatus.Active,
+                    pair.Value);
+            }
+            Assert.Equal(expected, statuses.Count);
+        }
     }
 }

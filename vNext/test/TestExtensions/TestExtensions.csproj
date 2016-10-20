@@ -36,8 +36,20 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestExtensions\BaseClusterFixture.cs">
+      <Link>BaseClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\DefaultClusterFixture.cs">
+      <Link>DefaultClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\HostedTestClusterBase.cs">
+      <Link>HostedTestClusterBase.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestExtensions\MockStorageProvider.cs">
       <Link>MockStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\OrleansTestingBase.cs">
+      <Link>OrleansTestingBase.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestExtensions\TestCategory.cs">
       <Link>TestCategory.cs</Link>

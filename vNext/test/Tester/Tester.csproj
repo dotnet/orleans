@@ -75,20 +75,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\Tester\BaseClusterFixture.cs">
-      <Link>BaseClusterFixture.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
       <Link>BasicActivationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\DefaultClusterFixture.cs">
-      <Link>DefaultClusterFixture.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\HostedTestClusterBase.cs">
-      <Link>HostedTestClusterBase.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\OrleansTestingBase.cs">
-      <Link>OrleansTestingBase.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>

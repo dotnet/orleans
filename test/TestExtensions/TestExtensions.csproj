@@ -36,7 +36,11 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseClusterFixture.cs" />
+    <Compile Include="DefaultClusterFixture.cs" />
+    <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MockStorageProvider.cs" />
+    <Compile Include="OrleansTestingBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestCategory.cs" />
     <Compile Include="TestConstants.cs" />
