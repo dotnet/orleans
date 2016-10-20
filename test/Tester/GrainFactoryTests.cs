@@ -1,9 +1,9 @@
 ﻿using System;
 using Orleans;
 using Orleans.Runtime;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests

@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 

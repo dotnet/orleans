@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
+using TestExtensions;
 using UnitTests.Grains;
 using UnitTests.TesterInternal;
 using Xunit;

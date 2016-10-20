@@ -4,6 +4,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.MembershipTests

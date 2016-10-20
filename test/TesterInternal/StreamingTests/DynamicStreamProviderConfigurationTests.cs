@@ -12,10 +12,10 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
 using Tester.TestStreamProviders;
+using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StreamingTests

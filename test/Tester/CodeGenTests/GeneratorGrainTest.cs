@@ -4,9 +4,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Serialization;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 
 namespace Tester.CodeGenTests

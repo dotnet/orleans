@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Table.Protocol;
 using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
 using Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StorageTests

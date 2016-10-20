@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 using Tester;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 

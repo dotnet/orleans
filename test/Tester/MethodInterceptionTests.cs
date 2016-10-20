@@ -1,9 +1,10 @@
-﻿namespace Tester
+﻿using TestExtensions;
+
+namespace Tester
 {
     using System.Threading.Tasks;
     using Orleans;
     using UnitTests.GrainInterfaces;
-    using UnitTests.Tester;
     using Xunit;
 
     public class MethodInterceptionTests : HostedTestClusterEnsureDefaultStarted

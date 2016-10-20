@@ -1,12 +1,9 @@
 ﻿using System;
-using System.IO;
-using System.Threading;
-using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 
-namespace Tester
+namespace TestExtensions
 {
     public abstract class BaseTestClusterFixture : IDisposable
     {

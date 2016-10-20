@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.TestingHost.Utils;
 using Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

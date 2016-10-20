@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 
 namespace Tester

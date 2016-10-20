@@ -14,6 +14,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

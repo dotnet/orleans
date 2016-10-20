@@ -3,7 +3,7 @@ using System.IO;
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 
-namespace Tester
+namespace TestExtensions
 {
     public class TestDefaultConfiguration
     {

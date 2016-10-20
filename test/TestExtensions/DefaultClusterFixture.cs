@@ -1,7 +1,7 @@
 ﻿using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 
-namespace Tester
+namespace TestExtensions
 {
     public class DefaultClusterFixture : BaseTestClusterFixture
     {
@@ -9,7 +9,7 @@ namespace Tester
         {
             var options = new TestClusterOptions();
 #if !NETSTANDARD_TODO
-            //wait for OrleansProviders project to be port over to vNext
+            // waiting for OrleansProviders project to be ported over to vNext
             options.ClusterConfiguration.AddMemoryStorageProvider("Default");
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
 #endif

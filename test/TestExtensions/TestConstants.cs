@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using Orleans.Runtime;
 
-namespace UnitTests
+namespace TestExtensions
 {
     // used for test constants
     internal static class TestConstants

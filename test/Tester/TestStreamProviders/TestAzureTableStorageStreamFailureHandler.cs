@@ -7,6 +7,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Streams;
+using TestExtensions;
 
 namespace Tester.TestStreamProviders
 {

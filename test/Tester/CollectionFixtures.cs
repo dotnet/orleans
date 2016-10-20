@@ -1,4 +1,5 @@
-﻿using Xunit;
+﻿using TestExtensions;
+using Xunit;
 
 namespace Tester
 {

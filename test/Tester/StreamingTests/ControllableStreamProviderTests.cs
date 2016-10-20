@@ -8,7 +8,7 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
 using Tester.TestStreamProviders.Controllable;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StreamingTests

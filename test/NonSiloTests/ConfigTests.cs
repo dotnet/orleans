@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 using Tester;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 using Xunit.Abstractions;

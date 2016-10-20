@@ -2,7 +2,7 @@ using System;
 using Orleans;
 using Orleans.Runtime;
 
-namespace UnitTests.Tester
+namespace TestExtensions
 {
     public abstract class OrleansTestingBase
     {

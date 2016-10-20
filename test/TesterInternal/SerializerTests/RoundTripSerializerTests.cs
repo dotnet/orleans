@@ -1,6 +1,6 @@
 ﻿using Orleans;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.SerializerTests

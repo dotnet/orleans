@@ -10,7 +10,7 @@ using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
 using Tester.TestStreamProviders.EventHub;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

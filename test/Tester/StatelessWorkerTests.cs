@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

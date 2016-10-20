@@ -8,7 +8,7 @@ using UnitTests.StorageTests.AWSUtils;
 using UnitTests.StreamingTests;
 using Xunit;
 using Orleans.Runtime.Configuration;
-using UnitTests.Tester;
+using TestExtensions;
 
 namespace UnitTests.Streaming
 {

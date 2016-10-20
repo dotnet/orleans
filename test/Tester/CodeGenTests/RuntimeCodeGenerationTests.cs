@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Serialization;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.CodeGenTests

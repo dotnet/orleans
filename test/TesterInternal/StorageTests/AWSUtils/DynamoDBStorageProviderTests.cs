@@ -6,6 +6,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.Serialization;
 using Orleans.Storage;
+using TestExtensions;
 using UnitTests.StorageTests.Relational;
 using Xunit;
 
