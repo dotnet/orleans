@@ -322,7 +322,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// <returns></returns>
         public SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
-            SiloAddress siloAddress;
+            SiloAddress siloAddress = null;
 
             lock (membershipRingList)
             {
@@ -338,8 +338,16 @@ namespace Orleans.Runtime.ConsistentRing
                 // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
                 // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-                siloAddress = membershipRingList.Find(siloAddr => (siloAddr.GetConsistentHashCode() >= hash) && // <= hash for counter-clockwise responsibilities
-                                    (!siloAddr.Equals(MyAddress) || !excludeMySelf));
+        
+                for (int index = 0; index < membershipRingList.Count; ++index)
+                {
+                    var siloAddr = membershipRingList[index];
+                    if (IsSiloNextInTheRing(siloAddr, hash, excludeMySelf))
+                    {
+                        siloAddress = siloAddr;
+                        break;
+                    }
+                }
 
                 if (siloAddress == null)
                 {
@@ -357,6 +365,11 @@ namespace Orleans.Runtime.ConsistentRing
 
             if (log.IsVerbose2) log.Verbose2("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
             return siloAddress;
+        }
+
+        private bool IsSiloNextInTheRing(SiloAddress siloAddr, uint hash, bool excludeMySelf)
+        {
+            return siloAddr.GetConsistentHashCode() >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
         }
     }
 }
