@@ -9,12 +9,13 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
+using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    public class GrainPlacementTests : HostedTestClusterPerTest
+    public class GrainPlacementTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
 

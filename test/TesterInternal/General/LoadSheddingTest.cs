@@ -4,11 +4,12 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.General
 {
-    public class LoadSheddingTest : HostedTestClusterPerTest
+    public class LoadSheddingTest : TestClusterPerTest
     {
         public override TestCluster CreateTestCluster()
         {

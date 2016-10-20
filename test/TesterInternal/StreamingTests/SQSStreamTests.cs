@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans.Providers.Streams;
 using Orleans.Storage;
@@ -9,11 +8,12 @@ using UnitTests.StorageTests.AWSUtils;
 using UnitTests.StreamingTests;
 using Xunit;
 using Orleans.Runtime.Configuration;
+using UnitTests.Tester;
 
 namespace UnitTests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
-    public class SQSStreamTests : HostedTestClusterPerTest
+    public class SQSStreamTests : TestClusterPerTest
     {
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSProvider";
 
