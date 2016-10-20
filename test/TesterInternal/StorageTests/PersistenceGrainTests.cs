@@ -12,11 +12,11 @@ using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable

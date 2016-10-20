@@ -1,8 +1,8 @@
 ﻿
 using Orleans;
 using Orleans.Runtime;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
 using Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

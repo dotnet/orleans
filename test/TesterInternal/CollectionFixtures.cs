@@ -1,4 +1,5 @@
 ﻿using Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests

@@ -6,9 +6,9 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 using Tester;
+using TestExtensions;
 
 namespace UnitTests.General
 {

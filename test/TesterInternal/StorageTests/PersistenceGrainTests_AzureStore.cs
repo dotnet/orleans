@@ -12,8 +12,8 @@ using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.General

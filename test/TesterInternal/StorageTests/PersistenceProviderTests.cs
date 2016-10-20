@@ -12,6 +12,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Samples.StorageProviders;
 using Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

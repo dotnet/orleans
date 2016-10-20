@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace Tester

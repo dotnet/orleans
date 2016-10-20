@@ -3,8 +3,8 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.Streaming

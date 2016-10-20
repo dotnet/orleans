@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Tester;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 

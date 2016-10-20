@@ -14,9 +14,9 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using OrleansAWSUtils.Storage;
 using Tester;
+using TestExtensions;
 using UnitTests.General;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

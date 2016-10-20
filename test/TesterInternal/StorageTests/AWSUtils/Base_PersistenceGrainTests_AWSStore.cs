@@ -8,8 +8,8 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 

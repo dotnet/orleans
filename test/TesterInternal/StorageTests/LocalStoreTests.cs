@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

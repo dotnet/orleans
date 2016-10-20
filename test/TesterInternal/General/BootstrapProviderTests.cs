@@ -7,11 +7,11 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 
 namespace UnitTests.General
 {

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Orleans.TestingHost;
-using UnitTests.Tester;
+using TestExtensions;
 using TestGrainInterfaces;
 using Xunit;
 

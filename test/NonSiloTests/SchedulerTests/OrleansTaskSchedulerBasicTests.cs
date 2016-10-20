@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
+using TestExtensions;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;

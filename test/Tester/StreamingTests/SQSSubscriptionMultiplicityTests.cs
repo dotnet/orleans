@@ -7,8 +7,8 @@ using OrleansAWSUtils.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using TestExtensions;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
 using Xunit;
 
 namespace Tester

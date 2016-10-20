@@ -6,12 +6,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using System;
+using TestExtensions;
 
 namespace Tester
 {

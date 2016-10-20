@@ -14,8 +14,8 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
 using Tester.TestStreamProviders.EventHub;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StreamingTests

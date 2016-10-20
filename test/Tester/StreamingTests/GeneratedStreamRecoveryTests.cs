@@ -9,9 +9,9 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
 using Tester.StreamingTests;
+using TestExtensions;
 using TestGrains;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StreamingTests

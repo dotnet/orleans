@@ -12,7 +12,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StreamingTests

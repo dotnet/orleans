@@ -3,9 +3,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
