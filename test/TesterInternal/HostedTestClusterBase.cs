@@ -3,7 +3,6 @@ using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
 
 namespace UnitTests
 {
