@@ -57,6 +57,42 @@
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
       <Name>OrleansTestingHost</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
+      <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj">
+      <Project>{afd242b4-eda9-42cd-ba39-e410b98add2a}</Project>
+      <Name>TestExtensions</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
+      <Project>{a972213f-189b-41d4-90fe-38d513c1106a}</Project>
+      <Name>TestGrainInterfaces</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj">
+      <Project>{aace28ae-f301-472a-b633-02b55434871a}</Project>
+      <Name>TestGrains</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\BaseClusterFixture.cs">
+      <Link>BaseClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
+      <Link>BasicActivationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\DefaultClusterFixture.cs">
+      <Link>DefaultClusterFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\HostedTestClusterBase.cs">
+      <Link>HostedTestClusterBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\OrleansTestingBase.cs">
+      <Link>OrleansTestingBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\TestUtils.cs">
+      <Link>TestUtils.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
