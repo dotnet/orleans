@@ -35,9 +35,9 @@ namespace Orleans
         /// <summary>
         /// Creates a grain reference caster delegate for the provided grain interface type and concrete grain reference type.
         /// </summary>
-        /// <param name="interfaceType"></param>
-        /// <param name="grainReferenceType"></param>
-        /// <returns></returns>
+        /// <param name="interfaceType">The interface type.</param>
+        /// <param name="grainReferenceType">The grain reference implementation type.</param>
+        /// <returns>A grain reference caster delegate.</returns>
         public static GrainFactory.GrainReferenceCaster CreateGrainReferenceCaster(
             Type interfaceType,
             Type grainReferenceType)
@@ -72,27 +72,27 @@ namespace Orleans
             // C#: var grainReferenceType = Type.GetTypeFromHandle(<grainReferenceType>.TypeHandle);
             il.DeclareLocal(typeof(Type));
             il.Emit(OpCodes.Ldtoken, grainReferenceType);
-            il.Emit(OpCodes.Call, GetTypeFromHandleMethodInfo);
+            EmitCall(il, GetTypeFromHandleMethodInfo);
             il.Emit(OpCodes.Stloc_1);
 
             // Get the runtime value of the target interface type.
             // C#: var interfaceType = Type.GetTypeFromHandle(<interfaceType>.TypeHandle);
             il.DeclareLocal(typeof(Type));
             il.Emit(OpCodes.Ldtoken, interfaceType);
-            il.Emit(OpCodes.Call, GetTypeFromHandleMethodInfo);
+            EmitCall(il, GetTypeFromHandleMethodInfo);
             il.Emit(OpCodes.Stloc_2);
 
             // C#: if (grainReferenceType.IsAssignableFrom(grainRef.GetType())) return grainRef;
             il.Emit(OpCodes.Ldloc_1);
             il.Emit(OpCodes.Ldloc_0);
             il.Emit(OpCodes.Call, GetTypeMethodInfo);
-            il.Emit(OpCodes.Callvirt, IsAssignableFromMethodInfo);
+            EmitCall(il, IsAssignableFromMethodInfo);
             il.Emit(OpCodes.Brtrue_S, returnLabel);
 
             // Convert the grainRef parameter to a weakly typed GrainReference.
             // C#: result = grainRef.AsWeaklyTypedReference();
             il.Emit(OpCodes.Ldloc_0);
-            il.Emit(OpCodes.Call, GrainReferenceCastHelperMethodInfo);
+            EmitCall(il, GrainReferenceCastHelperMethodInfo);
             il.Emit(OpCodes.Stloc_0);
 
             // If the result is assignable to the target interface type, return it.
@@ -100,7 +100,7 @@ namespace Orleans
             il.Emit(OpCodes.Ldloc_2);
             il.Emit(OpCodes.Ldloc_0);
             il.Emit(OpCodes.Call, GetTypeMethodInfo);
-            il.Emit(OpCodes.Callvirt, IsAssignableFromMethodInfo);
+            EmitCall(il, IsAssignableFromMethodInfo);
             il.Emit(OpCodes.Brtrue_S, returnLabel);
 
             // Otherwise, cast the input to a GrainReference and wrap it in the target type by calling the copy
@@ -122,6 +122,23 @@ namespace Orleans
             return (GrainFactory.GrainReferenceCaster)method.CreateDelegate(typeof(GrainFactory.GrainReferenceCaster));
         }
         
+        /// <summary>
+        /// Emits a call to the specified method.
+        /// </summary>
+        /// <param name="il">The il generator.</param>
+        /// <param name="method">The method to call.</param>
+        private static void EmitCall(ILGenerator il, MethodInfo method)
+        {
+            if (method.IsFinal || !method.IsVirtual)
+            {
+                il.Emit(OpCodes.Call, method);
+            }
+            else
+            {
+                il.Emit(OpCodes.Callvirt, method);
+            }
+        }
+
         private static bool IsGrainReferenceCopyConstructor(ConstructorInfo constructor)
         {
             var parameters = constructor.GetParameters();
