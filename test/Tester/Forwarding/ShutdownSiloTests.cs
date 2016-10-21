@@ -9,6 +9,9 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
+using Orleans;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace Tester.Forwarding
 {
@@ -18,7 +21,9 @@ namespace Tester.Forwarding
 
         public override TestCluster CreateTestCluster()
         {
+            Assert.True(StorageEmulator.TryStart());
             var options = new TestClusterOptions(NumberOfSilos);
+            options.ClusterConfiguration.AddAzureBlobStorageProvider("MemoryStore", "UseDevelopmentStorage=true");
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
             options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
             options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
@@ -46,37 +51,65 @@ namespace Tester.Forwarding
         [Fact, TestCategory("Functional"), TestCategory("Forward")]
         public async Task SiloGracefulShutdown_NoFailureOnGatewayShutdown()
         {
-            const int numberOfGrains = 5 * NumberOfSilos;
+            const int numberOfGrains = 2 * NumberOfSilos;
 
-            var grains = new List<ILongRunningTaskGrain<bool>>();
+            var grains = new List<ICounterGrain>();
             for (var i = 0; i < numberOfGrains; i++)
             {
-                grains.Add(await GetLongRunningTaskGrainOnPrimary<bool>());
+                grains.Add(await GetCounterGrainOnPrimary());
             }
 
-            // Put some work on a grain which is on Primary silo
-            var promises = new List<Task>();
-            foreach (var grain in grains)
-            {
-                promises.Add(grain.LongRunningTask(true, TimeSpan.FromSeconds(5)));
-            }
+            var cancellationTokenSource = new CancellationTokenSource();
+            var promise = CallIncrement(grains, cancellationTokenSource.Token);
 
-            // Shutdown the silo where there is a gateway
-            await Task.Delay(500);
+            await Task.Delay(1000);
             HostedCluster.StopSilo(HostedCluster.SecondarySilos.First());
+            await Task.Delay(1000);
 
-            // One call will fail and should be redirected to another gateway
-            await Task.WhenAll(grains.Select(g => g.GetRuntimeInstanceId()));
+            cancellationTokenSource.Cancel();
 
-            // Should not raise any exception because response should come from another silo
-            await Task.WhenAll(promises);
+            var numberOfCalls = await promise;
+            foreach (var g in grains)
+            {
+                var counterValue = await g.GetValue();
+                Assert.True(numberOfCalls.Item1 == counterValue, $"numberOfCalls={numberOfCalls.Item1} counterValue={counterValue} exceptionCounter={numberOfCalls.Item2}");
+            }
         }
 
-        private async Task<ILongRunningTaskGrain<T>> GetLongRunningTaskGrainOnPrimary<T>()
+        private static async Task<Tuple<int, int>> CallIncrement(IList<ICounterGrain> grains, CancellationToken token)
+        {
+            var counter = 0;
+            var tasks = new List<Task>();
+            while (!token.IsCancellationRequested)
+            {
+                foreach (var g in grains)
+                {
+                    tasks.Add(g.IncrementValue());
+                }
+                counter++;
+                await Task.Delay(100);
+            }
+            var promise = Task.WhenAll(tasks);
+            try
+            {
+                await promise;
+            }
+            catch (Exception)
+            {
+                // Nothing
+            }
+            if (promise.Exception != null)
+            {
+                Assert.True(promise.Exception.InnerExceptions.All(ex => ex.GetType() == typeof(SiloUnavailableException)));
+            }
+            return Tuple.Create(counter, promise.Exception?.InnerExceptions.Count ?? 0);
+        }
+
+        private async Task<ICounterGrain> GetCounterGrainOnPrimary()
         {
             while (true)
             {
-                var grain = HostedCluster.GrainFactory.GetGrain<ILongRunningTaskGrain<T>>(Guid.NewGuid());
+                var grain = HostedCluster.GrainFactory.GetGrain<ICounterGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
                 {
