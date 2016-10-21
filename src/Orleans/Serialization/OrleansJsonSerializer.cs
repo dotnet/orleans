@@ -112,6 +112,7 @@ namespace Orleans.Serialization
             var writer = new BinaryTokenStreamWriter();
             Serialize(source, writer, source.GetType());
             var retVal = Deserialize(source.GetType(), new BinaryTokenStreamReader(writer.ToByteArray()));
+            writer.ReleaseBuffers();
             return retVal;
         }
 

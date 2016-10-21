@@ -319,7 +319,9 @@ namespace Orleans.Runtime
         {
             var writer = new BinaryTokenStreamWriter();
             writer.Write(this);
-            return writer.ToByteArray();
+            var result = writer.ToByteArray();
+            writer.ReleaseBuffers();
+            return result;
         }
 
         internal static GrainId FromByteArray(byte[] byteArray)

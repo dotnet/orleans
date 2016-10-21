@@ -49,7 +49,9 @@ namespace Orleans.ServiceBus.Providers
         {
             var writeStream = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(eventData.Properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
-            return writeStream.ToByteArray();
+            var result = writeStream.ToByteArray();
+            writeStream.ReleaseBuffers();
+            return result;
         }
 
         /// <summary>
