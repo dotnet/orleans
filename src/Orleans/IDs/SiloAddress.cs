@@ -203,6 +203,7 @@ namespace Orleans.Runtime
             writer.Write(this);
             writer.Write(extraBit);
             byte[] bytes = writer.ToByteArray();
+            writer.ReleaseBuffers();
             return jenkinsHash.ComputeHash(bytes);
         }
 
