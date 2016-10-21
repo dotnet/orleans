@@ -129,8 +129,14 @@ namespace Orleans
         /// <param name="method">The method to call.</param>
         private static void EmitCall(ILGenerator il, MethodInfo method)
         {
-            if (method.IsFinal || !method.IsVirtual) il.Emit(OpCodes.Call, method);
-            else il.Emit(OpCodes.Callvirt, method);
+            if (method.IsFinal || !method.IsVirtual)
+            {
+                il.Emit(OpCodes.Call, method);
+            }
+            else
+            {
+                il.Emit(OpCodes.Callvirt, method);
+            }
         }
 
         private static bool IsGrainReferenceCopyConstructor(ConstructorInfo constructor)
