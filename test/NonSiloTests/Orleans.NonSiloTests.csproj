@@ -74,6 +74,7 @@
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
     <Compile Include="SerializationTests\SerializationTests.DifferentTypes.cs" />
     <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
+    <Compile Include="SerializationTests\StreamTypeSerializationTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
     <Compile Include="Serialization\ILBasedSerializerTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
@@ -171,6 +172,10 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
+      <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
+      <Name>OrleansAzureUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansBondUtils\OrleansBondUtils.csproj">
       <Project>{7a6b8051-5d99-483c-b9b7-444ed57918ec}</Project>
       <Name>OrleansBondUtils</Name>
@@ -186,6 +191,10 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.csproj">
+      <Project>{8BFF0092-15D2-4425-80C0-29E381702F2B}</Project>
+      <Name>OrleansServiceBus</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>

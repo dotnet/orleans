@@ -7,6 +7,7 @@ The idea is to track end-user facing changes as they occur.*
 - Invoker codegen: methods returning Task<object> do not need Box() calls #2221
 - CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
 - Several major performance improvements
+- Add streaming support for types that are serialized using IExternalSerializers
 
 ### [v1.3.0]
 - Bug fixes:

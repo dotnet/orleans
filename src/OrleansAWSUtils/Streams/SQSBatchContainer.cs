@@ -90,7 +90,7 @@ namespace OrleansAWSUtils.Streams
             var json = JObject.Parse(msg.Body);
             var sqsBatch = SerializationManager.DeserializeFromByteArray<SQSBatchContainer>(json["payload"].ToObject<byte[]>());
             sqsBatch.Message = msg;
-            sqsBatch.sequenceToken = new EventSequenceToken(sequenceId);
+            sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
             return sqsBatch;
         }
 
