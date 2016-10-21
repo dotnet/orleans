@@ -81,7 +81,9 @@ namespace Orleans.TestingHost
                 Type = type,
                 AppDomain = appDomain,
                 additionalAssemblies = additionalAssemblies,
+#if !NETSTANDARD_TODO
                 TestHook = siloHost.TestHook,
+#endif
             };
 
             retValue.ImportGeneratedAssemblies();

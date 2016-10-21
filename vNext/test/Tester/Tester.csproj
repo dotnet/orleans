@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
@@ -72,6 +73,10 @@
     <ProjectReference Include="..\TestGrains\TestGrains.csproj">
       <Project>{aace28ae-f301-472a-b633-02b55434871a}</Project>
       <Name>TestGrains</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj">
+      <Project>{a682abc1-1a51-4794-8012-da8e59ebc72a}</Project>
+      <Name>TestInternalGrains</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

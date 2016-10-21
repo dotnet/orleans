@@ -1,13 +1,16 @@
 ﻿#if NETSTANDARD_TODO
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Reflection;
-using Orleans.Runtime;
 
 namespace Orleans
 {
     internal sealed class AppDomain
     {
         public delegate void AssemblyLoadEventHandler(object sender, AssemblyLoadEventArgs args);
+
         public delegate void UnhandledExceptionEventHandler(object sender, UnhandledExceptionEventArgs e);
 
         public static AppDomain CurrentDomain { get; private set; }
@@ -31,19 +34,31 @@ namespace Orleans
             //};
         }
 
+        private Lazy<Assembly[]> assembliesList = new Lazy<Assembly[]>(() =>
+        {
+            string path = ".";
+            var assemblyFiles = Directory.EnumerateFiles(path, "*.dll");
+            var assemblyNames = assemblyFiles.Select(Path.GetFileNameWithoutExtension).ToList();
+            var assemblies = new HashSet<Assembly>();
+            foreach (var assemblyName in assemblyNames)
+            {
+                try
+                {
+                    assemblies.Add(Assembly.Load(new AssemblyName(assemblyName)));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to load assembly '{assemblyName}'. Skipping. {ex}");
+                }
+            }
+            assemblies.Add(typeof(Exception).GetTypeInfo().Assembly);
+            return assemblies.ToArray();
+        });
+
         public Assembly[] GetAssemblies()
         {
-            // TODO: replace with IAssemblyCatalog or something like that.
-            Assembly[] assemblies =
-            {
-                typeof(Exception).GetTypeInfo().Assembly,
-                typeof(AssemblyProcessor).GetTypeInfo().Assembly,
-                // load up classes for testing, until Assembly scanning is supported in vNext
-                Assembly.Load(new AssemblyName("Orleans.NonSiloTests")),
-                Assembly.Load(new AssemblyName("TestInternalGrains")),
-                Assembly.Load(new AssemblyName("TestGrainInterfaces")) 
-            };
-            return assemblies;
+            // TODO: very naive approach to be replaced with IAssemblyCatalog or something like that.
+            return assembliesList.Value;
         }
     }
 
