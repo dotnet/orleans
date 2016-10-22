@@ -20,6 +20,8 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
+    using System.Reflection;
+
     public class AzureQueueAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -36,7 +38,7 @@ namespace UnitTests.StorageTests
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
         
         public void Dispose()

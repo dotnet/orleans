@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
@@ -12,7 +15,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsFsharpTypes()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         void RoundtripSerializationTest<T>(T input)

@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     {
         private readonly Logger logger;
 
-        internal LocalReminderServiceFactory()
+        public LocalReminderServiceFactory()
         {
             logger = LogManager.GetLogger("ReminderFactory", LoggerType.Runtime);
         }

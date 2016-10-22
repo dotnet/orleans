@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Grain Factory to get and cast grain references.
         /// </summary>
-        GrainFactory InternalGrainFactory { get; }
+        IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
         /// Provides client application code with access to an Orleans logger.

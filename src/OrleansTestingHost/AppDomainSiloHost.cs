@@ -16,6 +16,8 @@ using Orleans.Storage;
 
 namespace Orleans.TestingHost
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     /// <summary>Allows programmatically hosting an Orleans silo in the curent app domain, exposing some marshable members via remoting.</summary>
     public class AppDomainSiloHost : MarshalByRefObject
     {
@@ -161,13 +163,13 @@ namespace Orleans.TestingHost
 
             simulatedMessageLoss[destination] = lossPercentage;
 
-            var mc = (MessageCenter)silo.LocalMessageCenter;
+            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = ShouldDrop;
         }
 
         internal void UnblockSiloCommunication()
         {
-            var mc = (MessageCenter)silo.LocalMessageCenter;
+            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
         }

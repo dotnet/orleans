@@ -287,8 +287,8 @@
     <Compile Include="..\..\..\src\OrleansRuntime\Placement\ISiloStatisticsChangeListener.cs">
       <Link>Placement\ISiloStatisticsChangeListener.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\OrleansRuntime\Placement\PlacementDirector.cs">
-      <Link>Placement\PlacementDirector.cs</Link>
+    <Compile Include="..\..\..\src\OrleansRuntime\Placement\IPlacementDirector.cs">
+      <Link>Placement\IPlacementDirector.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\OrleansRuntime\Placement\PlacementDirectorsManager.cs">
       <Link>Placement\PlacementDirectorsManager.cs</Link>
@@ -380,6 +380,9 @@
     <Compile Include="..\..\..\src\OrleansRuntime\Silo\Silo.cs">
       <Link>Silo\Silo.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\src\OrleansRuntime\Silo\SiloInitializationParameters.cs">
+      <Link>Silo\SiloInitializationParameters.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\OrleansRuntime\Silo\SiloControl.cs">
       <Link>Silo\SiloControl.cs</Link>
     </Compile>
@@ -439,6 +442,9 @@
     </Compile>
     <Compile Include="..\..\..\src\OrleansRuntime\Streams\StreamProviderManagerAgent.cs">
       <Link>Streams\StreamProviderManagerAgent.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansRuntime\Utilities\ServiceCollectionExtensions.cs">
+      <Link>Utilities\ServiceCollectionExtensions.cs</Link>
     </Compile>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>

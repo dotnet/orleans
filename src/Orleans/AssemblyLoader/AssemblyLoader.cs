@@ -33,9 +33,6 @@ namespace Orleans.Runtime
             SimulateLoadCriteriaFailure = false;
             SimulateReflectionOnlyLoadFailure = false;
             RethrowDiscoveryExceptions = false;
-
-            // Ensure that each assembly which is loaded is processed.
-            AssemblyProcessor.Initialize();
         }
         
         /// <summary>

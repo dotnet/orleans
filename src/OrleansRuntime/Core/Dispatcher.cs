@@ -19,6 +19,7 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly Logger logger;
         private readonly ClusterConfiguration config;
+        private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
@@ -28,12 +29,14 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
             Catalog catalog, 
-            ClusterConfiguration config)
+            ClusterConfiguration config,
+            PlacementDirectorsManager placementDirectorsManager)
         {
             Scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
+            this.placementDirectorsManager = placementDirectorsManager;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -371,7 +374,7 @@ namespace Orleans.Runtime
                 var context = new SchedulingContext(targetActivation);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                Scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context), context);
+                Scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context, this), context);
             }
         }
 
@@ -564,7 +567,7 @@ namespace Orleans.Runtime
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-            var placementResult = await PlacementDirectorsManager.Instance.SelectOrAddActivation(
+            var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
                 message.SendingAddress, message.TargetGrain, InsideRuntimeClient.Current.Catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)

@@ -18,8 +18,6 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Serialization
 {
-    using System.Runtime.InteropServices;
-
     /// <summary>
     /// SerializationManager to oversee the Orleans serializer system.
     /// </summary>
@@ -56,7 +54,7 @@ namespace Orleans.Serialization
         public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value);
 
         private static readonly string[] safeFailSerializers = { "Orleans.FSharp" };
-
+        
 #if NETSTANDARD
         // Workaround for CoreCLR where FormatterServices.GetUninitializedObject is not public (but might change in RTM so we could remove this then).
         private static readonly Func<Type, object> getUninitializedObjectDelegate =
@@ -145,7 +143,6 @@ namespace Orleans.Serialization
                 RegisterBuiltInSerializers();
                 BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
                 RegisterSerializationProviders(serializationProviders);
-                AssemblyProcessor.Initialize();
                 fallbackSerializer = GetFallbackSerializer(fallbackType);
             }
             catch (ReflectionTypeLoadException ex)
@@ -192,7 +189,6 @@ namespace Orleans.Serialization
             }
 
             RegisterSerializationProviders(serializationProviders);
-            AssemblyProcessor.Initialize();
         }
 
         internal static void RegisterBuiltInSerializers()

@@ -11,6 +11,8 @@ using Xunit.Abstractions;
 
 namespace NonSiloTests.UnitTests.SerializerTests
 {
+    using System.Reflection;
+
     public class MessageSerializerTests
     {
         private readonly ITestOutputHelper output;
@@ -23,7 +25,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
             var orleansConfig = ClusterConfiguration.LocalhostPrimarySilo();
             BufferPool.InitGlobalBufferPool(orleansConfig.Globals);
 
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

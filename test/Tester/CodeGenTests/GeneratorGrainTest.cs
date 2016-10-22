@@ -11,6 +11,8 @@ using Xunit;
 
 namespace Tester.CodeGenTests
 {
+    using System.Reflection;
+
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
@@ -18,7 +20,7 @@ namespace Tester.CodeGenTests
     {
         public GeneratorGrainTest()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

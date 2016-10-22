@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
@@ -15,7 +18,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsJsonTypes()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]

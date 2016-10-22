@@ -6,6 +6,8 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System.Reflection;
+
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>
@@ -13,7 +15,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsDifferentTypes()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

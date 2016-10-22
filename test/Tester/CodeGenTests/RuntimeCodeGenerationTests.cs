@@ -7,6 +7,8 @@ using Xunit;
 
 namespace Tester.CodeGenTests
 {
+    using System.Reflection;
+
     /// <summary>
     /// Tests runtime code generation.
     /// </summary>
@@ -14,7 +16,7 @@ namespace Tester.CodeGenTests
     {
         public RuntimeCodeGenerationTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

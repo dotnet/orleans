@@ -5,15 +5,9 @@ namespace Orleans.Runtime
     [Serializable]
     internal class SystemPlacement : PlacementStrategy
     {
-        internal static SystemPlacement Singleton { get; private set; }
-
-        internal static void InitializeClass()
-        {
-            Singleton = new SystemPlacement();
-        }
-
-        private SystemPlacement()
-        {}
+        internal static SystemPlacement Singleton { get; } = new SystemPlacement();
+        
+        private SystemPlacement() {}
 
         public override bool Equals(object obj)
         {

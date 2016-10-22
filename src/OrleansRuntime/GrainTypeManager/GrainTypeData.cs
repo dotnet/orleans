@@ -90,7 +90,7 @@ namespace Orleans.Runtime
         }
 
 #pragma warning disable 612,618
-        internal static PlacementStrategy GetPlacementStrategy(Type grainClass)
+        internal static PlacementStrategy GetPlacementStrategy(Type grainClass, PlacementStrategy defaultPlacement)
         {
             PlacementStrategy placement;
 
@@ -110,7 +110,7 @@ namespace Orleans.Runtime
                 return placement;
             }
 
-            return PlacementStrategy.GetDefault();
+            return defaultPlacement;
         }
 
         internal static MultiClusterRegistrationStrategy GetMultiClusterRegistrationStrategy(Type grainClass)

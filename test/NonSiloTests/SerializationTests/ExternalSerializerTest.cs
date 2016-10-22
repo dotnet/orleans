@@ -11,7 +11,7 @@ namespace UnitTests.Serialization
     {
         public ExternalSerializerTest()
         {
-            SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() }, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

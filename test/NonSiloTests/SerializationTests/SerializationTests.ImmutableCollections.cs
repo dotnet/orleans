@@ -7,11 +7,13 @@ using System.Collections;
 
 namespace Tester.SerializationTests
 {
+    using System.Reflection;
+
     public class SerializationTestsImmutableCollections
     {
         public SerializationTestsImmutableCollections()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)

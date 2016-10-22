@@ -17,7 +17,7 @@ namespace UnitTests
         
         public AssemblyLoaderTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]

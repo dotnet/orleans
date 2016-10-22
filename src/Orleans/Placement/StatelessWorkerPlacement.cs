@@ -5,19 +5,10 @@ namespace Orleans.Runtime
     [Serializable]
     internal class StatelessWorkerPlacement : PlacementStrategy
     {
-        private static int defaultMaxStatelessWorkers = Environment.ProcessorCount;
+        private static readonly int defaultMaxStatelessWorkers = Environment.ProcessorCount;
 
         public int MaxLocal { get; private set; }
-
-        internal static void InitializeClass(int defMaxStatelessWorkers)
-        {
-            if (defMaxStatelessWorkers < 1)
-                throw new ArgumentOutOfRangeException("defMaxStatelessWorkers",
-                    "defMaxStatelessWorkers must contain a value greater than zero.");
-
-            defaultMaxStatelessWorkers = defMaxStatelessWorkers;
-        }
-
+        
         internal StatelessWorkerPlacement(int maxLocal = -1)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute, 

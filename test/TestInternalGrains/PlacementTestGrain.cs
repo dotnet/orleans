@@ -11,6 +11,8 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
+    using Microsoft.Extensions.DependencyInjection;
+
     internal abstract class PlacementTestGrainBase : Grain
     {
         public Task<IPEndPoint> GetEndpoint()
@@ -123,6 +125,14 @@ namespace UnitTests.Grains
         PlacementTestGrainBase, IActivationCountBasedPlacementTestGrain
     {}
 
+    internal class DefaultPlacementGrain : Grain, IDefaultPlacementGrain
+    {
+        public Task<PlacementStrategy> GetDefaultPlacement()
+        {
+            var defaultStrategy = this.ServiceProvider.GetRequiredService<DefaultPlacementStrategy>();
+            return Task.FromResult(defaultStrategy.PlacementStrategy);
+        }
+    }
 
     //----------------------------------------------------------//
     // Grains for LocalContent grain case, when grain is activated on every silo by bootstrap provider.

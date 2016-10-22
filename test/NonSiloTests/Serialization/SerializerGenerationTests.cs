@@ -6,6 +6,9 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     /// <summary>
     /// Test the built-in serializers
     /// </summary>
@@ -13,7 +16,7 @@ namespace UnitTests.Serialization
     {
         public SerializerGenerationTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

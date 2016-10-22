@@ -9,6 +9,9 @@ using Xunit;
 
 namespace NonSiloTests.UnitTests.SerializerTests
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     [Serializable]
     public class ClassWithCustomCopier
     {
@@ -71,7 +74,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         public CustomSerializerTests()
         {
             LogManager.Initialize(new NodeConfiguration());
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("Serialization")]

@@ -11,6 +11,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     public class Identifiertests
     {
         private readonly ITestOutputHelper output;
@@ -22,7 +25,7 @@ namespace UnitTests.General
         public Identifiertests(ITestOutputHelper output)
         {
             this.output = output;
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 

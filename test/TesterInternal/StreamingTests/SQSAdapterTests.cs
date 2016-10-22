@@ -19,6 +19,8 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Streaming
 {
+    using System.Reflection;
+
     [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSAdapterTests : IDisposable
     {
@@ -36,7 +38,7 @@ namespace UnitTests.Streaming
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         public void Dispose()

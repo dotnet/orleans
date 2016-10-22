@@ -4,25 +4,24 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
+    using Orleans.Runtime.Configuration;
+
     /// <summary>
     /// Maps multi-cluster registration strategies to the corresponding registrar
     /// </summary>
     internal class RegistrarManager
     {
         private readonly Dictionary<Type, IGrainRegistrar> registrars = new Dictionary<Type, IGrainRegistrar>();
-
-        public static RegistrarManager Instance { get; private set; }
-
-
-        private RegistrarManager()
+        
+        public RegistrarManager(GrainDirectoryPartition directoryPartition, GlobalSingleInstanceActivationMaintainer gsiActivationMaintainer, GlobalConfiguration globalConfig, Logger logger)
         {
-        }
-
-        public static void InitializeGrainDirectoryManager(LocalGrainDirectory router, int numRetriesForGSI)
-        {
-            Instance = new RegistrarManager();
-            Instance.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(router.DirectoryPartition));
-            Instance.Register<GlobalSingleInstanceRegistration>(new GlobalSingleInstanceRegistrar(router.DirectoryPartition, router.Logger, router.GsiActivationMaintainer, numRetriesForGSI));
+            this.Register<ClusterLocalRegistration>(new ClusterLocalRegistrar(directoryPartition));
+            this.Register<GlobalSingleInstanceRegistration>(
+                new GlobalSingleInstanceRegistrar(
+                    directoryPartition,
+                    logger,
+                    gsiActivationMaintainer,
+                    globalConfig.GlobalSingleInstanceNumberRetries));
         }
 
         private void Register<TStrategy>(IGrainRegistrar directory)

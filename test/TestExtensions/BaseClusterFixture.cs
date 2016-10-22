@@ -5,6 +5,9 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     public abstract class BaseTestClusterFixture : IDisposable
     {
         private static int defaultsAreInitialized = 0;
@@ -17,7 +20,7 @@ namespace TestExtensions
         protected BaseTestClusterFixture()
         {
             GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
             var testCluster = CreateTestCluster();
             if (testCluster.Primary == null)
             {

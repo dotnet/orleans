@@ -5,11 +5,14 @@ using Xunit;
 
 namespace Tester.SerializationTests
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     public class ConsiderForCodeGenerationAttributeTests
     {
         public ConsiderForCodeGenerationAttributeTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]

@@ -2,24 +2,23 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Runtime.Startup
 {
+
     /// <summary>
     /// Configure dependency injection at startup
     /// </summary>
     internal class StartupBuilder
     {
-        internal static IServiceProvider ConfigureStartup(string startupTypeName, out bool usingCustomServiceProvider)
+        internal static IServiceProvider ConfigureStartup(string startupTypeName, Action<IServiceCollection, bool> registerSystemTypes)
         {
-            usingCustomServiceProvider = false;
+            var usingCustomServiceProvider = false;
             IServiceCollection serviceCollection = new ServiceCollection();
             ConfigureServicesBuilder servicesMethod = null;
             Type startupType = null;
 
-            if (!String.IsNullOrWhiteSpace(startupTypeName))
+            if (!string.IsNullOrWhiteSpace(startupTypeName))
             {
                 startupType = Type.GetType(startupTypeName);
                 if (startupType == null)
@@ -34,7 +33,7 @@ namespace Orleans.Runtime.Startup
                 }
             }
 
-            RegisterSystemTypes(serviceCollection);
+            registerSystemTypes(serviceCollection, usingCustomServiceProvider);
 
             if (usingCustomServiceProvider)
             {
@@ -43,15 +42,6 @@ namespace Orleans.Runtime.Startup
             }
 
             return serviceCollection.BuildServiceProvider();
-        }
-
-        private static void RegisterSystemTypes(IServiceCollection serviceCollection)
-        {
-            // add system types
-            // Note: you can replace IGrainFactory with your own implementation, but 
-            // we don't recommend it, in the aspect of performance and usability
-            serviceCollection.AddSingleton<GrainFactory>((_sp) => new GrainFactory());
-            serviceCollection.AddSingleton<IGrainFactory>((sp) => sp.GetService<GrainFactory>());
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)

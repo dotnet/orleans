@@ -273,8 +273,8 @@ namespace Orleans.Runtime.Management
         {
             if (membershipTable == null)
             {
-                var factory = new MembershipFactory();
-                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig.LivenessType, Silo.CurrentSilo.GlobalConfig.MembershipTableAssembly);
+                var factory = new MembershipFactory((IInternalGrainFactory)this.GrainFactory);
+                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig);
 
                 await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
                     LogManager.GetLogger(membershipTable.GetType().Name));

@@ -165,7 +165,7 @@ namespace Orleans
 
             internal PlacementAttribute(PlacementStrategy placement)
             {
-                PlacementStrategy = placement ?? PlacementStrategy.GetDefault();
+                PlacementStrategy = placement;
             }
         }
 

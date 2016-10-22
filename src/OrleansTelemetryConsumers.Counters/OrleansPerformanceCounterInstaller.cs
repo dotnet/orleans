@@ -11,6 +11,8 @@ using Orleans.Runtime.Configuration;
 
 namespace OrleansTelemetryConsumers.Counters
 {
+    using System.Reflection;
+
     /// <summary>
     /// Providers installer hooks for registering Orleans custom performance counters.
     /// </summary>
@@ -25,7 +27,7 @@ namespace OrleansTelemetryConsumers.Counters
         /// </summary>
         public OrleansPerformanceCounterInstaller()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);
@@ -35,7 +37,7 @@ namespace OrleansTelemetryConsumers.Counters
             if (GrainTypeManager.Instance == null)
             {
                 var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                var typeManager = new GrainTypeManager(false, null, loader); // We shouldn't need GrainFactory in this case
+                var typeManager = new GrainTypeManager(false, loader, DefaultPlacementStrategy.GetDefaultForTesting());
                 GrainTypeManager.Instance.Start(false);
             }
         }

@@ -12,18 +12,23 @@ namespace Orleans.Runtime.Counters
         internal SiloPerformanceMetrics MetricsTable;
         private readonly Logger logger = LogManager.GetLogger("SiloStatisticsManager");
 
-        internal SiloStatisticsManager(GlobalConfiguration globalConfig, NodeConfiguration nodeConfig)
+        public SiloStatisticsManager(SiloInitializationParameters initializationParams)
         {
             MessagingStatisticsGroup.Init(true);
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
-            ApplicationRequestsStatisticsGroup.Init(globalConfig.ResponseTimeout);
+            ApplicationRequestsStatisticsGroup.Init(initializationParams.GlobalConfig.ResponseTimeout);
             SchedulerStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
             runtimeStats = new RuntimeStatisticsGroup();
-            logStatistics = new LogStatistics(nodeConfig.StatisticsLogWriteInterval, true);
-            MetricsTable = new SiloPerformanceMetrics(runtimeStats, nodeConfig);
-            countersPublisher = new CountersStatistics(nodeConfig.StatisticsPerfCountersWriteInterval);
+            this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true);
+            this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, initializationParams.NodeConfig);
+            this.countersPublisher = new CountersStatistics(initializationParams.NodeConfig.StatisticsPerfCountersWriteInterval);
+
+            initializationParams.ClusterConfig.OnConfigChange(
+                "Defaults/LoadShedding",
+                () => this.MetricsTable.NodeConfig = initializationParams.NodeConfig,
+                false);
         }
 
         internal async Task SetSiloMetricsTableDataManager(Silo silo, NodeConfiguration nodeConfig)

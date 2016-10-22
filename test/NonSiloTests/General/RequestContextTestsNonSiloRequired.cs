@@ -12,6 +12,8 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    using System.Reflection;
+
     public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();
@@ -22,7 +24,7 @@ namespace UnitTests.General
 
         public RequestContextTests_Local()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;

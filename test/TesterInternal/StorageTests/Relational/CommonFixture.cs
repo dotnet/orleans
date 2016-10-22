@@ -1,17 +1,18 @@
-﻿using Orleans;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
 using Orleans.Serialization;
 using Orleans.SqlUtils;
 using Orleans.Storage;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using TestExtensions;
-using UnitTests.General;
 
+using TestExtensions;
+
+using UnitTests.General;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -55,10 +56,12 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            DefaultProviderRuntime = new StorageProviderManager(new GrainFactory(), null);
-            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), null)).WaitWithThrow(TestConstants.InitTimeout);
+            var testEnvironment = new SerializationTestEnvironment();
+            DefaultProviderRuntime = new StorageProviderManager(testEnvironment.GrainFactory, null);
+            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(
+                new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
 
-            SerializationManager.InitializeForTesting();
+            testEnvironment.InitializeForTesting();
         }
 
 

@@ -12,10 +12,8 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        internal override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementContext context)
+        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementContext context)
         {
-
-  
             // first, check if we can find an activation for this client in the cache or local directory partition
             AddressesAndTag addresses;
             if (context.FastLookup(target, out addresses))
@@ -43,7 +41,7 @@ namespace Orleans.Runtime.Placement
         }
 
 
-        internal override Task<PlacementResult> 
+        public override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + grain);

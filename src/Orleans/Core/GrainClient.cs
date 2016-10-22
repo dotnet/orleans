@@ -33,9 +33,7 @@ namespace Orleans
         private static OutsideRuntimeClient outsideRuntimeClient;
 
         private static readonly object initLock = new Object();
-
-        private static GrainFactory grainFactory;
-
+        
         // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
         // That means we are running in side a silo.
         private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
@@ -73,10 +71,10 @@ namespace Orleans
                 throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
             }
 
-            return grainFactory;
+                return outsideRuntimeClient.InternalGrainFactory;
         }
 
-        internal static GrainFactory InternalGrainFactory
+        internal static IInternalGrainFactory InternalGrainFactory
         {
             get
             {
@@ -85,7 +83,7 @@ namespace Orleans
                     throw new OrleansException("You must initialize the Grain Client before accessing the InternalGrainFactory");
                 }
 
-                return grainFactory;
+                return outsideRuntimeClient.InternalGrainFactory;
             }
         }
 
@@ -181,7 +179,7 @@ namespace Orleans
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private static void InternalInitialize(ClientConfiguration config, OutsideRuntimeClient runtimeClient = null)
+        private static void InternalInitialize(ClientConfiguration config)
         {
             // We deliberately want to run this initialization code on .NET thread pool thread to escape any
             // TPL execution environment and avoid any conflicts with client's synchronization context
@@ -197,7 +195,7 @@ namespace Orleans
                     else
                     {
                         // Finish initializing this client connection to the Orleans cluster
-                        DoInternalInitialize(config, runtimeClient);
+                        DoInternalInitialize(config);
                     }
                     tcs.SetResult(config); // Resolve promise
                 }
@@ -229,7 +227,7 @@ namespace Orleans
         /// <summary>
         /// Initializes client runtime from client configuration object.
         /// </summary>
-        private static void DoInternalInitialize(ClientConfiguration config, OutsideRuntimeClient runtimeClient = null)
+        private static void DoInternalInitialize(ClientConfiguration config)
         {
             if (IsInitialized)
                 return;
@@ -243,13 +241,7 @@ namespace Orleans
                         // this is probably overkill, but this ensures isFullyInitialized false
                         // before we make a call that makes RuntimeClient.Current not null
                         isFullyInitialized = false;
-                        grainFactory = new GrainFactory();
-
-                        if (runtimeClient == null)
-                        {
-                            runtimeClient = new OutsideRuntimeClient(config, grainFactory);
-                        }
-                        outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
+                        outsideRuntimeClient = new OutsideRuntimeClient(config);  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
 
                         // this needs to be the last successful step inside the lock so
@@ -313,7 +305,6 @@ namespace Orleans
                 RuntimeClient.Current = null;
             }
             outsideRuntimeClient = null;
-            grainFactory = null;
             ClientInvokeCallback = null;
         }
 

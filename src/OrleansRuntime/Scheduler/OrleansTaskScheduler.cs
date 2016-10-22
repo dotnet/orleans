@@ -28,13 +28,18 @@ namespace Orleans.Runtime.Scheduler
         public int RunQueueLength { get { return RunQueue.Length; } }
         
 
-        public OrleansTaskScheduler(int maxActiveThreads)
-            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100),
-            NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads)
         {
+            return new OrleansTaskScheduler(
+                maxActiveThreads,
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(100),
+                NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
+                LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS));
         }
 
-        public OrleansTaskScheduler(GlobalConfiguration globalConfig, NodeConfiguration config)
+        public OrleansTaskScheduler(NodeConfiguration config)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
                     config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {

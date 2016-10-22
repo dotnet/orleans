@@ -7,6 +7,8 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System.Reflection;
+
     /// <summary>
     /// Test the deep copy of built-in and user-defined types
     /// </summary>
@@ -14,7 +16,7 @@ namespace UnitTests.Serialization
     {
         public DeepCopyTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize(null, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
