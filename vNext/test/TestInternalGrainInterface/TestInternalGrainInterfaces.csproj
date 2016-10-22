@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A682ABC1-1A51-4794-8012-DA8E59EBC72A}</ProjectGuid>
+    <ProjectGuid>{AAE67055-F38A-45F0-AEA7-5754F4814EAA}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UnitTests.Grains</RootNamespace>
-    <AssemblyName>TestInternalGrains</AssemblyName>
+    <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
+    <AssemblyName>TestInternalGrainInterfaces</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -39,43 +39,21 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestInternalGrains\ActivateDeactivateTestGrain.cs">
-      <Link>ActivateDeactivateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\EchoTaskGrain.cs">
-      <Link>EchoTaskGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\ExtensionTestGrain.cs">
-      <Link>ExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\InterlockedFlag.cs">
-      <Link>InterlockedFlag.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
-      <Link>PersistenceTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
-      <Link>StreamLifecycleTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestExtension.cs">
-      <Link>TestExtension.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestGrain.cs">
-      <Link>TestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
+    <Compile Include="..\..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{aff2004c-cdf8-479c-bf27-c6bfe8ef93ea}</Project>
-      <Name>OrleansRuntime</Name>
-    </ProjectReference>
+    <None Include="project.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
       <Name>Orleans</Name>
@@ -85,13 +63,10 @@
       <Name>TestGrainInterfaces</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="project.json" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <PropertyGroup>
-    <OrleansProjectType>Server</OrleansProjectType>
+    <OrleansProjectType>Client</OrleansProjectType>
   </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
   <Choose>

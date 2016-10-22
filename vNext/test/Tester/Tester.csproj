@@ -86,8 +86,68 @@
     <Compile Include="..\..\..\test\Tester\CollectionFixtures.cs">
       <Link>CollectionFixtures.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\ConcreteStateClassTests.cs">
+      <Link>ConcreteStateClassTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\DeactivationTests.cs">
+      <Link>DeactivationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ExceptionPropagationTests.cs">
+      <Link>ExceptionPropagationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ExternalTypesTests.cs">
+      <Link>ExternalTypesTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\General\JsonGrainTests.cs">
+      <Link>General\JsonGrainTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\GenericGrainTests.cs">
+      <Link>GenericGrainTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs">
+      <Link>GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\GrainActivateDeactivateTests.cs">
+      <Link>GrainActivateDeactivateTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\GrainFactoryTests.cs">
+      <Link>GrainFactoryTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\GrainInterfaceHierarchyTests.cs">
+      <Link>GrainInterfaceHierarchyTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\KeyExtensionTests.cs">
+      <Link>KeyExtensionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ManagementGrainTests.cs">
+      <Link>ManagementGrainTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\MemoryStorageProviderTests.cs">
+      <Link>MemoryStorageProviderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\MethodInterceptionTests.cs">
+      <Link>MethodInterceptionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ObserverTests.cs">
+      <Link>ObserverTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ProviderTests.cs">
+      <Link>ProviderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\ReminderTest.cs">
+      <Link>ReminderTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\RequestContextTest.cs">
+      <Link>RequestContextTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\SimpleGrainTests.cs">
+      <Link>SimpleGrainTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StatelessWorkerTests.cs">
+      <Link>StatelessWorkerTests.cs</Link>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
