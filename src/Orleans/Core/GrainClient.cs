@@ -46,32 +46,38 @@ namespace Orleans
         {
             get
             {
-                if (IsRunningInsideSilo)
-                {
-                    // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
-                    bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
-                        && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
-                    if (runningInsideGrain)
-                    {
-                        throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
-                                 "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
-
-                    }
-                    else // running inside provider or else where
-                    {
-                        throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
-                                "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
-                    }
-                }
-
-                if (!IsInitialized)
-                {
-               
-                    throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
-                }
-
-                return grainFactory;
+                return GetGrainFactory();
             }
+        }
+
+        private static IGrainFactory GetGrainFactory()
+        {
+            if (IsRunningInsideSilo)
+            {
+                // just in case, make sure we don't get NullRefExc when checking RuntimeContext.
+                bool runningInsideGrain = RuntimeContext.Current != null && RuntimeContext.CurrentActivationContext != null
+                    && RuntimeContext.CurrentActivationContext.ContextType == SchedulingContextType.Activation;
+                if (runningInsideGrain)
+                {
+                    throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
+                             "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
+
+                }
+                else // running inside provider or else where
+                {
+                    throw new OrleansException("You are running inside the provider code, on the silo. GrainClient.GrainFactory should only be used on the client side. " +
+                            "Inside the provider code use GrainFactory that is passed via IProviderRuntime (use providerRuntime.GrainFactory).");
+                }
+            }
+
+            if (!IsInitialized)
+            {
+
+                throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
+            }
+
+            return grainFactory;
+
         }
 
         internal static GrainFactory InternalGrainFactory
@@ -249,7 +255,7 @@ namespace Orleans
                         }
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
-         
+
                         // this needs to be the last successful step inside the lock so 
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;

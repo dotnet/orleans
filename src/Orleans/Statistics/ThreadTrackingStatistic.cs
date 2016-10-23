@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -5,7 +6,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class ThreadTrackingStatistic
+    internal class ThreadTrackingStatistic : IDisposable
     {
         public ITimeInterval ExecutingCpuCycleTime;
         public ITimeInterval ExecutingWallClockTime;
@@ -36,7 +37,7 @@ namespace Orleans.Runtime
         /// <param name="threadName">Name used for logging the collected stastistics</param>
         public ThreadTrackingStatistic(string threadName)
         {
-            
+
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
             ExecutingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
             ProcessingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
@@ -70,7 +71,7 @@ namespace Orleans.Runtime
             allNumProcessedRequests.Add(
                 FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_PROCESSED_REQUESTS_PER_THREAD, threadName),
                         () => (float)NumRequests, storage));
-                
+
             // aggregate stats
             if (totalExecutingCpuCycleTime == null)
             {
@@ -102,10 +103,10 @@ namespace Orleans.Runtime
                     new StatisticName(StatisticNames.THREADS_PROCESSED_REQUESTS_PER_THREAD, "AllThreads"),
                         () => (float)allNumProcessedRequests.Select(cs => cs.GetCurrentValue()).Sum(), aggrCountersStorage);
             }
-            
+
             if (StatisticsCollector.PerformStageAnalysis)
                 globalStageAnalyzer.AddTracking(this);
-            }
+        }
 
         private float CalculateTotalAverage(List<FloatValueStatistic> allthreasCounters, FloatValueStatistic allNumRequestsCounter)
         {
@@ -241,5 +242,40 @@ namespace Orleans.Runtime
             }
 #endif
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects).
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~ThreadTrackingStatistic() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
     }
 }

@@ -11,7 +11,7 @@ namespace Orleans.Runtime
     /// </summary>
     /// <typeparam name="TKey"></typeparam>
     /// <typeparam name="TValue"></typeparam>
-    internal class GrainReferenceCache<TKey, TValue>
+    internal class GrainReferenceCache<TKey, TValue> : IDisposable
         where TValue : IAddressable
     {
         // Delegate type for fetching the value associated with a given key.
@@ -27,8 +27,8 @@ namespace Orleans.Runtime
         private class TimestampedValue
         {
             public DateTime WhenLoaded;
-            public TValue   Value;
-            public long     Generation;
+            public TValue Value;
+            public long Generation;
         }
 
         private readonly Dictionary<TKey, TimestampedValue> cache;
@@ -55,8 +55,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Return the number of entries currently in the cache
         /// </summary>
-        public int Count { 
-            get {
+        public int Count
+        {
+            get
+            {
                 try
                 {
                     rwLock.EnterReadLock();
@@ -67,7 +69,7 @@ namespace Orleans.Runtime
                 {
                     rwLock.ExitReadLock();
                 }
-            } 
+            }
         }
 
         /// <summary>
@@ -128,8 +130,8 @@ namespace Orleans.Runtime
                 while (cache.Count >= maximumCount)
                 {
                     long generationToDelete = Interlocked.Increment(ref generationToFree);
-                    KeyValuePair<TKey, TimestampedValue> entryToFree = 
-                        cache.FirstOrDefault( kvp => kvp.Value.Generation == generationToDelete);
+                    KeyValuePair<TKey, TimestampedValue> entryToFree =
+                        cache.FirstOrDefault(kvp => kvp.Value.Generation == generationToDelete);
 
                     if (entryToFree.Key != null)
                     {
@@ -137,7 +139,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                result = new TimestampedValue {Generation = Interlocked.Increment(ref nextGeneration)};
+                result = new TimestampedValue { Generation = Interlocked.Increment(ref nextGeneration) };
                 try
                 {
                     var r = fetcher(key);
@@ -157,6 +159,11 @@ namespace Orleans.Runtime
                 rwLock.ExitWriteLock();
             }
             return result.Value;
+        }
+
+        public void Dispose()
+        {
+            rwLock.Dispose();
         }
     }
 }

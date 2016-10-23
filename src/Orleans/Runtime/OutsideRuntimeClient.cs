@@ -1,11 +1,3 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Providers;
@@ -14,12 +6,19 @@ using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans
 {
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable
     {
-
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
         private readonly Logger logger;
@@ -46,6 +45,7 @@ namespace Orleans
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
+
         private static readonly TimeSpan resetTimeout = TimeSpan.FromMinutes(1);
 
         private const string BARS = "----------";
@@ -119,7 +119,6 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
         {
-
             this.grainFactory = grainFactory;
 
             if (cfg == null)
@@ -142,7 +141,7 @@ namespace Orleans
             try
             {
                 LoadAdditionalAssemblies();
-                
+
                 PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
@@ -173,9 +172,9 @@ namespace Orleans
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, config.DNSHostName, localAddress, handshakeClientId));
-                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}", 
+                string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
                     BARS, RuntimeVersion.Current, PrintAppDomainDetails());
-                startMsg = string.Format("{0} Config= "  + Environment.NewLine + " {1}", startMsg, config);
+                startMsg = string.Format("{0} Config= " + Environment.NewLine + " {1}", startMsg, config);
                 logger.Info(ErrorCode.ClientStarting, startMsg);
 
                 if (TestOnlyThrowExceptionDuringInit)
@@ -225,7 +224,7 @@ namespace Orleans
                 new Dictionary<string, SearchOption>
                     {
                         {
-                            Path.GetDirectoryName(typeof(OutsideRuntimeClient).GetTypeInfo().Assembly.Location), 
+                            Path.GetDirectoryName(typeof(OutsideRuntimeClient).GetTypeInfo().Assembly.Location),
                             SearchOption.AllDirectories
                         }
                     };
@@ -244,7 +243,7 @@ namespace Orleans
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
 #endif
         }
-        
+
         private void UnhandledException(ISchedulingContext context, Exception exception)
         {
             logger.Error(ErrorCode.Runtime_Error_100007, String.Format("OutsideRuntimeClient caught an UnobservedException."), exception);
@@ -262,7 +261,6 @@ namespace Orleans
             StartInternal();
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
-              
         }
 
         // used for testing to (carefully!) allow two clients in the same process
@@ -278,13 +276,13 @@ namespace Orleans
             listenForMessages = true;
 
             // Keeping this thread handling it very simple for now. Just queue task on thread pool.
-            Task.Factory.StartNew(() => 
+            Task.Factory.StartNew(() =>
                 {
                     try
                     {
                         RunClientMessagePump(ct);
                     }
-                    catch(Exception exc)
+                    catch (Exception exc)
                     {
                         logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
                     }
@@ -318,7 +316,7 @@ namespace Orleans
 #endif
 
                 // when we receive the first message, we update the
-                // clientId for this client because it may have been modified to 
+                // clientId for this client because it may have been modified to
                 // include the cluster name
                 if (!firstMessageReceived)
                 {
@@ -371,7 +369,7 @@ namespace Orleans
             LocalObjectData objectData;
             GuidId observerId = message.TargetObserverId;
             if (observerId == null)
-            {                
+            {
                 logger.Error(
                     ErrorCode.ProxyClient_OGC_TargetNotFound_2,
                     String.Format("Did not find TargetObserverId header in the message = {0}. A request message to a client is expected to have an observerId.", message));
@@ -386,7 +384,7 @@ namespace Orleans
                     ErrorCode.ProxyClient_OGC_TargetNotFound,
                     String.Format(
                         "Unexpected target grain in request: {0}. Message={1}",
-                        message.TargetGrain, 
+                        message.TargetGrain,
                         message));
             }
         }
@@ -417,22 +415,22 @@ namespace Orleans
             if (start)
             {
                 // we use Task.Run() to ensure that the message pump operates asynchronously
-                // with respect to the current thread. see 
+                // with respect to the current thread. see
                 // http://channel9.msdn.com/Events/TechEd/Europe/2013/DEV-B317#fbid=aIWUq0ssW74
-                // at position 54:45. 
+                // at position 54:45.
                 //
                 // according to the information posted at:
                 // http://stackoverflow.com/questions/12245935/is-task-factory-startnew-guaranteed-to-use-another-thread-than-the-calling-thr
                 // this idiom is dependent upon the a TaskScheduler not implementing the
-                // override QueueTask as task inlining (as opposed to queueing). this seems 
+                // override QueueTask as task inlining (as opposed to queueing). this seems
                 // implausible to the author, since none of the .NET schedulers do this and
                 // it is considered bad form (the OrleansTaskScheduler does not do this).
                 //
                 // if, for some reason this doesn't hold true, we can guarantee what we
-                // want by passing a placeholder continuation token into Task.StartNew() 
+                // want by passing a placeholder continuation token into Task.StartNew()
                 // instead. i.e.:
                 //
-                // return Task.StartNew(() => ..., new CancellationToken()); 
+                // return Task.StartNew(() => ..., new CancellationToken());
                 Func<Task> asyncFunc =
                     async () =>
                         await this.LocalObjectMessagePumpAsync(objectData);
@@ -484,7 +482,8 @@ namespace Orleans
                         this.ReportException(message, caught);
                     else if (message.Direction != Message.Directions.OneWay)
                         await this.SendResponseAsync(message, resultObject);
-                }catch(Exception)
+                }
+                catch (Exception)
                 {
                     // ignore, keep looping.
                 }
@@ -498,11 +497,11 @@ namespace Orleans
                 message.DropExpiredMessage(phase);
                 return true;
             }
-                return false;
+            return false;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private Task 
+        private Task
             SendResponseAsync(
                 Message message,
                 object resultObject)
@@ -543,9 +542,9 @@ namespace Orleans
                         logger.Error(
                             ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
                             String.Format(
-                                "Exception during invocation of notification method {0}, interface {1}. Ignoring exception because this is a one way request.", 
-                                request.MethodId, 
-                                request.InterfaceId), 
+                                "Exception during invocation of notification method {0}, interface {1}. Ignoring exception because this is a one way request.",
+                                request.MethodId,
+                                request.InterfaceId),
                             exception);
                         break;
                     }
@@ -631,7 +630,7 @@ namespace Orleans
             {
                 message.TargetObserverId = target.ObserverId;
             }
-            
+
             if (debugContext != null)
             {
                 message.DebugContext = debugContext;
@@ -653,7 +652,6 @@ namespace Orleans
             transport.SendMessage(message);
         }
 
-
         private bool TryResendMessage(Message message)
         {
             if (!message.MayResend(config))
@@ -665,7 +663,7 @@ namespace Orleans
 
             message.ResendCount = message.ResendCount + 1;
             message.TargetHistory = message.GetTargetHistory();
-            
+
             if (!message.TargetGrain.IsSystemTarget)
             {
                 message.TargetActivation = null;
@@ -746,13 +744,13 @@ namespace Orleans
                     listeningCts.Cancel();
                 }
             }, logger, "Client.Stop-ListeningCTS");
-        Utils.SafeExecute(() =>
-            {
-                if (transport != null)
+            Utils.SafeExecute(() =>
                 {
-                    transport.Stop();
-                }
-            }, logger, "Client.Stop-Transport");
+                    if (transport != null)
+                    {
+                        transport.Stop();
+                    }
+                }, logger, "Client.Stop-Transport");
             Utils.SafeExecute(() =>
             {
                 if (ClientStatistics != null)
@@ -772,7 +770,7 @@ namespace Orleans
                     logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
-            
+
             try
             {
                 UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
@@ -802,6 +800,7 @@ namespace Orleans
         {
             responseTimeout = timeout;
         }
+
         public TimeSpan GetResponseTimeout()
         {
             return responseTimeout;
@@ -855,7 +854,7 @@ namespace Orleans
             if (!(obj is GrainReference))
                 throw new ArgumentException("Argument reference is not a grain reference.");
 
-            var reference = (GrainReference) obj;
+            var reference = (GrainReference)obj;
             LocalObjectData ignore;
             if (!localObjects.TryRemove(reference.ObserverId, out ignore))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
@@ -866,21 +865,22 @@ namespace Orleans
             throw new InvalidOperationException();
         }
 
-        #endregion
+        #endregion Implementation of IRuntimeClient
 
         private void CurrentDomain_DomainUnload(object sender, EventArgs e)
         {
             try
             {
-                logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload, 
+                logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload,
                     String.Format("Current AppDomain={0} is unloading.", PrintAppDomainDetails()));
                 LogManager.Flush();
             }
-            catch(Exception)
+            catch (Exception)
             {
                 // just ignore, make sure not to throw from here.
             }
         }
+
         private string PrintAppDomainDetails()
         {
 #if NETSTANDARD_TODO
@@ -889,7 +889,6 @@ namespace Orleans
             return string.Format("<AppDomain.Id={0}, AppDomain.FriendlyName={1}>", AppDomain.CurrentDomain.Id, AppDomain.CurrentDomain.FriendlyName);
 #endif
         }
-
 
         private class LocalObjectData
         {
@@ -917,9 +916,15 @@ namespace Orleans
                 listeningCts = null;
             }
 
+            transport.Dispose();
+            incomingMessagesThreadTimeTracking.Dispose();
+            if (ClientStatistics != null)
+            {
+                ClientStatistics.Dispose();
+                ClientStatistics = null;
+            }
             GC.SuppressFinalize(this);
         }
-
 
         public IGrainTypeResolver GrainTypeResolver
         {

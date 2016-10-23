@@ -1,14 +1,14 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans.CodeGeneration;
+﻿using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using System;
+using System.Threading.Tasks;
 
 namespace Orleans
 {
     /// <summary>
     /// Distributed version of the CancellationTokenSource
     /// </summary>
-    public class GrainCancellationTokenSource : IDisposable
+    public sealed class GrainCancellationTokenSource : IDisposable
     {
         private readonly GrainCancellationToken _grainCancellationToken;
 
@@ -62,8 +62,8 @@ namespace Orleans
         /// <remarks>
         /// <para>
         /// The associated <see cref="T:Orleans.Async.GrainCancellationToken" /> will be
-        /// notified of the cancellation and will transition to a state where 
-        /// <see cref="GrainCancellationToken.CancellationToken">IsCancellationRequested</see> returns true. 
+        /// notified of the cancellation and will transition to a state where
+        /// <see cref="GrainCancellationToken.CancellationToken">IsCancellationRequested</see> returns true.
         /// Any callbacks or cancelable operations
         /// registered with the <see cref="T:Orleans.Threading.CancellationToken"/>  will be executed.
         /// </para>
@@ -80,12 +80,12 @@ namespace Orleans
         /// <exception cref="T:System.AggregateException">An aggregate exception containing all the exceptions thrown
         /// by the registered callbacks on the associated <see cref="T:Orleans.Async.GrainCancellationToken"/>.</exception>
         /// <exception cref="T:System.ObjectDisposedException">This <see
-        /// cref="T:Orleans.Async.GrainCancellationTokenSource"/> has been disposed.</exception> 
+        /// cref="T:Orleans.Async.GrainCancellationTokenSource"/> has been disposed.</exception>
         public Task Cancel()
         {
             return _grainCancellationToken.Cancel();
         }
-        
+
         /// <summary>
         /// Releases the resources used by this <see cref="T:Orleans.Async.GrainCancellationTokenSource" />.
         /// </summary>
@@ -117,6 +117,6 @@ namespace Orleans
             throw new NotSupportedException("GrainCancellationTokenSource can not be deep copied");
         }
 
-        #endregion
+        #endregion Serialization
     }
 }
