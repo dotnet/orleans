@@ -295,7 +295,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 // Wait a bit
                 TimeSpan pause = lazyDeregistrationDelay.Multiply(2);
-                logger.Info("Pausing for {0} because DoLazyDeregistration=True", pause);
+                logger.Info($"Pausing for {0} because we are using lazy deregistration", pause);
                 await Task.Delay(pause);
             }
 

@@ -7,8 +7,8 @@ namespace UnitTests.Stats
     [PreferLocalPlacement]
     public class StatsCollectorGrain : Grain, IStatsCollectorGrain
     {
-        private long numStatsCalls = -1;
-        private long numMetricsCalls = -1;
+        private long numStatsCalls;
+        private long numMetricsCalls;
 
         public Task ReportMetricsCalled()
         {

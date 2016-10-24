@@ -129,7 +129,7 @@ namespace Orleans.TestingHost
             if (obj == null) return null;
             if (obj is MarshalByRefObject || obj is ISerializable)
             {
-                // Referernce to the provider can safely be passed across app-domain boundary in unit test process
+                // Reference to the provider can safely be passed across app-domain boundary in unit test process
                 return obj;
             }
             throw new InvalidOperationException(
