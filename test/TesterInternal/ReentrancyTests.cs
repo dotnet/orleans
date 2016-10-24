@@ -21,14 +21,13 @@ using Xunit.Abstractions;
 
 namespace UnitTests
 {
-    public class ReentrancyTests : HostedTestClusterEnsureDefaultStarted, IClassFixture<ReentrancyTests.Fixture>
+    public class ReentrancyTests : OrleansTestingBase, IClassFixture<ReentrancyTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions();
-                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<MessageInterleavesPredicateBootstrapProvider>("message_interleaves_predicate_bootstrap");
                 options.ClusterConfiguration.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("sms");
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
@@ -38,11 +37,12 @@ namespace UnitTests
         }
 
         private readonly ITestOutputHelper output;
+        private readonly TestCluster hostedCluster;
 
         public ReentrancyTests(ITestOutputHelper output, Fixture fixture)
-            : base(fixture)
         {
             this.output = output;
+            hostedCluster = fixture.HostedCluster;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -84,7 +84,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
@@ -96,9 +96,9 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateReturnsFalse()
+        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<INonReentrantGrainWithMessageInterleavePredicate>(GetRandomGrainId());
+            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -118,37 +118,37 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
-                Assert.True(deadlock, "Non-reentrant grain should deadlock when CanInterleave predicate returns false");
+                Assert.True(deadlock, "Non-reentrant grain should deadlock when MayInterleave predicate returns false");
             }
             else
             {
-                Assert.True(timeout, "Non-reentrant grain should timeout when CanInterleave predicate returns false");
+                Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateReturnsFalse Test finished OK.");
+            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateReturnsTrue()
+        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<INonReentrantGrainWithMessageInterleavePredicate>(GetRandomGrainId());
+            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
-                Assert.True(grain.TwoReentrant().Wait(2000), "Grain should reenter when CanInterleave predicate returns true");
+                Assert.True(grain.TwoReentrant().Wait(2000), "Grain should reenter when MayInterleave predicate returns true");
             }
             catch (Exception ex)
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateReturnsTrue Test finished OK.");
+            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsFalse()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<INonReentrantGrainWithMessageInterleavePredicate>(GetRandomGrainId());
+            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SubscribeToStream().Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -168,7 +168,7 @@ namespace UnitTests
                     Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
                 }
             }
-            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock on stream item delivery to itself when CanInterleave predicate returns false");
             }
@@ -180,9 +180,9 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsTrue()
+        public void NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<INonReentrantGrainWithMessageInterleavePredicate>(GetRandomGrainId());
+            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SubscribeToStream().Wait();
             try
             {
@@ -192,13 +192,13 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
+            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_StreamItemDelivery_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateThrows()
+        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<INonReentrantGrainWithMessageInterleavePredicate>(GetRandomGrainId());
+            var grain = GrainClient.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -212,7 +212,7 @@ namespace UnitTests
                 Assert.True(ex.GetBaseException().InnerException?.Message == "boom", 
                     "Should fail with Orleans runtime exception having all of neccessary details");
             }
-            logger.Info("Reentrancy NonReentrantGrain_WithMessageInterleavesPredicate_WhenPredicateThrows Test finished OK.");
+            logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
@@ -238,7 +238,7 @@ namespace UnitTests
                     Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
                 }
             }
-            if (this.HostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
+            if (this.hostedCluster.ClusterConfiguration.Globals.PerformDeadlockDetection)
             {
                 Assert.True(deadlock, "Non-reentrant grain should deadlock");
             }
@@ -481,55 +481,6 @@ namespace UnitTests
             TimeSpan elapsed = totalTime.Elapsed;
             Assert.True(elapsed < MaxStressExecutionTime, $"Stress test execution took too long: {elapsed}");
         }
-    }
-
-    public class MessageInterleavesPredicateBootstrapProvider : IBootstrapProvider
-    {
-        public string Name { get; private set; }
-
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            Name = name;
-            InstallPredicate();
-            return TaskDone.Done;
-        }
-
-        void InstallPredicate()
-        {
-            GrainTypeData grainType;
-            GrainTypeManager.Instance.TryGetData(typeof(NonReentrantGrainWithMessageInterleavePredicate).FullName, out grainType);
-            grainType.SetMessageAllowedToInterleavePredicate(req =>
-            {
-                // not interested
-                if (req.Arguments.Length == 0)
-                    return false;
-
-                string arg = null;
-
-                // assume single argument message
-                if (req.Arguments.Length == 1)
-                    arg = (string)UnwrapImmutable(req.Arguments[0]);
-
-                // assume stream message
-                if (req.Arguments.Length == 2)
-                    arg = (string) UnwrapImmutable(req.Arguments[1]);
-                
-                if (arg == "err")
-                    throw new ApplicationException("boom");
-
-                return arg == "reentrant";
-            });
-        }
-
-        static object UnwrapImmutable(object item)
-        {
-            // how to unwrap Immutable<T>? Can we make Immutable<T> to implement IImmutable to support such cases?
-            return item is Immutable<object>
-                       ? ((Immutable<object>) item).Value
-                       : item;
-        }
-
-        public Task Close() => TaskDone.Done;
     }
 }
 

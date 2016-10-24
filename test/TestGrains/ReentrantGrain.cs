@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -70,9 +71,34 @@ namespace UnitTests.Grains
         }
     }
 
-    public class NonReentrantGrainWithMessageInterleavePredicate : Grain, INonReentrantGrainWithMessageInterleavePredicate
+    [MayInterleave("MayInterleave")]
+    public class MayInterleavePredicateGrain : Grain, IMayInterleavePredicateGrain
     {
-        private INonReentrantGrainWithMessageInterleavePredicate Self { get; set; }
+        public static bool MayInterleave(InvokeMethodRequest req)
+        {
+            // not interested
+            if (req.Arguments.Length == 0)
+                return false;
+
+            string arg = null;
+
+            // assume single argument message
+            if (req.Arguments.Length == 1)
+                arg = (string)UnwrapImmutable(req.Arguments[0]);
+
+            // assume stream message
+            if (req.Arguments.Length == 2)
+                arg = (string)UnwrapImmutable(req.Arguments[1]);
+
+            if (arg == "err")
+                throw new ApplicationException("boom");
+
+            return arg == "reentrant";
+        }
+
+        static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+
+        private IMayInterleavePredicateGrain Self { get; set; }
 
         // this interleaves only when arg == "reentrant" 
         // and test predicate will throw when arg = "err"
@@ -116,7 +142,7 @@ namespace UnitTests.Grains
         IAsyncStream<string> GetStream() => 
             GetStreamProvider("sms").GetStream<string>(Guid.Empty, "test-stream-interleave");
 
-        public Task SetSelf(INonReentrantGrainWithMessageInterleavePredicate self)
+        public Task SetSelf(IMayInterleavePredicateGrain self)
         {
             Self = self;
             return TaskDone.Done;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 
 using Orleans.CodeGeneration;
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
-            IsMessageAllowedToInterleavePredicate = _ => false;
+            IsMessageAllowedToInterleavePredicate = GetMessageAllowedToInterleavePredicate(type);
         }
 
         /// <summary>
@@ -131,21 +132,45 @@ namespace Orleans.Runtime
             }
         }
 
-        // used by Orleankka's bootstrapper
-        internal void SetMessageAllowedToInterleavePredicate(Func<InvokeMethodRequest, bool> predicate)
+        /// <summary>
+        /// Returns interleave predicate depending on whether class is marked with <see cref="MayInterleaveAttribute"/> or not.
+        /// </summary>
+        /// <param name="grainType">Grain class.</param>
+        /// <returns></returns>
+        private static Func<InvokeMethodRequest, bool> GetMessageAllowedToInterleavePredicate(Type grainType)
         {
-            if (predicate == null)
-                throw new ArgumentNullException(nameof(predicate));
+            if (!grainType.GetCustomAttributes<MayInterleaveAttribute>().Any())
+                return req => false;
 
-            IsMessageAllowedToInterleavePredicate = predicate;
+            if (grainType.GetCustomAttributes(typeof(ReentrantAttribute), true).Any())
+                throw new InvalidOperationException(
+                    $"Class {grainType.FullName} is already marked with Reentrant attribute");
+
+            var callbackMethodName = grainType.GetCustomAttribute<MayInterleaveAttribute>().CallbackMethodName;
+            var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static);
+            if (method == null)
+                throw new InvalidOperationException(
+                    $"Class {grainType.FullName} doesn't declare public static method " +
+                    $"with name {callbackMethodName} specified in MayInterleave attribute");
+
+            if (method.ReturnType != typeof(bool) || 
+                method.GetParameters().Length != 1 || 
+                method.GetParameters()[0].ParameterType != typeof(InvokeMethodRequest))
+                throw new InvalidOperationException(
+                    $"Wrong signature of callback method {callbackMethodName} " +
+                    $"specified in MayInterleave attribute for grain class {grainType.FullName}. \n" +
+                    $"Expected: public static bool {callbackMethodName}(InvokeMethodRequest req)");
+
+            var parameter = Expression.Parameter(typeof(InvokeMethodRequest));
+            var call = Expression.Call(null, method, parameter);
+            var predicate = Expression.Lambda<Func<InvokeMethodRequest, bool>>(call, parameter).Compile();
+
+            return predicate;
         }
 
-        public bool IsMessageAllowedToInterleave(Message message)
+        internal bool IsMessageAllowedToInterleave(Message message)
         {
-            if (message.Direction != Message.Directions.Request)
-                return IsReentrant;
-
-            return IsMessageAllowedToInterleavePredicate((InvokeMethodRequest)message.BodyObject);
+            return IsMessageAllowedToInterleavePredicate((InvokeMethodRequest) message.BodyObject);
         }
     }
 }
