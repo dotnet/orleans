@@ -137,6 +137,23 @@ namespace UnitTests.Serialization
 
         [Theory, TestCategory("BVT"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
+        public void Serialize_Type(SerializerToUse serializerToUse)
+        {
+            InitializeSerializer(serializerToUse);
+
+            // Test serialization of Type.
+            var expected = typeof(int);
+            var actual = (Type)OrleansSerializationLoop(expected);
+            Assert.Equal(expected.AssemblyQualifiedName, actual.AssemblyQualifiedName);
+
+            // Test serialization of RuntimeType.
+            expected = 8.GetType();
+            actual = (Type)OrleansSerializationLoop(expected);
+            Assert.Equal(expected.AssemblyQualifiedName, actual.AssemblyQualifiedName);
+        }
+
+        [Theory, TestCategory("BVT"), TestCategory("Serialization")]
+        [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ComplexStruct(SerializerToUse serializerToUse)
         {
             InitializeSerializer(serializerToUse);
