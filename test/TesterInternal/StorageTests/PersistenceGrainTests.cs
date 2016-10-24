@@ -1048,7 +1048,7 @@ namespace UnitTests.StorageTests
         public async Task Serialize_GrainState_DeepCopy_Stress()
         {
             int num = 100;
-            int loops = num * 1000;
+            int loops = num * 100;
             GrainStateContainingGrainReferences[] states = new GrainStateContainingGrainReferences[num];
             for (int i = 0; i < num; i++)
             {
