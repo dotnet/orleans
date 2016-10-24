@@ -12,11 +12,11 @@ namespace Orleans.Core
     internal class GrainStateStorageBridge : IStorage
     {
         private readonly IStorageProvider store;
-        private readonly IStatefulGrain grain;
-        private readonly Grain baseGrain;
+        private IStatefulGrain statefulGrain;
+        private Grain baseGrain;
         private readonly string grainTypeName;
 
-        public GrainStateStorageBridge(string grainTypeName, IStatefulGrain grain, IStorageProvider store)
+        public GrainStateStorageBridge(string grainTypeName, IStorageProvider store)
         {
             if (grainTypeName == null)
             {
@@ -26,14 +26,23 @@ namespace Orleans.Core
             {
                 throw new ArgumentNullException("store", "No storage provider supplied");
             }
-            if (grain == null || grain.GrainState == null)
-            {
-                throw new ArgumentNullException("grain.GrainState", "No grain state object supplied");
-            }
+           
             this.grainTypeName = grainTypeName;
-            this.grain = grain;
-            this.baseGrain = grain as Grain;
+           
+            this.baseGrain = statefulGrain as Grain;
             this.store = store;
+        }
+
+        internal void SetGrain(Grain grain)
+        {
+            statefulGrain = grain as IStatefulGrain;
+
+            if (statefulGrain?.GrainState == null)
+            {
+                throw new ArgumentNullException($"{nameof(grain)}", "No grain state object supplied");
+            }
+
+            this.baseGrain = grain;
         }
 
         /// <summary>
@@ -47,7 +56,7 @@ namespace Orleans.Core
             GrainReference grainRef = baseGrain.GrainReference;
             try
             {
-                await store.ReadStateAsync(grainTypeName, grainRef, grain.GrainState);
+                await store.ReadStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
 
                 StorageStatisticsGroup.OnStorageRead(store, grainTypeName, grainRef, sw.Elapsed);
             }
@@ -76,7 +85,7 @@ namespace Orleans.Core
             Exception errorOccurred;
             try
             {
-                await store.WriteStateAsync(grainTypeName, grainRef, grain.GrainState);
+                await store.WriteStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
                 StorageStatisticsGroup.OnStorageWrite(store, grainTypeName, grainRef, sw.Elapsed);
                 errorOccurred = null;
             }
@@ -130,10 +139,10 @@ namespace Orleans.Core
             try
             {
                 // Clear (most likely Delete) state from external storage
-                await store.ClearStateAsync(grainTypeName, grainRef, grain.GrainState);
+                await store.ClearStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
 
                 // Reset the in-memory copy of the state
-                grain.GrainState.State = Activator.CreateInstance(grain.GrainState.State.GetType());
+                statefulGrain.GrainState.State = Activator.CreateInstance(statefulGrain.GrainState.State.GetType());
 
                 // Update counters
                 StorageStatisticsGroup.OnStorageDelete(store, grainTypeName, grainRef, sw.Elapsed);
