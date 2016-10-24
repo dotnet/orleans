@@ -1637,7 +1637,7 @@ namespace Orleans.Serialization
 
         internal static void SerializeType(object obj, BinaryTokenStreamWriter stream, Type expected)
         {
-            stream.Write(((Type)obj).OrleansTypeName());
+            stream.Write(((Type)obj).OrleansTypeKeyString());
         }
 
         internal static object DeserializeType(Type expected, BinaryTokenStreamReader stream)
