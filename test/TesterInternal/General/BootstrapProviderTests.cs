@@ -97,7 +97,7 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in silos)
             {
-                var providers = silo.TestHook.GetAllSiloProviderNames().ToList();
+                var providers = await silo.TestHook.GetAllSiloProviderNames();
 
                 Assert.Contains("bootstrap1", providers);
                 Assert.Contains("bootstrap2", providers);
@@ -127,7 +127,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.TestHook.GetBootstrapProvider(providerName);
+                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.AppDomainTestHook.GetBootstrapProvider(providerName);
                 Assert.NotNull(provider);
                 providerInUse = provider;
             }

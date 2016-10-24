@@ -12,6 +12,7 @@ namespace Orleans.Runtime.Messaging
         private IncomingMessageAcceptor ima;
         private static readonly Logger log = LogManager.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
+        internal Func<Message, bool> ShouldDrop;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;

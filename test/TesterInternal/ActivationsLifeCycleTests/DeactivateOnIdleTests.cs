@@ -238,28 +238,35 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
         public async Task MissingActivation_1()
         {
+            var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
             var options = new TestClusterOptions(2);
+            // Disable retries in this case, to make test more predictable.
+            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
             options.ClientConfiguration.Gateways.RemoveAt(1);
             Initialize(options);
             for (int i = 0; i < 10; i++)
             {
-                await MissingActivation_Runner(i, false);
+                await MissingActivation_Runner(i, directoryLazyDeregistrationDelay);
             }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
         public async Task MissingActivation_2()
         {
+            var directoryLazyDeregistrationDelay = TimeSpan.FromSeconds(5);
             var options = new TestClusterOptions(2);
+            options.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
+            // Disable retries in this case, to make test more predictable.
+            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
             options.ClientConfiguration.Gateways.RemoveAt(1);
             Initialize(options);
             for (int i = 0; i < 10; i++)
             {
-                await MissingActivation_Runner(i, true);
+                await MissingActivation_Runner(i, directoryLazyDeregistrationDelay);
             }
         }
 
-        private async Task MissingActivation_Runner(int grainId, bool doLazyDeregistration)
+        private async Task MissingActivation_Runner(int grainId, TimeSpan lazyDeregistrationDelay)
         {
             logger.Info("\n\n\n SMissingActivation_Runner.\n\n\n");
 
@@ -273,32 +280,23 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var label = await g.GetLabel();
             }
 
-            // Disable retries in this case, to make test more predictable.
-            testCluster.Primary.TestHook.SetMaxForwardCount_ForTesting(0);
-            testCluster.SecondarySilos[0].TestHook.SetMaxForwardCount_ForTesting(0);
-
-            var lazyDeregistrationDelay = doLazyDeregistration ? TimeSpan.FromSeconds(2) : TimeSpan.FromMilliseconds(-1);
-
-            testCluster.Primary.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
-            testCluster.SecondarySilos[0].TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
-
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
-            int primaryActivation = testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
-            int secondaryActivation = testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
+            int primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
+            int secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
             Assert.Equal(1, primaryActivation + secondaryActivation);
 
             // If we try again, we shouldn't find any
-            primaryActivation = testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
-            secondaryActivation = testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
+            primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grain);
+            secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grain);
             Assert.Equal(0, primaryActivation + secondaryActivation);
 
 
-            if (doLazyDeregistration)
+            if (lazyDeregistrationDelay > TimeSpan.Zero)
             {
                 // Wait a bit
                 TimeSpan pause = lazyDeregistrationDelay.Multiply(2);
-                logger.Info("Pausing for {0} because DoLazyDeregistration=True", pause);
-                Thread.Sleep(pause);
+                logger.Info($"Pausing for {0} because we are using lazy deregistration", pause);
+                await Task.Delay(pause);
             }
 
             // Now send a message again; it should fail);
@@ -308,7 +306,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             // Try again; it should succeed or fail, based on doLazyDeregistration
 
-            if (doLazyDeregistration)
+            if (lazyDeregistrationDelay > TimeSpan.Zero)
             {
                 var newLabel = await g.GetLabel();
                 logger.Info("After 2nd call. newLabel = " + newLabel);

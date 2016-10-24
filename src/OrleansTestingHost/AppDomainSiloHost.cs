@@ -1,8 +1,18 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Runtime.Serialization;
 using Orleans.CodeGeneration;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Placement;
+using Orleans.Runtime.TestHooks;
+using Orleans.Storage;
 
 namespace Orleans.TestingHost
 {
@@ -18,13 +28,17 @@ namespace Orleans.TestingHost
         public AppDomainSiloHost(string name, Silo.SiloType siloType, ClusterConfiguration config)
         {
             this.silo = new Silo(name, siloType, config);
+            this.silo.InitializeTestHooksSystemTarget();
+            this.AppDomainTestHook = new AppDomainTestHooks(this.silo);
         }
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => silo.SiloAddress;
 
-        /// <summary>Gets the Silo test hook (NOTE: this will be removed really soon, and was migrated here temporarily)</summary>
-        public Silo.TestHooks TestHook => silo.TestHook;
+        /// <summary>Gets the Silo test hook</summary>
+        internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.SiloAddress);
+
+        internal AppDomainTestHooks AppDomainTestHook { get; }
 
         /// <summary>Methods for optimizing the code generator.</summary>
         public class CodeGeneratorOptimizer : MarshalByRefObject
@@ -85,6 +99,89 @@ namespace Orleans.TestingHost
         public void Shutdown()
         {
             silo.Shutdown();
+        }
+    }
+
+    /// <summary>
+    /// Test hook functions for white box testing.
+    /// NOTE: this class has to and will be removed entirely. This requires the tests that currently rely on it, to assert using different mechanisms, such as with grains.
+    /// </summary>
+    internal class AppDomainTestHooks : MarshalByRefObject
+    {
+        private readonly Silo silo;
+
+        public AppDomainTestHooks(Silo silo)
+        {
+            this.silo = silo;
+        }
+
+        internal IBootstrapProvider GetBootstrapProvider(string name)
+        {
+            IBootstrapProvider provider = silo.BootstrapProviders.First(p => p.Name.Equals(name));
+            return CheckReturnBoundaryReference("bootstrap provider", provider);
+        }
+
+        /// <summary>Find the named storage provider loaded in this silo. </summary>
+        internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)silo.StorageProviderManager.GetProvider(name));
+
+        private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
+        {
+            if (obj == null) return null;
+            if (obj is MarshalByRefObject || obj is ISerializable)
+            {
+                // Reference to the provider can safely be passed across app-domain boundary in unit test process
+                return obj;
+            }
+            throw new InvalidOperationException(
+                $"Cannot return reference to {what} {TypeUtils.GetFullName(obj.GetType())} if it is not MarshalByRefObject or Serializable");
+        }
+
+        public IDictionary<GrainId, IGrainInfo> GetDirectoryForTypeNamesContaining(string expr)
+        {
+            var x = new Dictionary<GrainId, IGrainInfo>();
+            foreach (var kvp in ((LocalGrainDirectory)silo.LocalGrainDirectory).DirectoryPartition.GetItems())
+            {
+                if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
+                    continue;// Skip system grains, system targets and clients
+                if (((Catalog)silo.Catalog).GetGrainTypeName(kvp.Key).Contains(expr))
+                    x.Add(kvp.Key, kvp.Value);
+            }
+            return x;
+        }
+        
+        // store silos for which we simulate faulty communication
+        // number indicates how many percent of requests are lost
+        private ConcurrentDictionary<IPEndPoint, double> simulatedMessageLoss;
+        private readonly SafeRandom random = new SafeRandom();
+
+        internal void BlockSiloCommunication(IPEndPoint destination, double lossPercentage)
+        {
+            if (simulatedMessageLoss == null)
+                simulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
+
+            simulatedMessageLoss[destination] = lossPercentage;
+
+            var mc = (MessageCenter)silo.LocalMessageCenter;
+            mc.ShouldDrop = ShouldDrop;
+        }
+
+        internal void UnblockSiloCommunication()
+        {
+            var mc = (MessageCenter)silo.LocalMessageCenter;
+            mc.ShouldDrop = null;
+            simulatedMessageLoss.Clear();
+        }
+        
+        private bool ShouldDrop(Message msg)
+        {
+            if (simulatedMessageLoss != null)
+            {
+                double blockedpercentage;
+                simulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
+                return (random.NextDouble() * 100 < blockedpercentage);
+            }
+            else
+                return false;
         }
     }
 }

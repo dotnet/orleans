@@ -507,7 +507,7 @@ namespace Tests.GeoClusterTests
             int totalSoFar = 0;
             foreach (var silo in silos)
             {
-                var dir = silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
                 foreach (var grainKeyValue in dir)
                 {
                     GrainId grainId = grainKeyValue.Key;
@@ -543,7 +543,7 @@ namespace Tests.GeoClusterTests
             foreach (var kvp in Clusters)
                 foreach (var silo in kvp.Value.Silos)
                 {
-                    var dir = silo.TestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
+                    var dir = silo.AppDomainTestHook.GetDirectoryForTypeNamesContaining("ClusterTestGrain");
 
                     foreach (var grainKeyValue in dir)
                     {

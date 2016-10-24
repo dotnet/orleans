@@ -394,6 +394,12 @@
     <Compile Include="..\..\..\src\OrleansRuntime\Silo\SiloProviderRuntime.cs">
       <Link>Silo\SiloProviderRuntime.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\src\OrleansRuntime\Silo\TestHooks\ITestHooksSystemTarget.cs">
+      <Link>Silo\TestHooks\ITestHooksSystemTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\OrleansRuntime\Silo\TestHooks\TestHooksSystemTarget.cs">
+      <Link>Silo\TestHooks\TestHooksSystemTarget.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\OrleansRuntime\Silo\Watchdog.cs">
       <Link>Silo\Watchdog.cs</Link>
     </Compile>

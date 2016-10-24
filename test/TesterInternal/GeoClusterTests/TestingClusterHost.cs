@@ -68,7 +68,7 @@ namespace Tests.GeoClusterTests
             catch (Exception e)
             {
                 WriteLog("--- Exception observed in {0}: {1})", name, e);
-                throw e;
+                throw;
             }
         }
 
@@ -81,7 +81,7 @@ namespace Tests.GeoClusterTests
             catch (Exception e)
             {
                 WriteLog("Equality assertion failed; expected={0}, actual={1} comment={2}", expected, actual, comment);
-                throw e;
+                throw;
             }
         }
 
@@ -247,7 +247,7 @@ namespace Tests.GeoClusterTests
             catch (Exception e)
             {
                 WriteLog("Exception caught in test cleanup function: {0}", e);
-                throw e;
+                throw;
             }
 
             stopwatch.Stop();
@@ -374,7 +374,7 @@ namespace Tests.GeoClusterTests
                 foreach (var dest in Clusters[to].Silos)
                 {
                     WriteLog("Blocking {0}->{1}", silo, dest);
-                    silo.TestHook.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100);
+                    silo.AppDomainTestHook.BlockSiloCommunication(dest.SiloAddress.Endpoint, 100);
                 }
         }
 
@@ -383,7 +383,7 @@ namespace Tests.GeoClusterTests
             foreach (var silo in Clusters[from].Silos)
             {
                 WriteLog("Unblocking {0}", silo);
-                silo.TestHook.UnblockSiloCommunication();
+                silo.AppDomainTestHook.UnblockSiloCommunication();
             }
         }
   

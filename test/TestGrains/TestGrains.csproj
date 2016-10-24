@@ -116,6 +116,7 @@
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
+    <Compile Include="StatsCollectorGrain.cs" />
     <Compile Include="StreamCheckpoint.cs" />
     <Compile Include="StreamInterceptionGrain.cs" />
     <Compile Include="ValueTypeTestGrain.cs" />

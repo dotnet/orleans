@@ -350,13 +350,13 @@ namespace UnitTests.StorageTests
         }
 
        
-        protected void Persistence_Silo_StorageProvider_Azure(Type providerType)
+        protected async Task Persistence_Silo_StorageProvider_Azure(Type providerType)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 string provider = providerType.FullName;
-                List<string> providers = silo.TestHook.GetStorageProviderNames().ToList();
+                List<string> providers = (await silo.TestHook.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(provider), $"No storage provider found: {provider}");
             }
         }

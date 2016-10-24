@@ -50,7 +50,7 @@ namespace UnitTests.Grains
             }
 
             burstCount = count;
-            Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation = OnCollectActivation;
+            InsideRuntimeClient.Current.Catalog.ActivationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
             return TaskDone.Done;
         }
 
