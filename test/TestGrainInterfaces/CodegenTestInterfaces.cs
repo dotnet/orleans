@@ -37,6 +37,44 @@ public class Outsider { }
 
 namespace UnitTests.GrainInterfaces
 {
+    [Serializable]
+    public class CaseInsensitiveStringEquality : EqualityComparer<string>
+    {
+        public override bool Equals(string x, string y)
+        {
+            return x.Equals(y, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public override int GetHashCode(string obj)
+        {
+            return obj.ToLowerInvariant().GetHashCode();
+        }
+    }
+
+    [Serializable]
+    public class Mod5IntegerComparer : EqualityComparer<int>
+    {
+        public override bool Equals(int x, int y)
+        {
+            return ((x - y) % 5) == 0;
+        }
+
+        public override int GetHashCode(int obj)
+        {
+            return obj % 5;
+        }
+    }
+
+    [Serializable]
+    public class CaseInsensitiveStringComparer : Comparer<string>
+    {
+        public override int Compare(string x, string y)
+        {
+            var x1 = x.ToLowerInvariant();
+            var y1 = y.ToLowerInvariant();
+            return Comparer<string>.Default.Compare(x1, y1);
+        }
+    }
 
     [Serializable]
     public class RootType
