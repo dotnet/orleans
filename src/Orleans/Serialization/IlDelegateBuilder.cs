@@ -4,7 +4,7 @@ namespace Orleans.Serialization
     using System.Reflection;
     using System.Reflection.Emit;
 
-    internal class IlDelegateBuilder<TDelegate>
+    internal class ILDelegateBuilder<TDelegate>
         where TDelegate : class
     {
         private readonly DynamicMethod dynamicMethod;
@@ -13,20 +13,28 @@ namespace Orleans.Serialization
 
         private readonly ReflectedSerializationMethodInfo methods;
 
+        private readonly ILFieldBuilder fields;
+
         /// <summary>
-        /// Creates a new instance of the <see cref="IlDelegateBuilder{TDelegate}"/> class.
+        /// Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.
         /// </summary>
         /// <param name="name">The name of the new delegate.</param>
         /// <param name="methods">The reflected methods used during delegate creation.</param>
         /// <param name="methodInfo">
         /// The method info for <typeparamref name="TDelegate"/> delegates, used for determining parameter types.
         /// </param>
-        public IlDelegateBuilder(string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
+        public ILDelegateBuilder(ILFieldBuilder fields, string name, ReflectedSerializationMethodInfo methods, MethodInfo methodInfo)
         {
+            this.fields = fields;
             this.methods = methods;
             var returnType = methodInfo.ReturnType;
             var parameterTypes = GetParameterTypes(methodInfo);
-            this.dynamicMethod = new DynamicMethod(name, returnType, parameterTypes, typeof(IlDelegateBuilder<>).GetTypeInfo().Module, true);
+            this.dynamicMethod = new DynamicMethod(
+                name,
+                returnType,
+                parameterTypes,
+                typeof(ILDelegateBuilder<>).GetTypeInfo().Module,
+                true);
             this.il = this.dynamicMethod.GetILGenerator();
         }
 
@@ -43,25 +51,124 @@ namespace Orleans.Serialization
         /// <param name="index">
         /// The index of the argument to load.
         /// </param>
-        public void LoadArgument(ushort index) => this.il.Emit(OpCodes.Ldarg, index);
+        public void LoadArgument(ushort index)
+        {
+            switch (index)
+            {
+                case 0:
+                    this.il.Emit(OpCodes.Ldarg_0);
+                    break;
+                case 1:
+                    this.il.Emit(OpCodes.Ldarg_1);
+                    break;
+                case 2:
+                    this.il.Emit(OpCodes.Ldarg_2);
+                    break;
+                case 3:
+                    this.il.Emit(OpCodes.Ldarg_3);
+                    break;
+                default:
+                    if (index < 0xFF)
+                    {
+                        this.il.Emit(OpCodes.Ldarg_S, (byte)index);
+                    }
+                    else
+                    {
+                        this.il.Emit(OpCodes.Ldarg, index);
+                    }
+
+                    break;
+            }
+        }
 
         /// <summary>
         /// Pops the stack and stores it in the specified local.
         /// </summary>
         /// <param name="local">The local variable to store into.</param>
-        public void StoreLocal(Local local) => this.il.Emit(OpCodes.Stloc, (IlGeneratorLocal)local);
+        public void StoreLocal(Local local)
+        {
+            var loc = (IlGeneratorLocal)local;
+
+            var index = loc.Value.LocalIndex;
+            switch (index)
+            {
+                case 0:
+                    this.il.Emit(OpCodes.Stloc_0);
+                    break;
+                case 1:
+                    this.il.Emit(OpCodes.Stloc_1);
+                    break;
+                case 2:
+                    this.il.Emit(OpCodes.Stloc_2);
+                    break;
+                case 3:
+                    this.il.Emit(OpCodes.Stloc_3);
+                    break;
+                default:
+                    if (index < 0xFF)
+                    {
+                        this.il.Emit(OpCodes.Stloc_S, (byte)index);
+                    }
+                    else
+                    {
+                        this.il.Emit(OpCodes.Stloc, loc);
+                    }
+
+                    break;
+            }
+        }
 
         /// <summary>
         /// Pushes the specified local onto the stack.
         /// </summary>
         /// <param name="local">The local variable to load from.</param>
-        public void LoadLocal(Local local) => this.il.Emit(OpCodes.Ldloc, (IlGeneratorLocal)local);
+        public void LoadLocal(Local local)
+        {
+            var loc = (IlGeneratorLocal)local;
+            var index = loc.Value.LocalIndex;
+            switch (index)
+            {
+                case 0:
+                    this.il.Emit(OpCodes.Ldloc_0);
+                    break;
+                case 1:
+                    this.il.Emit(OpCodes.Ldloc_1);
+                    break;
+                case 2:
+                    this.il.Emit(OpCodes.Ldloc_2);
+                    break;
+                case 3:
+                    this.il.Emit(OpCodes.Ldloc_3);
+                    break;
+                default:
+                    if (index < 0xFF)
+                    {
+                        this.il.Emit(OpCodes.Ldloc_S, (byte)index);
+                    }
+                    else
+                    {
+                        this.il.Emit(OpCodes.Ldloc, loc);
+                    }
+
+                    break;
+            }
+        }
 
         /// <summary>
         /// Loads the specified field onto the stack from the referenced popped from the stack.
         /// </summary>
         /// <param name="field">The field.</param>
-        public void LoadField(FieldInfo field) => this.il.Emit(OpCodes.Ldfld, field);
+        public void LoadField(FieldInfo field)
+        {
+            if (field.IsStatic)
+            {
+                this.il.Emit(OpCodes.Ldsfld, field);
+            }
+            else
+            {
+                this.il.Emit(OpCodes.Ldfld, field);
+            }
+        }
 
         /// <summary>
         /// Boxes the value on the top of the stack.
@@ -75,15 +182,19 @@ namespace Orleans.Serialization
         /// <param name="type">The type to load.</param>
         public void LoadType(Type type)
         {
-            this.il.Emit(OpCodes.Ldtoken, type);
-            this.Call(this.methods.GetTypeFromHandle);
+            var field = this.fields.GetOrCreateStaticField(type);
+            this.il.Emit(OpCodes.Ldsfld, field);
         }
 
         /// <summary>
         /// Calls the specified method.
         /// </summary>
         /// <param name="method">The method to call.</param>
-        public void Call(MethodInfo method) => this.il.Emit(OpCodes.Call, method);
+        public void Call(MethodInfo method)
+        {
+            if (method.IsFinal || !method.IsVirtual) this.il.Emit(OpCodes.Call, method);
+            else this.il.Emit(OpCodes.Callvirt, method);
+        }
 
         /// <summary>
         /// Returns from the current method.
@@ -94,13 +205,35 @@ namespace Orleans.Serialization
         /// Pops the value on the top of the stack and stores it in the specified field on the object popped from the top of the stack.
         /// </summary>
         /// <param name="field">The field to store into.</param>
-        public void StoreField(FieldInfo field) => this.il.Emit(OpCodes.Stfld, field);
+        public void StoreField(FieldInfo field)
+        {
+            if (field.IsStatic)
+            {
+                this.il.Emit(OpCodes.Stsfld, field);
+            }
+            else
+            {
+                this.il.Emit(OpCodes.Stfld, field);
+            }
+        }
 
         /// <summary>
         /// Pushes the address of the specified local onto the stack.
         /// </summary>
         /// <param name="local">The local variable.</param>
-        public void LoadLocalAddress(Local local) => this.il.Emit(OpCodes.Ldloca, (IlGeneratorLocal)local);
+        public void LoadLocalAddress(Local local)
+        {
+            var loc = (IlGeneratorLocal)local;
+            var index = loc.Value.LocalIndex;
+            if (index < 0xFF)
+            {
+                this.il.Emit(OpCodes.Ldloca_S, (byte)index);
+            }
+            else
+            {
+                this.il.Emit(OpCodes.Ldloca, loc);
+            }
+        }
 
         /// <summary>
         /// Unboxes the value on the top of the stack.
@@ -133,7 +266,10 @@ namespace Orleans.Serialization
         /// Builds a delegate from the previously emitted instructions.
         /// </summary>
         /// <returns>The delegate.</returns>
-        public TDelegate Build() => this.dynamicMethod.CreateDelegate(typeof(TDelegate)) as TDelegate;
+        public TDelegate CreateDelegate()
+        {
+            return this.dynamicMethod.CreateDelegate(typeof(TDelegate)) as TDelegate;
+        }
 
         /// <summary>
         /// Pushes the specified local variable as a reference onto the stack.
@@ -229,14 +365,14 @@ namespace Orleans.Serialization
 
         private class IlGeneratorLocal : Local
         {
-            private readonly LocalBuilder value;
+            public readonly LocalBuilder Value;
 
             public IlGeneratorLocal(LocalBuilder value)
             {
-                this.value = value;
+                this.Value = value;
             }
 
-            public static implicit operator LocalBuilder(IlGeneratorLocal local) => local.value;
+            public static implicit operator LocalBuilder(IlGeneratorLocal local) => local.Value;
         }
     }
 }

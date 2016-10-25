@@ -59,7 +59,7 @@ namespace UnitTests.Serialization
                 case SerializerToUse.Default:
                     break;
                 case SerializerToUse.IlBasedFallbackSerializer:
-                    fallback = typeof(IlBasedFallbackSerializer).GetTypeInfo();
+                    fallback = typeof(ILBasedSerializer).GetTypeInfo();
                     break;
 #if !NETSTANDARD_TODO
                 case SerializerToUse.BinaryFormatterFallbackSerializer:

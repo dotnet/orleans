@@ -7,19 +7,19 @@ namespace UnitTests.Serialization
     using Xunit;
 
     [TestCategory("BVT"), TestCategory("Serialization")]
-    public class IlBasedSerializerTests
+    public class ILSerializerTests
     {
-        public IlBasedSerializerTests()
+        public ILSerializerTests()
         {
             SerializationManager.InitializeForTesting();
         }
 
         /// <summary>
-        /// Tests that <see cref="IlBasedSerializerGenerator"/> supports distinct field selection for serialization
+        /// Tests that <see cref="ILSerializerGenerator"/> supports distinct field selection for serialization
         /// versus copy operations.
         /// </summary>
         [Fact]
-        public void IlBasedSerializer_AllowCopiedFieldsToDifferFromSerializedFields()
+        public void ILSerializer_AllowCopiedFieldsToDifferFromSerializedFields()
         {
             var input = new FieldTest
             {
@@ -28,7 +28,7 @@ namespace UnitTests.Serialization
                 Three = 3
             };
 
-            var generator = new IlBasedSerializerGenerator();
+            var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType(), f => f.Name != "One", f => f.Name != "Three");
             var copy = (FieldTest)serializers.DeepCopy(input);
             Assert.Equal(1, copy.One);

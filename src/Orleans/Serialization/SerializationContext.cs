@@ -3,8 +3,6 @@ using System.Collections.Generic;
 
 namespace Orleans.Serialization
 {
-    using System.Runtime.CompilerServices;
-
     /// <summary>
     /// Maintains context information for current thread during serialization operations.
     /// </summary>
@@ -46,34 +44,19 @@ namespace Orleans.Serialization
 
         private readonly Dictionary<object, Record> processedObjects;
 
-        private class ReferenceEqualsComparer : EqualityComparer<object>
-        {
-            /// <summary>
-            /// Defines object equality by reference equality (eq, in LISP).
-            /// </summary>
-            /// <returns>
-            /// true if the specified objects are equal; otherwise, false.
-            /// </returns>
-            /// <param name="x">The first object to compare.</param><param name="y">The second object to compare.</param>
-            public override bool Equals(object x, object y)
-            {
-                return object.ReferenceEquals(x, y);
-            }
-
-            public override int GetHashCode(object obj)
-            {
-                return obj == null ? 0 : RuntimeHelpers.GetHashCode(obj);
-            }
-        }
+        private readonly Dictionary<Type, short> processedTypes;
 
         private SerializationContext()
         {
             processedObjects = new Dictionary<object, Record>(new ReferenceEqualsComparer());
+            processedTypes = new Dictionary<Type, short>();
         }
 
         internal void Reset()
         {
             processedObjects.Clear();
+            processedTypes.Clear();
+            this.nextTypeIndex = 0;
         }
 
         /// <summary>
@@ -94,6 +77,21 @@ namespace Orleans.Serialization
         internal void RecordObject(object original, int offset)
         {
             processedObjects[original] = new Record(offset);
+        }
+
+        private short nextTypeIndex;
+
+        internal short CheckTypeWhileSerializing(Type type)
+        {
+            short typeIndex;
+            if (!processedTypes.TryGetValue(type, out typeIndex)) typeIndex = -1;
+            
+            return typeIndex;
+        }
+
+        internal void RecordType(Type type)
+        {
+            this.processedTypes[type] = this.nextTypeIndex++;
         }
 
         // Returns an object suitable for insertion if this is a back-reference, or null if it's new

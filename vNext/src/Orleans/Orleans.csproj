@@ -589,23 +589,20 @@
     <Compile Include="..\..\..\src\Orleans\Serialization\TypeUtilities.cs">
       <Link>Serialization\TypeUtilities.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedFallbackSerializer.cs">
-      <Link>Serialization\IlBasedFallbackSerializer.cs</Link>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ILDelegateBuilder.cs">
+      <Link>Serialization\ILDelegateBuilder.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializerGenerator.cs">
-      <Link>Serialization\IlBasedSerializerGenerator.cs</Link>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ILBasedSerializer.cs">
+      <Link>Serialization\ILBasedSerializer.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializers.cs">
-      <Link>Serialization\IlBasedSerializers.cs</Link>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ILFieldBuilder.cs">
+      <Link>Serialization\ILFieldBuilder.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlBasedSerializerTypeChecker.cs">
-      <Link>Serialization\IlBasedSerializerTypeChecker.cs</Link>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ILGenerationException.cs">
+      <Link>Serialization\ILGenerationException.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlCodeGenerationException.cs">
-      <Link>Serialization\IlCodeGenerationException.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\src\Orleans\Serialization\IlDelegateBuilder.cs">
-      <Link>Serialization\IlDelegateBuilder.cs</Link>
+    <Compile Include="..\..\..\src\Orleans\Serialization\ILSerializerGenerator.cs">
+      <Link>Serialization\ILSerializerGenerator.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Serialization\ReflectedSerializationMethodInfo.cs">
       <Link>Serialization\ReflectedSerializationMethodInfo.cs</Link>
@@ -621,6 +618,9 @@
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Statistics\ClientStatisticsManager.cs">
       <Link>Statistics\ClientStatisticsManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Utils\ReferenceEqualsComparer.cs">
+      <Link>Utils\ReferenceEqualsComparer.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Statistics\ClientTableStatistics.cs">
       <Link>Statistics\ClientTableStatistics.cs</Link>
