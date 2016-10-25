@@ -1018,11 +1018,7 @@
     </None>
     <None Include="project.json" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
-  <PropertyGroup>
-    <NuGetTargetMoniker>.NETStandard,Version=v1.5</NuGetTargetMoniker>
-  </PropertyGroup>
   <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
     <PropertyGroup Condition="'$(BuildNumber)' == ''">
       <BuildNumber>1</BuildNumber>
