@@ -9,6 +9,9 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Tester;
 using Xunit;
+using Orleans;
+using Orleans.Runtime.Configuration;
+using Orleans.TestingHost.Utils;
 
 namespace Tester.Forwarding
 {
@@ -18,7 +21,9 @@ namespace Tester.Forwarding
 
         public override TestCluster CreateTestCluster()
         {
+            Assert.True(StorageEmulator.TryStart());
             var options = new TestClusterOptions(NumberOfSilos);
+            options.ClusterConfiguration.AddAzureBlobStorageProvider("MemoryStore", "UseDevelopmentStorage=true");
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
             options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
             options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
