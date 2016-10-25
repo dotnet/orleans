@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -6,7 +5,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class ThreadTrackingStatistic : IDisposable
+    internal class ThreadTrackingStatistic
     {
         public ITimeInterval ExecutingCpuCycleTime;
         public ITimeInterval ExecutingWallClockTime;
@@ -37,7 +36,6 @@ namespace Orleans.Runtime
         /// <param name="threadName">Name used for logging the collected stastistics</param>
         public ThreadTrackingStatistic(string threadName)
         {
-
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
             ExecutingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
             ProcessingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
@@ -158,7 +156,6 @@ namespace Orleans.Runtime
             // As this function is called constantly, we perform two additional tasks in this function which require calls from the thread being tracked (the constructor is not called from the tracked thread)
             if (firstStart)
             {
-
                 // If this is the first function call where client has connected, we ensure execution timers are started and context switches are tracked
                 firstStart = false;
                 if (StatisticsCollector.CollectContextSwitchesStats)
@@ -217,7 +214,6 @@ namespace Orleans.Runtime
             // Iterate over all "Thread" category performance counters on system (includes numerous processes)
             foreach (string threadName in allThreadsWithPerformanceCounters.GetInstanceNames())
             {
-
                 // Obtain those performance counters for the OrleansHost
                 if (threadName.Contains("OrleansHost") && threadName.EndsWith("/" + Thread.CurrentThread.ManagedThreadId))
                 {
@@ -232,7 +228,6 @@ namespace Orleans.Runtime
             // Look at all performance counters for this thread
             foreach (PerformanceCounter performanceCounter in performanceCountersForThisThread)
             {
-
                 // Find performance counter for context switches
                 if (performanceCounter.CounterName == CONTEXT_SWTICH_COUNTER_NAME)
                 {
@@ -242,40 +237,5 @@ namespace Orleans.Runtime
             }
 #endif
         }
-
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    // TODO: dispose managed state (managed objects).
-                }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-
-                disposedValue = true;
-            }
-        }
-
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-        // ~ThreadTrackingStatistic() {
-        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-        //   Dispose(false);
-        // }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
-            // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
-        }
-        #endregion
     }
 }

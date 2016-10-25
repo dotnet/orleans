@@ -1,11 +1,3 @@
-using Orleans.CodeGeneration;
-using Orleans.Messaging;
-using Orleans.Providers;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
-using Orleans.Storage;
-using Orleans.Streams;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -14,6 +6,14 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.CodeGeneration;
+using Orleans.Messaging;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Serialization;
+using Orleans.Storage;
+using Orleans.Streams;
 
 namespace Orleans
 {
@@ -917,7 +917,6 @@ namespace Orleans
             }
 
             transport.Dispose();
-            incomingMessagesThreadTimeTracking.Dispose();
             if (ClientStatistics != null)
             {
                 ClientStatistics.Dispose();

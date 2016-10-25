@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
-using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,7 +60,6 @@ namespace Orleans
                 {
                     throw new OrleansException("You are running inside a grain. GrainClient.GrainFactory should only be used on the client side. " +
                              "Inside a grain use GrainFactory property of the Grain base class (use this.GrainFactory).");
-
                 }
                 else // running inside provider or else where
                 {
@@ -72,12 +70,10 @@ namespace Orleans
 
             if (!IsInitialized)
             {
-
                 throw new OrleansException("You must initialize the Grain Client before accessing the GrainFactory");
             }
 
             return grainFactory;
-
         }
 
         internal static GrainFactory InternalGrainFactory
@@ -144,8 +140,8 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Initializes the client runtime from the provided client configuration object. 
-        /// If the configuration object is null, the initialization fails. 
+        /// Initializes the client runtime from the provided client configuration object.
+        /// If the configuration object is null, the initialization fails.
         /// </summary>
         /// <param name="config">A ClientConfiguration object.</param>
         public static void Initialize(ClientConfiguration config)
@@ -160,7 +156,7 @@ namespace Orleans
 
         /// <summary>
         /// Initializes the client runtime from the standard client configuration file using the provided gateway address.
-        /// Any gateway addresses specified in the config file will be ignored and the provided gateway address wil be used instead. 
+        /// Any gateway addresses specified in the config file will be ignored and the provided gateway address wil be used instead.
         /// </summary>
         /// <param name="gatewayAddress">IP address and port of the gateway silo</param>
         /// <param name="overrideConfig">Whether the specified gateway endpoint should override / replace the values from config file, or be additive</param>
@@ -187,7 +183,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private static void InternalInitialize(ClientConfiguration config, OutsideRuntimeClient runtimeClient = null)
         {
-            // We deliberately want to run this initialization code on .NET thread pool thread to escape any 
+            // We deliberately want to run this initialization code on .NET thread pool thread to escape any
             // TPL execution environment and avoid any conflicts with client's synchronization context
             var tcs = new TaskCompletionSource<ClientConfiguration>();
             WaitCallback doInit = state =>
@@ -256,7 +252,7 @@ namespace Orleans
                         outsideRuntimeClient = runtimeClient;  // Keep reference, to avoid GC problems
                         outsideRuntimeClient.Start();
 
-                        // this needs to be the last successful step inside the lock so 
+                        // this needs to be the last successful step inside the lock so
                         // IsInitialized doesn't return true until we're fully initialized
                         isFullyInitialized = true;
                     }
@@ -294,15 +290,15 @@ namespace Orleans
         }
 
         /// <summary>
-        /// This is the lock free version of uninitilize so we can share 
+        /// This is the lock free version of uninitilize so we can share
         /// it between the public method and error paths inside initialize.
         /// This should only be called inside a lock(initLock) block.
         /// </summary>
         private static void InternalUninitialize(bool cleanup = true)
         {
             // Update this first so IsInitialized immediately begins returning
-            // false.  Since this method should be protected externally by 
-            // a lock(initLock) we should be able to reset everything else 
+            // false.  Since this method should be protected externally by
+            // a lock(initLock) we should be able to reset everything else
             // before the next init attempt.
             isFullyInitialized = false;
 
@@ -369,7 +365,7 @@ namespace Orleans
         /// <summary>
         /// Global pre-call interceptor function
         /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
-        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings 
+        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
         /// such as <c>Orleans.RequestContext</c> will be picked up.
         /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
         /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
