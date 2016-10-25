@@ -50,8 +50,14 @@
     <Compile Include="..\..\..\test\TestGrains\ActivateDeactivateWatcherGrain.cs">
       <Link>ActivateDeactivateWatcherGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrains\CircularStateTestGrain.cs">
+      <Link>CircularStateTestGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrains\ClusterTestGrains.cs">
       <Link>ClusterTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ConcreteGrainsWithGenericInterfaces.cs">
+      <Link>ConcreteGrainsWithGenericInterfaces.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrains\ExceptionGrain.cs">
       <Link>ExceptionGrain.cs</Link>
@@ -92,11 +98,20 @@
     <Compile Include="..\..\..\test\TestGrains\SimpleGrain.cs">
       <Link>SimpleGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleObserverableGrain.cs">
+      <Link>SimpleObserverableGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrains\SimplePersistentGrain.cs">
       <Link>SimplePersistentGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SpecializedSimpleGenericGrain.cs">
+      <Link>SpecializedSimpleGenericGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrains\StatelessWorkerGrain.cs">
       <Link>StatelessWorkerGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ValueTypeTestGrain.cs">
+      <Link>ValueTypeTestGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
