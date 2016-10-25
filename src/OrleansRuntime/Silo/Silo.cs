@@ -761,7 +761,6 @@ namespace Orleans.Runtime
                     SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
                 }
 
-
                 // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
