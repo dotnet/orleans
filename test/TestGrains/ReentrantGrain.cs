@@ -71,7 +71,7 @@ namespace UnitTests.Grains
         }
     }
 
-    [MayInterleave("MayInterleave")]
+    [MayInterleave(nameof(MayInterleave))]
     public class MayInterleavePredicateGrain : Grain, IMayInterleavePredicateGrain
     {
         public static bool MayInterleave(InvokeMethodRequest req)
