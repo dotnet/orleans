@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         internal Type StateObjectType { get; private set; }
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
-        Func<InvokeMethodRequest, bool> IsMessageAllowedToInterleavePredicate { get; set; }
+        internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
    
         public GrainTypeData(Type type, Type stateObjectType)
         {
@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
-            IsMessageAllowedToInterleavePredicate = GetMessageAllowedToInterleavePredicate(type);
+            MayInterleave = GetMayInterleavePredicate(type) ?? (_ => false);
         }
 
         /// <summary>
@@ -137,10 +137,10 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainType">Grain class.</param>
         /// <returns></returns>
-        private static Func<InvokeMethodRequest, bool> GetMessageAllowedToInterleavePredicate(Type grainType)
+        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(Type grainType)
         {
             if (!grainType.GetCustomAttributes<MayInterleaveAttribute>().Any())
-                return req => false;
+                return null;
 
             if (grainType.GetCustomAttributes(typeof(ReentrantAttribute), true).Any())
                 throw new InvalidOperationException(
@@ -166,11 +166,6 @@ namespace Orleans.Runtime
             var predicate = Expression.Lambda<Func<InvokeMethodRequest, bool>>(call, parameter).Compile();
 
             return predicate;
-        }
-
-        internal bool IsMessageAllowedToInterleave(Message message)
-        {
-            return IsMessageAllowedToInterleavePredicate((InvokeMethodRequest) message.BodyObject);
         }
     }
 }
