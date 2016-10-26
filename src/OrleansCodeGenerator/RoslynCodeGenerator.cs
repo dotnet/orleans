@@ -11,6 +11,8 @@ namespace Orleans.CodeGenerator
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.Runtime;
+    using Orleans.Serialization;
+
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -347,7 +349,7 @@ namespace Orleans.CodeGenerator
                                           && knownAssemblyAttribute.TreatTypesAsSerializable;
                 foreach (var type in TypeUtils.GetDefinedTypes(assembly, Logger))
                 {
-                    var considerForSerialization = considerAllTypesForSerialization || type.GetTypeInfo().IsSerializable;
+                    var considerForSerialization = considerAllTypesForSerialization || type.GetTypeInfo().IsMarkedAsSerializable();
                     ConsiderType(type, runtime, targetAssembly, includedTypes, considerForSerialization);
                 }
             }

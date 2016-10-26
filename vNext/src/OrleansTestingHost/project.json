@@ -1,7 +1,8 @@
-{
+﻿{
   "dependencies": {
     "Microsoft.Extensions.Configuration": "1.0.0",
-    "Microsoft.Extensions.Configuration.Binder": "1.0.0"
+    "Microsoft.Extensions.Configuration.Binder": "1.0.0",
+    "Wire": "0.8.1"
   },
   "frameworks": {
     "net462": {}

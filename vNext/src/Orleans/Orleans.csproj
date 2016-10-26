@@ -1010,6 +1010,7 @@
     <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Shims\AppDomain.cs" />
     <Compile Include="Shims\RuntimeStatisticsGroup.cs" />
+    <Compile Include="Shims\FormatterShim.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">

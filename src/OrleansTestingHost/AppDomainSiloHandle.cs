@@ -12,6 +12,8 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.TestingHost
 {
 #if NETSTANDARD
+    using System.IO;
+    
     using AppDomain = System.AppDomain;
 #endif
 
@@ -60,8 +62,20 @@ namespace Orleans.TestingHost
                 optimizer.AddCachedAssembly(assembly.Key, assembly.Value);
             }
 
-            var args = new object[] { siloName, type, config };
+#if NETSTANDARD
+            // Serialize the configuration to a byte array to that it can traverse app domain boundaries.
+            var serializer = new Wire.Serializer(new Wire.SerializerOptions(preserveObjectReferences: true));
+            byte[] serializedClusterConfig;
+            using (var stream = new MemoryStream())
+            {
+                serializer.Serialize(config, stream);
+                serializedClusterConfig = stream.ToArray();
+            }
 
+            var args = new object[] { siloName, type, serializedClusterConfig };
+#else
+            var args = new object[] { siloName, type, config };
+#endif
             var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
                 typeof(AppDomainSiloHost).Assembly.FullName, typeof(AppDomainSiloHost).FullName, false,
                 BindingFlags.Default, null, args, CultureInfo.CurrentCulture,
@@ -69,7 +83,7 @@ namespace Orleans.TestingHost
 
             appDomain.UnhandledException += ReportUnobservedException;
             appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
-
+            
             siloHost.Start();
 
             var retValue = new AppDomainSiloHandle
@@ -77,7 +91,7 @@ namespace Orleans.TestingHost
                 Name = siloName,
                 SiloHost = siloHost,
                 NodeConfiguration = nodeConfiguration,
-                SiloAddress = siloHost.SiloAddress,
+                SiloAddress = SiloAddress.FromParsableString(siloHost.GetSiloAddressString()),
                 Type = type,
                 AppDomain = appDomain,
                 additionalAssemblies = additionalAssemblies,

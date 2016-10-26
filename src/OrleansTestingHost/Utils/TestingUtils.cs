@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -87,18 +86,20 @@ namespace Orleans.TestingHost.Utils
             throw new TimeoutException(message);
         }
 
+#if !NETSTANDARD
         /// <summary> Serialize and deserialize the input </summary>
         /// <typeparam name="T">The type of the input</typeparam>
         /// <param name="input">The input to serialize and deserialize</param>
         /// <returns>Input that have been serialized and then deserialized</returns>
         public static T RoundTripDotNetSerializer<T>(T input)
         {
-            IFormatter formatter = new BinaryFormatter();
+            IFormatter formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
             MemoryStream stream = new MemoryStream(new byte[100000], true);
             formatter.Serialize(stream, input);
             stream.Position = 0;
             T output = (T)formatter.Deserialize(stream);
             return output;
         }
+#endif
     }
 }

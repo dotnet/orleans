@@ -42,6 +42,11 @@ namespace Orleans.Serialization
             shallowCopyableTypes[typeof(CancellationToken)] = true;
         }
 
+        public static bool IsMarkedAsSerializable(this TypeInfo type)
+        {
+            return type.IsSerializable || type.GetCustomAttributes().Any(attr => attr.GetType().Name == "SerializableAttribute");
+        }
+
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
             bool result;

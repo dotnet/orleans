@@ -6,6 +6,10 @@ using Orleans.Storage;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+using NonSerializedAttribute = Orleans.NonSerializedAttribute;
+#endif
 
 namespace UnitTests.StorageTests
 {

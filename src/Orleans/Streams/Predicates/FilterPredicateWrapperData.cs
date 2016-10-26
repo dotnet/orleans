@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -13,7 +14,10 @@ namespace Orleans.Streams
     /// Predicate filter functions must be staic (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
     /// </summary>
     [Serializable]
-    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper, ISerializable
+    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper
+#if !NETSTANDARD
+        , ISerializable
+#endif
     {
         public object FilterData { get; private set; }
 
@@ -37,7 +41,8 @@ namespace Orleans.Streams
             DehydrateStaticFunc(pred);
         }
 
-        #region ISerializable methods
+#if !NETSTANDARD
+#region ISerializable methods
         protected FilterPredicateWrapperData(SerializationInfo info, StreamingContext context)
         {
             FilterData = info.GetValue(SER_FIELD_DATA, typeof(object));
@@ -52,7 +57,8 @@ namespace Orleans.Streams
             info.AddValue(SER_FIELD_METHOD, methodName);
             info.AddValue(SER_FIELD_CLASS,  className);
         }
-        #endregion
+#endregion
+#endif
 
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
         {

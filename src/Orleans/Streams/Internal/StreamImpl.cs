@@ -4,12 +4,16 @@ using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable
+    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl
+#if !NETSTANDARD
+        , ISerializable
+#endif
     {
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;
@@ -156,7 +160,7 @@ namespace Orleans.Streams
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(streamId.ProviderName) as IInternalStreamProvider;
         }
 
-        #region IComparable<IAsyncStream<T>> Members
+#region IComparable<IAsyncStream<T>> Members
 
         public int CompareTo(IAsyncStream<T> other)
         {
@@ -164,9 +168,9 @@ namespace Orleans.Streams
             return o == null ? 1 : streamId.CompareTo(o.streamId);
         }
 
-        #endregion
+#endregion
 
-        #region IEquatable<IAsyncStream<T>> Members
+#region IEquatable<IAsyncStream<T>> Members
 
         public virtual bool Equals(IAsyncStream<T> other)
         {
@@ -174,7 +178,7 @@ namespace Orleans.Streams
             return o != null && streamId.Equals(o.streamId);
         }
 
-        #endregion
+#endregion
 
         public override bool Equals(object obj)
         {
@@ -191,8 +195,9 @@ namespace Orleans.Streams
         {
             return streamId.ToString();
         }
-                
-        #region ISerializable Members
+
+#if !NETSTANDARD
+#region ISerializable Members
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -210,6 +215,7 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        #endregion
+#endregion
+#endif
     }
 }
