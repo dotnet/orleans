@@ -250,7 +250,7 @@ VALUES
 	(
 		DeploymentId
 	)
-	SELECT @DeploymentId
+	SELECT * FROM ( SELECT @DeploymentId ) AS TMP
 	WHERE NOT EXISTS
 	(
 	SELECT 1
@@ -302,7 +302,7 @@ BEGIN
 		StartTime,
 		IAmAliveTime
 	)
-	SELECT
+	SELECT * FROM ( SELECT
 		_DeploymentId,
 		_Address,
 		_Port,
@@ -312,7 +312,7 @@ BEGIN
 		_Status,
 		_ProxyPort,
 		_StartTime,
-		_IAmAliveTime
+		_IAmAliveTime) AS TMP
 	WHERE NOT EXISTS
 	(
 	SELECT 1
@@ -478,7 +478,7 @@ BEGIN
 			ModifiedOn,
 			Version
 		)
-		SELECT
+		SELECT * FROM ( SELECT
 			_GrainIdHash,
 			_GrainIdN0,
 			_GrainIdN1,
@@ -490,7 +490,7 @@ BEGIN
 			_PayloadJson,
 			_PayloadXml,
             UTC_TIMESTAMP(),
-			1
+			1) AS TMP
 		WHERE NOT EXISTS
 		(
 			-- There should not be any version of this grain state.
