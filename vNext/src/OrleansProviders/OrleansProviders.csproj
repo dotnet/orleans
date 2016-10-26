@@ -48,7 +48,7 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\src\Build\GlobalAssemblyInfo.cs">
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\OrleansProviders\BuiltInProvidersConfigurationExtensions.cs">
