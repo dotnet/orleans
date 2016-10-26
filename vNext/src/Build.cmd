@@ -55,42 +55,30 @@ if EXIST "%VERSION_FILE%" (
 
 if "%builduri%" == "" set builduri=Build.cmd
 
-set PROJ=%CMDHOME%\Orleans.sln
+set PROJ=%CMDHOME%\Orleans.vNext.sln
+
+:: Restore nuget packages before building the solution
+"%MSBUILDEXE%" %CMDHOME%\..\..\src\Before.Orleans.sln.targets /p:SolutionPath=%PROJ%
 
 @echo ===== Building %PROJ% =====
 
 @echo Build Debug ==============================
 
 SET CONFIGURATION=Debug
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
+SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%\
 
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% /p:GenerateProjectSpecificOutputFolder=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
+SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%\
 
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% /p:GenerateProjectSpecificOutputFolder=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
-
-set STEP=VSIX
-
-if "%VSSDK140Install%" == "" (
-    @echo Visual Studio 2015 SDK not installed - Skipping building VSIX
-    @GOTO :BuildFinished
-)
-
-@echo Build VSIX ============================
-
-set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-SET OutDir=%OutDir%\VSIX
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for VSIX package for %PROJ%
 
 :BuildFinished
 @echo ===== Build succeeded for %PROJ% =====
