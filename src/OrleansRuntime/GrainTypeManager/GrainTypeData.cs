@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             GrainClass = TypeUtils.GetFullName(typeInfo);
             RemoteInterfaceTypes = GetRemoteInterfaces(type); ;
             StateObjectType = stateObjectType;
-            MayInterleave = GetMayInterleavePredicate(type) ?? (_ => false);
+            MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
         }
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainType">Grain class.</param>
         /// <returns></returns>
-        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(Type grainType)
+        private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(TypeInfo grainType)
         {
             if (!grainType.GetCustomAttributes<MayInterleaveAttribute>().Any())
                 return null;
