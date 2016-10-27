@@ -7,12 +7,13 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager
+    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener
     {
         private readonly Logger logger = LogManager.GetLogger("TypeManager");
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloStatusOracle statusOracle;
         private readonly OrleansTaskScheduler scheduler;
+        private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
 
         internal TypeManager(SiloAddress myAddr, GrainTypeManager grainTypeManager, ISiloStatusOracle oracle, OrleansTaskScheduler scheduler)
@@ -28,6 +29,7 @@ namespace Orleans.Runtime
             this.grainTypeManager = grainTypeManager;
             statusOracle = oracle;
             this.scheduler = scheduler;
+            hasToRefreshClusterGrainInterfaceMap = true;
             this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
                     OnRefreshClusterMapTimer,
                     null,
@@ -56,8 +58,20 @@ namespace Orleans.Runtime
             return Task.FromResult(table);
         }
 
+        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            hasToRefreshClusterGrainInterfaceMap = true;
+        }
+
         private async Task OnRefreshClusterMapTimer(object _)
         {
+            // Check if we have to refresh
+            if (!hasToRefreshClusterGrainInterfaceMap)
+            {
+                logger.Verbose3("OnRefreshClusterMapTimer: no refresh required");
+                return;
+            }
+            hasToRefreshClusterGrainInterfaceMap = false;
 
             logger.Info("OnRefreshClusterMapTimer: refresh start");
             var activeSilos = statusOracle.GetApproximateSiloStatuses(onlyActive: true);
@@ -113,7 +127,7 @@ namespace Orleans.Runtime
             {
 				// Will be retried on the next timer hit
                 logger.Error(ErrorCode.TypeManager_GetSiloGrainInterfaceMapError, $"Exception when trying to get GrainInterfaceMap for silos {siloAddress}", ex);
-                
+				hasToRefreshClusterGrainInterfaceMap = true;
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, null);
             }
         }
