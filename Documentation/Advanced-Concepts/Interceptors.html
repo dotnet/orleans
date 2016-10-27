@@ -131,34 +131,43 @@
 <p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="90" sourceendlinenumber="90">This happens if the assembly containing the exception is not available to the client. For example, say you are using Entity Framework in your grain implementations; then it is possible that an <code>EntityException</code> is thrown. The client on the other hand does not (and should not) reference <code>EntityFramework.dll</code> since it has no knowledge about the underlying data access layer.</p>
 <p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="92" sourceendlinenumber="92">When the client tries to deserialize the <code>EntityException</code>, it will fail due to the missing DLL; as a consequence a <code>TypeLoadException</code> is thrown hiding the original <code>EntityException</code>.</p>
 <p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="94" sourceendlinenumber="94">One may argue that this is pretty okay, since the client would never handle the <code>EntityException</code>; otherwise it would have to reference <code>EntityFramework.dll</code>.</p>
-<p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="96" sourceendlinenumber="96">But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type <code>Exception</code> if the exception type is presumably unknown on the client side. This can be done as follows:</p>
-<pre sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="98" sourceendlinenumber="150"><code class="lang-csharp">private static Task RegisterInterceptors(IProviderRuntime providerRuntime, IProviderConfiguration config)
+<p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="96" sourceendlinenumber="96">But what if the client wants at least to log the exception? The problem is that the original error message is lost. One way to workaround this issue is to intercept server-side exceptions and replace them by plain exceptions of type <code>Exception</code> if the exception type is presumably unknown on the client side.</p>
+<p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="98" sourceendlinenumber="98">However, there is one important thing we have to keep in mind: we only want to replace an exception <strong>if the caller is the grain client</strong>. We don&#39;t want to replace an exception if the caller is another grain (or the Orleans infrastructure which is making grain calls, too; e.g. on the <code>GrainBasedReminderTable</code> grain).</p>
+<p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="100" sourceendlinenumber="100">On the server side this can be done with a silo-level interceptor:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="102" sourceendlinenumber="161"><code class="lang-csharp">private static Task RegisterInterceptors(IProviderRuntime providerRuntime, IProviderConfiguration config)
 {
     var knownAssemblyNames = GetKnownExceptionTypeAssemblyNames();
 
     providerRuntime.SetInvokeInterceptor(async (method, request, grain, invoker) =&gt;
     {
-        try
+        if (RequestContext.Get(&quot;IsExceptionConversionEnabled&quot;) as bool? == true)
         {
-            return await invoker.Invoke(grain, request);
-        }
-        catch (Exception exc)
-        {
-            var type = exc.GetType();
+            RequestContext.Remove(&quot;IsExceptionConversionEnabled&quot;);
 
-            if (knownAssemblyNames.Contains(type.Assembly.GetName().Name))
+            try
             {
-                throw;
+                return await invoker.Invoke(grain, request);
             }
+            catch (Exception exc)
+            {
+                var type = exc.GetType();
 
-            // special exception handling
-            throw new Exception(
-                $&quot;Exception of non-public type &#39;{type.FullName}&#39; has been wrapped. Original message: &lt;&lt;&lt;&lt;----{Environment.NewLine}{exc.ToString()}{Environment.NewLine}----&gt;&gt;&gt;&gt;&quot;);
+                if (knownAssemblyNames.Contains(type.Assembly.GetName().Name))
+                {
+                    throw;
+                }
+
+                // special exception handling
+                throw new Exception(
+                    $&quot;Exception of non-public type &#39;{type.FullName}&#39; has been wrapped. Original message: &lt;&lt;&lt;&lt;----{Environment.NewLine}{exc.ToString()}{Environment.NewLine}----&gt;&gt;&gt;&gt;&quot;);
+            }
         }
+
+        return await invoker.Invoke(grain, request);
     });
 
     return TaskDone.Done;
-}
+
 
 private static HashSet&lt;string&gt; GetKnownExceptionTypeAssemblyNames()
     =&gt;
@@ -183,7 +192,10 @@ private static HashSet&lt;string&gt; GetKnownExceptionTypeAssemblyNames()
         &quot;MyCompany.Microservices.Interfaces&quot;,
         &quot;MyCompany.Microservices.ServiceLayer&quot;
 };
-</code></pre>
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="163" sourceendlinenumber="163">On the client side you have to set up a client-side interceptor:</p>
+<pre sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="165" sourceendlinenumber="167"><code class="lang-csharp">GrainClient.ClientInvokeCallback = (request, grain) =&gt; { RequestContext.Set(&quot;IsExceptionConversionEnabled&quot;, true); };
+</code></pre><p sourcefile="Documentation/Advanced-Concepts/Interceptors.md" sourcestartlinenumber="169" sourceendlinenumber="169">This way the client tells the server that it wants to use exception conversion.</p>
+
             </article>
           </div>
           
