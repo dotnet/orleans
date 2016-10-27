@@ -1,6 +1,8 @@
-﻿namespace Orleans.Runtime
+﻿using System;
+
+namespace Orleans.Runtime
 {
-    internal class RuntimeStatisticsGroup
+    internal class RuntimeStatisticsGroup : IDisposable
     {
         private static readonly Logger logger = LogManager.GetLogger("RuntimeStatisticsGroup", LoggerType.Runtime);
         public long MemoryUsage => 0;
@@ -16,6 +18,10 @@
         }
 
         public void Stop()
+        {
+        }
+
+        public void Dispose()
         {
         }
     }
