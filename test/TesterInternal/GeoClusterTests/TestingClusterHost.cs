@@ -78,7 +78,7 @@ namespace Tests.GeoClusterTests
             {
                 Assert.Equal(expected, actual);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 WriteLog("Equality assertion failed; expected={0}, actual={1} comment={2}", expected, actual, comment);
                 throw;

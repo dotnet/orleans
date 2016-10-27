@@ -15,9 +15,8 @@ namespace Orleans.Serialization
 
         private readonly ILFieldBuilder fields;
 
-        /// <summary>
-        /// Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.
-        /// </summary>
+        /// <summary>Creates a new instance of the <see cref="ILDelegateBuilder{TDelegate}"/> class.</summary>
+        /// <param name="fields">Field builder.</param>
         /// <param name="name">The name of the new delegate.</param>
         /// <param name="methods">The reflected methods used during delegate creation.</param>
         /// <param name="methodInfo">
