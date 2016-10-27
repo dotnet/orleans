@@ -24,9 +24,6 @@ namespace Orleans.Runtime
     /// Information stored in RequestContext is propagated from 
     /// Orleans clients to Orleans grains automatically 
     /// by the Orleans runtime.
-    /// RequestContext data is not automatically propagated across 
-    /// TPL thread-switch boundaries -- <see cref="CallContext"/> 
-    /// for that type of functionality.
     /// </para>
     /// </remarks>
     public static class RequestContext

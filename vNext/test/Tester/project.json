@@ -6,32 +6,7 @@
     "Newtonsoft.Json": "9.0.1",
     "xunit": "2.1.0",
     "xunit.runner.visualstudio": "2.1.0",
-    "Xunit.SkippableFact": "1.2.14",
-
-
-
-
-    "System.Collections.Immutable": "1.2.0",
-    "System.Security.Cryptography.Algorithms": "4.2.0",
-    "System.Xml.XmlDocument": "4.0.1",
-    "System.Xml.XPath.XmlDocument": "4.0.1",
-    "System.ComponentModel.TypeConverter": "4.1.0",
-    "System.Linq.Expressions": "4.1.0",
-    "System.Diagnostics.Process": "4.1.0",
-    "System.Threading.Thread": "4.0.0",
-    "System.Diagnostics.TraceSource": "4.0.0",
-    "System.Reflection.TypeExtensions": "4.1.0",
-    "System.Net.NameResolution": "4.0.0",
-    "System.Net.NetworkInformation": "4.1.0",
-    "System.Runtime.Serialization.Formatters": "4.0.0-rc3-24212-01",
-    "System.Runtime.Serialization.Primitives": "4.1.1",
-    "System.Reflection.Emit": "4.0.1",
-    "System.Reflection.Emit.Lightweight": "4.0.1",
-    "System.Diagnostics.FileVersionInfo": "4.0.0",
-    "System.Threading.ThreadPool": "4.0.10",
-
-    "Microsoft.Extensions.DependencyInjection": "1.0.0",
-    "System.Runtime": "4.1.0"
+    "Xunit.SkippableFact": "1.2.14"
   },
   "frameworks": {
     "net462": {}

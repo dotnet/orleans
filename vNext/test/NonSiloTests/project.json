@@ -1,7 +1,5 @@
 ﻿{
   "dependencies": {
-    "System.Management.Automation": "6.1.7601.17515",
-    "System.Xml.XmlDocument": "4.0.1",
     "xunit": "2.1.0",
     "xunit.runner.visualstudio": "2.1.0",
     "Xunit.SkippableFact": "1.2.14",
