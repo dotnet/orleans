@@ -4,7 +4,7 @@ using Orleans.Runtime.Providers;
 
 namespace Orleans.Runtime
 {
-    internal class TypeManager : SystemTarget, ITypeManager
+    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager
     {
         private readonly GrainTypeManager grainTypeManager;
 
@@ -15,7 +15,12 @@ namespace Orleans.Runtime
         }
 
 
-        public Task<IGrainTypeResolver> GetTypeCodeMap(SiloAddress silo)
+        public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
+        {
+            return Task.FromResult<IGrainTypeResolver>(grainTypeManager.ClusterGrainInterfaceMap);
+        }
+
+        public Task<GrainInterfaceMap> GetSiloTypeCodeMap()
         {
             return Task.FromResult(grainTypeManager.GetTypeCodeMap());
         }
