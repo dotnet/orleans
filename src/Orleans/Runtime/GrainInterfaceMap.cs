@@ -67,7 +67,6 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<int> unordered;
 
-        [NonSerialized]
         private readonly Dictionary<int, GrainClassData> implementationIndex;
 
         [NonSerialized] // Client shouldn't need this
@@ -89,6 +88,38 @@ namespace Orleans.Runtime
             this.localTestMode = localTestMode;
             if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
+        }
+
+        internal void AddMap(GrainInterfaceMap map)
+        {
+            foreach (var kvp in map.typeToInterfaceData)
+            {
+                if (!typeToInterfaceData.ContainsKey(kvp.Key))
+                {
+                    typeToInterfaceData.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (var kvp in map.table)
+            {
+                if (!table.ContainsKey(kvp.Key))
+                {
+                    table.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (var grainClassTypeCode in map.unordered)
+            {
+                unordered.Add(grainClassTypeCode);
+            }
+
+            foreach (var kvp in map.implementationIndex)
+            {
+                if (!implementationIndex.ContainsKey(kvp.Key))
+                {
+                    implementationIndex.Add(kvp.Key, kvp.Value);
+                }
+            }
         }
 
         internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
@@ -170,6 +201,14 @@ namespace Orleans.Runtime
             lock (this)
             {
                 return table.ContainsKey(interfaceId);
+            }
+        }
+
+        internal bool ContainsGrainImplementation(int typeCode)
+        {
+            lock (this)
+            {
+                return implementationIndex.ContainsKey(typeCode);
             }
         }
 
