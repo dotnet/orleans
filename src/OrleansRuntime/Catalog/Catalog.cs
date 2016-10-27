@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+
+using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -382,14 +384,14 @@ namespace Orleans.Runtime
 
 #region Grains
 
-        internal bool IsReentrantGrain(ActivationId running)
+        internal bool CanInterleave(ActivationId running, Message message)
         {
             ActivationData target;
             GrainTypeData data;
             return TryGetActivationData(running, out target) &&
                 target.GrainInstance != null &&
                 GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
-                data.IsReentrant;
+                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
         }
 
         public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
