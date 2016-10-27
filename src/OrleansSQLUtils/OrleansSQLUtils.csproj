@@ -54,6 +54,7 @@
     <Compile Include="OrleansRelationalDownloadStream.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReminderService\SqlReminderTable.cs" />
+    <Compile Include="Storage\AdoNetConfigurationExtensions.cs" />
     <Compile Include="Storage\AdoNetInvariants.cs" />
     <Compile Include="Storage\DbConstantsStore.cs" />
     <Compile Include="Storage\DbExtensions.cs" />
