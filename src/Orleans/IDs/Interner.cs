@@ -52,7 +52,7 @@ namespace Orleans
     /// </summary>
     /// <typeparam name="K">Type of objects to be used for intern keys</typeparam>
     /// <typeparam name="T">Type of objects to be interned / cached</typeparam>
-    internal class Interner<K, T> where T : class
+    internal class Interner<K, T> : IDisposable where T : class
     {
         private static readonly string internCacheName = "Interner-" + typeof(T).Name;
         private readonly Logger logger;
@@ -99,8 +99,9 @@ namespace Orleans
         public T FindOrCreate(K key, Func<T> creatorFunc)
         {
             T obj = null;
-            WeakReference cacheEntry = internCache.GetOrAdd(key, 
-                (k) => {
+            WeakReference cacheEntry = internCache.GetOrAdd(key,
+                (k) =>
+                {
                     obj = creatorFunc();
                     return new WeakReference(obj);
                 });
@@ -131,7 +132,7 @@ namespace Orleans
         {
             obj = null;
             WeakReference cacheEntry;
-            if(internCache.TryGetValue(key, out cacheEntry))
+            if (internCache.TryGetValue(key, out cacheEntry))
             {
                 if (cacheEntry != null)
                 {
@@ -204,7 +205,7 @@ namespace Orleans
         public void StopAndClear()
         {
             internCache.Clear();
-            if(cacheCleanupTimer != null)
+            if (cacheCleanupTimer != null)
             {
                 cacheCleanupTimer.Dispose();
             }
@@ -268,7 +269,7 @@ namespace Orleans
         private string PrintInternerContent()
         {
             StringBuilder s = new StringBuilder();
-          
+
             foreach (var e in internCache)
             {
                 if (e.Value != null && e.Value.IsAlive && e.Value.Target != null)
@@ -277,6 +278,11 @@ namespace Orleans
                 }
             }
             return s.ToString();
+        }
+
+        public void Dispose()
+        {
+            cacheCleanupTimer.Dispose();
         }
     }
 }

@@ -120,12 +120,13 @@ namespace Orleans.Runtime.Configuration
             CalculateOverrides();
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
         private static string WriteXml(XmlElement element)
         {
-            using(var sw = new StringWriter())
+            using (var sw = new StringWriter())
             {
-                using(var xw = XmlWriter.Create(sw))
-                { 
+                using (var xw = XmlWriter.Create(sw))
+                {
                     element.WriteTo(xw);
                     xw.Flush();
                     return sw.ToString();
@@ -179,7 +180,7 @@ namespace Orleans.Runtime.Configuration
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
                 }
             }
-            
+
             foreach (var p in overrideXml)
             {
                 var n = new NodeConfiguration(Defaults);
@@ -327,7 +328,7 @@ namespace Orleans.Runtime.Configuration
             }
             foreach (var attribute in AttributeNames(test))
             {
-                if (! allowed.HasAttribute(attribute))
+                if (!allowed.HasAttribute(attribute))
                 {
                     disallowed.Add(prefix + "/@" + attribute);
                 }
@@ -339,7 +340,7 @@ namespace Orleans.Runtime.Configuration
                 if (testChild == null)
                     continue;
                 XmlElement allowedChild;
-                if (! allowedChildren.TryGetValue(testChild.LocalName, out allowedChild))
+                if (!allowedChildren.TryGetValue(testChild.LocalName, out allowedChild))
                 {
                     disallowed.Add(prefix + "/" + testChild.LocalName);
                 }
@@ -483,7 +484,7 @@ namespace Orleans.Runtime.Configuration
                 }
                 else
                 {
-                    if(CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
+                    if (CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
                         chosen = addr;
                 }
             }
@@ -500,7 +501,7 @@ namespace Orleans.Runtime.Configuration
 
             // compare starting from most significant octet.
             // 10.68.20.21 < 10.98.05.04
-            for (int i = 0; i < lbytes.Length; i++) 
+            for (int i = 0; i < lbytes.Length; i++)
             {
                 if (lbytes[i] != rbytes[i])
                 {
@@ -524,10 +525,10 @@ namespace Orleans.Runtime.Configuration
 
             var candidates = new List<IPAddress>();
             // loop through interfaces
-            for (int i=0; i < netInterfaces.Length; i++)
+            for (int i = 0; i < netInterfaces.Length; i++)
             {
                 NetworkInterface netInterface = netInterfaces[i];
-                
+
                 if (netInterface.OperationalStatus != OperationalStatus.Up)
                 {
                     // Skip network interfaces that are not operational
@@ -546,7 +547,7 @@ namespace Orleans.Runtime.Configuration
                     if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
                     {
                         //don't pick loopback address, unless we were asked for a loopback interface
-                        if(!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                        if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
                         {
                             candidates.Add(ip.Address); // collect all candidates.
                         }
@@ -582,7 +583,7 @@ namespace Orleans.Runtime.Configuration
             config.Defaults.HostNameOrIPAddress = "localhost";
             config.Defaults.Port = siloPort;
             config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
-            
+
             config.PrimaryNode = siloAddress;
 
             return config;

@@ -10,11 +10,11 @@ namespace Orleans.Messaging
 {
     /// <summary>
     /// The GatewayManager class holds the list of known gateways, as well as maintaining the list of "dead" gateways.
-    /// 
-    /// The known list can come from one of two places: the full list may appear in the client configuration object, or 
+    ///
+    /// The known list can come from one of two places: the full list may appear in the client configuration object, or
     /// the config object may contain an IGatewayListProvider delegate. If both appear, then the delegate takes priority.
     /// </summary>
-    internal class GatewayManager : IGatewayListListener
+    internal class GatewayManager : IGatewayListListener, IDisposable
     {
         internal readonly IGatewayListProvider ListProvider;
         private SafeTimer gatewayRefreshTimer;
@@ -117,11 +117,11 @@ namespace Orleans.Messaging
         }
 
         /// <summary>
-        /// Selects a gateway to use for a new bucket. 
-        /// 
-        /// Note that if a list provider delegate was given, the delegate is invoked every time this method is called. 
+        /// Selects a gateway to use for a new bucket.
+        ///
+        /// Note that if a list provider delegate was given, the delegate is invoked every time this method is called.
         /// This method performs caching to avoid hammering the ultimate data source.
-        /// 
+        ///
         /// This implementation does a simple round robin selection. It assumes that the gateway list from the provider
         /// is in the same order every time.
         /// </summary>
@@ -223,7 +223,7 @@ namespace Orleans.Messaging
                 {
                     DateTime diedAt;
                     // We consider a node to be dead if we recorded it is dead due to socket error
-                    // and it was recorded (diedAt) not too long ago (less than maxStaleness ago). 
+                    // and it was recorded (diedAt) not too long ago (less than maxStaleness ago).
                     // The latter is to cover the case when the Gateway provider returns an outdated list that does not yet reflect the actually recently died Gateway.
                     // If it has passed more than maxStaleness - we assume maxStaleness is the upper bound on Gateway provider freshness.
                     bool isDead = knownDead.TryGetValue(trial, out diedAt) && DateTime.UtcNow.Subtract(diedAt) < maxStaleness;
@@ -249,6 +249,11 @@ namespace Orleans.Messaging
                             prevRefresh);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            gatewayRefreshTimer.Dispose();
         }
     }
 }

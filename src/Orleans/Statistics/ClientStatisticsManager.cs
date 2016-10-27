@@ -5,13 +5,13 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager
+    internal class ClientStatisticsManager : IDisposable
     {
         private readonly ClientConfiguration config;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private readonly Logger logger ;
+        private readonly Logger logger;
 
         internal ClientStatisticsManager(ClientConfiguration config)
         {
@@ -98,6 +98,16 @@ namespace Orleans.Runtime
 
             tableStatistics?.Dispose();
             tableStatistics = null;
+        }
+
+        public void Dispose()
+        {
+            if (runtimeStats != null)
+                runtimeStats.Dispose();
+            runtimeStats = null;
+            if (logStatistics != null)
+                logStatistics.Dispose();
+            logStatistics = null;
         }
     }
 }

@@ -57,7 +57,7 @@ namespace Orleans.Messaging
     // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
     // so there's no need to worry about the order in which we take and release those locks.
     // </summary>
-    internal class ProxiedMessageCenter : IMessageCenter
+    internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
         #region Constants
 
@@ -129,7 +129,7 @@ namespace Orleans.Messaging
         public void Stop()
         {
             Running = false;
-            
+
             Utils.SafeExecute(() =>
             {
                 PendingInboundMessages.CompleteAdding();
@@ -383,7 +383,7 @@ namespace Orleans.Messaging
             throw new NotImplementedException("Reconnect");
         }
 
-#region Random IMessageCenter stuff
+        #region Random IMessageCenter stuff
 
         public int SendQueueLength
         {
@@ -395,7 +395,7 @@ namespace Orleans.Messaging
             get { return 0; }
         }
 
-#endregion
+        #endregion
 
         private ITypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
         {
@@ -416,13 +416,24 @@ namespace Orleans.Messaging
 
         internal void UpdateClientId(GrainId clientId)
         {
-            if(ClientId.Category != UniqueKey.Category.Client)
+            if (ClientId.Category != UniqueKey.Category.Client)
                 throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
 
             if (clientId.Category != UniqueKey.Category.GeoClient)
                 throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
 
             ClientId = clientId;
+        }
+
+        public void Dispose()
+        {
+            PendingInboundMessages.Dispose();
+            if (gatewayConnections != null)
+                foreach (var item in gatewayConnections)
+                {
+                    item.Value.Dispose();
+                }
+            GatewayManager.Dispose();
         }
     }
 }
