@@ -60,7 +60,8 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
         private readonly Logger logger;
-        private readonly GrainTypeManager typeManager;
+        private readonly GrainTypeManager grainTypeManager;
+        private TypeManager typeManager;
         private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloStatisticsManager siloStatistics;
         private readonly MembershipFactory membershipFactory;
@@ -93,6 +94,7 @@ namespace Orleans.Runtime
         internal GlobalConfiguration GlobalConfig => this.initializationParams.GlobalConfig;
         internal NodeConfiguration LocalConfig => this.initializationParams.NodeConfig;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
+        internal GrainTypeManager LocalGrainTypeManager { get { return grainTypeManager; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
@@ -304,7 +306,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            typeManager = Services.GetRequiredService<GrainTypeManager>();
+            grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
 
             // Performance metrics
             siloStatistics = Services.GetRequiredService<SiloStatisticsManager>();
@@ -381,7 +383,8 @@ namespace Orleans.Runtime
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            this.RegisterSystemTarget(new TypeManager(this.SiloAddress, this.typeManager));
+            typeManager = new TypeManager(SiloAddress, LocalGrainTypeManager, membershipOracle, LocalScheduler);
+            RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
             if (this.membershipOracle is SystemTarget)
@@ -474,7 +477,7 @@ namespace Orleans.Runtime
             ConfigureThreadPoolAndServicePointSettings();
 
             // This has to start first so that the directory system target factory gets loaded before we start the router.
-            typeManager.Start();
+            grainTypeManager.Start();
             runtimeClient.Start();
 
             // The order of these 4 is pretty much arbitrary.

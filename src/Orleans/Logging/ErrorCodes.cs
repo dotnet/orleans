@@ -1093,6 +1093,8 @@ namespace Orleans
         GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
         GlobalSingleInstance_MultipleOwners = GlobalSingleInstanceBase + 4,
 
+        TypeManagerBase = Runtime + 4200,
+        TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
     }
 }
 // ReSharper restore InconsistentNaming
