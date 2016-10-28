@@ -119,6 +119,7 @@ namespace Orleans.Runtime
 
 
         public GrainTypeManager GrainTypeManager { get; private set; }
+
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
         internal readonly ActivationCollector ActivationCollector;
@@ -199,6 +200,15 @@ namespace Orleans.Runtime
         /// Gets the dispatcher used by this instance.
         /// </summary>
         public Dispatcher Dispatcher { get; }
+
+        public IList<SiloAddress> GetCompatibleSiloList(GrainId grain)
+        {
+            var typeCode = grain.GetTypeCode();
+            var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode).Intersect(AllActiveSilos).ToList();
+            if (compatibleSilos.Count == 0)
+                throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+            return compatibleSilos;
+        }
 
         internal void SetStorageManager(IStorageProviderManager storageManager)
         {

@@ -24,6 +24,8 @@ namespace Orleans.Runtime.Placement
 
         List<SiloAddress> AllActiveSilos { get; }
 
+        IList<SiloAddress> GetCompatibleSiloList(GrainId grain);
+
         SiloAddress LocalSilo { get; }
 
         SiloStatus LocalSiloStatus { get; }
@@ -67,6 +69,16 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy unused;
             MultiClusterRegistrationStrategy unusedActivationStrategy;
             @this.GetGrainTypeInfo(typeCode, out grainClass, out unused, out unusedActivationStrategy, genericArguments);
+            return grainClass;
+        }
+
+        public static string GetGrainTypeNameAndSupportedSilos(this IPlacementContext @this, GrainId grainId, out IList<SiloAddress> supportedSiloAddresses, string genericArguments = null)
+        {
+            string grainClass;
+            PlacementStrategy unused;
+            MultiClusterRegistrationStrategy unusedActivationStrategy;
+            @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out unused, out unusedActivationStrategy, genericArguments);
+            supportedSiloAddresses = @this.GetCompatibleSiloList(grainId);
             return grainClass;
         }
 
