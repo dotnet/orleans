@@ -56,8 +56,9 @@ if "%PRERELEASE_BUILD%" == "true" (
 
 @set NUGET_PACK_OPTS= -Version !VERSION!
 @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -Properties SRC_DIR=%SRC_DIR%
-REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -OutputDirectory "%BASE_PATH%"
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Properties SRC_DIR=%SRC_DIR%
+REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed -Verbose
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
   "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS% -Symbols
