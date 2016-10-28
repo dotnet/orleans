@@ -95,6 +95,7 @@
     <Compile Include="ReminderTestGrain.cs" />
     <Compile Include="RequestContextTestGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
+    <Compile Include="MessageSerializationGrain.cs" />
     <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />

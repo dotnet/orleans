@@ -12,6 +12,8 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
+    using System.Linq.Expressions;
+
     internal class IncomingMessageAcceptor : AsynchAgent
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(CreateSocketReceiveAsyncEventArgsPoolWrapper);
@@ -645,10 +647,33 @@ namespace Orleans.Runtime.Messaging
                 {
                     _buffer.UpdateReceivedData(e.Buffer, e.BytesTransferred);
 
-                    Message msg;
-                    while (_buffer.TryDecodeMessage(out msg))
+                    while (true)
                     {
-                        IMA.HandleMessage(msg, Socket);
+                        Message msg = null;
+                        try
+                        {
+                            if (!this._buffer.TryDecodeMessage(out msg)) break;
+                            this.IMA.HandleMessage(msg, this.Socket);
+                        }
+                        catch (Exception exception)
+                        {
+                            // If deserialization completely failed or the message was one-way, rethrow the exception
+                            // so that it can be handled at another level.
+                            if (msg?.Headers == null || msg.Direction != Message.Directions.Request)
+                            {
+                                throw;
+                            }
+
+                            // The message body was not successfully decoded, but the headers were.
+                            // Send a fast fail to the caller.
+                            MessagingStatisticsGroup.OnRejectedMessage(msg);
+                            var response = msg.CreateResponseMessage();
+                            response.Result = Message.ResponseTypes.Error;
+                            response.BodyObject = Response.ExceptionResponse(exception);
+                            
+                            // Send the error response and continue processing the next message.
+                            this.IMA.MessageCenter.SendMessage(response);
+                        }
                     }
                 }
                 catch (Exception exc)
