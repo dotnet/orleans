@@ -22,8 +22,6 @@ namespace Orleans.Runtime.Placement
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
 
-        List<SiloAddress> AllActiveSilos { get; }
-
         IList<SiloAddress> GetCompatibleSiloList(GrainId grain);
 
         SiloAddress LocalSilo { get; }
