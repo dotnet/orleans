@@ -18,16 +18,18 @@
     <copyright>Copyright Microsoft 2016</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <dependency id="Microsoft.Orleans.Core" version="$version$" />
-      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
-      <dependency id="Microsoft.Extensions.Configuration.Binder" version="1.0.0" />
+      <group targetFramework=".NETFramework4.6.2">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+        <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+        <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
+        <dependency id="Microsoft.Extensions.Configuration.Binder" version="1.0.0" />
+      </group>
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTestingHost.XML" target="lib\net451" />
-    <file src="OrleansTestingHost.dll" target="lib\net451" />
-    <file src="OrleansTestingHost.pdb" target="lib\net451" />
+    <file src="OrleansTestingHost.XML" target="lib\net462" />
+    <file src="OrleansTestingHost.dll" target="lib\net462" />
+    <file src="OrleansTestingHost.pdb" target="lib\net462" />
     
     <file src="$SRC_DIR$OrleansTestingHost\**\*.cs" target="src" />
   </files>

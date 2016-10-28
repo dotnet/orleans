@@ -3,7 +3,7 @@
 
 IF %1.==. GOTO Usage
 
-set NUGET_EXE=%~dp0..\.nuget\nuget.exe
+set NUGET_EXE=%~dp0..\..\..\src\.nuget\nuget.exe
 
 set BASE_PATH=%1
 set VERSION=%2
