@@ -4,7 +4,6 @@ namespace Orleans.Serialization
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
-    using System.Net;
     using System.Reflection;
 
     using Orleans.Runtime;
@@ -47,21 +46,7 @@ namespace Orleans.Serialization
                 [typeof(DateTime).TypeHandle] =
                     new SimpleTypeSerializer(w => w.Write(default(DateTime)), r => r.ReadDateTime()),
                 [typeof(TimeSpan).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(TimeSpan)), r => r.ReadTimeSpan()),
-                [typeof(GrainId).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(GrainId)), r => r.ReadGrainId()),
-                [typeof(ActivationId).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(ActivationId)), r => r.ReadActivationId()),
-                [typeof(SiloAddress).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(SiloAddress)), r => r.ReadSiloAddress()),
-                [typeof(ActivationAddress).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(ActivationAddress)), r => r.ReadActivationAddress()),
-                [typeof(IPAddress).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(IPAddress)), r => r.ReadIPAddress()),
-                [typeof(IPEndPoint).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(IPEndPoint)), r => r.ReadIPEndPoint()),
-                [typeof(CorrelationId).TypeHandle] =
-                    new SimpleTypeSerializer(w => w.Write(default(CorrelationId)), r => r.ReadCorrelationId())
+                    new SimpleTypeSerializer(w => w.Write(default(TimeSpan)), r => r.ReadTimeSpan())
             };
         }
 
