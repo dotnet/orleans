@@ -2,11 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-
 namespace Orleans.Runtime.ConsistentRing
 {
-    using Orleans.Runtime.Configuration;
-
     /// <summary>
     /// We use the 'backward/clockwise' definition to assign responsibilities on the ring. 
     /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its predecessing range). 

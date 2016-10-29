@@ -1,7 +1,7 @@
+using Orleans.Runtime.Configuration;
+
 namespace Orleans.Runtime
 {
-    using Orleans.Runtime.Configuration;
-
     /// <summary>
     /// Parameters used to initialize a silo and values derived from those parameters.
     /// </summary>
@@ -45,6 +45,9 @@ namespace Orleans.Runtime
         /// </summary>
         public ClusterConfiguration ClusterConfig { get; }
 
+        /// <summary>
+        /// Gets the global configuration.
+        /// </summary>
         public GlobalConfiguration GlobalConfig => this.ClusterConfig.Globals;
 
         /// <summary>

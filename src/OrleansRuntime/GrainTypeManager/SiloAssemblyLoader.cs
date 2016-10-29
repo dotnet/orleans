@@ -6,12 +6,11 @@ using System.Reflection;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
 {
-    using Orleans.Runtime.Configuration;
-
     internal class SiloAssemblyLoader
     {
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");

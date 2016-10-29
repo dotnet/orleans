@@ -12,15 +12,13 @@ using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
 
-
 namespace Orleans.Runtime
 {
-    using Orleans.Runtime.Messaging;
-
     internal class Catalog : SystemTarget, ICatalog, IPlacementContext, ISiloStatusListener
     {
         /// <summary>

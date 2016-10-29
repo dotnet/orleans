@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Orleans.GrainDirectory;
 using Orleans.Providers;
@@ -31,8 +32,6 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
-    using Microsoft.Extensions.DependencyInjection.Extensions;
-
     /// <summary>
     /// Orleans silo.
     /// </summary>
