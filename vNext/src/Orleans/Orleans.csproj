@@ -1012,9 +1012,18 @@
     <Compile Include="Shims\RuntimeStatisticsGroup.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
+    <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
       <Link>Configuration\OrleansConfiguration.xsd</Link>
       <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="project.json" />
   </ItemGroup>

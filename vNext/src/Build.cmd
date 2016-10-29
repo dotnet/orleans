@@ -65,20 +65,26 @@ set PROJ=%CMDHOME%\Orleans.vNext.sln
 @echo Build Debug ==============================
 
 SET CONFIGURATION=Debug
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%\
+SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
 "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% /p:GenerateProjectSpecificOutputFolder=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
+
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %OutDir% %VERSION_FILE% %CMDHOME%\ true
+@if ERRORLEVEL 1 GOTO :ErrorStop
 
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%\
+SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
 "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% /p:GenerateProjectSpecificOutputFolder=false "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
+
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %OutDir% %VERSION_FILE% %CMDHOME%\
+@if ERRORLEVEL 1 GOTO :ErrorStop
 
 :BuildFinished
 @echo ===== Build succeeded for %PROJ% =====
