@@ -24,7 +24,7 @@ For the remainder of this section, we will only be considering Option #2 / `Grai
 
 ## Grain State Stores
 
-Grain classes that inherit from `Grain<T>` (where `T` is an application-specific state data type derived from `GrainState`) will have their state loaded automatically from a specified storage.
+Grain classes that inherit from `Grain<T>` (where `T` is an application-specific state data type that needs to be persisted) will have their state loaded automatically from a specified storage.
 
 Grains will be marked with a `[StorageProvider]` attribute that specifies a named instance of a storage provider to use for reading / writing the state data for this grain.
 
@@ -217,7 +217,7 @@ The `T` in the above definition will be replaced by an application-specific grai
 The grain class should also be annotated with a `[StorageProvider]` attribute that tells the runtime which storage provider (instance) to use with grains of this type.
 
 ``` csharp
-public interface MyGrainState : GrainState
+public class MyGrainState
 {
   public int Field1 { get; set; }
   public string Field2 { get; set; }
@@ -294,8 +294,8 @@ public interface IStorageProvider
   Task Init();
   Task Close();
 
-  Task ReadStateAsync(string grainType, GrainId grainId, GrainState grainState);
-  Task WriteStateAsync(string grainType, GrainId grainId, GrainState grainState);
+  Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+  Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
 }
 ```
 
