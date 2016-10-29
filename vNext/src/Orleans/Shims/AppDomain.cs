@@ -35,9 +35,9 @@ namespace Orleans
             //};
         }
 
-        private Lazy<Assembly[]> assembliesList = new Lazy<Assembly[]>(() =>
+        private readonly Lazy<Assembly[]> assembliesList = new Lazy<Assembly[]>(() =>
         {
-            string path = ".";
+            string path = AppContext.BaseDirectory;
             var assemblyFiles = Directory.EnumerateFiles(path, "*.dll");
             var assemblyNames = assemblyFiles.Select(Path.GetFileNameWithoutExtension).ToList();
             var assemblies = new HashSet<Assembly>();
@@ -49,10 +49,15 @@ namespace Orleans
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to load assembly '{assemblyName}'. Skipping. {ex}");
+                    Console.WriteLine($"WARNING: Failed to load assembly '{assemblyName}'. Skipping. {ex}");
                 }
             }
             assemblies.Add(typeof(Exception).GetTypeInfo().Assembly);
+
+            foreach (var assembly in assemblies.ToList())
+            {
+                LoadDependencies(assemblies, assembly);
+            }
             return assemblies.ToArray();
         });
 
@@ -60,6 +65,25 @@ namespace Orleans
         {
             // TODO: very naive approach to be replaced with IAssemblyCatalog or something like that.
             return assembliesList.Value;
+        }
+
+        private static void LoadDependencies(HashSet<Assembly> loadedAssemblies, Assembly fromAssembly)
+        {
+            foreach (var reference in fromAssembly.GetReferencedAssemblies())
+            {
+                try
+                {
+                    var asm = Assembly.Load(reference);
+                    if (loadedAssemblies.Add(asm))
+                    {
+                        LoadDependencies(loadedAssemblies, asm);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"WARNING: Unable to load assembly {reference.FullName} referenced by {fromAssembly.FullName}. Skipping. {ex}");
+                }
+            }
         }
     }
 
