@@ -37,7 +37,7 @@ namespace OrleansTelemetryConsumers.Counters
             if (GrainTypeManager.Instance == null)
             {
                 var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                var typeManager = new GrainTypeManager(false, loader, DefaultPlacementStrategy.GetDefaultForTesting());
+                var typeManager = new GrainTypeManager(false, loader, new RandomPlacementDefaultStrategy());
                 GrainTypeManager.Instance.Start(false);
             }
         }
@@ -80,6 +80,14 @@ namespace OrleansTelemetryConsumers.Counters
             }
 
             base.Uninstall(savedState);
+        }
+
+        private class RandomPlacementDefaultStrategy : DefaultPlacementStrategy
+        {
+            public RandomPlacementDefaultStrategy()
+                : base(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY)
+            {
+            }
         }
     }
 }

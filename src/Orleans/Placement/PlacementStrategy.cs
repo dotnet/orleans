@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         {
         }
 
-        private DefaultPlacementStrategy(string placement)
+        protected DefaultPlacementStrategy(string placement)
         {
             this.PlacementStrategy = GetDefaultStrategy(placement);
         }
@@ -23,10 +23,7 @@ namespace Orleans.Runtime
         /// Gets the default placement strategy.
         /// </summary>
         public PlacementStrategy PlacementStrategy { get; }
-
-        internal static DefaultPlacementStrategy GetDefaultForTesting()
-            => new DefaultPlacementStrategy(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY);
-
+        
         private static PlacementStrategy GetDefaultStrategy(string str)
         {
             if (str.Equals(typeof(RandomPlacement).Name))
