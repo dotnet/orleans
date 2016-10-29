@@ -15,11 +15,14 @@ namespace Orleans.Runtime.Placement
 
         private readonly IServiceProvider serviceProvider;
 
-        public PlacementDirectorsManager(IServiceProvider services, DefaultPlacementStrategy defaultPlacementStrategy)
+        public PlacementDirectorsManager(
+            IServiceProvider services,
+            DefaultPlacementStrategy defaultPlacementStrategy,
+            ClientObserversPlacementDirector clientObserversPlacementDirector)
         {
             this.serviceProvider = services;
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
-            this.clientObserversPlacementDirector = new ClientObserversPlacementDirector();
+            this.clientObserversPlacementDirector = clientObserversPlacementDirector;
             this.ResolveIncludedStrategies();
         }
 

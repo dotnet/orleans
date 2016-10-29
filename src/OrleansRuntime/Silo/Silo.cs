@@ -263,6 +263,7 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
                     services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
                     services.TryAddSingleton<DefaultPlacementStrategy>();
+                    services.TryAddSingleton<ClientObserversPlacementDirector>();
                     
                     services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
                     if (usingCustomServiceProvider)
