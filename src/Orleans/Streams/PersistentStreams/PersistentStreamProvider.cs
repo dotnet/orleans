@@ -149,6 +149,10 @@ namespace Orleans.Providers.Streams.Common
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
+            if (queueAdapter.Direction == StreamProviderDirection.ReadOnly)
+            {
+                throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
+            }
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
         }
 
