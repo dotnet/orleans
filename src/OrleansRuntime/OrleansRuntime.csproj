@@ -166,6 +166,7 @@
     <Compile Include="Silo\SiloControl.cs" />
     <Compile Include="Storage\MemoryStorageGrain.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
+    <Compile Include="Streams\LoadShedQueueFlowController.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingAgent.cs" />
     <Compile Include="Streams\PubSub\PubSubRendezvousGrain.cs" />
