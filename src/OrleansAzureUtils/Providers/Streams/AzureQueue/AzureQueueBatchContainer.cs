@@ -88,7 +88,12 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
             var rawBytes = SerializationManager.SerializeToByteArray(azureQueueBatchMessage);
+#if !NETSTANDARD_TODO
+            //CloudQueueMessage(byte[]) is not supported in netstandard, maybe use CreateCloudQueueMessageFromByteArray
             return new CloudQueueMessage(rawBytes);
+#else
+            return null;
+#endif
         }
 
         internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)

@@ -71,14 +71,21 @@ namespace Orleans.Providers.Streams.AzureQueue
             CloudQueueMessage cloudMsg = null;
             if (isBytes)
             {
+#if !NETSTANDARD_TODO
+                //CloudQueueMessage(byte[]) is not supported in netstandard, maybe use CreateCloudQueueMessageFromByteArray
                 cloudMsg = new CloudQueueMessage(data as byte[]);
-            }else if (isString)
+#endif
+            }
+            else if (isString)
             {
                 cloudMsg = new CloudQueueMessage(data as string);
             }else if (data == null)
             {
+#if !NETSTANDARD_TODO
+                //CloudQueueMessage(byte[]) is not supported in netstandard, maybe use CreateCloudQueueMessageFromByteArray
                 // It's OK to pass null data. why should I care?
                 cloudMsg = new CloudQueueMessage(null as byte[]);
+#endif
             }
             await Queue.AddQueueMessage(cloudMsg);
         }

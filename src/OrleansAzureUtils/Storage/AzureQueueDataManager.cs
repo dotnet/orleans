@@ -114,8 +114,12 @@ namespace Orleans.AzureUtils
                 var myQueue = queueOperationsClient.GetQueueReference(QueueName);
 
                 // Create the queue if it doesn't already exist.
-
+#if !NETSTANDARD_TODO
+                //BeginCreateIfNotExists and EndCreateIfNotExists Not supported yet. 
                 bool didCreate = await Task<bool>.Factory.FromAsync(myQueue.BeginCreateIfNotExists, myQueue.EndCreateIfNotExists, null);
+#else
+                bool didCreate = true;
+#endif
                 queue = myQueue;
                 logger.Info(ErrorCode.AzureQueue_01, "{0} Azure storage queue {1}", (didCreate ? "Created" : "Attached to"), QueueName);
             }
@@ -140,12 +144,15 @@ namespace Orleans.AzureUtils
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
+#if !NETSTANDARD_TODO
+                //BeginExists and EndExists BeginDelete EndDelete not supported in netstandard yet, maybe can use DeleteIfExistsAsync
                 var exists = Task<bool>.Factory.FromAsync(queueRef.BeginExists, queueRef.EndExists, null);
                 if (await exists)
                 {
                     await Task.Factory.FromAsync(queueRef.BeginDelete, queueRef.EndDelete, null);
                     logger.Info(ErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
                 }
+#endif
             }
             catch (Exception exc)
             {
@@ -168,7 +175,10 @@ namespace Orleans.AzureUtils
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
+#if !NETSTANDARD_TODO
+                //BeginClear and EndClear is not supported in netstandard yet, maybe can use ClearAsync
                 await Task.Factory.FromAsync(queueRef.BeginClear, queueRef.EndClear, null);
+#endif
                 logger.Info(ErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (Exception exc)
@@ -191,8 +201,11 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Adding message {0} to queue: {1}", message, QueueName);
             try
             {
+#if !NETSTANDARD_TODO
+                // BeginAddMessage and EndAddMessage is not supported in netstandard, maybe can use AddMessageAsync
                 await Task.Factory.FromAsync(
                     queue.BeginAddMessage, queue.EndAddMessage, message, null);
+#endif
             }
             catch (Exception exc)
             {
@@ -213,8 +226,13 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Peeking a message from queue: {0}", QueueName);
             try
             {
+#if !NETSTANDARD_TODO
+            //BeginPeekMessage and EndPeekMessage is not supported in netstandard, maybe can use AddMessageAsync
                 return await Task<CloudQueueMessage>.Factory.FromAsync( 
                     queue.BeginPeekMessage, queue.EndPeekMessage, null);
+#else
+                return null;
+#endif
             }
             catch (Exception exc)
             {
@@ -237,6 +255,7 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Getting a message from queue: {0}", QueueName);
             try
             {
+                //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
                 // http://msdn.microsoft.com/en-us/library/ee758456.aspx
                 // If no messages are visible in the queue, GetMessage returns null.
                 return await queue.GetMessageAsync(messageVisibilityTimeout, options: null, operationContext: null);
@@ -289,8 +308,11 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Deleting a message from queue: {0}", QueueName);
             try
             {
-               await Task.Factory.FromAsync(
+#if !NETSTANDARD_TODO
+                //BeginDeleteMessage and EndDeleteMessage is not supported in netstandard, may be use DeleteMessageAync
+                await Task.Factory.FromAsync(
                    queue.BeginDeleteMessage, queue.EndDeleteMessage, message.Id, message.PopReceipt, null);
+#endif
             }
             catch (Exception exc)
             {
@@ -317,8 +339,13 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("GetApproximateMessageCount a message from queue: {0}", QueueName);
             try
             {
+#if !NETSTANDARD_TODO
+                //BeginFetchAttributes and EndFetchAttributes not supported in netstandard yet. Maybe can use FetchAttributesAsync
                 await Task.Factory.FromAsync(queue.BeginFetchAttributes, queue.EndFetchAttributes, null);
                 return queue.ApproximateMessageCount.HasValue ? queue.ApproximateMessageCount.Value : 0;
+#else
+                return 0;
+#endif
             }
             catch (Exception exc)
             {

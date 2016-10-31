@@ -5,7 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+#if !NETSTANDARD_TODO
 using System.Web;
+#endif
 
 namespace Orleans.Runtime.Host
 {
@@ -125,7 +127,8 @@ namespace Orleans.Runtime.Host
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));
             });
-
+#if !NETSTANDARD_TODO
+            //System.Web namespace is deprecated in netstandard, need to find a replacement for HttpContext class
             Utils.SafeExecute(() =>
             {
                 // Try using Server.MapPath to resolve for web roles running in IIS web apps
@@ -135,8 +138,8 @@ namespace Orleans.Runtime.Host
                     if (appRootPath != null)
                         locations.Add(new DirectoryInfo(appRootPath));
                 }
-            });
 
+            });
 
             Utils.SafeExecute(() =>
             {
@@ -146,6 +149,7 @@ namespace Orleans.Runtime.Host
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));
             });
+#endif
 
             // Try current directory
             locations.Add(new DirectoryInfo("."));
