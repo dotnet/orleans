@@ -78,6 +78,10 @@
       <Project>{0054DB14-2A92-4CC0-959E-A2C51F5E65D4}</Project>
       <Name>OrleansProviders</Name>
     </ProjectReference>
+    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>
       <Name>Orleans</Name>
