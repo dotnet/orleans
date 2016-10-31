@@ -28,7 +28,7 @@ namespace Tester.TestStreamProviders.EventHub
                 }
                 var bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(adapterSettings.CacheSizeMb, () => new FixedSizeBuffer(1 << 20));
                 var dataAdapter = new CachedDataAdapter(partition, bufferPool, timePurgePredicate);
-                return new EventHubQueueCache(checkpointer, dataAdapter, log);
+                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, log);
             }
         }
 

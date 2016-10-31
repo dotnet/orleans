@@ -44,6 +44,30 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubMessage
     {
         /// <summary>
+        /// Contructor
+        /// </summary>
+        /// <param name="streamIdentity">Stream Identity</param>
+        /// <param name="partitionKey">EventHub partition key for message</param>
+        /// <param name="offset">Offset into the EventHub parition where this message was from</param>
+        /// <param name="sequenceNumber">Offset into the EventHub parition where this message was from</param>
+        /// <param name="enqueueTimeUtc">Time in UTC when this message was injected by EventHub</param>
+        /// <param name="dequeueTimeUtc">Time in UTC when this message was read from EventHub into the current service</param>
+        /// <param name="properties">User properties from EventData object</param>
+        /// <param name="payload">Binary data from EventData objbect</param>
+        public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
+            DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
+        {
+            StreamIdentity = streamIdentity;
+            PartitionKey = partitionKey;
+            Offset = offset;
+            SequenceNumber = sequenceNumber;
+            EnqueueTimeUtc = enqueueTimeUtc;
+            DequeueTimeUtc = dequeueTimeUtc;
+            Properties = properties;
+            Payload = payload;
+        }
+
+        /// <summary>
         /// Duplicate of EventHub's EventData class.
         /// </summary>
         /// <param name="cachedMessage"></param>
@@ -97,18 +121,27 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// Default eventhub data comparer.  Implements comparisions against CachedEventHubMessage
     /// </summary>
-    internal class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
+    public class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
     {
+        /// <summary>
+        /// Singleton instance, since type is stateless using this will reduce allocations.
+        /// </summary>
         public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
 
-        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken token)
+        /// <summary>
+        /// Compare a cached message with a sequence token to determine if it message is before or after the token
+        /// </summary>
+        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken streamToken)
         {
-            var realToken = (EventSequenceToken)token;
+            var realToken = (EventSequenceToken)streamToken;
             return cachedMessage.SequenceNumber != realToken.SequenceNumber
                 ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
                 : 0 - realToken.EventIndex;
         }
 
+        /// <summary>
+        /// Checks to see if the cached message is part of the provided stream
+        /// </summary>
         public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
         {
             int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);

@@ -30,6 +30,15 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
+        /// Track attempts to initialize the receiver.
+        /// </summary>
+        /// <param name="success">True if read succeeded, false if read failed.</param>
+        public void TrackInitialization(bool success)
+        {
+            logger.TrackMetric("Initialization", success ? 0 : 1, LogProperties);
+        }
+
+        /// <summary>
         /// Track attempts to read from the partition.    Tracked per partition read operation.
         /// </summary>
         /// <param name="success">True if read succeeded, false if read failed.</param>
@@ -58,6 +67,15 @@ namespace Orleans.ServiceBus.Providers
         public void TrackAgeOfMessagesRead(TimeSpan newest, TimeSpan oldest)
         {
             logger.TrackMetric("AgeOfMessagesBeingProcessed", newest, LogProperties);
+        }
+
+        /// <summary>
+        /// Track attempts to shutdown the receiver.
+        /// </summary>
+        /// <param name="success">True if read succeeded, false if read failed.</param>
+        public void TrackShutdown(bool success)
+        {
+            logger.TrackMetric("Shutdown", success ? 0 : 1, LogProperties);
         }
     }
 
