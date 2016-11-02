@@ -705,12 +705,29 @@ namespace Orleans.CodeGenerator
                     return getValueExpression;
                 }
 
+                ExpressionSyntax deepCopyValueExpression;
+
+                // Addressable arguments must be converted to references before passing.
+                if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
+                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface)
+                {
+                    deepCopyValueExpression =
+                        SF.ConditionalExpression(
+                            SF.BinaryExpression(SyntaxKind.IsExpression, getValueExpression, typeof(Grain).GetTypeSyntax()),
+                            SF.InvocationExpression(getValueExpression.Member("AsReference", this.FieldInfo.FieldType)),
+                            getValueExpression);
+                }
+                else
+                {
+                    deepCopyValueExpression = getValueExpression;
+                }
+
                 // Deep-copy the value.
                 Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object));
                 var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 return SF.CastExpression(
                     typeSyntax,
-                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getValueExpression)));
+                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(deepCopyValueExpression)));
             }
 
             /// <summary>
