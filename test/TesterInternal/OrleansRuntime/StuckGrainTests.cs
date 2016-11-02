@@ -16,20 +16,16 @@ namespace UnitTests.StuckGrainTests
     /// </summary>
     public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartSecondary = false,
-                    AdjustConfig = config =>
-                    {
-                        GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
-                        config.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(1));
-                        config.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
-                    }
-                });
+                GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
+                var options = new TestClusterOptions(1);
+                options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(1));
+                options.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
+
+                return new TestCluster(options);
             }
         }
 
@@ -40,44 +36,19 @@ namespace UnitTests.StuckGrainTests
             var stuckGrain = GrainClient.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
-            var timeoutTask = task.WithTimeout(TimeSpan.FromSeconds(1));
-
-            bool excThrown = false;
-
-            try
-            {
-                await timeoutTask;
-            }
-            catch (TimeoutException)
-            {
-                excThrown = true;
-            }
-
-            Assert.True(excThrown, "Timeout exceptions hasn't been thrown for call that is supposed to run forever.");
+            // Should timeout
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
 
             var cleaner = GrainClient.GrainFactory.GetGrain<IStuckCleanGrain>(id);
             await cleaner.Release(id);
 
-            timeoutTask = task.WithTimeout(TimeSpan.FromSeconds(1));
+            // Should complete now
+            await task.WithTimeout(TimeSpan.FromSeconds(1));
 
-            excThrown = false;
+            // wait for activation collection
+            await Task.Delay(TimeSpan.FromSeconds(5)); 
 
-            try
-            {
-                await timeoutTask;
-            }
-            catch (TimeoutException)
-            {
-                excThrown = true;
-            }
-
-            Assert.False(excThrown, "Timeout exceptions has been thrown for call that is supposed to complete.");
-
-            await Task.Delay(TimeSpan.FromSeconds(2)); // wait for activation collection
-
-            var activated = await cleaner.IsActivated(id);
-
-            Assert.False(activated, "Grain activation is supposed be garbage collected, but it is still running.");
+            Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
         }
     }
 }
