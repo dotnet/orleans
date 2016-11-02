@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -109,6 +110,15 @@ namespace Orleans.Runtime
 #endif
             requestQueue.CompleteAdding();
             base.Stop();
+        }
+
+        protected void DrainQueue(Action<T> action)
+        {
+            T request;
+            while (requestQueue.TryTake(out request))
+            {
+                action(request);
+            }
         }
 
         public virtual int Count

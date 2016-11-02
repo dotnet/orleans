@@ -219,7 +219,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="timePurge"></param>
         /// <param name="logger"></param>
         public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, IObjectPool<FixedSizeBuffer> bufferPool, TimePurgePredicate timePurge, Logger logger)
-            : this(checkpointer, new EventHubDataAdapter(bufferPool, timePurge), logger)
+            : this(checkpointer, new EventHubDataAdapter(bufferPool, timePurge), EventHubDataComparer.Instance, logger)
         {
         }
 
@@ -228,9 +228,10 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="checkpointer"></param>
         /// <param name="cacheDataAdapter"></param>
+        /// <param name="comparer"></param>
         /// <param name="logger"></param>
-        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, Logger logger)
-            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, EventHubDataComparer.Instance, logger)
+        public EventHubQueueCache(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger)
+            : base(EventHubAdapterReceiver.MaxMessagesPerRead, checkpointer, cacheDataAdapter, comparer, logger)
         {
             log = logger.GetSubLogger("messagecache", "-");
         }

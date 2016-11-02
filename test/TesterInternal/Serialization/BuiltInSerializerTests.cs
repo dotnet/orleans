@@ -21,6 +21,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Serialization
 {
+    using System.Reflection;
+
+    using Orleans.GrainDirectory;
+    using Orleans.Runtime.GrainDirectory;
+
     using TestGrainInterfaces;
 
     /// <summary>
@@ -54,6 +59,24 @@ namespace UnitTests.Serialization
         {
             this.output = output;
             LogManager.Initialize(new NodeConfiguration());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("CodeGen")]
+        public void InternalSerializableTypesHaveSerializers()
+        {
+            InitializeSerializer(SerializerToUse.Default);
+            Assert.True(
+                SerializationManager.HasSerializer(typeof(AddressesAndTag)),
+                $"Should be able to serialize internal type {nameof(AddressesAndTag)}.");
+            Assert.True(
+                SerializationManager.HasSerializer(typeof(ActivationInfo)),
+                $"Should be able to serialize internal type {nameof(ActivationInfo)}.");
+            var grainReferenceType = typeof(IGrain).Assembly.GetType(
+                "Orleans.OrleansCodeGenRemindableReference",
+                throwOnError: true);
+            Assert.True(
+                SerializationManager.HasSerializer(grainReferenceType),
+                $"Should be able to serialize grain reference type {grainReferenceType}.");
         }
 
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

@@ -97,7 +97,9 @@ namespace Orleans.Providers.Streams.PersistentStreams
         {
             var bodyStream = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(token, bodyStream);
-            return bodyStream.ToByteArray();
+            var result = bodyStream.ToByteArray();
+            bodyStream.ReleaseBuffers();
+            return result;
         }
 
         private static StreamSequenceToken TokenFromBytes(byte[] bytes)

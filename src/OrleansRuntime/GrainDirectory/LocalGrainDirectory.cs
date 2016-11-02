@@ -19,6 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// list of silo members sorted by the hash value of their address
         /// </summary>
         private readonly List<SiloAddress> membershipRingList;
+        
         private readonly HashSet<SiloAddress> membershipCache;
         private readonly AsynchAgent maintainer;
         private readonly Logger log;
@@ -86,12 +87,12 @@ namespace Orleans.Runtime.GrainDirectory
         internal readonly CounterStatistic UnregistrationsManyRemoteSent;
         internal readonly CounterStatistic UnregistrationsManyRemoteReceived;
 
-        
         public LocalGrainDirectory(Silo silo)
         {
             log = LogManager.GetLogger("Orleans.GrainDirectory.LocalGrainDirectory");
 
             MyAddress = silo.LocalMessageCenter.MyAddress;
+
             Scheduler = silo.LocalScheduler;
             membershipRingList = new List<SiloAddress>();
             membershipCache = new HashSet<SiloAddress>();
@@ -460,8 +461,12 @@ namespace Orleans.Runtime.GrainDirectory
                 return Seed;
             }
 
-            SiloAddress siloAddress;
+            SiloAddress siloAddress = null;
             int hash = unchecked((int)grainId.GetUniformHashCode());
+
+
+            // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
+            bool excludeMySelf = !Running && excludeThisSiloIfStopping;
 
             lock (membershipCache)
             {
@@ -471,12 +476,17 @@ namespace Orleans.Runtime.GrainDirectory
                     return excludeThisSiloIfStopping && !Running ? null : MyAddress;
                 }
 
-                // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-                bool excludeMySelf = !Running && excludeThisSiloIfStopping; 
-
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-                siloAddress = membershipRingList.FindLast(siloAddr => (siloAddr.GetConsistentHashCode() <= hash) &&
-                                    (!siloAddr.Equals(MyAddress) || !excludeMySelf));
+                for (var index = membershipRingList.Count - 1; index >= 0; --index)
+                {
+                    var item = membershipRingList[index];
+                    if (IsSiloNextInTheRing(item, hash, excludeMySelf))
+                    {
+                        siloAddress = item;
+                        break;
+                    }
+                }
+                
                 if (siloAddress == null)
                 {
                     // If not found in the traversal, last silo will do (we are on a ring).
@@ -1088,6 +1098,11 @@ namespace Orleans.Runtime.GrainDirectory
             return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
         }
 
+        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
+        {
+            return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
+        }
+
         private static void RemoveActivations(IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
         {
             int removeCount = activations.Count(doRemove);
@@ -1115,6 +1130,5 @@ namespace Orleans.Runtime.GrainDirectory
                 return membershipCache.Contains(silo);
             }
         }
-
     }
 }

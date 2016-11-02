@@ -1,4 +1,5 @@
 ﻿
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -40,31 +41,37 @@ namespace Orleans.ServiceBus.Providers
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
 
-        public int GetMaxAddCount() { return flowController.GetMaxAddCount(); }
+        public int GetMaxAddCount()
+        {
+            return flowController.GetMaxAddCount();
+        }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
-            Func<string, IStreamQueueCheckpointer<string>, Logger,IEventHubQueueCache> cacheFactory,
+            Func<string, IStreamQueueCheckpointer<string>, Logger, IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
-            IEventHubReceiverMonitor monitor = null)
+            IEventHubReceiverMonitor monitor)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
             if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
+            if (monitor == null) throw new ArgumentNullException(nameof(monitor));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
             this.baseLogger = baseLogger;
             this.logger = baseLogger.GetSubLogger("receiver", "-");
-            this.monitor = monitor ?? new DefaultEventHubReceiverMonitor(settings.Hub.Path, settings.Partition, baseLogger.GetSubLogger("monitor", "-"));
+            this.monitor = monitor;
         }
 
         public Task Initialize(TimeSpan timeout)
         {
             logger.Info("Initializing EventHub partition {0}-{1}.", settings.Hub.Path, settings.Partition);
             // if receiver was already running, do nothing
-            return ReceiverRunning == Interlocked.Exchange(ref recieverState, ReceiverRunning) ? TaskDone.Done : Initialize();
+            return ReceiverRunning == Interlocked.Exchange(ref recieverState, ReceiverRunning)
+                ? TaskDone.Done
+                : Initialize();
         }
 
         /// <summary>
@@ -74,16 +81,25 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         private async Task Initialize()
         {
-            checkpointer = await checkpointerFactory(settings.Partition);
-            cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
-            flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache };
-            string offset = await checkpointer.Load();
-            receiver = await CreateReceiver(settings, offset, logger);
+            try
+            {
+                checkpointer = await checkpointerFactory(settings.Partition);
+                cache = cacheFactory(settings.Partition, checkpointer, baseLogger);
+                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) {cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit()};
+                string offset = await checkpointer.Load();
+                receiver = await CreateReceiver(settings, offset, logger);
+                monitor.TrackInitialization(true);
+            }
+            catch (Exception)
+            {
+                monitor.TrackInitialization(false);
+                throw;
+            }
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (recieverState==ReceiverShutdown || maxCount <= 0)
+            if (recieverState == ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }
@@ -91,9 +107,10 @@ namespace Orleans.ServiceBus.Providers
             // if receiver initialization failed, retry
             if (receiver == null)
             {
-                logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead, "Retrying initialization of EventHub partition {0}-{1}.", settings.Hub.Path, settings.Partition);
+                logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                    "Retrying initialization of EventHub partition {0}-{1}.", settings.Hub.Path, settings.Partition);
                 await Initialize();
-                if (receiver==null)
+                if (receiver == null)
                 {
                     // should not get here, should throw instead, but just incase.
                     return new List<IBatchContainer>();
@@ -113,7 +130,8 @@ namespace Orleans.ServiceBus.Providers
             catch (Exception ex)
             {
                 monitor.TrackRead(false);
-                logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead, "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", settings.Hub.Path,
+                logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                    "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", settings.Hub.Path,
                     settings.Partition, ex);
                 throw;
             }
@@ -170,29 +188,40 @@ namespace Orleans.ServiceBus.Providers
             return TaskDone.Done;
         }
 
-        public Task Shutdown(TimeSpan timeout)
+        public async Task Shutdown(TimeSpan timeout)
         {
-            // if receiver was already shutdown, do nothing
-            if (ReceiverShutdown == Interlocked.Exchange(ref recieverState, ReceiverShutdown))
+            try
             {
-                return TaskDone.Done;
+                // if receiver was already shutdown, do nothing
+                if (ReceiverShutdown == Interlocked.Exchange(ref recieverState, ReceiverShutdown))
+                {
+                    return;
+                }
+
+                logger.Info("Stopping reading from EventHub partition {0}-{1}", settings.Hub.Path, settings.Partition);
+
+                // clear cache and receiver
+                IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
+                EventHubReceiver localReceiver = Interlocked.Exchange(ref receiver, null);
+                // start closing receiver
+                Task closeTask = TaskDone.Done;
+                if (localReceiver != null)
+                {
+                    closeTask = localReceiver.CloseAsync();
+                }
+                // dispose of cache
+                localCache?.Dispose();
+
+                // finish return receiver closing task
+                await closeTask;
+
+                monitor.TrackShutdown(true);
             }
-
-            logger.Info("Stopping reading from EventHub partition {0}-{1}", settings.Hub.Path, settings.Partition);
-
-            // clear cache and receiver
-            IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
-            EventHubReceiver localReceiver = Interlocked.Exchange(ref receiver, null);
-            // start closing receiver
-            Task closeTask = TaskDone.Done;
-            if (localReceiver != null)
+            catch (Exception)
             {
-                closeTask = localReceiver.CloseAsync();
+                monitor.TrackShutdown(false);
+                throw;
             }
-            // dispose of cache
-            localCache?.Dispose();
-            // finish return receiver closing task
-            return closeTask;
         }
 
         private static async Task<EventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, Logger logger)

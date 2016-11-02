@@ -281,6 +281,7 @@ namespace Orleans.Runtime
                     var writer = new BinaryTokenStreamWriter();
                     writer.Write(this);
                     byte[] bytes = writer.ToByteArray();
+                    writer.ReleaseBuffers();
                     n = jenkinsHash.ComputeHash(bytes);
                 }
                 else

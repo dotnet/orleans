@@ -8,7 +8,7 @@ namespace Orleans.EventSourcing
     /// The base class for all grain classes that have event-sourced state.
     /// </summary>
     public class JournaledGrain<TGrainState> : Grain<TGrainState>
-        where TGrainState : JournaledGrainState<TGrainState>
+        where TGrainState : JournaledGrainState<TGrainState>, new()
     {
         /// <summary>
         /// Helper method for raising events, applying them to TGrainState and optionally committing to storage

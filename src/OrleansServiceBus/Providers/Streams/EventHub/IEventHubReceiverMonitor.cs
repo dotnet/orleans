@@ -9,6 +9,12 @@ namespace Orleans.ServiceBus.Providers
     public interface IEventHubReceiverMonitor
     {
         /// <summary>
+        /// Track attempts to initialize the receiver.
+        /// </summary>
+        /// <param name="success">True if read succeeded, false if read failed.</param>
+        void TrackInitialization(bool success);
+
+        /// <summary>
         /// Track attempts to read from the partition.    Tracked per partition read operation.
         /// </summary>
         /// <param name="success">True if read succeeded, false if read failed.</param>
@@ -26,5 +32,11 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="oldest">The difference between now utc on host and the eventhub enqueue time of the oldest message in a set of messages read.</param>
         /// <param name="newest">The difference between now utc on host and the eventhub enqueue time of the newest message in a set of messages read.</param>
         void TrackAgeOfMessagesRead(TimeSpan oldest, TimeSpan newest);
+
+        /// <summary>
+        /// Track attempts to shutdown the receiver.
+        /// </summary>
+        /// <param name="success">True if read succeeded, false if read failed.</param>
+        void TrackShutdown(bool success);
     }
 }

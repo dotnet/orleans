@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 using Orleans.Runtime;
@@ -66,6 +67,7 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
+            DrainQueue(RerouteMessage);
             RuntimeClient.Current.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
@@ -289,6 +291,13 @@ namespace Orleans.Messaging
                 Log.Warn(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
+        }
+
+        private void RerouteMessage(Message msg)
+        {
+            msg.TargetActivation = null;
+            msg.TargetSilo = null;
+            MsgCenter.SendMessage(msg);
         }
     }
 }

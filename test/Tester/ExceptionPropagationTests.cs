@@ -129,8 +129,12 @@ namespace UnitTests.General
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grainCallTask);
 
             Assert.Equal("Test exception", exception.Message);
-        }
 
+            var grainCallTask2 = grain.ThrowsSynchronousInvalidOperationException();
+            var exception2 = await Assert.ThrowsAsync<InvalidOperationException>(() => grainCallTask2);
+            Assert.Equal("Test exception", exception2.Message);
+        }
+        
         [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
         public void ExceptionPropagationForwardsEntireAggregateException()
         {

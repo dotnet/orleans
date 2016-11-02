@@ -23,15 +23,18 @@ namespace Orleans.Runtime.Scheduler
         internal readonly TimeSpan MaxWorkQueueWait;
         internal readonly bool InjectMoreWorkerThreads;
 
-        internal int BusyWorkerCount { get { return runningThreadCount; } }
-        
+        internal bool ShouldInjectWorkerThread { get { return InjectMoreWorkerThreads && runningThreadCount < WorkerPoolThread.MAX_THREAD_COUNT_TO_REPLACE; } }
+
         internal WorkerPool(OrleansTaskScheduler sched, int maxActiveThreads, bool injectMoreWorkerThreads)
         {
             scheduler = sched;
             MaxActiveThreads = maxActiveThreads;
             InjectMoreWorkerThreads = injectMoreWorkerThreads;
             MaxWorkQueueWait = TimeSpan.FromMilliseconds(50);
-            threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
+            if (InjectMoreWorkerThreads)
+            {
+                threadLimitingSemaphore = new Semaphore(maxActiveThreads, maxActiveThreads);
+            }
             pool = new HashSet<WorkerPoolThread>();
             createThreadCount = 0;
             lockable = new object();
@@ -81,23 +84,28 @@ namespace Orleans.Runtime.Scheduler
 
         internal void TakeCpu()
         {
-            threadLimitingSemaphore.WaitOne();
+            // maintain the threadLimitingSemaphore ONLY if thread injection is enabled.
+            if (InjectMoreWorkerThreads)
+                threadLimitingSemaphore.WaitOne();
         }
 
         internal void PutCpu()
         {
-            threadLimitingSemaphore.Release();
+            if (InjectMoreWorkerThreads)
+                threadLimitingSemaphore.Release();
         }
 
         internal void RecordRunningThread()
         {
-            Interlocked.Increment(ref runningThreadCount);
+            // maintain the runningThreadCount ONLY if thread injection is enabled.
+            if (InjectMoreWorkerThreads)
+                Interlocked.Increment(ref runningThreadCount);
         }
 
         internal void RecordIdlingThread()
         {
-            if (Interlocked.Decrement(ref runningThreadCount) == 0)
-                scheduler.OnAllWorkerThreadsIdle();
+            if (InjectMoreWorkerThreads)
+                Interlocked.Decrement(ref runningThreadCount);
         }
 
         internal bool CanExit()

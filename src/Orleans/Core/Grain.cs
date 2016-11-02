@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -15,8 +16,6 @@ namespace Orleans
     /// </summary>
     public abstract class Grain : IAddressable
     {
-        private IGrainRuntime runtime;
-
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
@@ -27,14 +26,20 @@ namespace Orleans
 
         internal IGrainRuntime Runtime { get; set; }
 
+        /// <summary>
+        /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
+        /// </summary>
         protected IGrainFactory GrainFactory 
         {
-            get { return Runtime.GrainFactory; }
+            get { return Runtime?.GrainFactory; }
         }
 
+        /// <summary>
+        /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
+        /// </summary>
         protected IServiceProvider ServiceProvider 
         {
-            get { return Runtime.ServiceProvider; }
+            get { return Runtime?.ServiceProvider; }
         }
 
         internal IGrainIdentity Identity;
@@ -64,7 +69,7 @@ namespace Orleans
         /// </summary>
         public string IdentityString
         {
-            get { return Identity.IdentityString; }
+            get { return Identity?.IdentityString ?? string.Empty; }
         }
 
         /// <summary>
@@ -73,7 +78,7 @@ namespace Orleans
         /// </summary>
         public string RuntimeIdentity
         {
-            get { return Runtime.SiloIdentity; }
+            get { return Runtime?.SiloIdentity ?? string.Empty; }
         }
 
         /// <summary>
@@ -107,6 +112,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
+            EnsureRuntime();
             return Runtime.TimerRegistry.RegisterTimer(this, asyncCallback, state, dueTime, period);
         }
 
@@ -127,6 +133,8 @@ namespace Orleans
             {
                 throw new InvalidOperationException(string.Format("Grain {0} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service", IdentityString));
             }
+
+            EnsureRuntime();
             return Runtime.ReminderRegistry.RegisterOrUpdateReminder(reminderName, dueTime, period);
         }
 
@@ -138,6 +146,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task UnregisterReminder(IGrainReminder reminder)
         {
+            EnsureRuntime();
             return Runtime.ReminderRegistry.UnregisterReminder(reminder);
         }
 
@@ -149,6 +158,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task<IGrainReminder> GetReminder(string reminderName)
         {
+            EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminder(reminderName);
         }
 
@@ -159,12 +169,14 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Task<List<IGrainReminder>> GetReminders()
         {
+            EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminders();
         }
 
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual IEnumerable<IStreamProvider> GetStreamProviders()
         {
+            EnsureRuntime();
             return Runtime.StreamProviderManager.GetStreamProviders();
         }
 
@@ -173,6 +185,7 @@ namespace Orleans
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentNullException("name");
+            EnsureRuntime();
             return Runtime.StreamProviderManager.GetProvider(name) as IStreamProvider;
         }
 
@@ -183,6 +196,7 @@ namespace Orleans
         /// </summary>
         protected virtual void DeactivateOnIdle()
         {
+            EnsureRuntime();
             Runtime.DeactivateOnIdle(this);
         }
 
@@ -195,6 +209,7 @@ namespace Orleans
         /// </summary>
         protected virtual void DelayDeactivation(TimeSpan timeSpan)
         {
+            EnsureRuntime();
             Runtime.DelayDeactivation(this, timeSpan);
         }
 
@@ -223,6 +238,7 @@ namespace Orleans
         [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
         protected virtual Logger GetLogger(string loggerName)
         {
+            EnsureRuntime();
             return Runtime.GetLogger(loggerName);
         }
 
@@ -241,13 +257,21 @@ namespace Orleans
         {
             return RuntimeClient.Current.CaptureRuntimeEnvironment();
         }
+
+        private void EnsureRuntime()
+        {
+            if (Runtime == null)
+            {
+                throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
+            }
+        }
     }
 
     /// <summary>
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStatefulGrain
+    public class Grain<TGrainState> : Grain, IStatefulGrain where TGrainState : new()
     {
         private readonly GrainState<TGrainState> grainState;
 
