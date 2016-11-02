@@ -5,8 +5,8 @@ using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StuckGrainTests
@@ -27,12 +27,13 @@ namespace UnitTests.StuckGrainTests
                     {
                         GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
                         config.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(1));
+                        config.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
                     }
                 });
             }
         }
 
-        [Fact(Skip = "WIP"), TestCategory("Functional"), TestCategory("ActivationCollection")]
+        [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_Basic()
         {
             var id = Guid.NewGuid();
