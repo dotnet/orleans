@@ -6,7 +6,7 @@
 
 
 
-[![Build status](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/master/job/netfx/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_orleans/job/master/)
+[![Build status](http://ci.dot.net/job/dotnet_orleans/job/master/job/netfx/badge/icon)](http://ci.dot.net/job/dotnet_orleans/job/master/)
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
