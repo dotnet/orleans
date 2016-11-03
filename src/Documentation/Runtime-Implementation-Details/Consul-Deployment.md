@@ -13,7 +13,7 @@ There is a very detailed overview of Consul including comparisons with similar s
 Consul is written in GO and is [open source](https://github.com/hashicorp/consul); compiled downloads are available for [Mac OS X, FreeBSD, Linux, Solaris and Windows](https://www.consul.io/downloads.html)
 
 ## Why Choose Consul?
-As an [Orleans Membership Provider](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management), Consul is a good choice when you need to deliver an **on-premise solution** which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.  Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.  And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation. We therefore implemented a membership table in Consul (also known as "Orleans Custom System Store"), which fully integrates with Orleans's [Cluster Management](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management).
+As an [Orleans Membership Provider](https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html), Consul is a good choice when you need to deliver an **on-premise solution** which does not require your potential customers to have existing infrastructure **and** a co-operative IT provider.  Consul is a very lightweight single executable, has no dependencies and as such can easily be built into your own middleware solution.  And when Consul is already your solution for discovering, checking and maintaining your microservices, it makes sense to fully integrate with Orleans membership for simplicity and ease of operation. We therefore implemented a membership table in Consul (also known as "Orleans Custom System Store"), which fully integrates with Orleans's [Cluster Management](https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html).
 
 ## Setting up Consul
 There is very extensive documentation available on [Consul.io](https://www.consul.io) about setting up a stable Consul cluster and it doesn't make sense to repeat that here; however for your convenience we include this guide so you can very quickly get Orleans running with a standalone Consul agent.
@@ -54,6 +54,10 @@ There is currently a known issue with the "Custom" membership provider OrleansCo
     <Globals>
         <SystemStore SystemStoreType="None" DataConnectionString="http://localhost:8500" DeploymentId="MyOrleansDeployment" />
     </Globals>
+    <Defaults>
+        <Networking Address="localhost" Port="22222" />
+        <ProxyingGateway Address="localhost" Port="30000" />
+    </Defaults>    
 </OrleansConfiguration>
 ```
 
@@ -111,7 +115,7 @@ You will notice that the keys are prefixed with *"orleans/"* this is hard coded 
 [
     {
         "LockIndex": 0,
-        "Key": "orleans/MyOrleansDeployment/192.168.1.26:11111@191780753",
+        "Key": "orleans/MyOrleansDeployment/192.168.1.26:22222@191780753",
         "Flags": 0,
         "Value": "[BASE64 UTF8 Encoded String]",
         "CreateIndex": 10,
@@ -143,7 +147,7 @@ When the Clients connect, they read the KVs for all silos in the cluster in one 
 ## Limitations
 
 ### Orleans Extended Membership Protocol (Table Version & ETag)
-Consul KV currrently does not currently support atomic updates. Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described [here](http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management) and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented. Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
+Consul KV currrently does not currently support atomic updates. Therefore, the Orleans Consul Membership Provider only implements the the Orleans Basic Membership Protocol, as described [here](https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html) and does not support the Extended Membership Protocol.  This Extended protocol was introduced as an additional, but not essential, silo connectivity validation and as a foundation to functionality that has not yet been implemented. Providing your infrastructure is correctly configured you will not experience any detrimental effect of the lack of support.
 
 ### Multiple Datacenters
 The Key Value Pairs in Consul are not currently replicated between Consul datacenters.  There is a [separate project](https://github.com/hashicorp/consul-replicate) to address this but it has not yet been proven to support Orleans.
