@@ -10,10 +10,6 @@
     "WindowsAzure.Storage": "7.2.1"
   },
   "frameworks": {
-    "netstandard1.5": {
-      "imports": [
-        "portable-net45+win8+wp8+wpa81"
-      ]
-    }
+    "netstandard1.5": { "imports": "portable-net45+win8+wp8+wpa81" }
   }
 }
