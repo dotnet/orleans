@@ -22,7 +22,7 @@ namespace UnitTests.StuckGrainTests
             {
                 GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
                 var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(1));
+                options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
                 options.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
 
                 return new TestCluster(options);
@@ -46,9 +46,36 @@ namespace UnitTests.StuckGrainTests
             await task.WithTimeout(TimeSpan.FromSeconds(1));
 
             // wait for activation collection
-            await Task.Delay(TimeSpan.FromSeconds(5)); 
+            await Task.Delay(TimeSpan.FromSeconds(6)); 
 
             Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
+        public async Task StuckGrainTest_StuckDetectionAndForward()
+        {
+            const int nonBlockingCalls = 3;
+
+            var id = Guid.NewGuid();
+            var stuckGrain = GrainClient.GrainFactory.GetGrain<IStuckGrain>(id);
+            var task = stuckGrain.RunForever();
+
+            // Should timeout
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
+
+            for (var i = 0; i < nonBlockingCalls-1; i++)
+            {
+                await Assert.ThrowsAsync<TimeoutException>(
+                    () => stuckGrain.NonBlockingCall().WithTimeout(TimeSpan.FromMilliseconds(500)));
+            }
+
+            // Wait so the first task will reach with DefaultCollectionAge timeout
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            // No issue on this one
+            await stuckGrain.NonBlockingCall();
+
+            Assert.Equal(nonBlockingCalls, await stuckGrain.GetNonBlockingCallCounter());
         }
     }
 }
