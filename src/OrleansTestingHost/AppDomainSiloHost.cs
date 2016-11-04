@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Runtime.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -16,8 +17,6 @@ using Orleans.Storage;
 
 namespace Orleans.TestingHost
 {
-    using Microsoft.Extensions.DependencyInjection;
-
     /// <summary>Allows programmatically hosting an Orleans silo in the curent app domain, exposing some marshable members via remoting.</summary>
     public class AppDomainSiloHost : MarshalByRefObject
     {

@@ -1,10 +1,10 @@
+using System.Collections.Generic;
+using System.Reflection;
+
+using Orleans.Runtime;
+
 namespace Orleans.Serialization
 {
-    using System.Collections.Generic;
-    using System.Reflection;
-
-    using Orleans.Runtime;
-
     public class SerializationTestEnvironment
     {
         public SerializationTestEnvironment()

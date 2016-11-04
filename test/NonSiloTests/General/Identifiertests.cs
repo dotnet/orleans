@@ -11,9 +11,6 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    using System.Collections.Generic;
-    using System.Reflection;
-
     public class Identifiertests
     {
         private readonly ITestOutputHelper output;

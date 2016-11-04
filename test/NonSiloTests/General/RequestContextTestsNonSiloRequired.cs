@@ -12,8 +12,6 @@ using Xunit;
 
 namespace UnitTests.General
 {
-    using System.Reflection;
-
     public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();

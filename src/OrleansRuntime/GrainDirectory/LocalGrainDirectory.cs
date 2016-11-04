@@ -6,12 +6,11 @@ using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.SystemTargetInterfaces;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    using Orleans.Runtime.Configuration;
-    using Orleans.Runtime.Messaging;
-
     internal class LocalGrainDirectory :
 #if !NETSTANDARD
         MarshalByRefObject,

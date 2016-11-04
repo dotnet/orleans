@@ -11,8 +11,6 @@ using Xunit.Abstractions;
 
 namespace NonSiloTests.UnitTests.SerializerTests
 {
-    using System.Reflection;
-
     public class MessageSerializerTests
     {
         private readonly ITestOutputHelper output;

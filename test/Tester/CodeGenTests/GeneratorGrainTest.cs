@@ -11,8 +11,6 @@ using Xunit;
 
 namespace Tester.CodeGenTests
 {
-    using System.Reflection;
-
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>

@@ -5,9 +5,6 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    using System.Collections.Generic;
-    using System.Reflection;
-
     public abstract class BaseTestClusterFixture : IDisposable
     {
         private static int defaultsAreInitialized = 0;

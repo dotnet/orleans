@@ -9,9 +9,6 @@ using Xunit;
 
 namespace NonSiloTests.UnitTests.SerializerTests
 {
-    using System.Collections.Generic;
-    using System.Reflection;
-
     [Serializable]
     public class ClassWithCustomCopier
     {

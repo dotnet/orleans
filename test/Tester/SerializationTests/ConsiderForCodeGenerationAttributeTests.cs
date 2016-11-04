@@ -5,9 +5,6 @@ using Xunit;
 
 namespace Tester.SerializationTests
 {
-    using System.Collections.Generic;
-    using System.Reflection;
-
     public class ConsiderForCodeGenerationAttributeTests
     {
         public ConsiderForCodeGenerationAttributeTests()

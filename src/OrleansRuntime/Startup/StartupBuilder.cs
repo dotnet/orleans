@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Startup
 {
-
     /// <summary>
     /// Configure dependency injection at startup
     /// </summary>

@@ -7,8 +7,6 @@ using System.Collections;
 
 namespace Tester.SerializationTests
 {
-    using System.Reflection;
-
     public class SerializationTestsImmutableCollections
     {
         public SerializationTestsImmutableCollections()

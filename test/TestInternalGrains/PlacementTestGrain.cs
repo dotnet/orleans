@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Placement;
@@ -11,8 +12,6 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    using Microsoft.Extensions.DependencyInjection;
-
     internal abstract class PlacementTestGrainBase : Grain
     {
         public Task<IPEndPoint> GetEndpoint()

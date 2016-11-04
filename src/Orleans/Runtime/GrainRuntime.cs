@@ -1,11 +1,10 @@
 ﻿using System;
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
-    using Orleans.Runtime.Configuration;
-
     internal class GrainRuntime : IGrainRuntime
     {
         private readonly IRuntimeClient runtimeClient;

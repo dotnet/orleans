@@ -7,8 +7,6 @@ using Xunit;
 
 namespace Tester.CodeGenTests
 {
-    using System.Reflection;
-
     /// <summary>
     /// Tests runtime code generation.
     /// </summary>

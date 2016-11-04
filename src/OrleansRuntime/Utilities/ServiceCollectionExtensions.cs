@@ -1,10 +1,10 @@
+using System.Linq;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace Orleans.Runtime
 {
-    using System.Linq;
-
-    using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.Extensions.DependencyInjection.Extensions;
-
     /// <summary>
     /// Extension methods for <see cref="IServiceCollection"/>.
     /// </summary>

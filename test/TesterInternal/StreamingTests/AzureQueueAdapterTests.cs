@@ -20,8 +20,6 @@ using Xunit.Abstractions;
 
 namespace UnitTests.StorageTests
 {
-    using System.Reflection;
-
     public class AzureQueueAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;

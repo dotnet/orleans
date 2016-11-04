@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
@@ -9,8 +10,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    using System.Net;
-
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;

@@ -12,8 +12,6 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AWSUtils
 {
-    using Orleans.Runtime;
-
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBStorageProviderTests
     {

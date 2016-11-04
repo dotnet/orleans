@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    using Orleans.Runtime.Configuration;
-
     /// <summary>
     /// Maps multi-cluster registration strategies to the corresponding registrar
     /// </summary>

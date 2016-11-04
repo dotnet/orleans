@@ -1,11 +1,11 @@
+using System;
+using System.Collections.Concurrent;
+using System.Reflection;
+
+using Orleans.CodeGeneration;
+
 namespace Orleans.Runtime
 {
-    using System;
-    using System.Collections.Concurrent;
-    using System.Reflection;
-
-    using Orleans.CodeGeneration;
-
     /// <summary>
     /// Cache of type metadata.
     /// </summary>

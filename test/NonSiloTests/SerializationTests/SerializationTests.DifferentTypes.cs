@@ -6,8 +6,6 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using System.Reflection;
-
     /// <summary>
     /// Summary description for SerializationTests
     /// </summary>

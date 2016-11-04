@@ -19,8 +19,6 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Streaming
 {
-    using System.Reflection;
-
     [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSAdapterTests : IDisposable
     {

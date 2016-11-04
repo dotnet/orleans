@@ -7,8 +7,6 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using System.Reflection;
-
     /// <summary>
     /// Test the deep copy of built-in and user-defined types
     /// </summary>

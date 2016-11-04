@@ -1,12 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Placement
 {
-    using System.Collections.Concurrent;
-
-    using Microsoft.Extensions.DependencyInjection;
-
     internal class PlacementDirectorsManager
     {
         private readonly ConcurrentDictionary<Type, IPlacementDirector> directors = new ConcurrentDictionary<Type, IPlacementDirector>();

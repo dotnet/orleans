@@ -11,8 +11,6 @@ using Orleans.Runtime.Configuration;
 
 namespace OrleansTelemetryConsumers.Counters
 {
-    using System.Reflection;
-
     /// <summary>
     /// Providers installer hooks for registering Orleans custom performance counters.
     /// </summary>

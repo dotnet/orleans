@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using TestExtensions;
 using UnitTests.Grains;
@@ -13,8 +14,6 @@ using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
-    using Orleans.Runtime.Configuration;
-
     public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
         private readonly ITestOutputHelper output;

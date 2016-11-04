@@ -1,9 +1,9 @@
+using System;
+
+using Orleans.Runtime;
+
 namespace Orleans
 {
-    using System;
-
-    using Orleans.Runtime;
-
     /// <summary>
     /// The internal grain factory interface.
     /// </summary>
