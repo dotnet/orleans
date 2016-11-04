@@ -74,18 +74,23 @@ namespace Orleans.Runtime
 
         private readonly bool localTestMode;
         private readonly HashSet<string> loadedGrainAsemblies;
+		
+		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        private readonly PlacementStrategy defaultPlacementStrategy;
+        internal IList<int> SupportedGrainTypes
+        {
+            get { return implementationIndex.Keys.ToList(); }
+        }
 
         public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
         {
-            this.defaultPlacementStrategy = defaultPlacementStrategy;
             table = new Dictionary<int, GrainInterfaceData>();
             typeToInterfaceData = new Dictionary<string, GrainInterfaceData>();
             primaryImplementations = new Dictionary<string, string>();
             implementationIndex = new Dictionary<int, GrainClassData>();
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
+            this.defaultPlacementStrategy = defaultPlacementStrategy;
             if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
         }
