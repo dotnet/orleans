@@ -1,15 +1,14 @@
 ﻿{
   "supports": {},
   "dependencies": {
-    "Microsoft.Data.OData": "5.8.0",
-    "Microsoft.Data.Services.Client": "5.8.0",
     "Microsoft.NETCore.Portable.Compatibility": "1.0.1",
     "NETStandard.Library": "1.6.0",
     "System.Net.Requests": "4.0.11",
-    "System.Spatial": "5.8.0",
     "WindowsAzure.Storage": "7.2.1"
   },
   "frameworks": {
-    "netstandard1.5": { "imports": "portable-net45+win8+wp8+wpa81" }
+    "netstandard1.5": {
+      "imports": "portable-net45+win8+wp8+wpa81"
+    }
   }
 }
