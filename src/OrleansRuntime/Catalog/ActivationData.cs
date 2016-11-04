@@ -148,7 +148,7 @@ namespace Orleans.Runtime
         }
 
         // This is the maximum amount of time we expect a request to continue processing
-        private static TimeSpan maxRequestProcessingTime;
+        private static TimeSpan maxWarningRequestProcessingTime;
         private static NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
         private IGrainMethodInvoker lastInvoker;
@@ -161,7 +161,7 @@ namespace Orleans.Runtime
         public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
             // Consider adding a config parameter for this
-            maxRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
+            maxWarningRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
             nodeConfiguration = nodeConfig;
         }
 
@@ -483,26 +483,39 @@ namespace Orleans.Runtime
             }
         }
 
+        public enum EnqueueMessageResult
+        {
+            Success,
+            ErrorInvalidActivation,
+            ErrorStuckActivation,
+        }
+
         /// <summary>
         /// Insert in a FIFO order
         /// </summary>
         /// <param name="message"></param>
-        public bool EnqueueMessage(Message message)
+        public EnqueueMessageResult EnqueueMessage(Message message)
         {
             lock (this)
             {
+                var result = EnqueueMessageResult.Success;
                 if (State == ActivationState.Invalid)
                 {
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
-                    return false;
+                    return EnqueueMessageResult.ErrorInvalidActivation;
                 }
-                // If maxRequestProcessingTime is never set, then we will skip this check
-                if (maxRequestProcessingTime.TotalMilliseconds > 0 && Running != null)
+                if (Running != null)
                 {
-                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
-                    if (currentRequestActiveTime > maxRequestProcessingTime)
+                    if (currentRequestActiveTime > CollectionAgeLimit)
+                    {
+                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
+                        result = EnqueueMessageResult.ErrorStuckActivation;
+                    }
+                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
+                    else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
                     {
                         logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
@@ -512,7 +525,7 @@ namespace Orleans.Runtime
 
                 waiting = waiting ?? new List<Message>();
                 waiting.Add(message);
-                return true;
+                return result;
             }
         }
 

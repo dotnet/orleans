@@ -15,6 +15,7 @@ namespace UnitTests.Grains
     public class StuckGrain : Grain, IStuckGrain
     {
         private static Dictionary<Guid, TaskCompletionSource<bool>> tcss = new Dictionary<Guid, TaskCompletionSource<bool>>();
+        private static Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
         private static HashSet<Guid> grains = new HashSet<Guid>();
 
         public static bool Release(Guid key)
@@ -50,18 +51,42 @@ namespace UnitTests.Grains
             }
         }
 
+        public Task NonBlockingCall()
+        {
+            counters[this.GetPrimaryKey()] = counters[this.GetPrimaryKey()] + 1;
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetNonBlockingCallCounter()
+        {
+            return Task.FromResult(counters[this.GetPrimaryKey()]);
+        }
+
         public override Task OnActivateAsync()
         {
+            var key = this.GetPrimaryKey();
             lock (grains)
             {
-                grains.Add(this.GetPrimaryKey());
+                grains.Add(key);
+            }
+            lock (counters)
+            {
+                counters[key] = 0;
             }
             return base.OnActivateAsync();
         }
 
         public override Task OnDeactivateAsync()
         {
-            grains.Remove(this.GetPrimaryKey());
+            var key = this.GetPrimaryKey();
+            lock (grains)
+            {
+                grains.Remove(key);
+            }
+            lock (tcss)
+            {
+                tcss.Remove(key);
+            }
             return base.OnDeactivateAsync();
         }
     }
