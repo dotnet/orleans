@@ -8,7 +8,7 @@
   },
   "frameworks": {
     "netstandard1.5": {
-      "imports": "portable-net45+win8+wp8+wpa81"
+      "imports": "net40"
     }
   }
 }
