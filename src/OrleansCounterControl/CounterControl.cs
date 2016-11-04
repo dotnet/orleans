@@ -108,7 +108,7 @@ namespace Orleans.Counter.Control
                 return 1;
             }
 
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
 
             InitConsoleLogging();
 

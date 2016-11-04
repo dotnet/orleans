@@ -18,7 +18,7 @@ namespace Tester.CodeGenTests
     {
         public GeneratorGrainTest()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

@@ -11,7 +11,7 @@ namespace UnitTests.Serialization
     {
         public ILSerializerTests()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         /// <summary>

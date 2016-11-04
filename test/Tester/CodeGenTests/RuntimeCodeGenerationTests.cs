@@ -14,7 +14,7 @@ namespace Tester.CodeGenTests
     {
         public RuntimeCodeGenerationTests()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

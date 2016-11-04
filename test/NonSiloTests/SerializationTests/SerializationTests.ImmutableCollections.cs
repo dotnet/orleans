@@ -11,7 +11,7 @@ namespace Tester.SerializationTests
     {
         public SerializationTestsImmutableCollections()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)

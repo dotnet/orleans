@@ -9,7 +9,7 @@ namespace Tester.SerializationTests
     {
         public ConsiderForCodeGenerationAttributeTests()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]

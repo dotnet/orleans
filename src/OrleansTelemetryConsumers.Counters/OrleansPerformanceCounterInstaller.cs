@@ -25,7 +25,7 @@ namespace OrleansTelemetryConsumers.Counters
         /// </summary>
         public OrleansPerformanceCounterInstaller()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);

@@ -15,7 +15,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsJsonTypes()
         {
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]

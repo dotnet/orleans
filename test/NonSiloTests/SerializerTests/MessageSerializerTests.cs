@@ -23,7 +23,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
             var orleansConfig = ClusterConfiguration.LocalhostPrimarySilo();
             BufferPool.InitGlobalBufferPool(orleansConfig.Globals);
 
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

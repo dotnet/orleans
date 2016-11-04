@@ -16,7 +16,7 @@ namespace UnitTests
         {
             TestDefaultConfiguration.InitializeDefaults();
             GrainClient.Uninitialize();
-            SerializationTestEnvironment.Initialize(null, null);
+            SerializationTestEnvironment.Initialize();
             var hostedCluster = CreateClusterHost();
             this.HostedCluster = hostedCluster;
         }
