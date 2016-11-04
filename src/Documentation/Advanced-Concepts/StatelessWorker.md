@@ -32,7 +32,7 @@ Hence, the pool of activations will eventually shrink to match the load.
 The following example defines a Stateless Worker grain class `MyStatelessWorkerGrain` with the default maximum activation number limit. 
 ``` csharp
 [StatelessWorker]
-public class MyStatelessWorkerGrain() : IMyStatelessWorkerGrain
+public class MyStatelessWorkerGrain : IMyStatelessWorkerGrain
 {
  ...
 }
@@ -51,7 +51,7 @@ await worker.Process(args);
 This one defines a Stateless Worker grain class with no more than one grain activation per silo. 
 ``` csharp
 [StatelessWorker(1)] // max 1 activation per silo
-public class MyLonelyWorkerGrain() : ILonelyWorkerGrain
+public class MyLonelyWorkerGrain : ILonelyWorkerGrain
 {
  ...
 }
