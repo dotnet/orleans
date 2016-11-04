@@ -239,7 +239,6 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<MultiClusterOracleFactory>();
                     services.TryAddSingleton<LocalReminderServiceFactory>();
                     services.TryAddSingleton<DeploymentLoadPublisher>();
-                    services.TryAddExisting<IDeploymentLoadPublisher, DeploymentLoadPublisher>();
                     services.TryAddSingleton<IMembershipTable>(
                         sp => sp.GetRequiredService<MembershipFactory>().GetMembershipTable(sp.GetRequiredService<GlobalConfiguration>()));
                     services.TryAddSingleton<MembershipOracle>(
@@ -251,9 +250,7 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<Func<ISiloStatusOracle>>(sp => () => sp.GetRequiredService<ISiloStatusOracle>());
                     services.TryAddSingleton<MultiClusterOracleFactory>();
                     services.TryAddSingleton<LocalReminderServiceFactory>();
-                    services.TryAddSingleton<SiloControl>();
                     services.TryAddSingleton<ClientObserverRegistrar>();
-                    services.TryAddExisting<IClientObserverRegistrar, ClientObserverRegistrar>();
 
                     // Placement
                     services.TryAddSingleton<PlacementDirectorsManager>();
@@ -366,7 +363,8 @@ namespace Orleans.Runtime
             logger.Verbose("Creating System Targets for this silo.");
 
             logger.Verbose("Creating {0} System Target", "SiloControl");
-            RegisterSystemTarget(Services.GetRequiredService<SiloControl>());
+            var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
+            RegisterSystemTarget(siloControl);
 
             logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
             RegisterSystemTarget(new StreamProviderManagerAgent(this, allSiloProviders));

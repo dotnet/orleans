@@ -215,7 +215,7 @@ namespace Orleans
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }
 
-            var implementation = TypeCodeMapper.GetImplementation(interfaceType, this.runtimeClient, grainClassNamePrefix);
+            var implementation = TypeCodeMapper.GetImplementation(this.runtimeClient.GrainTypeResolver, interfaceType, grainClassNamePrefix);
             return implementation;
         }
 

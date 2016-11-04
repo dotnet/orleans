@@ -165,6 +165,8 @@ namespace Orleans
 
             internal PlacementAttribute(PlacementStrategy placement)
             {
+                if (placement == null) throw new ArgumentNullException(nameof(placement));
+
                 PlacementStrategy = placement;
             }
         }

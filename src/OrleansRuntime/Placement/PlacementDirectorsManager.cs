@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Placement
             this.serviceProvider = services;
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.clientObserversPlacementDirector = clientObserversPlacementDirector;
-            this.ResolveIncludedStrategies();
+            this.ResolveBuiltInStrategies();
         }
 
         private IPlacementDirector ResolveDirector(PlacementStrategy strategy)
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Placement
             return director.OnAddActivation(strategy, grain, context);
         }
 
-        private void ResolveIncludedStrategies()
+        private void ResolveBuiltInStrategies()
         {
             var strategies = new PlacementStrategy[]
             {
