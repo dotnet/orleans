@@ -6,7 +6,7 @@ title: My First Orleans Application
 # My First Orleans Application
 
 In this tutorial, we will walk through the steps to get the simplest possible Orleans application up and running, the all-too-familiar "Hello World!".
-We're using VS 2013, but it works equally well with VS 2012.
+We're using VS 2013, but it works equally well with VS 2012 and VS 2015.
 
 Before we start, there are three Orleans concepts that you will run into in this tutorial: that of a grain, a communication interface, and a silo.
 
@@ -26,6 +26,9 @@ Silos are containers of grains, potentially millions of grains in a single silo.
 Typically, you will run one silo per machine, but it sometimes make sense to run more than one on a single machine, when testing, for example.
 
 ## Getting Started
+
+Before getting started, make sure the Microsoft Orleans Tools for Visual Studio is installed. The plugin can be downloaded from:
+https://visualstudiogallery.msdn.microsoft.com/36903961-63bd-4eec-9ca4-cf2319dc75f4
 
 After starting Visual Studio, go to create a new project.
 Under "Visual C#," you should see the following:
