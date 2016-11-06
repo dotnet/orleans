@@ -101,7 +101,7 @@ The following attributes can be added to the `<Provider />` element to configure
 
 ### ADO.NET Storage Provider (SQL Storage Provider)
 
-Note that to use the it is necessary to deploy the database script to the database. It can be found in the The scripts are located in the Nuget library, similar to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version and database vendor.
+Note that to use this it is necessary to deploy the database script to the database. The scripts are located in the NuGet library, similar to `\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net<version>\SQLServer\` depending on version and database vendor.
 
 ```xml
 <Provider Type="Orleans.SqlUtils.StorageProvider.SqlStorageProvider" Name="SqlStore" DataConnectionString="Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;" />
