@@ -54,8 +54,6 @@ namespace UnitTests.StuckGrainTests
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_StuckDetectionAndForward()
         {
-            const int nonBlockingCalls = 3;
-
             var id = Guid.NewGuid();
             var stuckGrain = GrainClient.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
@@ -63,7 +61,7 @@ namespace UnitTests.StuckGrainTests
             // Should timeout
             await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
 
-            for (var i = 0; i < nonBlockingCalls-1; i++)
+            for (var i = 0; i < 3; i++)
             {
                 await Assert.ThrowsAsync<TimeoutException>(
                     () => stuckGrain.NonBlockingCall().WithTimeout(TimeSpan.FromMilliseconds(500)));
@@ -75,7 +73,7 @@ namespace UnitTests.StuckGrainTests
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
-            Assert.Equal(nonBlockingCalls, await stuckGrain.GetNonBlockingCallCounter());
+            Assert.Equal(1, await stuckGrain.GetNonBlockingCallCounter());
         }
     }
 }

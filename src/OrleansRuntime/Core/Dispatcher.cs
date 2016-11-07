@@ -400,10 +400,8 @@ namespace Orleans.Runtime
                     break;
                 case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
                     // Avoid any new call to this activation
-                    targetActivation.SetState(ActivationState.Deactivating);
-                    // Delete the activation since it seems stuck. This call will remove the activation
-                    // from the directory and forward all calls. 
-                    catalog.DeleteActivations(new List<ActivationAddress>() { targetActivation.Address }).Ignore();
+                    catalog.RemoveFromDirectory(targetActivation).Wait();
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

@@ -498,7 +498,6 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                var result = EnqueueMessageResult.Success;
                 if (State == ActivationState.Invalid)
                 {
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
@@ -512,7 +511,7 @@ namespace Orleans.Runtime
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
                             $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
-                        result = EnqueueMessageResult.ErrorStuckActivation;
+                        return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
@@ -525,7 +524,7 @@ namespace Orleans.Runtime
 
                 waiting = waiting ?? new List<Message>();
                 waiting.Add(message);
-                return result;
+                return EnqueueMessageResult.Success;
             }
         }
 

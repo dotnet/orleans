@@ -205,6 +205,13 @@ namespace Orleans.Runtime
             gcTimer = t;
         }
 
+        internal async Task RemoveFromDirectory(ActivationData activationData)
+        {
+            // Avoid any new call to this activation
+            activationData.SetState(ActivationState.Invalid);
+            await directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force);
+        }
+
         private Task OnTimer(object _)
         {
             return CollectActivationsImpl(true);
