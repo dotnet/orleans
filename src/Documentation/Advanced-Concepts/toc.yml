@@ -36,3 +36,5 @@
   href: Troubleshooting-Deployments.md
 - name: Powershell Client
   href: Powershell-Client.md
+- name: Code generation
+  href: Codegen.md
