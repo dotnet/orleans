@@ -227,12 +227,14 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
+                var grainIdHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var clearRecord = (await Storage.ReadAsync(CurrentOperationalQueries.ClearState, command =>
                 {
-                    command.AddParameter("GrainIdHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes()));
+                    command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
                     command.AddParameter("GrainIdN1", grainId.N1Key);
-                    command.AddParameter("GrainTypeHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType)));
+                    command.AddParameter("GrainTypeHash", grainTypeHash);
                     command.AddParameter("GrainTypeString", baseGrainType);
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", ServiceId);
@@ -287,12 +289,14 @@ namespace Orleans.Storage
 
                 var commandBehavior = choice.PreferStreaming ? CommandBehavior.SequentialAccess : CommandBehavior.Default;
                 var grainStateType = grainState.State.GetType();
+                var grainIdHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var readRecords = (await Storage.ReadAsync(CurrentOperationalQueries.ReadFromStorage, (command =>
                 {
-                    command.AddParameter("GrainIdHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes()));
+                    command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
                     command.AddParameter("GrainIdN1", grainId.N1Key);
-                    command.AddParameter("GrainTypeHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType)));
+                    command.AddParameter("GrainTypeHash", grainTypeHash);
                     command.AddParameter("GrainTypeString", baseGrainType);
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", ServiceId);
@@ -402,19 +406,20 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
-
+                var grainIdHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var writeRecord = await Storage.ReadAsync(CurrentOperationalQueries.WriteToStorage, command =>
                 {
-                    command.AddParameter("GrainIdHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes()));
+                    command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
                     command.AddParameter("GrainIdN1", grainId.N1Key);
-                    command.AddParameter("GrainTypeHash", HashPicker.PickHasher(ServiceId, Name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType)));
-                    command.AddParameter("GrainTypeString", (string)baseGrainType);
+                    command.AddParameter("GrainTypeHash", grainTypeHash);
+                    command.AddParameter("GrainTypeString", baseGrainType);
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", ServiceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
 
-                    SerializationChoice serializer = StorageSerializationPicker.PickSerializer(ServiceId, Name, (string)baseGrainType, grainReference, grainState);
+                    SerializationChoice serializer = StorageSerializationPicker.PickSerializer(ServiceId, Name, baseGrainType, grainReference, grainState);
                     command.AddParameter("PayloadBinary", (byte[])(serializer.Serializer.Tag == UseBinaryFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                     command.AddParameter("PayloadJson", (string)(serializer.Serializer.Tag == UseJsonFormatPropertyName ? serializer.Serializer.Serialize(data) : null));
                     command.AddParameter("PayloadXml", (string)(serializer.Serializer.Tag == UseXmlFormatPropertyName ? serializer.Serializer.Serialize(data) : null));

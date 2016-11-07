@@ -64,14 +64,14 @@ namespace UnitTests.StorageTests.Relational
 
         internal async Task Relational_WriteReadWriteRead100StatesInParallel()
         {
-            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteRead100StatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
+            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
         }
 
 
         internal async Task Relational_HashCollisionTests()
         {
             ((AdoNetStorageProvider)PersistenceStorageTests.Storage).HashPicker = ConstantHasher;
-            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteRead100StatesInParallel(nameof(Relational_HashCollisionTests));
+            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_HashCollisionTests), 2);
         }
 
 

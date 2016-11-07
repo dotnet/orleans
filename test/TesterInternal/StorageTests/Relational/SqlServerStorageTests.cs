@@ -19,6 +19,7 @@ namespace UnitTests.StorageTests.Relational
     /// <remarks>To duplicate these tests to any back-end, not just for relational, copy and paste this class,
     /// optionally remove <see cref="RelationalStorageTests"/> inheritance and implement a provider and environment
     /// setup as done in <see cref="CommonFixture"/> and how it delegates it.</remarks>
+    [TestCategory("SqlServer")]
     public class SqlServerStorageTests: RelationalStorageTests, IDisposable, IClassFixture<CommonFixture>
     {
         /// <summary>
@@ -26,16 +27,11 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNameSqlServer;
 
-        /// <summary>
-        /// The category of this back-end vendor.
-        /// </summary>
-        public const string VendorCategory = "SqlServer";
-
 
         public SqlServerStorageTests(CommonFixture commonFixture) : base(AdoNetInvariant, commonFixture)
         {
             //XUnit.NET will automatically call this constructor before every test method run.
-            Skip.If(PersistenceStorageTests == null, $"Persistence storage not available for {VendorCategory}.");
+            Skip.If(PersistenceStorageTests == null, $"Persistence storage not available for SqlServer.");
         }
 
 
@@ -45,7 +41,7 @@ namespace UnitTests.StorageTests.Relational
         }
 
         [SkippableFact]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task WriteReadCyrillic()
         {
             await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
@@ -53,14 +49,14 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableFact]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task WriteReadWriteRead100StatesInParallel()
         {
             await Relational_WriteReadWriteRead100StatesInParallel();
         }
 
         [SkippableFact]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_HashCollisionTests()
         {
             await Relational_HashCollisionTests();
@@ -68,7 +64,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task ChangeStorageFormatFromBinaryToJson_WriteRead(string grainType, GrainReference grainReference, GrainState<TestState1> grainState)
         {
             await Relational_ChangeStorageFormatFromBinaryToJsonInMemory_WriteRead(grainType, grainReference, grainState);
@@ -76,7 +72,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableFact]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task WriteDuplicateFailsWithInconsistentStateException()
         {
             await Relational_WriteDuplicateFailsWithInconsistentStateException();
@@ -84,7 +80,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableFact]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task WriteInconsistentFailsWithIncosistentStateException()
         {
             await Relational_WriteInconsistentFailsWithIncosistentStateException();
@@ -92,7 +88,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetPlain_IntegerKey_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestState1> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -100,7 +96,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<Guid>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetPlain_GuidKey_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestState1> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -108,7 +104,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task PersistenceStorage_StorageDataSetPlain_StringKey_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestState1> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -116,7 +112,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task DataSet2_Cyrillic_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -124,7 +120,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<long, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_IntegerKey_Generic_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -132,7 +128,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<Guid, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_GuidKey_Generic_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -140,7 +136,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_StringKey_Generic_WriteClearRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await PersistenceStorageTests.Store_WriteClearRead(grainType, grainReference, grainState);
@@ -148,7 +144,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_Json_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await Relational_Json_WriteRead(grainType, grainReference, grainState);
@@ -156,7 +152,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MySql")]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGenericHuge_Json_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await Relational_Json_WriteReadStreaming(grainType, grainReference, grainState);
@@ -164,7 +160,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGeneric<string, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGeneric_Xml_WriteRead(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await Relational_Xml_WriteRead(grainType, grainReference, grainState);
@@ -172,7 +168,7 @@ namespace UnitTests.StorageTests.Relational
 
 
         [SkippableTheory, ClassData(typeof(StorageDataSetGenericHuge<string, string>))]
-        [TestCategory("Functional"), TestCategory("Persistence"), TestCategory(VendorCategory)]
+        [TestCategory("Functional"), TestCategory("Persistence")]
         internal async Task StorageDataSetGenericHuge_Xml_WriteReadStreaming(string grainType, GrainReference grainReference, GrainState<TestStateGeneric1<string>> grainState)
         {
             await Relational_Xml_WriteReadStreaming(grainType, grainReference, grainState);

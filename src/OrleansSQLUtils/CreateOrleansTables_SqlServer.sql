@@ -237,6 +237,10 @@ CREATE TABLE Storage
 );
 CREATE NONCLUSTERED INDEX IX_Storage ON Storage(GrainIdHash, GrainTypeHash);
 
+-- This ensures lock escalation will not lock the whole table, which can potentially be enormous.
+-- See more information at https://www.littlekendra.com/2016/02/04/why-rowlock-hints-can-make-queries-slower-and-blocking-worse-in-sql-server/.
+ALTER TABLE Storage SET(LOCK_ESCALATION = DISABLE);
+
 -- A feature with ID is compression. If it is supported, it is used for Storage table. This is an Enterprise feature.
 -- This consumes more processor cycles, but should save on space on GrainIdString, GrainTypeString and ServiceId, which
 -- contain mainly the same values. Also the payloads will be compressed.
@@ -766,6 +770,7 @@ VALUES
 
 	DECLARE @NewGrainStateVersion AS INT = @GrainStateVersion;
 
+
 	-- If the @GrainStateVersion is not zero, this branch assumes it exists in this database.
 	-- The NULL value is supplied by Orleans when the state is new.
 	IF @GrainStateVersion IS NOT NULL
@@ -782,9 +787,9 @@ VALUES
 		WHERE
 			GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
 			AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-			AND GrainIdN0 = @GrainIdN0 AND @GrainIdN0 IS NOT NULL
-			AND GrainIdN1 = @GrainIdN1 AND @GrainIdN1 IS NOT NULL
-			AND GrainTypeString = @GrainTypeString AND @GrainTypeString IS NOT NULL
+			AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
+			AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+			AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
 			AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
 			AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 			AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
@@ -792,7 +797,7 @@ VALUES
 	END
 
 	-- The grain state has not been read. The following locks rather pessimistically
-	-- to ensure only on INSERT succeeds.
+	-- to ensure only one INSERT succeeds.
 	IF @GrainStateVersion IS NULL
 	BEGIN
 		INSERT INTO Storage
@@ -827,13 +832,13 @@ VALUES
 		 (
 			-- There should not be any version of this grain state.
 			SELECT 1
-			FROM Storage WITH(UPDLOCK, HOLDLOCK)
+			FROM Storage WITH(XLOCK, ROWLOCK, HOLDLOCK, INDEX(IX_Storage))
 			WHERE
 				GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
 				AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-				AND GrainIdN0 = @GrainIdN0 AND @GrainIdN0 IS NOT NULL
-				AND GrainIdN1 = @GrainIdN1 AND @GrainIdN1 IS NOT NULL
-				AND GrainTypeString = @GrainTypeString AND @GrainTypeString IS NOT NULL
+				AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
+				AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+				AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
 				AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
 				AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		 ) OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
@@ -867,9 +872,9 @@ VALUES
     WHERE
 	    GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
-        AND GrainIdN0 = @GrainIdN0 AND @GrainIdN0 IS NOT NULL
-		AND GrainIdN1 = @GrainIdN1 AND @GrainIdN1 IS NOT NULL
-        AND GrainTypeString = @GrainTypeString AND @GrainTypeString IS NOT NULL
+        AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
+		AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+        AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
 		AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
 		AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
@@ -899,11 +904,11 @@ VALUES
     FROM
         Storage
     WHERE
-        GrainIdHash = @GrainIdHash
-        AND GrainTypeHash = @GrainTypeHash
-        AND GrainIdN0 = @GrainIdN0 AND @GrainIdN0 IS NOT NULL
-		AND GrainIdN1 = @GrainIdN1 AND @GrainIdN1 IS NOT NULL
-        AND GrainTypeString = @GrainTypeString
+        GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
+        AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
+        AND (GrainIdN0 = @GrainIdN0 OR @GrainIdN0 IS NULL)
+		AND (GrainIdN1 = @GrainIdN1 OR @GrainIdN1 IS NULL)
+        AND (GrainTypeString = @GrainTypeString OR @GrainTypeString IS NULL)
 		AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
 		AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));'
