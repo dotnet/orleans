@@ -262,7 +262,7 @@ namespace Orleans.CodeGenerator
 
             // Addressable arguments must be converted to references before passing.
             if (typeof(IAddressable).IsAssignableFrom(arg.ParameterType)
-                && (typeof(Grain).IsAssignableFrom(arg.ParameterType) || arg.ParameterType.GetTypeInfo().IsInterface))
+                && arg.ParameterType.GetTypeInfo().IsInterface)
             {
                 return
                     SF.ConditionalExpression(
