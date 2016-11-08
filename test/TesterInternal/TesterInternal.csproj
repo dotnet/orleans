@@ -52,7 +52,6 @@
     <Compile Include="ErrorInjectionStorageProvider.cs" />
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
-    <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
     <Compile Include="MembershipTests\PostgreSqlMembershipTableTests.cs" />
@@ -72,12 +71,8 @@
     <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
-    <Compile Include="StorageTests\AzureStorageBasicTestFixture.cs" />
     <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
-    <Compile Include="RemindersTest\AzureRemindersTableTests.cs" />
-    <Compile Include="StorageTests\PersistenceGrainTests_AzureBlobStore.cs" />
-    <Compile Include="StorageTests\PersistenceGrainTests_AzureTableStore.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
     <Compile Include="StorageTests\Relational\CommonFixture.cs" />
     <Compile Include="StorageTests\Relational\CommonStorageTests.cs" />
@@ -96,7 +91,6 @@
     <Compile Include="StorageTests\Relational\TestDataSets\TestState1.cs" />
     <Compile Include="StorageTests\Relational\TestDataSets\TestStateGeneric1.cs" />
     <Compile Include="StorageTests\Relational\TestEnvironmentInvariant.cs" />
-    <Compile Include="StreamingTests\AQStreamingTests.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
@@ -113,7 +107,6 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
-    <Compile Include="GeoClusterTests\AzureGossipTableTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
@@ -154,22 +147,12 @@
     <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
     <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="StatsTests.cs" />
-    <Compile Include="StorageTests\AzureTableDataManagerStressTests.cs" />
-    <Compile Include="StorageTests\AzureTableErrorCodeTests.cs" />
-    <Compile Include="MembershipTests\AzureMembershipTableTests.cs" />
     <Compile Include="MembershipTests\MembershipTableTestsBase.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
-    <Compile Include="StorageTests\PersistenceGrainTests_AzureStore.cs" />
-    <Compile Include="StorageTests\PersistenceProviderTests.cs" />
     <Compile Include="StorageTests\StorageProviders\BaseJSONStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
-    <Compile Include="StorageTests\UnitTestAzureTableDataManager.cs" />
-    <Compile Include="StorageTests\AzureTableDataManagerTests.cs" />
-    <Compile Include="StorageTests\SiloInstanceTableManagerTests.cs" />
-    <Compile Include="StorageTests\AzureQueueDataManagerTests.cs" />
     <Compile Include="MembershipTests\ZookeeperMembershipTableTests.cs" />
-    <Compile Include="StreamingTests\AzureQueueAdapterTests.cs" />
     <Compile Include="StreamingTests\DynamicStreamProviderConfigurationTests.cs" />
     <Compile Include="StreamingTests\HaloStreamSubscribeTests.cs" />
     <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
@@ -331,12 +314,6 @@
     <Content Include="ClientConfig_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Config_AzureBlobStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureTableStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -363,6 +340,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <PropertyGroup Condition=" '$(OS)' == 'Windows_NT' ">
     <!-- PostBuild.cmd script is platform specific, so for now we only want to run it on Windows -->

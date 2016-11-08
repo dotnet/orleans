@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "xunit": "2.1.0",
+    "xunit.runner.visualstudio": "2.1.0",
+    "Xunit.SkippableFact": "1.2.14"
+  },
+  "frameworks": {
+    "net462": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

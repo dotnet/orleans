@@ -118,55 +118,57 @@ namespace Orleans.Runtime.ReminderService
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
             string serviceIdStr = ReminderTableEntry.ConstructServiceIdStr(ServiceId);
+            string filterOnServiceIdStr = TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThan, serviceIdStr + '_'),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThanOrEqual,
+                        serviceIdStr + (char)('_' + 1)));
             if (begin < end)
             {
-                Expression<Func<ReminderTableEntry, bool>> query =
-                    e => String.Compare(e.PartitionKey, serviceIdStr + '_') > 0
-                        && String.Compare(e.PartitionKey, serviceIdStr + (char)('_' + 1)) <= 0
-                        && String.Compare(e.PartitionKey, sBegin) > 0
-                        && String.Compare(e.PartitionKey, sEnd) <= 0;
-
-                var queryResults = await ReadTableEntriesAndEtagsAsync(query);
+                string filterBetweenBeginAndEnd = TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThan, sBegin),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThanOrEqual,
+                        sEnd));
+                string query = TableQuery.CombineFilters(filterOnServiceIdStr, TableOperators.And, filterBetweenBeginAndEnd);
+                var queryResults = await ReadTableEntriesAndEtagsWithFilterStringAsync(query);
                 return queryResults.ToList();
             }
 
             if (begin == end)
             {
-                
-                Expression<Func<ReminderTableEntry, bool>> query =
-                    e => String.Compare(e.PartitionKey, serviceIdStr + '_') > 0
-                        && String.Compare(e.PartitionKey, serviceIdStr + (char)('_' + 1)) <= 0;
-
-                var queryResults = await ReadTableEntriesAndEtagsAsync(query);
+                var queryResults = await ReadTableEntriesAndEtagsWithFilterStringAsync(filterOnServiceIdStr);
                 return queryResults.ToList();
             }
 
             // (begin > end)
-            Expression<Func<ReminderTableEntry, bool>> p1Query =
-                e => String.Compare(e.PartitionKey, serviceIdStr + '_') > 0
-                    && String.Compare(e.PartitionKey, serviceIdStr + (char)('_' + 1)) <= 0
-                    && String.Compare(e.PartitionKey, sBegin) > 0;
-            Expression<Func<ReminderTableEntry, bool>> p2Query =
-                e => String.Compare(e.PartitionKey, serviceIdStr + '_') > 0
-                    && String.Compare(e.PartitionKey, serviceIdStr + (char)('_' + 1)) <= 0
-                    && String.Compare(e.PartitionKey, sEnd) <= 0;
+            string filterExtendBeginAndEnd = TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThan, sBegin),
+                    TableOperators.Or,
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThanOrEqual,
+                        sEnd));
+            string query1 = TableQuery.CombineFilters(
+                filterOnServiceIdStr, TableOperators.And, filterExtendBeginAndEnd);
 
-            var p1 = ReadTableEntriesAndEtagsAsync(p1Query);
-            var p2 = ReadTableEntriesAndEtagsAsync(p2Query);
-
-            IEnumerable<Tuple<ReminderTableEntry, string>>[] arr = await Task.WhenAll(p1, p2);
-            return  arr[0].Concat(arr[1]).ToList();
+            var results = await ReadTableEntriesAndEtagsWithFilterStringAsync(query1);
+            return results.ToList();
         }
 
         internal async Task<List<Tuple<ReminderTableEntry, string>>> FindReminderEntries(GrainReference grainRef)
         {
             var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
-            Expression<Func<ReminderTableEntry, bool>> query =
-                 e => e.PartitionKey == partitionKey
-                    && String.Compare(e.RowKey, grainRef.ToKeyString() + '-') > 0
-                    && String.Compare(e.RowKey, grainRef.ToKeyString() + (char)('-' + 1)) <= 0;
+            string filter = TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThan, grainRef.ToKeyString() + '-'),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual,
+                       grainRef.ToKeyString() + (char)('-' + 1)));
+            string query =
+                TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey),
+                    TableOperators.And,
+                    filter);
 
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
+            var queryResults = await ReadTableEntriesAndEtagsWithFilterStringAsync(query);
             return queryResults.ToList();
         }
 

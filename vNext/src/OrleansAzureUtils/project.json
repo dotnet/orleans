@@ -35,6 +35,6 @@
     "WindowsAzure.Storage": "7.2.1"
   },
   "frameworks": {
-    "netstandard1.5": { }
+    "netstandard1.5": {}
   }
 }

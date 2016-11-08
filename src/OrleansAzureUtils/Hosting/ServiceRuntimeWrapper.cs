@@ -186,12 +186,7 @@ namespace Orleans.Runtime.Host
                 // Trying to load by partial name, so that we are not version specific.
                 // Assembly.LoadWithPartialName has been deprecated. Is there a better way to load any version of a known assembly?
 #pragma warning disable 618
-#if !NETSTANDARD_TODO
-                // LoadWithPartialName is not supported in netstandard, need to find a replacement
-                assembly = Assembly.LoadWithPartialName("Microsoft.WindowsAzure.ServiceRuntime");
-#else
                 assembly = Assembly.Load(new AssemblyName("Microsoft.WindowsAzure.ServiceRuntime"));
-#endif
 #pragma warning restore 618
                 if (assembly == null)
                 {

@@ -22,4 +22,5 @@ using Orleans.CodeGeneration;
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: SkipCodeGeneration]

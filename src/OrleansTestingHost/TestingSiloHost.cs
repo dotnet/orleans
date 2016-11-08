@@ -645,9 +645,9 @@ namespace Orleans.TestingHost
             }
         }
 
-        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        private SiloHandle StartOrleansSilo(Silo.SiloType type, TestingSiloOptions options, int instanceCount)
         {
-            return StartOrleansSilo(this, type, options, instanceCount, shared);
+            return StartOrleansSilo(this, type, options, instanceCount);
         }
 
         /// <summary>
@@ -657,9 +657,8 @@ namespace Orleans.TestingHost
         /// <param name="type">The type of the silo to deploy</param>
         /// <param name="options">The options to use for the silo</param>
         /// <param name="instanceCount">The instance count of the silo</param>
-        /// <param name="shared">The shared AppDomain to use</param>
         /// <returns>A handle to the deployed silo</returns>
-        public static SiloHandle StartOrleansSilo(TestingSiloHost host, Silo.SiloType type, TestingSiloOptions options, int instanceCount, AppDomain shared = null)
+        public static SiloHandle StartOrleansSilo(TestingSiloHost host, Silo.SiloType type, TestingSiloOptions options, int instanceCount)
         {
             if (host == null) throw new ArgumentNullException("host");
 
@@ -780,9 +779,9 @@ namespace Orleans.TestingHost
             return depId;
         }
 
-        #endregion
+#endregion
 
-        #region Tracing helper functions. Will eventually go away entirely
+#region Tracing helper functions. Will eventually go away entirely
 
         private const string LogWriterContextKey = "TestingSiloHost_LogWriter";
 
@@ -826,6 +825,6 @@ namespace Orleans.TestingHost
             CallContext.FreeNamedDataSlot(LogWriterContextKey);
         }
 
-        #endregion
+#endregion
     }
 }

@@ -66,6 +66,7 @@
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -120,6 +121,24 @@
     <Compile Include="..\..\..\test\Tester\ObserverTests.cs">
       <Link>ObserverTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\ClientStreamTestRunner.cs">
+      <Link>StreamingTests\ClientStreamTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\SampleStreamingTests.cs">
+      <Link>StreamingTests\SampleStreamingTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTests.cs">
+      <Link>StreamingTests\StreamFilteringTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\SubscriptionMultiplicityTestRunner.cs">
+      <Link>StreamingTests\SubscriptionMultiplicityTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\TestStreamProviders\FailureInjectionStreamProvider.cs">
+      <Link>TestStreamProviders\FailureInjectionStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs">
+      <Link>TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
@@ -151,6 +170,5 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

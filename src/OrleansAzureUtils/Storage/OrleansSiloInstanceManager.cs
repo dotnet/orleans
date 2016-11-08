@@ -228,12 +228,13 @@ namespace Orleans.AzureUtils
 
             try
             {
-                Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                    instance.PartitionKey == this.DeploymentId
-                    && instance.Status == INSTANCE_STATUS_ACTIVE
-                    && instance.ProxyPort != zeroPort;
-
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
+                string filterOnPartitionKey = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal,
+                    this.DeploymentId);
+                string filterOnStatus = TableQuery.GenerateFilterCondition("Status", QueryComparisons.Equal,
+                    INSTANCE_STATUS_ACTIVE);
+                string filterOnProxyPort = TableQuery.GenerateFilterCondition("ProxyPort", QueryComparisons.NotEqual, zeroPort);
+                string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
+                var queryResults = await storage.ReadTableEntriesAndEtagsWithFilterStringAsync(query)
                                     .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
                
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
@@ -311,11 +312,14 @@ namespace Orleans.AzureUtils
         {
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
-            Expression<Func<SiloInstanceTableEntry, bool>> query = instance =>
-                instance.PartitionKey == DeploymentId
-                && (instance.RowKey == rowKey || instance.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            string filterOnPartitionKey = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal,
+                    this.DeploymentId);
+            string filterOnRowKey1 = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal,
+                rowKey);
+            string filterOnRowKey2 = TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnRowKey1, TableOperators.Or, filterOnRowKey2));
 
-            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
+            var queryResults = await storage.ReadTableEntriesAndEtagsWithFilterStringAsync(query);
 
             var asList = queryResults.ToList();
             if (asList.Count < 1 || asList.Count > 2)

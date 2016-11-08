@@ -6,8 +6,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
-#if !NETSTANDARD_TODO
-// namespace not supported in "WindowsAzure.Storage": "7.2.1" yet
+#if !NETSTANDARD
+// lib not supported in netstandard
 using Microsoft.WindowsAzure.Storage.Table.Queryable;
 #endif
 using Orleans.Runtime;
@@ -65,15 +65,8 @@ namespace Orleans.AzureUtils
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
                 CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-#if !NETSTANDARD_TODO
-                bool didCreate = await Task<bool>.Factory.FromAsync(
-                     tableRef.BeginCreateIfNotExists,
-                     tableRef.EndCreateIfNotExists,
-                     null);
-#else
-                // CloudTable.BeginCreateIfNotExists/EndCreateIfNotExists can be replaced by CloudTable.CreateIfNotExistsAsync
-                bool didCreate = true;
-#endif
+                bool didCreate = await tableRef.CreateIfNotExistsAsync();
+
 
                 Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
@@ -104,15 +97,8 @@ namespace Orleans.AzureUtils
             {
                 CloudTableClient tableCreationClient = GetCloudTableCreationClient();
                 CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-#if !NETSTANDARD_TODO
-                bool didDelete = await Task<bool>.Factory.FromAsync(
-                        tableRef.BeginDeleteIfExists,
-                        tableRef.EndDeleteIfExists,
-                        null);
-#else
-                //CloudTable.BeginDeleteIfExists/EndDeleteIfExists can be replaced by CloudTable.DeleteIfExistsAsync
-                bool didDelete = false;
-#endif
+
+                bool didDelete = await tableRef.DeleteIfExistsAsync();
 
                 if (didDelete)
                 {
@@ -164,17 +150,9 @@ namespace Orleans.AzureUtils
 
                 try
                 {
-#if !NETSTANDARD_TODO
                     // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
-                    var opResult = await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
-                        TableOperation.Insert(data),
-                        null);
-#else
-                    //CloudTabel.BeginExecute/EndExecute not supported in  "WindowsAzure.Storage": "7.2.1"
-                    var opResult = new TableResult();
-#endif
+                    var opResult = await tableReference.ExecuteAsync(TableOperation.Insert(data));
+
 
                     return opResult.Etag;
                 }
@@ -209,17 +187,7 @@ namespace Orleans.AzureUtils
                     // svc.AttachTo(TableName, data, null);
                     // svc.UpdateObject(data);
                     // SaveChangesOptions.ReplaceOnUpdate,
-#if !NETSTANDARD_TODO
-                    var opResult = await Task<TableResult>.Factory.FromAsync(
-                       tableReference.BeginExecute,
-                       tableReference.EndExecute,
-                       TableOperation.InsertOrReplace(data),
-                       null);
-#else
-                    //CloudTabel.BeginExecute/EndExecute not supported in  "WindowsAzure.Storage": "7.2.1"
-                    var opResult = new TableResult();
-#endif
-
+                    var opResult = await tableReference.ExecuteAsync(TableOperation.InsertOrReplace(data));
                     return opResult.Etag;                                                           
                 }
                 catch (Exception exc)
@@ -258,18 +226,8 @@ namespace Orleans.AzureUtils
                     // svc.UpdateObject(data);
 
                     data.ETag = eTag;
-#if !NETSTANDARD_TODO
                     // Merge requires an ETag (which may be the '*' wildcard).
-                    var opResult = await Task<TableResult>.Factory.FromAsync(
-                          tableReference.BeginExecute,
-                          tableReference.EndExecute,
-                          TableOperation.Merge(data),
-                          null);
-#else
-                    //CloudTabel.BeginExecute/EndExecute not supported in  "WindowsAzure.Storage": "7.2.1"
-                    var opResult = new TableResult();
-#endif
-
+                    var opResult = await tableReference.ExecuteAsync(TableOperation.Merge(data));
                     return opResult.Etag;
                 }
                 catch (Exception exc)
@@ -303,16 +261,8 @@ namespace Orleans.AzureUtils
                 try
                 {
                     data.ETag = dataEtag;
-#if !NETSTANDARD_TODO
-                    var opResult = await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
-                        TableOperation.Replace(data),
-                        null);
-#else
-                    //CloudTabel.BeginExecute/EndExecute not supported in  "WindowsAzure.Storage": "7.2.1"
-                    var opResult = new TableResult();
-#endif
+                    var opResult = await tableReference.ExecuteAsync(TableOperation.Replace(data));
+
                     //The ETag of data is needed in further operations.                                        
                     return opResult.Etag;
                 }
@@ -347,14 +297,8 @@ namespace Orleans.AzureUtils
                 
                 try
                 {
-#if !NETSTANDARD_TODO
-                    // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then DeleteIfExistsAsync.
-                    await Task<TableResult>.Factory.FromAsync(
-                        tableReference.BeginExecute,
-                        tableReference.EndExecute,
-                        TableOperation.Delete(data),
-                        null);
-#endif
+                    await tableReference.ExecuteAsync(TableOperation.Delete(data));
+
                 }
                 catch (Exception exc)
                 {
@@ -388,15 +332,10 @@ namespace Orleans.AzureUtils
                 {
                     string queryString = TableQueryFilterBuilder.MatchPartitionKeyAndRowKeyFilter(partitionKey, rowKey);
                     var query = new TableQuery<T>().Where(queryString);
-#if !NETSTANDARD_TODO
-                    //CloudTable.BeginExecuteQuerySegmented/EndExecuteQuerySegmented not supported in netstandard, can be replaced by ExecuteQuerySegmentedAsync
-                    TableQuerySegment<T> segment = await Task.Factory
-                        .FromAsync<TableQuery<T>, TableContinuationToken, TableQuerySegment<T>>(
-                            tableReference.BeginExecuteQuerySegmented,
-                            tableReference.EndExecuteQuerySegmented<T>, query, null, null);
+                    TableQuerySegment<T> segment = await tableReference.ExecuteQuerySegmentedAsync(query, null); 
 
                     retrievedResult = segment.Results.SingleOrDefault();
-#endif
+
                 }
                 catch (StorageException exception)
                 {
@@ -422,10 +361,9 @@ namespace Orleans.AzureUtils
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
         {
-            Expression<Func<T, bool>> query = instance =>
-                instance.PartitionKey == partitionKey;
+            string query = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey);
 
-            return ReadTableEntriesAndEtagsAsync(query);
+            return ReadTableEntriesAndEtagsWithFilterStringAsync(query);
         }
 
         /// <summary>
@@ -435,7 +373,7 @@ namespace Orleans.AzureUtils
         /// <returns>Enumeration of all entries in the table.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
         {
-            return ReadTableEntriesAndEtagsAsync(null);
+            return ReadTableEntriesAndEtagsWithFilterStringAsync(null);
         }
 
         /// <summary>
@@ -479,14 +417,7 @@ namespace Orleans.AzureUtils
 
                 try
                 {
-#if !NETSTANDARD_TODO
-                    //BeginExecuteBatch/EndExecuteBatch not supported in netstandard
-                    await Task<IList<TableResult>>.Factory.FromAsync(
-                        tableReference.BeginExecuteBatch,
-                        tableReference.EndExecuteBatch,
-                        entityBatch,
-                        null);
-#endif
+                    await tableReference.ExecuteBatchAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -506,64 +437,93 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="predicate">Predicate function to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
+#if !NETSTANDARD
+        //Microsoft.WindowsAzure.Storage.Table.Queryable is not supported in netstandard, so TableQuery with an Expression predicate 
+        // is not supported in netstandard, just keep this method in full dotnet
+        // for full dotnet users consistency
         public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(Expression<Func<T, bool>> predicate)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
-
             try
             {
-#if !NETSTANDARD_TODO
-                //CloudTable.CreateQuery not supported in "WindowsAzure.Storage": "7.2.1" yet
-                TableQuery<T> cloudTableQuery = predicate == null 
+                TableQuery<T> cloudTableQuery = predicate == null
                     ? tableReference.CreateQuery<T>()
                     : tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
-#endif
-                try
-                {
-                    Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
-                    {
-                        TableQuerySegment<T> querySegment = null;
-                        var list = new List<T>();
-#if !NETSTANDARD_TODO
-                        //ExecuteSegmentedAsync not supported in "WindowsAzure.Storage": "7.2.1" yet
-                        while (querySegment == null || querySegment.ContinuationToken != null)
-                        {
-                            querySegment = await cloudTableQuery.ExecuteSegmentedAsync(querySegment?.ContinuationToken);
-                            list.AddRange(querySegment);
-                        }
-#endif
-
-                        return list;
-                    };
-
-                    IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
-
-                    List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                        counter => executeQueryHandleContinuations(),
-                        AzureTableDefaultPolicies.MaxTableOperationRetries,
-                        (exc, counter) => AzureStorageUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                        AzureTableDefaultPolicies.TableOperationTimeout,
-                        backoff);
-
-                    // Data was read successfully if we got to here                    
-                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
-
-            }
-            catch (Exception exc)
-                {
-                    // Out of retries...
-                    var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
-                    if (!AzureStorageUtils.TableStorageDataNotFound(exc))
-                    {
-                        Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
-                    }
-                    throw new OrleansException(errorMsg, exc);
-                }
+                return await ReadTableEntriesAndEtagsWithTableQueryAsync(cloudTableQuery);
             }
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+#endif
+
+        /// <summary>
+        /// Read data entries and their corresponding eTags from the Azure table.
+        /// </summary>
+        /// <param name="filter">filter string to use for querying the table and filtering the results.</param>
+        /// <returns>Enumeration of entries in the table which match the query condition.</returns>
+        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsWithFilterStringAsync(string filter)
+        {
+            const string operation = "ReadTableEntriesAndEtags";
+            var startTime = DateTime.UtcNow;
+            try
+            {
+                TableQuery<T> cloudTableQuery = filter == null
+                    ? new TableQuery<T>()
+                    : new TableQuery<T>().Where(filter);
+                return await ReadTableEntriesAndEtagsWithTableQueryAsync(cloudTableQuery);
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+        /// <summary>
+        /// Read data entries and their corresponding eTags from the Azure table.
+        /// </summary>
+        /// <param name="filter">Predicate function to use for querying the table and filtering the results.</param>
+        /// <returns>Enumeration of entries in the table which match the query condition.</returns>
+        private async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsWithTableQueryAsync(TableQuery<T> cloudTableQuery)
+        {
+            try
+            {
+                Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
+                {
+                    TableQuerySegment<T> querySegment = null;
+                    var list = new List<T>();
+                        
+                    while (querySegment == null || querySegment.ContinuationToken != null)
+                    {
+                        querySegment = await tableReference.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
+                        list.AddRange(querySegment);
+                    }
+                    return list;
+                };
+
+                IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
+
+                List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    counter => executeQueryHandleContinuations(),
+                    AzureTableDefaultPolicies.MaxTableOperationRetries,
+                    (exc, counter) => AzureStorageUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
+                    AzureTableDefaultPolicies.TableOperationTimeout,
+                    backoff);
+
+                // Data was read successfully if we got to here                    
+                return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
+
+            }
+            catch (Exception exc)
+            {
+                // Out of retries...
+                var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
+                if (!AzureStorageUtils.TableStorageDataNotFound(exc))
+                {
+                    Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
+                }
+                throw new OrleansException(errorMsg, exc);
             }
         }
 
@@ -609,15 +569,9 @@ namespace Orleans.AzureUtils
 
                 try
                 {
-#if !NETSTANDARD_TODO
                     //CloudTable.BeginExecuteBatch/EndExecuteBatch not supported in "WindowsAzure.Storage": "7.2.1" yet
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
-                    await Task<IList<TableResult>>.Factory.FromAsync(
-                        tableReference.BeginExecuteBatch,
-                        tableReference.EndExecuteBatch,
-                        entityBatch,
-                        null);
-#endif
+                    await tableReference.ExecuteBatchAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -659,16 +613,8 @@ namespace Orleans.AzureUtils
                     entityBatch.Add(TableOperation.Insert(data1));
                     data2.ETag = data2Etag;
                     entityBatch.Add(TableOperation.Replace(data2));
-#if !NETSTANDARD_TODO
-                    var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
-                        tableReference.BeginExecuteBatch,
-                        tableReference.EndExecuteBatch,
-                        entityBatch,
-                        null);
-#else
-                    // CloudTable.BeginExecuteBatch/EndExecuteBatch not supported in "WindowsAzure.Storage": "7.2.1"
-                    var opResults = new List<TableResult>();
-#endif
+
+                    var opResults = await tableReference.ExecuteBatchAsync(entityBatch);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -717,16 +663,9 @@ namespace Orleans.AzureUtils
                         data2.ETag = data2Etag;
                         entityBatch.Add(TableOperation.Replace(data2));
                     }
-#if !NETSTANDARD_TODO
-                    var opResults = await Task<IList<TableResult>>.Factory.FromAsync(
-                        tableReference.BeginExecuteBatch,
-                        tableReference.EndExecuteBatch,
-                        entityBatch,
-                        null);
-#else
-                    // CloudTable.BeginExecuteBatch/EndExecuteBatch not supported in "WindowsAzure.Storage": "7.2.1"
-                    var opResults = new List<TableResult>();
-#endif
+
+                    var opResults = await tableReference.ExecuteBatchAsync(entityBatch);
+
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.

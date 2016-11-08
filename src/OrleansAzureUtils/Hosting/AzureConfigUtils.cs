@@ -128,7 +128,7 @@ namespace Orleans.Runtime.Host
                     locations.Add(new DirectoryInfo(appRootPath));
             });
 #if !NETSTANDARD_TODO
-            //System.Web namespace is deprecated in netstandard, need to find a replacement for HttpContext class
+            //System.Web namespace is deprecated in netstandard, need to find a alternative way to get {ServerRoot}
             Utils.SafeExecute(() =>
             {
                 // Try using Server.MapPath to resolve for web roles running in IIS web apps
@@ -150,7 +150,6 @@ namespace Orleans.Runtime.Host
                     locations.Add(new DirectoryInfo(appRootPath));
             });
 #endif
-
             // Try current directory
             locations.Add(new DirectoryInfo("."));
             return locations;

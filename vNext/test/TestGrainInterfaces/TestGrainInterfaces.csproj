@@ -83,11 +83,20 @@
     <Compile Include="..\..\..\test\TestGrainInterfaces\IMethodInterceptionGrain.cs">
       <Link>IMethodInterceptionGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IMultipleImplicitSubscriptionGrain.cs">
+      <Link>IMultipleImplicitSubscriptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IMultipleSubscriptionConsumerGrain.cs">
+      <Link>IMultipleSubscriptionConsumerGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
       <Link>IPersistenceTestGrains.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IReminderTestGrain.cs">
       <Link>IReminderTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\ISampleStreamingGrain.cs">
+      <Link>ISampleStreamingGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\ISerializationGeneratorTests.cs">
       <Link>ISerializationGeneratorTests.cs</Link>
@@ -103,6 +112,15 @@
     </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IStatelessWorkerGrain.cs">
       <Link>IStatelessWorkerGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamingGrain.cs">
+      <Link>IStreamingGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamingImmutabilityTestGrain.cs">
+      <Link>IStreamingImmutabilityTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreaming_ProducerGrain.cs">
+      <Link>IStreaming_ProducerGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
       <Link>IStreamLifecycleTestGrains.cs</Link>
