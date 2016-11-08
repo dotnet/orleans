@@ -23,6 +23,7 @@ namespace UnitTests.StuckGrainTests
                 GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
                 var options = new TestClusterOptions(1);
                 options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
+                options.ClusterConfiguration.Globals.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
                 options.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
 
                 return new TestCluster(options);

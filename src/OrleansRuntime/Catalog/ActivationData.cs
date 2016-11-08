@@ -148,6 +148,7 @@ namespace Orleans.Runtime
         }
 
         // This is the maximum amount of time we expect a request to continue processing
+        private static TimeSpan maxRequestProcessingTime;
         private static TimeSpan maxWarningRequestProcessingTime;
         private static NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
@@ -160,6 +161,7 @@ namespace Orleans.Runtime
 
         public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
         {
+            maxRequestProcessingTime = config.Globals.MaxRequestProcessingTime;
             // Consider adding a config parameter for this
             maxWarningRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
             nodeConfiguration = nodeConfig;
@@ -507,7 +509,7 @@ namespace Orleans.Runtime
                 if (Running != null)
                 {
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
-                    if (currentRequestActiveTime > CollectionAgeLimit)
+                    if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
                             $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");

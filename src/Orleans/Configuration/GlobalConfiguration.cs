@@ -308,6 +308,11 @@ namespace Orleans.Runtime.Configuration
         internal TimeSpan CollectionQuantum { get; set; }
 
         /// <summary>
+        /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
+        /// </summary>
+        public TimeSpan MaxRequestProcessingTime { get; set; }
+
+        /// <summary>
         /// The CacheSize attribute specifies the maximum number of grains to cache directory information for.
         /// </summary>
         public int CacheSize { get; set; }
@@ -534,7 +539,8 @@ namespace Orleans.Runtime.Configuration
 
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
-            
+
+            MaxRequestProcessingTime = DEFAULT_COLLECTION_AGE_LIMIT;
             CollectionQuantum = DEFAULT_COLLECTION_QUANTUM;
 
             CacheSize = DEFAULT_CACHE_SIZE;
