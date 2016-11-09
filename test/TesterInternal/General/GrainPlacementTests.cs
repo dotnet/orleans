@@ -39,13 +39,11 @@ namespace UnitTests.General
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test DefaultPlacementShouldBeRandom ******************************");
             TestSilosStarted(2);
 
-            Assert.Equal(
-                RandomPlacement.Singleton,
-                PlacementStrategy.GetDefault());
+            var actual = await GrainFactory.GetGrain<IDefaultPlacementGrain>(GetRandomGrainId()).GetDefaultPlacement();
+            Assert.IsType<RandomPlacement>(actual);
         }
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
@@ -56,8 +54,7 @@ namespace UnitTests.General
             TestSilosStarted(2);
 
             logger.Info("********************** TestSilosStarted passed OK. ******************************");
-
-            var placement = RandomPlacement.Singleton;
+            
             var grains =
                 Enumerable.Range(0, 20).
                 Select(

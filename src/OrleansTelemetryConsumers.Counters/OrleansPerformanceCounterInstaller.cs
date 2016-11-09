@@ -25,7 +25,7 @@ namespace OrleansTelemetryConsumers.Counters
         /// </summary>
         public OrleansPerformanceCounterInstaller()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             Trace.Listeners.Clear();
             var cfg = new NodeConfiguration { TraceFilePattern = null, TraceToConsole = false };
             LogManager.Initialize(cfg);
@@ -35,7 +35,7 @@ namespace OrleansTelemetryConsumers.Counters
             if (GrainTypeManager.Instance == null)
             {
                 var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                var typeManager = new GrainTypeManager(false, null, loader); // We shouldn't need GrainFactory in this case
+                var typeManager = new GrainTypeManager(false, loader, new RandomPlacementDefaultStrategy());
                 GrainTypeManager.Instance.Start(false);
             }
         }
@@ -78,6 +78,14 @@ namespace OrleansTelemetryConsumers.Counters
             }
 
             base.Uninstall(savedState);
+        }
+
+        private class RandomPlacementDefaultStrategy : DefaultPlacementStrategy
+        {
+            public RandomPlacementDefaultStrategy()
+                : base(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY)
+            {
+            }
         }
     }
 }

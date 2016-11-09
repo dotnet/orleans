@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 
 namespace Orleans.Runtime
@@ -15,6 +16,11 @@ namespace Orleans.Runtime
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
         private List<string> discoveredAssemblyLocations;
         private Dictionary<string, SearchOption> directories;
+
+        public SiloAssemblyLoader(NodeConfiguration nodeConfig)
+            : this(nodeConfig.AdditionalAssemblyDirectories)
+        {
+        }
 
         public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories)
         {

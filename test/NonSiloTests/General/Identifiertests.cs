@@ -22,7 +22,7 @@ namespace UnitTests.General
         public Identifiertests(ITestOutputHelper output)
         {
             this.output = output;
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 

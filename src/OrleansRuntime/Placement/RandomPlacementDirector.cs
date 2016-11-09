@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class RandomPlacementDirector : PlacementDirector
+    internal class RandomPlacementDirector : IPlacementDirector<RandomPlacement>
     {
         private readonly SafeRandom random = new SafeRandom();
 
-        internal override async Task<PlacementResult> OnSelectActivation(
+        public virtual async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementContext context)
         {
             List<ActivationAddress> places = (await context.Lookup(target)).Addresses;
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Placement
             return PlacementResult.IdentifySelection(places[random.Next(places.Count)]);
         }
 
-        internal override Task<PlacementResult> OnAddActivation(
+        public virtual Task<PlacementResult> OnAddActivation(
             PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             var grainType = context.GetGrainTypeName(grain);

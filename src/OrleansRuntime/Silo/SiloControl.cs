@@ -11,13 +11,26 @@ namespace Orleans.Runtime
 {
     internal class SiloControl : SystemTarget, ISiloControl
     {
-        private readonly Silo silo;
         private static readonly Logger logger = LogManager.GetLogger("SiloControl", LoggerType.Runtime);
+        private readonly Silo silo;
+        private readonly DeploymentLoadPublisher deploymentLoadPublisher;
+        private readonly Catalog catalog;
+        private readonly GrainTypeManager grainTypeManager;
+        private readonly ISiloPerformanceMetrics siloMetrics;
 
-        public SiloControl(Silo silo)
+        public SiloControl(
+            Silo silo,
+            DeploymentLoadPublisher deploymentLoadPublisher,
+            Catalog catalog,
+            GrainTypeManager grainTypeManager,
+            ISiloPerformanceMetrics siloMetrics)
             : base(Constants.SiloControlId, silo.SiloAddress)
         {
             this.silo = silo;
+            this.deploymentLoadPublisher = deploymentLoadPublisher;
+            this.catalog = catalog;
+            this.grainTypeManager = grainTypeManager;
+            this.siloMetrics = siloMetrics;
         }
 
         #region Implementation of ISiloControl
@@ -68,44 +81,44 @@ namespace Orleans.Runtime
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
             logger.Info("ForceActivationCollection");
-            return InsideRuntimeClient.Current.Catalog.CollectActivations(ageLimit);
+            return this.catalog.CollectActivations(ageLimit);
         }
 
         public Task ForceRuntimeStatisticsCollection()
         {
             if (logger.IsVerbose) logger.Verbose("ForceRuntimeStatisticsCollection");
-            return DeploymentLoadPublisher.Instance.RefreshStatistics();
+            return this.deploymentLoadPublisher.RefreshStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
             if (logger.IsVerbose) logger.Verbose("GetRuntimeStatistics");
-            return Task.FromResult(new SiloRuntimeStatistics(silo.Metrics, DateTime.UtcNow));
+            return Task.FromResult(new SiloRuntimeStatistics(this.siloMetrics, DateTime.UtcNow));
         }
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
             logger.Info("GetGrainStatistics");
-            return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetGrainStatistics());
+            return Task.FromResult(this.catalog.GetGrainStatistics());
         }
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
             if (logger.IsVerbose) logger.Verbose("GetDetailedGrainStatistics");
-            return Task.FromResult(InsideRuntimeClient.Current.Catalog.GetDetailedGrainStatistics(types));
+            return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.Info("GetSimpleGrainStatistics");
-            return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetSimpleGrainStatistics().Select(p =>
+            return Task.FromResult( this.catalog.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = silo.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.Info("DetailedGrainReport for grain id {0}", grainId);
-            return Task.FromResult( InsideRuntimeClient.Current.Catalog.GetDetailedGrainReport(grainId));
+            return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
         }
 
         public Task UpdateConfiguration(string configuration)
@@ -123,7 +136,7 @@ namespace Orleans.Runtime
 
         public Task<int> GetActivationCount()
         {
-            return Task.FromResult(InsideRuntimeClient.Current.Catalog.ActivationCount);
+            return Task.FromResult(this.catalog.ActivationCount);
         }
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
@@ -158,7 +171,7 @@ namespace Orleans.Runtime
 
         public Task<string[]> GetGrainTypeList()
         {
-            return Task.FromResult(GrainTypeManager.Instance.GetGrainTypeList());
+            return Task.FromResult(this.grainTypeManager.GetGrainTypeList());
         }
 
         #endregion

@@ -12,7 +12,7 @@ namespace UnitTests.Serialization
     {
         public ProtobufSerializationTests()
         {
-            SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(ProtobufSerializer).GetTypeInfo() });
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(ProtobufSerializer).GetTypeInfo() }, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("Protobuf")]

@@ -71,7 +71,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         public CustomSerializerTests()
         {
             LogManager.Initialize(new NodeConfiguration());
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("Serialization")]

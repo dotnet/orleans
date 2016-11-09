@@ -36,23 +36,24 @@ namespace Orleans.Runtime
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
+        private readonly Lazy<ISiloStatusOracle> siloStatusOracle;
         private IGrainTypeResolver grainInterfaceMap;
 
         internal readonly IConsistentRingProvider ConsistentRingProvider;
-        
-        
+
         public InsideRuntimeClient(
             Dispatcher dispatcher,
             Catalog catalog,
             ILocalGrainDirectory directory,
-            SiloAddress silo,
             ClusterConfiguration config,
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
-            GrainFactory grainFactory)
+            TypeMetadataCache typeMetadataCache,
+            Func<ISiloStatusOracle> siloStatusOracle,
+            OrleansTaskScheduler scheduler)
         {
             this.dispatcher = dispatcher;
-            MySilo = silo;
+            MySilo = catalog.LocalSilo;
             this.directory = directory;
             ConsistentRingProvider = ring;
             Catalog = catalog;
@@ -62,7 +63,10 @@ namespace Orleans.Runtime
             config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
-            this.InternalGrainFactory = grainFactory;
+            this.Scheduler = scheduler;
+            this.siloStatusOracle = new Lazy<ISiloStatusOracle>(siloStatusOracle);
+            this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
+            RuntimeClient.Current = this;
         }
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
@@ -74,16 +78,16 @@ namespace Orleans.Runtime
         public Catalog Catalog { get; private set; }
 
         public SiloAddress MySilo { get; private set; }
-
-        public Dispatcher Dispatcher { get { return dispatcher; } }
-
+        
         public ClusterConfiguration Config { get; private set; }
 
-        public OrleansTaskScheduler Scheduler { get { return Dispatcher.Scheduler; } }
+        public OrleansTaskScheduler Scheduler { get; }
 
-        public IGrainFactory GrainFactory { get { return InternalGrainFactory; } }
+        public IGrainFactory GrainFactory => this.ConcreteGrainFactory;
 
-        public GrainFactory InternalGrainFactory { get; private set; }
+        public IInternalGrainFactory InternalGrainFactory => this.ConcreteGrainFactory;
+
+        public GrainFactory ConcreteGrainFactory { get; private set; }
 
 
         #region Implementation of IRuntimeClient
@@ -798,12 +802,12 @@ namespace Orleans.Runtime
 
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
-            return GrainTypeManager.Instance.GetInvoker(interfaceId, genericGrainType);
+            return this.typeManager.GetInvoker(interfaceId, genericGrainType);
         }
 
         public SiloStatus GetSiloStatus(SiloAddress siloAddress)
         {
-            return Silo.CurrentSilo.LocalSiloStatusOracle.GetApproximateSiloStatus(siloAddress);
+            return this.siloStatusOracle.Value.GetApproximateSiloStatus(siloAddress);
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

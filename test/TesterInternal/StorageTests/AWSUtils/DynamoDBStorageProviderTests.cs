@@ -12,7 +12,6 @@ using Xunit;
 
 namespace UnitTests.StorageTests.AWSUtils
 {
-
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBStorageProviderTests
     {
@@ -25,9 +24,10 @@ namespace UnitTests.StorageTests.AWSUtils
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
-            DefaultProviderRuntime = new StorageProviderManager(new GrainFactory(), null);
-            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(new ClientProviderRuntime(new GrainFactory(), null)).WaitWithThrow(TestConstants.InitTimeout);
-            SerializationManager.InitializeForTesting();
+            var testEnvironment = new SerializationTestEnvironment();
+            DefaultProviderRuntime = new StorageProviderManager(testEnvironment.GrainFactory, null);
+            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
+            testEnvironment.InitializeForTesting();
 
             var properties = new Dictionary<string, string>();
             properties["DataConnectionString"] = $"Service={AWSTestConstants.Service}";

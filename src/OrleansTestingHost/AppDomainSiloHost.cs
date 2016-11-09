@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Runtime.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -161,13 +162,13 @@ namespace Orleans.TestingHost
 
             simulatedMessageLoss[destination] = lossPercentage;
 
-            var mc = (MessageCenter)silo.LocalMessageCenter;
+            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = ShouldDrop;
         }
 
         internal void UnblockSiloCommunication()
         {
-            var mc = (MessageCenter)silo.LocalMessageCenter;
+            var mc = this.silo.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
         }

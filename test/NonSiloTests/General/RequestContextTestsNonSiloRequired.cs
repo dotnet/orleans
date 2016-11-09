@@ -22,7 +22,7 @@ namespace UnitTests.General
 
         public RequestContextTests_Local()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             oldPropagateActivityId = RequestContext.PropagateActivityId;
             RequestContext.PropagateActivityId = true;
             Trace.CorrelationManager.ActivityId = Guid.Empty;

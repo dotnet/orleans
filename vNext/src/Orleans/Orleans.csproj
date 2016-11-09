@@ -85,6 +85,9 @@
     <Compile Include="..\..\..\src\Orleans\AssemblyLoader\CachedTypeResolver.cs">
       <Link>AssemblyLoader\CachedTypeResolver.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\src\Orleans\AssemblyLoader\TypeMetadataCache.cs">
+      <Link>AssemblyLoader\TypeMetadataCache.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\src\Orleans\Async\AsyncBatchedContinuationQueue.cs">
       <Link>Async\AsyncBatchedContinuationQueue.cs</Link>
     </Compile>
@@ -225,6 +228,9 @@
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Core\Exceptions.cs">
       <Link>Core\Exceptions.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Core\IInternalGrainFactory.cs">
+      <Link>Core\IInternalGrainFactory.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Core\Grain.cs">
       <Link>Core\Grain.cs</Link>
@@ -418,9 +424,6 @@
     <Compile Include="..\..\..\src\Orleans\Placement\ActivationCountBasedPlacement.cs">
       <Link>Placement\ActivationCountBasedPlacement.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\src\Orleans\Placement\GrainStrategy.cs">
-      <Link>Placement\GrainStrategy.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\src\Orleans\Placement\PlacementResult.cs">
       <Link>Placement\PlacementResult.cs</Link>
     </Compile>
@@ -489,6 +492,9 @@
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Runtime\Constants.cs">
       <Link>Runtime\Constants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Runtime\ILocalSiloDetails.cs">
+      <Link>Runtime\ILocalSiloDetails.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Runtime\GrainInterfaceMap.cs">
       <Link>Runtime\GrainInterfaceMap.cs</Link>
@@ -597,6 +603,9 @@
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Serialization\ILFieldBuilder.cs">
       <Link>Serialization\ILFieldBuilder.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\src\Orleans\Serialization\SerializationTestEnvironment.cs">
+      <Link>Serialization\SerializationTestEnvironment.cs</Link>
     </Compile>
     <Compile Include="..\..\..\src\Orleans\Serialization\ILGenerationException.cs">
       <Link>Serialization\ILGenerationException.cs</Link>
