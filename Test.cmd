@@ -9,14 +9,20 @@ if [%1]==[all]             GOTO ALL
 
 :NETFX
 cmd /c "%~dp0src\Test.cmd"
+set exitcode=%errorlevel%
 GOTO END
 
 :VNEXT
 cmd /c "%~dp0vNext\src\Test.cmd"
+set exitcode=%errorlevel%
 GOTO END
 
 :ALL
 cmd /c "%~dp0src\Test.cmd"
+set exitcode=%errorlevel%
 cmd /c "%~dp0vNext\src\Test.cmd"
+set /a exitcode=%errorlevel%+%exitcode%
 
 :END
+endlocal&set exitcode=%exitcode%
+exit /B %exitcode%
