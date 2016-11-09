@@ -77,7 +77,6 @@ namespace Orleans.Streams
         {
             if (uniformHashCache == 0)
             {
-                JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
                 byte[] guidBytes = Guid.ToByteArray();
                 byte[] providerBytes = Encoding.UTF8.GetBytes(ProviderName);
                 byte[] allBytes;
@@ -95,7 +94,7 @@ namespace Orleans.Streams
                     Array.Copy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
                     Array.Copy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
                 }
-                uniformHashCache = jenkinsHash.ComputeHash(allBytes);
+                uniformHashCache = JenkinsHash.ComputeHash(allBytes);
             }
             return uniformHashCache;
         }

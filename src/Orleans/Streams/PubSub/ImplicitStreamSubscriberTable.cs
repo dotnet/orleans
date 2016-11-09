@@ -132,19 +132,17 @@ namespace Orleans.Streams
         /// <returns></returns>
         private Guid MakeSubscriptionGuid(int grainIdTypeCode, StreamId streamId)
         {
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
-
             // next 2 shorts ing guid are from namespace hash
-            uint namespaceHash = jenkinsHash.ComputeHash(streamId.Namespace);
+            uint namespaceHash = JenkinsHash.ComputeHash(streamId.Namespace);
             byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
             short s1 = BitConverter.ToInt16(namespaceHashByes, 0);
             short s2 = BitConverter.ToInt16(namespaceHashByes, 2);
 
             // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the provider name.
             // get streamId guid hash code
-            uint streamIdGuidHash = jenkinsHash.ComputeHash(streamId.Guid.ToByteArray());
+            uint streamIdGuidHash = JenkinsHash.ComputeHash(streamId.Guid.ToByteArray());
             // get provider name hash code
-            uint providerHash = jenkinsHash.ComputeHash(streamId.ProviderName);
+            uint providerHash = JenkinsHash.ComputeHash(streamId.ProviderName);
 
             // build guid tailing 8 bytes from grainIdHash and the hash of the provider name.
             var tail = new List<byte>();
