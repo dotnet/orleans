@@ -711,10 +711,16 @@ namespace Orleans.CodeGenerator
                 if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
                     && this.FieldInfo.FieldType.GetTypeInfo().IsInterface)
                 {
+                    var getAsReference = getValueExpression.Member(
+                        (IAddressable grain) => grain.AsReference<IGrain>(),
+                        this.FieldInfo.FieldType);
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
-                            SF.BinaryExpression(SyntaxKind.IsExpression, getValueExpression, typeof(Grain).GetTypeSyntax()),
-                            SF.InvocationExpression(getValueExpression.Member("AsReference", this.FieldInfo.FieldType)),
+                            SF.BinaryExpression(
+                                SyntaxKind.IsExpression,
+                                getValueExpression,
+                                typeof(Grain).GetTypeSyntax()),
+                            SF.InvocationExpression(getAsReference),
                             getValueExpression);
                 }
                 else
