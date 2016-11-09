@@ -709,9 +709,7 @@ namespace Orleans.CodeGenerator
 
                 // Addressable arguments must be converted to references before passing.
                 if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
-                    &&
-                    (typeof(Grain).IsAssignableFrom(this.FieldInfo.FieldType) ||
-                     this.FieldInfo.FieldType.GetTypeInfo().IsInterface))
+                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface)
                 {
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
