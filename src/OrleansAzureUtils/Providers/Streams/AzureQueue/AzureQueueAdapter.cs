@@ -11,7 +11,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         protected readonly string DeploymentId;
         protected readonly string DataConnectionString;
-        protected readonly TimeSpan? VisibilityTimeout;
+        protected readonly TimeSpan? MessageVisibilityTimeout;
         private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
 
@@ -28,13 +28,13 @@ namespace Orleans.Providers.Streams.AzureQueue
             DataConnectionString = dataConnectionString;
             DeploymentId = deploymentId;
             Name = providerName;
-            VisibilityTimeout = messageVisibilityTimeout;
+            MessageVisibilityTimeout = messageVisibilityTimeout;
             this.streamQueueMapper = streamQueueMapper;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, VisibilityTimeout);
+            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, MessageVisibilityTimeout);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -47,7 +47,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             AzureQueueDataManager queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new AzureQueueDataManager(queueId.ToString(), DeploymentId, DataConnectionString, VisibilityTimeout);
+                var tmpQueue = new AzureQueueDataManager(queueId.ToString(), DeploymentId, DataConnectionString, MessageVisibilityTimeout);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
