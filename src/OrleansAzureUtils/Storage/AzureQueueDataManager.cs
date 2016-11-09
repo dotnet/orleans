@@ -50,6 +50,7 @@ namespace Orleans.AzureUtils
         private string connectionString { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly Logger logger;
+        private readonly TimeSpan? messageVisibilityTimeout;
         private readonly CloudQueueClient queueOperationsClient;
         private CloudQueue queue;
 
@@ -58,13 +59,15 @@ namespace Orleans.AzureUtils
         /// </summary>
         /// <param name="queueName">Name of the queue to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        public AzureQueueDataManager(string queueName, string storageConnectionString)
+        /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
+        public AzureQueueDataManager(string queueName, string storageConnectionString, TimeSpan? visibilityTimeout = null)
         {
             AzureStorageUtils.ValidateQueueName(queueName);
 
             logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = queueName;
             connectionString = storageConnectionString;
+            messageVisibilityTimeout = visibilityTimeout;
 
             queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
                 connectionString,
@@ -79,14 +82,16 @@ namespace Orleans.AzureUtils
         /// <param name="queueName">Name of the queue to be connected to.</param>
         /// <param name="deploymentId">The deployment id of the Azure service hosting this silo. It will be concatenated to the queueName.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        public AzureQueueDataManager(string queueName, string deploymentId, string storageConnectionString)
+        /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
+        public AzureQueueDataManager(string queueName, string deploymentId, string storageConnectionString, TimeSpan? visibilityTimeout = null)
         {
             AzureStorageUtils.ValidateQueueName(queueName);
-
+            
             logger = LogManager.GetLogger(this.GetType().Name, LoggerType.Runtime);
             QueueName = deploymentId + "-" + queueName;
             AzureStorageUtils.ValidateQueueName(QueueName);
             connectionString = storageConnectionString;
+            messageVisibilityTimeout = visibilityTimeout;
 
             queueOperationsClient = AzureStorageUtils.GetCloudQueueClient(
                 connectionString,
@@ -234,8 +239,7 @@ namespace Orleans.AzureUtils
             {
                 // http://msdn.microsoft.com/en-us/library/ee758456.aspx
                 // If no messages are visible in the queue, GetMessage returns null.
-                return await Task<CloudQueueMessage>.Factory.FromAsync(
-                     queue.BeginGetMessage, queue.EndGetMessage, null);
+                return await queue.GetMessageAsync(messageVisibilityTimeout, options: null, operationContext: null);
             }
             catch (Exception exc)
             {
@@ -262,8 +266,7 @@ namespace Orleans.AzureUtils
             if (logger.IsVerbose2) logger.Verbose2("Getting up to {0} messages from queue: {1}", count, QueueName);
             try
             {
-                return await Task<IEnumerable<CloudQueueMessage>>.Factory.FromAsync(
-                     queue.BeginGetMessages, queue.EndGetMessages, count, null);
+                return await queue.GetMessagesAsync(count, messageVisibilityTimeout, options: null, operationContext: null);
             }
             catch (Exception exc)
             {

@@ -21,13 +21,13 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(QueueId queueId, string dataConnectionString, string deploymentId)
+        public static IQueueAdapterReceiver Create(QueueId queueId, string dataConnectionString, string deploymentId, TimeSpan? messageVisibilityTimeout = null)
         {
             if (queueId == null) throw new ArgumentNullException("queueId");
             if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (String.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
             
-            var queue = new AzureQueueDataManager(queueId.ToString(), deploymentId, dataConnectionString);
+            var queue = new AzureQueueDataManager(queueId.ToString(), deploymentId, dataConnectionString, messageVisibilityTimeout);
             return new AzureQueueAdapterReceiver(queueId, queue);
         }
 
