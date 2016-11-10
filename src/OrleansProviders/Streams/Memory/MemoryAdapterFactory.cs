@@ -173,8 +173,7 @@ namespace Orleans.Providers
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             // provider name hash code
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
-            int providerNameGuidHash = (int)jenkinsHash.ComputeHash(providerName);
+            int providerNameGuidHash = (int)JenkinsHash.ComputeHash(providerName);
 
             // get queueId hash code
             uint queueIdHash = queueId.GetUniformHashCode();

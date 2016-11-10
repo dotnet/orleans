@@ -9,11 +9,6 @@ namespace Orleans.Storage
     public class OrleansDefaultHasher: IHasher
     {
         /// <summary>
-        /// The hash function as given in description.
-        /// </summary>
-        private JenkinsHash HashFunction { get; } = JenkinsHash.Factory.GetHashGenerator(threadLocal: true);
-
-        /// <summary>
         /// <see cref="IHasher.Description"/>
         /// </summary>
         public string Description { get; } = $"The default Orleans hash function ({nameof(JenkinsHash)}).";
@@ -24,7 +19,7 @@ namespace Orleans.Storage
         /// </summary>
         public int Hash(byte[] data)
         {
-            return unchecked((int)HashFunction.ComputeHash(data));
+            return unchecked((int)JenkinsHash.ComputeHash(data));
         }
     }
 }

@@ -214,7 +214,7 @@
 
             public TypeKey(byte[] key)
             {
-                this.HashCode = unchecked((int)JenkinsHash.Factory.GetHashGenerator().ComputeHash(key));
+                this.HashCode = unchecked((int)JenkinsHash.ComputeHash(key));
                 this.TypeName = key;
             }
 
