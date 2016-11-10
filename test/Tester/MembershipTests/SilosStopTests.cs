@@ -36,15 +36,8 @@ namespace UnitTests.MembershipTests
 
             await Task.Delay(500);
             HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
-            try
-            {
-                await promise;
-                Assert.True(false, "The broken promise exception was not thrown");
-            }
-            catch (Exception ex)
-            {
-                Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
-            }
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
@@ -56,15 +49,8 @@ namespace UnitTests.MembershipTests
 
             HostedCluster.KillSilo(HostedCluster.SecondarySilos[0]);
             HostedCluster.KillSilo(HostedCluster.Primary);
-            try
-            {
-                await task;
-                Assert.True(false, "The broken promise exception was not thrown");
-            }
-            catch (Exception ex)
-            {
-                Assert.Equal(typeof(SiloUnavailableException), ex.GetBaseException().GetType());
-            }
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => task);
         }
 
         private async Task<ILongRunningTaskGrain<bool>> GetGrainOnTargetSilo(SiloHandle siloHandle)
