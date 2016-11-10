@@ -52,7 +52,6 @@ namespace Orleans.Runtime.Placement
                     "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
 
             chooseHowMany = globalConfig.ActivationCountBasedPlacementChooseOutOf;
-            deploymentLoadPublisher = deploymentLoadPublisher;
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
