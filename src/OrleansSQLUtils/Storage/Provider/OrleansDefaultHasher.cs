@@ -1,7 +1,4 @@
-﻿using Orleans;
-
-
-namespace Orleans.Storage
+﻿namespace Orleans.Storage
 {
     /// <summary>
     /// A default implementation uses the same hash as Orleans in grains placement.

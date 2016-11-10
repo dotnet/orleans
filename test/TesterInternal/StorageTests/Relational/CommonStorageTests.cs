@@ -35,35 +35,45 @@ namespace UnitTests.StorageTests.Relational
         }
 
 
-        internal async Task PersistenceStorage_WriteReadWriteRead100StatesInParallel(string prefix = nameof(this.PersistenceStorage_WriteReadWriteRead100StatesInParallel))
+        internal async Task PersistenceStorage_WriteReadWriteReadStatesInParallel(string prefix = nameof(this.PersistenceStorage_WriteReadWriteReadStatesInParallel), int countOfGrains = 100)
         {
-            //As data is written and read the ETags are as checked for correctness (they change).
+            //As data is written and read the Version numbers (ETags) are as checked for correctness (they change).
             //Additionally the Store_WriteRead tests does its validation.
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             int StartOfRange = 33900;
-            const int CountOfRange = 100;
+            int CountOfRange = countOfGrains;
             string grainIdTemplate = $"{prefix}-" + "{0}";
-            var tasks = Enumerable.Range(StartOfRange, CountOfRange).Select(async i =>
+
+            //The purpose of this Task.Run is to ensure the storage provider will be tested from
+            //multiple threads concurrently, as would happen in running system also.
+            var tasks = Enumerable.Range(StartOfRange, CountOfRange).Select(i => Task.Run(async () =>
             {
                 //Since the version is NULL, storage provider tries to insert this data
                 //as new state. If there is already data with this class, the writing fails
                 //and the storage provider throws. Essentially it means either this range
                 //is ill chosen or the test failed due another problem.
                 var grainId = string.Format(grainIdTemplate, i);
-                var grainData = CommonStorageUtilities.GetTestReferenceAndState(grainId, null);
+                var grainData = CommonStorageUtilities.GetTestReferenceAndState(i, null);
 
+                //A sanity checker that the first version really has null as its state. Then it is stored
+                //to the database and a new version is acquired.
                 var firstVersion = grainData.Item2.ETag;
                 Assert.Equal(firstVersion, null);
-                await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
 
-                var secondVersion = grainData.Item2.ETag;
-                Assert.NotEqual(firstVersion, secondVersion);
+                //This loop writes the state consecutive times to the database to make sure its
+                //version is updated appropriately.
                 await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
+                for(int k = 0; k < 10; ++k)
+                {
+                    var secondVersion = grainData.Item2.ETag;
+                    Assert.NotEqual(firstVersion, secondVersion);
+                    await Store_WriteRead(grainTypeName, grainData.Item1, grainData.Item2);
 
-                var thirdVersion = grainData.Item2.ETag;
-                Assert.NotEqual(firstVersion, secondVersion);
-                Assert.NotEqual(secondVersion, thirdVersion);
-            });
+                    var thirdVersion = grainData.Item2.ETag;
+                    Assert.NotEqual(firstVersion, secondVersion);
+                    Assert.NotEqual(secondVersion, thirdVersion);
+                }
+            }));
             await Task.WhenAll(tasks);
         }
 
@@ -91,6 +101,7 @@ namespace UnitTests.StorageTests.Relational
 
             return (InconsistentStateException)exception;
         }
+
 
 
         /// <summary>
