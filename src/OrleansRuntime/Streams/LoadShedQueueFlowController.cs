@@ -29,7 +29,7 @@ namespace Orleans.Streams
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
-            return new LoadShedQueueFlowController(Silo.CurrentSilo.LocalConfig.LoadSheddingLimit * (percentOfSiloSheddingLimit / 100));
+            return new LoadShedQueueFlowController((int)(Silo.CurrentSilo.LocalConfig.LoadSheddingLimit * (percentOfSiloSheddingLimit / 100.0)));
         }
 
         /// <summary>
