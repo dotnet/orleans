@@ -45,7 +45,7 @@ namespace UnitTests.StorageTests.AWSUtils
         [SkippableFact, TestCategory("Functional")]
         internal async Task WriteRead100StatesInParallel()
         {
-            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteRead100StatesInParallel();
+            await PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel();
         }
     }
 }
