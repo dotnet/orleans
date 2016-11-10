@@ -10,8 +10,6 @@ namespace Orleans.Runtime.Placement
 {
     internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector<ActivationCountBasedPlacement>
     {
-        private readonly DeploymentLoadPublisher deploymentLoadPublisher;
-
         private class CachedLocalStat
         {
             public SiloAddress Address { get; private set; }
@@ -54,8 +52,7 @@ namespace Orleans.Runtime.Placement
                     "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
 
             chooseHowMany = globalConfig.ActivationCountBasedPlacementChooseOutOf;
-            this.deploymentLoadPublisher = deploymentLoadPublisher;
-            this.deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
+            deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
         private static bool IsSiloOverloaded(SiloRuntimeStatistics stats)
