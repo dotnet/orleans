@@ -36,7 +36,7 @@ namespace UnitTests.StorageTests
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationTestEnvironment.Initialize();
+            SerializationManager.InitializeForTesting();
         }
         
         public void Dispose()
@@ -50,7 +50,8 @@ namespace UnitTests.StorageTests
             var properties = new Dictionary<string, string>
                 {
                     {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
-                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId}
+                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId},
+                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" }
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
