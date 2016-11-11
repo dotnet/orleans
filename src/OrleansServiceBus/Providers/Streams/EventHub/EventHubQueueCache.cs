@@ -33,12 +33,12 @@ namespace Orleans.ServiceBus.Providers
         /// Construct EventHub queue cache.
         /// </summary>
         /// <param name="defaultMaxAddCount">Default max number of items that can be added to the cache between purge calls.</param>
-        /// <param name="flowControlTreashold">percentage of unprocesses cache that triggers flow control</param>
+        /// <param name="flowControlThreshold">percentage of unprocesses cache that triggers flow control</param>
         /// <param name="checkpointer">Logic used to store queue position.</param>
         /// <param name="cacheDataAdapter">Performs data transforms appropriate for the various types of queue data.</param>
         /// <param name="comparer">Compares cached data</param>
         /// <param name="logger"></param>
-        protected EventHubQueueCache(int defaultMaxAddCount, double flowControlTreashold, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger)
+        protected EventHubQueueCache(int defaultMaxAddCount, double flowControlThreshold, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger)
         {
             this.defaultMaxAddCount = defaultMaxAddCount;
             Checkpointer = checkpointer;
@@ -46,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
             cacheDataAdapter.PurgeAction = cache.Purge;
             cache.OnPurged = OnPurge;
 
-            cachePressureMonitor = new AveragingCachePressureMonitor(flowControlTreashold, logger);
+            cachePressureMonitor = new AveragingCachePressureMonitor(flowControlThreshold, logger);
         }
 
         /// <summary>
@@ -152,11 +152,11 @@ namespace Orleans.ServiceBus.Providers
         private double cachePressureContributionCount;
         private DateTime nextCheckedTime;
         private bool isUnderPressure;
-        private double flowControlTreashold;
+        private double flowControlThreshold;
 
-        public AveragingCachePressureMonitor(double flowControlTreashold, Logger logger)
+        public AveragingCachePressureMonitor(double flowControlThreshold, Logger logger)
         {
-            this.flowControlTreashold = flowControlTreashold;
+            this.flowControlThreshold = flowControlThreshold;
             this.logger = logger.GetSubLogger("flowcontrol", "-");
             nextCheckedTime = DateTime.MinValue;
             isUnderPressure = false;
@@ -166,7 +166,7 @@ namespace Orleans.ServiceBus.Providers
         {
             // Weight unhealthy contributions thrice as much as healthy ones.
             // This is a crude compensation for the fact that healthy consumers wil consume more often than unhealthy ones.
-            double weight = cachePressureContribution < flowControlTreashold ? 1.0 : 3.0;
+            double weight = cachePressureContribution < flowControlThreshold ? 1.0 : 3.0;
             accumulatedCachePressure += cachePressureContribution * weight;
             cachePressureContributionCount += weight;
         }
@@ -193,13 +193,13 @@ namespace Orleans.ServiceBus.Providers
 
             double pressure = accumulatedCachePressure / cachePressureContributionCount;
             bool wasUnderPressure = isUnderPressure;
-            isUnderPressure = pressure > flowControlTreashold;
+            isUnderPressure = pressure > flowControlThreshold;
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)
             {
                 logger.Info(isUnderPressure
-                    ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlTreashold}"
-                    : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlTreashold}");
+                    ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
+                    : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");
             }
             cachePressureContributionCount = 0.0;
             accumulatedCachePressure = 0.0;
@@ -244,13 +244,13 @@ namespace Orleans.ServiceBus.Providers
         /// Construct cache given a custom data adapter.
         /// </summary>
         /// <param name="defaultMaxAddCount">Max number of message that can be added to cache from single read</param>
-        /// <param name="flowControlTreashold">percentage of unprocesses cache that triggers flow control</param>
+        /// <param name="flowControlThreshold">percentage of unprocesses cache that triggers flow control</param>
         /// <param name="checkpointer">queue checkpoint writer</param>
         /// <param name="cacheDataAdapter">adapts queue data to cache</param>
         /// <param name="comparer">compares stream information to cached data</param>
         /// <param name="logger">cache logger</param>
-        public EventHubQueueCache(int defaultMaxAddCount, double flowControlTreashold, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger)
-            : base(defaultMaxAddCount, flowControlTreashold, checkpointer, cacheDataAdapter, comparer, logger)
+        public EventHubQueueCache(int defaultMaxAddCount, double flowControlThreshold, IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter, ICacheDataComparer<CachedEventHubMessage> comparer, Logger logger)
+            : base(defaultMaxAddCount, flowControlThreshold, checkpointer, cacheDataAdapter, comparer, logger)
         {
             log = logger.GetSubLogger("messagecache", "-");
         }
