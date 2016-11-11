@@ -135,7 +135,6 @@
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
     <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
-    <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />

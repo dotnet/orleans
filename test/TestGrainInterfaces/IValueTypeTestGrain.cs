@@ -129,11 +129,11 @@ namespace UnitTests.GrainInterfaces
         Task SetStateData(ValueTypeTestData d);
     }
 
-    public interface IEnumResultGrain : IGrainWithIntegerKey
+    public interface IRoundtripSerializationGrain : IGrainWithIntegerKey
     {
         Task<CampaignEnemyTestType> GetEnemyType();
 
-        Task<ClusterConfiguration> GetConfiguration();
+        Task<object> GetClosedGenericValue();
     }
 
     [Serializable]

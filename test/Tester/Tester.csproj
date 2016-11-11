@@ -54,6 +54,7 @@
     <Compile Include="RelationalUtilities\PostgreSqlStorageForTesting.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
+    <Compile Include="SerializationTests\RoundTripSerializerTests.cs" />
     <Compile Include="SiloInitializationTests.cs" />
     <Compile Include="StreamingTests\SQSClientStreamTests.cs" />
     <Compile Include="StreamingTests\SQSSubscriptionMultiplicityTests.cs" />
