@@ -335,12 +335,11 @@ namespace Orleans.Streams
                 }
 
                 if (IsShutdown) return; // timer was already removed, last tick
-                
-                int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
+                    int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we breack out of loop
                     // If read fails, we try again, with backoff policy.
