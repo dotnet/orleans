@@ -21,6 +21,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         private string providerName;
         private int cacheSize;
         private int numQueues;
+        private TimeSpan? messageVisibilityTimeout;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
@@ -28,6 +29,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         public const string DataConnectionStringPropertyName = "DataConnectionString";
         /// <summary>"DeploymentId".</summary>
         public const string DeploymentIdPropertyName = "DeploymentId";
+        /// <summary>"MessageVisibilityTimeout".</summary>
+        public const string MessageVisibilityTimeoutPropertyName = "VisibilityTimeout";
 
         /// <summary>
         /// Application level failure handler override.
@@ -42,7 +45,23 @@ namespace Orleans.Providers.Streams.AzureQueue
                 throw new ArgumentException(String.Format("{0} property not set", DataConnectionStringPropertyName));
             if (!config.Properties.TryGetValue(DeploymentIdPropertyName, out deploymentId))
                 throw new ArgumentException(String.Format("{0} property not set", DeploymentIdPropertyName));
+            string messageVisibilityTimeoutRaw;
+            if (config.Properties.TryGetValue(MessageVisibilityTimeoutPropertyName, out messageVisibilityTimeoutRaw))
+            {
+                TimeSpan messageVisibilityTimeoutTemp;
+                if (!TimeSpan.TryParse(messageVisibilityTimeoutRaw, out messageVisibilityTimeoutTemp))
+                {
+                    throw new ArgumentException(String.Format("Failed to parse {0} value '{1}' as a TimeSpan",
+                        MessageVisibilityTimeoutPropertyName, messageVisibilityTimeoutRaw));
+                }
 
+                messageVisibilityTimeout = messageVisibilityTimeoutTemp;
+            }
+            else
+            {
+                messageVisibilityTimeout = null;
+            }
+            
             cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
 
             string numQueuesString;
@@ -66,7 +85,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName);
+            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

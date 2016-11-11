@@ -33,9 +33,9 @@ namespace UnitTests.StorageTests
         }
 
 
-        private async Task<AzureQueueDataManager> GetTableManager(string qName)
+        private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, TestDefaultConfiguration.DataConnectionString);
+            AzureQueueDataManager manager = new AzureQueueDataManager(qName, DeploymentId, TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
             await manager.InitQueueAsync();
             return manager;
         }
@@ -122,6 +122,34 @@ namespace UnitTests.StorageTests
                 });
             }
             await Task.WhenAll(promises);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
+        public async Task AQ_Standalone_4()
+        {
+            TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);
+
+            queueName = "Test-5-".ToLower() + Guid.NewGuid();
+            AzureQueueDataManager manager = await GetTableManager(queueName, visibilityTimeout);
+            Assert.Equal(0, await manager.GetApproximateMessageCount());
+
+            CloudQueueMessage inMessage = new CloudQueueMessage("Hello, World");
+            await manager.AddQueueMessage(inMessage);
+            Assert.Equal(1, await manager.GetApproximateMessageCount());
+            
+            CloudQueueMessage outMessage = await manager.GetQueueMessage();
+            logger.Info("GetQueueMessage: {0}", AzureStorageUtils.PrintCloudQueueMessage(outMessage));
+            Assert.Equal(inMessage.AsString, outMessage.AsString);
+
+            await Task.Delay(visibilityTimeout);
+
+            Assert.Equal(1, await manager.GetApproximateMessageCount());
+
+            CloudQueueMessage outMessage2 = await manager.GetQueueMessage();
+            Assert.Equal(inMessage.AsString, outMessage2.AsString);
+
+            await manager.DeleteQueueMessage(outMessage2);
+            Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
     }
 }
