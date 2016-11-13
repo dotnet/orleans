@@ -110,7 +110,7 @@ The rules are:</p>
 <p> Unless you implement all three serialization routines, you should mark your type with the <code>Serializable</code> attribute so that the missing methods will be generated for you.</p>
 <h3 id="copier">Copier</h3>
 <p>Copier methods are flagged with the <code>Orleans.CopierMethod</code> attribute:</p>
-<pre><code class="lang-csharp">[CopierMethod]}
+<pre><code class="lang-csharp">[CopierMethod]
 static private object Copy(object input)
 {
     ...
