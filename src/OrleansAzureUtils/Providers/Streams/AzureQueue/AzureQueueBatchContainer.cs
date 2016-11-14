@@ -88,11 +88,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
             var rawBytes = SerializationManager.SerializeToByteArray(azureQueueBatchMessage);
-#if !NETSTANDARD
-            return new CloudQueueMessage(rawBytes);
-#else
-            return CloudQueueMessage.CreateCloudQueueMessageFromByteArray(rawBytes);
-#endif
+
+            //new CloudQueueMessage(byte[]) not supported in netstandard, taking a detour to set it
+            var cloudQueueMessage = new CloudQueueMessage(null as string);
+            cloudQueueMessage.SetMessageContent(rawBytes);
+            return cloudQueueMessage;
         }
 
         internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
