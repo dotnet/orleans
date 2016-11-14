@@ -12,8 +12,6 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    using System.Linq.Expressions;
-
     internal class IncomingMessageAcceptor : AsynchAgent
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(CreateSocketReceiveAsyncEventArgsPoolWrapper);
