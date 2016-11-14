@@ -68,7 +68,7 @@ All serializer routines should be implemented as static members of the class or 
 Copier methods are flagged with the `Orleans.CopierMethod` attribute:
 
 ``` csharp
-[CopierMethod]}
+[CopierMethod]
 static private object Copy(object input)
 {
     ...
