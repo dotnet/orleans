@@ -77,7 +77,8 @@ namespace NonSiloTests.UnitTests.SerializerTests
             headerList.Add(new ArraySegment<byte>(header));
             var bodyList = new List<ArraySegment<byte>>();
             bodyList.Add(new ArraySegment<byte>(body));
-            var resp1 = new Message(headerList, bodyList);
+            var resp1 = new Message(headerList);
+            resp1.SetBodyBytes(bodyList);
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);

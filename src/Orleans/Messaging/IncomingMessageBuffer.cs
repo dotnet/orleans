@@ -152,30 +152,46 @@ namespace Orleans.Runtime
             // decode body
             int bodyOffset = headerOffset + headerLength;
             List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
-
-            // need to maintain ownership of buffer, so if we are supporting forwarding we need to duplicate the body buffer.
-            if (supportForwarding)
-            {
-                body = DuplicateBuffer(body);
-            }
-
+            
             // build message
-            msg = new Message(header, body, !supportForwarding);
-            MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
-
-            if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
+            msg = new Message(header);
+            try
             {
-                Log.Info(ErrorCode.Messaging_LargeMsg_Incoming, "Receiving large message Size={0} HeaderLength={1} BodyLength={2}. Msg={3}",
-                    headerLength + bodyLength, headerLength, bodyLength, msg.ToString());
-                if (Log.IsVerbose3) Log.Verbose3("Received large message {0}", msg.ToLongString());
+                if (this.supportForwarding)
+                {
+                    // If forwarding is supported, then deserialization will be deferred until the body value is needed.
+                    // Need to maintain ownership of buffer, so we need to duplicate the body buffer.
+                    msg.SetBodyBytes(this.DuplicateBuffer(body));
+                }
+                else
+                {
+                    // Attempt to deserialize the body immediately.
+                    msg.DeserializeBodyObject(body);
+                }
             }
+            finally
+            {
+                MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
-            // update parse receiveOffset and clear lengths
-            decodeOffset = bodyOffset + bodyLength;
-            headerLength = 0;
-            bodyLength = 0;
+                if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
+                {
+                    Log.Info(
+                        ErrorCode.Messaging_LargeMsg_Incoming,
+                        "Receiving large message Size={0} HeaderLength={1} BodyLength={2}. Msg={3}",
+                        headerLength + bodyLength,
+                        headerLength,
+                        bodyLength,
+                        msg.ToString());
+                    if (Log.IsVerbose3) Log.Verbose3("Received large message {0}", msg.ToLongString());
+                }
 
-            AdjustBuffer();
+                // update parse receiveOffset and clear lengths
+                decodeOffset = bodyOffset + bodyLength;
+                headerLength = 0;
+                bodyLength = 0;
+
+                AdjustBuffer();
+            }
 
             return true;
         }

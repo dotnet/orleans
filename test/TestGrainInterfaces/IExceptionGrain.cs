@@ -28,4 +28,13 @@ namespace UnitTests.GrainInterfaces
 
         Task ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
     }
+
+    public interface IMessageSerializationGrain : IGrainWithIntegerKey
+    {
+        Task<object> EchoObject(object input);
+
+        Task GetUnserializableObjectChained();
+
+        Task<string> GetSiloIdentity();
+    }
 }

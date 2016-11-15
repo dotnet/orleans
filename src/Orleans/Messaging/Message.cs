@@ -456,18 +456,31 @@ namespace Orleans.Runtime
 
         // Initializes body and header but does not take ownership of byte.
         // Caller must clean up bytes
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
+        public Message(List<ArraySegment<byte>> header)
         {
             var input = new BinaryTokenStreamReader(header);
             Headers = SerializationManager.DeserializeMessageHeaders(input);
-            if (deserializeBody)
-            {
-                bodyObject = DeserializeBody(body);
-            }
-            else
-            {
-                bodyBytes = body;
-            }
+        }
+
+        /// <summary>
+        /// Clears the current body and sets the serialized body contents to the provided value.
+        /// </summary>
+        /// <param name="body">The serialized body contents.</param>
+        public void SetBodyBytes(List<ArraySegment<byte>> body)
+        {
+            // Dispose of the current body.
+            this.BodyObject = null;
+
+            this.bodyBytes = body;
+        }
+
+        /// <summary>
+        /// Deserializes the provided value into this instance's <see cref="BodyObject"/>.
+        /// </summary>
+        /// <param name="body">The serialized body contents.</param>
+        public void DeserializeBodyObject(List<ArraySegment<byte>> body)
+        {
+            this.BodyObject = DeserializeBody(body);
         }
 
         public Message CreateResponseMessage()
