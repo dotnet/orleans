@@ -491,7 +491,7 @@ namespace Orleans.Runtime
             var hasCopier = false;
             var hasSerializer = false;
             var hasDeserializer = false;
-            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public))
+            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
                 hasSerializer |= method.GetCustomAttribute<SerializerMethodAttribute>(false) != null;
                 hasDeserializer |= method.GetCustomAttribute<DeserializerMethodAttribute>(false) != null;
