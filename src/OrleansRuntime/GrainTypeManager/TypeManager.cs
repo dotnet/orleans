@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
 
-        internal TypeManager(SiloAddress myAddr, GrainTypeManager grainTypeManager, ISiloStatusOracle oracle, OrleansTaskScheduler scheduler)
+        internal TypeManager(SiloAddress myAddr, GrainTypeManager grainTypeManager, ISiloStatusOracle oracle, OrleansTaskScheduler scheduler, TimeSpan refreshClusterMapTimeout)
             : base(Constants.TypeManagerId, myAddr)
         {
             if (grainTypeManager == null)
@@ -34,7 +34,7 @@ namespace Orleans.Runtime
                     OnRefreshClusterMapTimer,
                     null,
                     TimeSpan.Zero,  // Force to do it once right now
-                    TimeSpan.FromMilliseconds(500)); // TODO Config
+                    refreshClusterMapTimeout); 
         }
 
 

@@ -15,12 +15,14 @@ namespace Tester.HeterogeneousSilosTests
     public class HeterogeneousTests : OrleansTestingBase, IDisposable
     {
         private TestCluster cluster;
+        private readonly TimeSpan refreshTimeout = TimeSpan.FromMilliseconds(200);
 
         private void SetupAndDeployCluster(string defaultPlacementStrategy, params Type[] blackListedTypes)
         {
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.Globals.TypeMapRefreshTimeout = refreshTimeout;
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
             options.ClusterConfiguration.Overrides[Silo.PrimarySiloName].ExcludedGrainTypes = typesName;
             cluster = new TestCluster(options);

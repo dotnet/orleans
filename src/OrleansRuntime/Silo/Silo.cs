@@ -382,9 +382,10 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
+
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            typeManager = new TypeManager(SiloAddress, LocalGrainTypeManager, membershipOracle, LocalScheduler);
-            RegisterSystemTarget(typeManager);
+            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshTimeout);
+            this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
             if (this.membershipOracle is SystemTarget)
