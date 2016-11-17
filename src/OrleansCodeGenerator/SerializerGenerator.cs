@@ -705,15 +705,18 @@ namespace Orleans.CodeGenerator
                     return getValueExpression;
                 }
 
-                ExpressionSyntax deepCopyValueExpression;
-
                 // Addressable arguments must be converted to references before passing.
+                ExpressionSyntax deepCopyValueExpression;
                 if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
                     && this.FieldInfo.FieldType.GetTypeInfo().IsInterface)
                 {
                     var getAsReference = getValueExpression.Member(
                         (IAddressable grain) => grain.AsReference<IGrain>(),
                         this.FieldInfo.FieldType);
+
+                    // If the value is a Grain at runtime, convert it to a strongly-typed GrainReference
+                    // using value.AsReference<TInterface>().
+                    // C#: value is Grain ? value.AsReference<TInterface>() : value;
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
                             SF.BinaryExpression(
