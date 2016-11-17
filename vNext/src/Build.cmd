@@ -29,6 +29,8 @@ if "%builduri%" == "" set builduri=Build.cmd
 
 set PROJ=%CMDHOME%\Orleans.vNext.sln
 
+
+>>>>>>> vNext ignore nuget restore error, treat it as warning and continue
 @echo ===== Building %PROJ% =====
 call %_dotnet% restore "%PROJ%"
 call %_dotnet% restore "%CMDHOME%\.nuget\Tools.csproj"
