@@ -113,7 +113,7 @@ public class InjectedService : IInjectedService
 
 # Test Framework Integration
 
-DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our [tutorials](https://dotnet.github.io/orleans/Tutorials/Unit-Testing-Grains.html).
+DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our [tutorials](../../Tutorials/Unit-Testing-Grains.md).
 
 You will need to do two things setup DI with tests. First you will need to implement mocks of your services. Here is an example of doing this.
 
