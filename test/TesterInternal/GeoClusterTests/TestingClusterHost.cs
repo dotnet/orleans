@@ -323,7 +323,7 @@ namespace Tests.GeoClusterTests
             WriteLog("Starting {0} connected to {1}", name, gatewayport);
 
             var clientArgs = new object[] { name, gatewayport, ClusterId, customizer };
-            var setup = new AppDomainSetup { ApplicationBase = Environment.CurrentDirectory };
+            var setup = AppDomainSiloHandle.GetAppDomainSetupInfo();
             var clientDomain = AppDomain.CreateDomain(name, null, setup);
 
             T client = (T)clientDomain.CreateInstanceFromAndUnwrap(
