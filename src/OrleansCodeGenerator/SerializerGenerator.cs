@@ -706,23 +706,27 @@ namespace Orleans.CodeGenerator
                 }
 
                 // Addressable arguments must be converted to references before passing.
+                // IGrainObserver instances cannot be directly converted to references, therefore they are not included.
                 ExpressionSyntax deepCopyValueExpression;
                 if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
-                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface)
+                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface
+                    && !typeof(IGrainObserver).IsAssignableFrom(this.FieldInfo.FieldType))
                 {
                     var getAsReference = getValueExpression.Member(
                         (IAddressable grain) => grain.AsReference<IGrain>(),
                         this.FieldInfo.FieldType);
 
-                    // If the value is a Grain at runtime, convert it to a strongly-typed GrainReference
-                    // using value.AsReference<TInterface>().
-                    // C#: value is Grain ? value.AsReference<TInterface>() : value;
+                    // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
+                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
                     deepCopyValueExpression =
                         SF.ConditionalExpression(
-                            SF.BinaryExpression(
-                                SyntaxKind.IsExpression,
-                                getValueExpression,
-                                typeof(Grain).GetTypeSyntax()),
+                            SF.PrefixUnaryExpression(
+                                SyntaxKind.LogicalNotExpression,
+                                SF.ParenthesizedExpression(
+                                    SF.BinaryExpression(
+                                        SyntaxKind.IsExpression,
+                                        getValueExpression,
+                                        typeof(GrainReference).GetTypeSyntax()))),
                             SF.InvocationExpression(getAsReference),
                             getValueExpression);
                 }
