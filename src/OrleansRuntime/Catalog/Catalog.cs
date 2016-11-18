@@ -205,10 +205,9 @@ namespace Orleans.Runtime
             gcTimer = t;
         }
 
-        internal void RemoveFromDirectory(ActivationData activationData)
+        internal void RemoveStuckGrainFromDirectory(ActivationData activationData)
         {
-            // Avoid any new call to this activation
-            activationData.SetState(ActivationState.Invalid);
+            DeactivateActivations(new List<ActivationData>() {activationData}).Ignore();
             scheduler.RunOrQueueTask(
                 () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
                 SchedulingContext)
