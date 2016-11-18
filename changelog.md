@@ -5,6 +5,7 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 - Several major performance improvements
+- Add streaming support for types that are serialized using IExternalSerializers
 
 ### [v1.3.1]
 - Improvements

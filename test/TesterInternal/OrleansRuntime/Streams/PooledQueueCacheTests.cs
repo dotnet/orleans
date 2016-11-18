@@ -138,13 +138,13 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
             {
-                return new EventSequenceToken(cachedMessage.SequenceNumber);
+                return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
             }
 
             public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
             {
                 IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace);
-                StreamSequenceToken sequenceToken = new EventSequenceToken(queueMessage.SequenceNumber);
+                StreamSequenceToken sequenceToken = new EventSequenceTokenV2(queueMessage.SequenceNumber);
                 return new StreamPosition(streamIdentity, sequenceToken);
             }
 
@@ -231,7 +231,7 @@ namespace UnitTests.OrleansRuntime.Streams
             }
 
             // get cursor for stream1, walk all the events in the stream using the cursor
-            object stream1Cursor = cache.GetCursor(stream1, new EventSequenceToken(startOfCache));
+            object stream1Cursor = cache.GetCursor(stream1, new EventSequenceTokenV2(startOfCache));
             int stream1EventCount = 0;
             while (cache.TryGetNextMessage(stream1Cursor, out batch))
             {
@@ -245,7 +245,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal((sequenceNumber - startOfCache) / 2, stream1EventCount);
 
             // get cursor for stream2, walk all the events in the stream using the cursor
-            object stream2Cursor = cache.GetCursor(stream2, new EventSequenceToken(startOfCache));
+            object stream2Cursor = cache.GetCursor(stream2, new EventSequenceTokenV2(startOfCache));
             int stream2EventCount = 0;
             while (cache.TryGetNextMessage(stream2Cursor, out batch))
             {
@@ -311,7 +311,7 @@ namespace UnitTests.OrleansRuntime.Streams
             IStreamIdentity streamId = new StreamIdentity(Guid.NewGuid(), TestStreamNamespace);
 
             // No data in cache, cursors should not throw.
-            object cursor = cache.GetCursor(streamId, new EventSequenceToken(sequenceNumber++));
+            object cursor = cache.GetCursor(streamId, new EventSequenceTokenV2(sequenceNumber++));
             Assert.NotNull(cursor);
 
             // try to iterate, should throw
@@ -347,7 +347,7 @@ namespace UnitTests.OrleansRuntime.Streams
             ex = null;
             try
             {
-                cache.GetCursor(streamId, new EventSequenceToken(10));
+                cache.GetCursor(streamId, new EventSequenceTokenV2(10));
             }
             catch (QueueCacheMissException cacheMissException)
             {
@@ -356,7 +356,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.NotNull(ex);
 
             // Get valid cursor into cache
-            cursor = cache.GetCursor(streamId, new EventSequenceToken(13));
+            cursor = cache.GetCursor(streamId, new EventSequenceTokenV2(13));
             // query once, to make sure cursor is good
             gotNext = cache.TryGetNextMessage(cursor, out batch);
             Assert.NotNull(cursor);

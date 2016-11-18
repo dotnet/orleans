@@ -90,6 +90,7 @@ namespace UnitTests.Serialization
         public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
         {
             DeserializeCalled = true;
+            reader.ReadToken();
             return new FakeSerialized { SomeData = "fake deserialization" };
         }
     }

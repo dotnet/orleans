@@ -48,6 +48,9 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\src\OrleansProviders\Streams\Common\EventSequenceTokenV2.cs">
+      <Link>Streams\Common\EventSequenceTokenV2.cs</Link>
+    </Compile>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>

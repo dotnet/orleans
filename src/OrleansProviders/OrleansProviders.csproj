@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
+    <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
     <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterConfig.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterFactory.cs" />

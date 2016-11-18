@@ -57,6 +57,7 @@
     <Compile Include="MultiClusterNetwork\GossipTableInstanceManager.cs" />
     <Compile Include="Providers\AzureConfigurationExtensions.cs" />
     <Compile Include="Providers\Storage\AzureBlobStorage.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueBatchContainerV2.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\StreamDeliveryFailureEntity.cs" />
     <Compile Include="Storage\AzureBasedMembershipTable.cs" />
