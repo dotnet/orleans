@@ -61,13 +61,15 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
+            var delayTimeout = refreshTimeout.Add(refreshTimeout);
+
             // Should fail
             var exception = Assert.Throws<ArgumentException>(() => GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
 
             // Start a new silo with TestGrain
             cluster.StartAdditionalSilo();
-            Thread.Sleep(1000);
+            await Task.Delay(delayTimeout);
 
             // Disconnect/Reconnect the client
             GrainClient.Uninitialize();
@@ -82,7 +84,7 @@ namespace Tester.HeterogeneousSilosTests
 
             // Stop the latest silos
             cluster.StopSecondarySilos();
-            Thread.Sleep(1000);
+            await Task.Delay(delayTimeout);
 
             var grain = GrainFactory.GetGrain<ITestGrain>(0);
             var orleansException = await Assert.ThrowsAsync<OrleansException>(() => grain.SetLabel("Hello world"));
