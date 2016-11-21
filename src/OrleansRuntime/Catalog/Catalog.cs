@@ -205,15 +205,6 @@ namespace Orleans.Runtime
             gcTimer = t;
         }
 
-        internal void DeactivateStuckActivation(ActivationData activationData)
-        {
-            DeactivateActivations(new List<ActivationData>() {activationData}).Ignore();
-            scheduler.RunOrQueueTask(
-                () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
-                SchedulingContext)
-                .Ignore();
-        }
-
         private Task OnTimer(object _)
         {
             return CollectActivationsImpl(true);
@@ -810,6 +801,20 @@ namespace Orleans.Runtime
         // Cannot be awaitable, since after DestroyActivation is done the activation is in Invalid state and cannot await any Task.
         internal void DeactivateActivationOnIdle(ActivationData data)
         {
+            DeactivateActivationImpl(data, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE);
+        }
+
+        internal void DeactivateStuckActivation(ActivationData activationData)
+        {
+            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
+            scheduler.RunOrQueueTask(
+                () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
+                SchedulingContext)
+                .Ignore();
+        }
+
+        private void DeactivateActivationImpl(ActivationData data, StatisticName statisticName)
+        {
             bool promptly = false;
             bool alreadBeingDestroyed = false;
             lock (data)
@@ -848,7 +853,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
                 "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
-            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
+            CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
                 DestroyActivationVoid(data); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
