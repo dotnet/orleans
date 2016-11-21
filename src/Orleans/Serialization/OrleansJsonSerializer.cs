@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
@@ -36,7 +35,9 @@ namespace Orleans.Serialization
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+#if !NETSTANDARD
+                TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Simple,
+#endif
                 Formatting = Formatting.None
             };
 
@@ -63,7 +64,7 @@ namespace Orleans.Serialization
                 bool useFullAssemblyNames;
                 if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
                 {
-                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+                    settings.TypeNameAssemblyFormat = System.Runtime.Serialization.Formatters.FormatterAssemblyStyle.Full;
                 }
             }
 

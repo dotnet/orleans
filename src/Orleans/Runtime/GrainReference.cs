@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Reflection;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -13,7 +11,10 @@ namespace Orleans.Runtime
     /// This is the base class for all typed grain references.
     /// </summary>
     [Serializable]
-    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
+    public class GrainReference : IAddressable, IEquatable<GrainReference>
+#if !NETSTANDARD
+        , System.Runtime.Serialization.ISerializable
+#endif
     {
         private readonly string genericArguments;
         private readonly GuidId observerId;
@@ -642,10 +643,10 @@ namespace Orleans.Runtime
             //return FromGrainId(GrainId.FromParsableString(grainIdStr), generic);
         }
 
-
+#if !NETSTANDARD
         #region ISerializable Members
 
-        public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
+        public virtual void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
             info.AddValue("GrainId", GrainId.ToParsableString(), typeof(string));
@@ -664,7 +665,7 @@ namespace Orleans.Runtime
         }
 
         // The special constructor is used to deserialize values. 
-        protected GrainReference(SerializationInfo info, StreamingContext context)
+        protected GrainReference(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
         {
             // Reset the property value using the GetValue method.
             var grainIdStr = info.GetString("GrainId");
@@ -686,5 +687,6 @@ namespace Orleans.Runtime
         }
 
         #endregion
+#endif
     }
 }

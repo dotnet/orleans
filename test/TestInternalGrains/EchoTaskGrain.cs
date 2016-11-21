@@ -8,7 +8,9 @@ using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
-
+#if NETSTANDARD
+using Serializable = System.SerializableAttribute;
+#endif
 namespace UnitTests.Grains
 {
     [Serializable]

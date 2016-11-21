@@ -118,7 +118,7 @@ namespace Orleans.CodeGenerator
 
         private static bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
         {
-            return field.GetCustomAttribute<NonSerializedAttribute>() == null
+            return field.GetCustomAttributes().All(attr => attr.GetType().Name != "NonSerializedAttribute")
                    && !SerializationManager.HasSerializer(field.FieldType)
                    && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }

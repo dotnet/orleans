@@ -691,7 +691,7 @@ namespace Orleans.Serialization
                             {
                                 // the lookup registers the serializer.
                             }
-                            else if (!typeInfo.IsSerializable)
+                            else if (!typeInfo.IsMarkedAsSerializable())
                             {
                                 // Comparers with no fields can be safely dealt with as just a type name
                                 var comparer = false;

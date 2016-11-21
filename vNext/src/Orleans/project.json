@@ -15,7 +15,6 @@
     "System.Reflection.Emit": "4.0.1",
     "System.Reflection.Emit.Lightweight": "4.0.1",
     "System.Reflection.TypeExtensions": "4.1.0",
-    "System.Runtime.Serialization.Formatters": "4.0.0-rc3-24212-01",
     "System.Runtime.Serialization.Primitives": "4.1.1",
     "System.Security.Cryptography.Algorithms": "4.2.0",
     "System.Threading.Thread": "4.0.0",

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using Orleans.Serialization;
 
 namespace Orleans.Streams
 {
@@ -8,7 +9,10 @@ namespace Orleans.Streams
     /// This class is a [Serializable] holder for a logical-or composite predicate function.
     /// </summary>
     [Serializable]
-    internal class OrFilter : IStreamFilterPredicateWrapper, ISerializable
+    internal class OrFilter : IStreamFilterPredicateWrapper
+#if !NETSTANDARD
+        , ISerializable
+#endif
     {
         public object FilterData
         {
@@ -37,7 +41,8 @@ namespace Orleans.Streams
             filters.Add(filter);
         }
 
-        #region ISerializable methods
+#if !NETSTANDARD
+#region ISerializable methods
         protected OrFilter(SerializationInfo info, StreamingContext context)
         {
             filters = (List<IStreamFilterPredicateWrapper>)info.GetValue("Filters", serializedType);
@@ -46,7 +51,8 @@ namespace Orleans.Streams
         {
             info.AddValue("Filters", this.filters, serializedType);
         }
-        #endregion
+#endregion
+#endif
 
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
         {

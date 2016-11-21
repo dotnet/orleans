@@ -62,9 +62,6 @@ namespace Orleans.CodeGenerator
                 .AddAttributes(
                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
 #if !NETSTANDARD
-                    // we could add Serializable attribute if we want, but that would require that the target
-                    // project depends on System.Runtime.Serialization.Formatters, which is currently in preview
-                    SF.Attribute(typeof(SerializableAttribute).GetNameSyntax()),
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
 #endif
                     markerAttribute);

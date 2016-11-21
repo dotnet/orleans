@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Threading.Tasks;
 using Orleans;
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+#endif
 
 namespace UnitTests.GrainInterfaces
 {

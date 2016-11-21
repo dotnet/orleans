@@ -13,6 +13,9 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 using Xunit;
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+#endif
 
 namespace UnitTests.Grains
 {

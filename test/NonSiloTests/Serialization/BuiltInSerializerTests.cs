@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
@@ -17,6 +16,10 @@ using Xunit;
 using Xunit.Abstractions;
 
 // ReSharper disable NotAccessedVariable
+
+#if NETSTANDARD
+    using Serializable = System.SerializableAttribute;
+#endif
 
 namespace UnitTests.Serialization
 {
@@ -738,6 +741,7 @@ namespace UnitTests.Serialization
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
+#if !NETSTANDARD
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
@@ -769,7 +773,8 @@ namespace UnitTests.Serialization
 
             Assert.Contains("is not marked as serializable", exc.Message);
         }
-        
+#endif
+
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
@@ -873,24 +878,26 @@ namespace UnitTests.Serialization
             return copy;
         }
 
+#if !NETSTANDARD
         private object DotNetSerializationLoop(object input)
         {
             byte[] bytes;
             object deserialized;
             using (var str = new MemoryStream())
             {
-                IFormatter formatter = new BinaryFormatter();
+                IFormatter formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
                 formatter.Serialize(str, input);
                 str.Flush();
                 bytes = str.ToArray();
             }
             using (var inStream = new MemoryStream(bytes))
             {
-                IFormatter formatter = new BinaryFormatter();
+                IFormatter formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
                 deserialized = formatter.Deserialize(inStream);
             }
             return deserialized;
         }
+#endif
 
         private void ValidateDictionary<K, V>(Dictionary<K, V> source, object deserialized, string type)
         {

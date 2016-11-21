@@ -9,6 +9,10 @@ using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+using NonSerializedAttribute = Orleans.NonSerializedAttribute;
+#endif
 
 namespace UnitTests.Grains
 {

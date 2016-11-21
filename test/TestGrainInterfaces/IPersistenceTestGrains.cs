@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+#endif
 
 // ReSharper disable InconsistentNaming
 

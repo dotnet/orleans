@@ -21,7 +21,7 @@ namespace Orleans.TestingHost
     public class AppDomainSiloHost : MarshalByRefObject
     {
         private readonly Silo silo;
-
+        
         /// <summary>Creates and initializes a silo in the current app domain.</summary>
         /// <param name="name">Name of this silo.</param>
         /// <param name="siloType">Type of this silo.</param>
@@ -33,8 +33,30 @@ namespace Orleans.TestingHost
             this.AppDomainTestHook = new AppDomainTestHooks(this.silo);
         }
 
+#if NETSTANDARD
+        /// <summary>Creates and initializes a silo in the current app domain.</summary>
+        /// <param name="name">Name of this silo.</param>
+        /// <param name="siloType">Type of this silo.</param>
+        /// <param name="serializedClusterConfig">Serialized cluster config data to be used for this silo.</param>
+        public AppDomainSiloHost(string name, Silo.SiloType siloType, byte[] serializedClusterConfig)
+        {
+            var serializer = new Wire.Serializer(new Wire.SerializerOptions(preserveObjectReferences: true));
+            ClusterConfiguration config;
+            using (var stream = new MemoryStream(serializedClusterConfig))
+            {
+                config = serializer.Deserialize<ClusterConfiguration>(stream);
+            }
+
+            this.silo = new Silo(name, siloType, config);
+            this.silo.InitializeTestHooksSystemTarget();
+            this.AppDomainTestHook = new AppDomainTestHooks(this.silo);
+        }
+#endif
+
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => silo.SiloAddress;
+
+        public string GetSiloAddressString() => SiloAddress.ToParsableString();
 
         /// <summary>Gets the Silo test hook</summary>
         internal ITestHooks TestHook => GrainClient.InternalGrainFactory.GetSystemTarget<ITestHooksSystemTarget>(Constants.TestHooksSystemTargetId, this.SiloAddress);

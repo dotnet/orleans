@@ -1,9 +1,11 @@
 namespace Orleans.CodeGeneration
 {
+    using System;
+
     /// <summary>
     /// Represents a generated assembly.
     /// </summary>
-    [System.Serializable]
+    [Serializable]
     public class GeneratedAssembly
     {
         /// <summary>

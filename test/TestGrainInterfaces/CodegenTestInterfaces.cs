@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-
+#if NETSTANDARD
+using SerializableAttribute = Orleans.SerializableAttribute;
+using NonSerializedAttribute = Orleans.NonSerializedAttribute;
+#endif
 
 namespace UnitTests.GrainInterfaces
 {
