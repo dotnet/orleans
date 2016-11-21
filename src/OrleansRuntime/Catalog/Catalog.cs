@@ -804,9 +804,13 @@ namespace Orleans.Runtime
             DeactivateActivationImpl(data, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE);
         }
 
+        // To be called fro within Activation context.
+        // To be used only if an activation is stuck for a long time, since it can lead to a duplicate activation
         internal void DeactivateStuckActivation(ActivationData activationData)
         {
             DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
+            // The unregistration is normally done in the regular deactivation process, but since this activation seems
+            // stuck (it might never run the deactivation process), we remove it from the directory directly
             scheduler.RunOrQueueTask(
                 () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
                 SchedulingContext)
