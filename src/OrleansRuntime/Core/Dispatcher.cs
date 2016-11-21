@@ -400,7 +400,7 @@ namespace Orleans.Runtime
                     break;
                 case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
                     // Avoid any new call to this activation
-                    catalog.RemoveStuckGrainFromDirectory(targetActivation);
+                    catalog.DeactivateStuckActivation(targetActivation);
                     ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
                     break;
                 default:
