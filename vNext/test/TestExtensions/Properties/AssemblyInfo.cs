@@ -18,4 +18,5 @@ using System.Runtime.InteropServices;
 [assembly: Guid("8380c2c1-dcac-43bd-a1e9-74bf8f904cc7")]
 
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
-
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("TesterInternal")]

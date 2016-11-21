@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 // associated with an assembly.
 [assembly: AssemblyTitle("OrleansRuntime")]
 [assembly: AssemblyDescription("Orleans - Runtime")]
-[assembly: AssemblyConfiguration("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
 // to COM components.  If you need to access a type in this assembly from 
@@ -17,3 +16,5 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansTestingHost")]
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("TesterInternal")]

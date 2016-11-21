@@ -12,10 +12,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{22C57246-E750-4254-80D2-9BEF9C241189}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansRuntime", "OrleansRuntime\OrleansRuntime.csproj", "{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}"
-	ProjectSection(ProjectDependencies) = postProject
-		{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A} = {AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}
-		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
-	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
 EndProject
