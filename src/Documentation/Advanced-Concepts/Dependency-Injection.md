@@ -132,7 +132,7 @@ public class MockServices
 }
 ```
 
-To enable these services to be included in your test silo, you will need to inject the startup class. Here is an example of doing this.
+To include these services in your test silo, you will need to specify MockServices as the silo startup class. Here is an example of doing this.
 
 ``` csharp
 [TestClass]
