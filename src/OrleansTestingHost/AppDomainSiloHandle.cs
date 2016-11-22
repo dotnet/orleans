@@ -223,7 +223,7 @@ namespace Orleans.TestingHost
 #endif
         }
 
-        private static AppDomainSetup GetAppDomainSetupInfo()
+        internal static AppDomainSetup GetAppDomainSetupInfo()
         {
             var currentAppDomain = AppDomain.CurrentDomain;
 

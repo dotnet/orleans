@@ -108,7 +108,7 @@ namespace Orleans.Counter.Control
                 return 1;
             }
 
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
 
             InitConsoleLogging();
 
@@ -177,7 +177,7 @@ namespace Orleans.Counter.Control
                 if (GrainTypeManager.Instance == null)
                 {
                     var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                    var typeManager = new GrainTypeManager(false, null, loader); // We shouldn't need GrainFactory in this case
+                    var typeManager = new GrainTypeManager(false, loader, new RandomPlacementDefaultStrategy()); 
                     GrainTypeManager.Instance.Start(false);
                 }
                 // Register perf counters
@@ -220,6 +220,14 @@ namespace Orleans.Counter.Control
                     ConsoleText.WriteStatus("Ignoring error deleting Orleans counters due to brute-force mode");
                 else
                     throw;
+            }
+        }
+
+        private class RandomPlacementDefaultStrategy : DefaultPlacementStrategy
+        {
+            public RandomPlacementDefaultStrategy()
+                : base(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY)
+            {
             }
         }
     }

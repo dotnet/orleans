@@ -4,9 +4,34 @@ All notable end-user facing changes are documented in this file.
 ### [vNext]
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
-- Invoker codegen: methods returning Task<object> do not need Box() calls #2221
-- CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
 - Several major performance improvements
+- Add streaming support for types that are serialized using IExternalSerializers
+
+### [v1.3.1]
+- Improvements
+  - Ability to specify interleaving per message type (was needed for Orleankka) #2246
+  - Support serialization of enums backed by non-Int32 fields #2237 
+  - Add TGrainState constraints to document clearly what is needed by folks implementing stateful grains. #1923
+  - Serialization fixes #2295
+  - Update OrleansConfiguration.xsd with DI info #2314
+  - Reroute client messages via a different gateway upon a gateway disconnection #2298
+  - Add helper methods to ease ADO.NET configuration #2291
+  - EventHubStreamProvider improvements #2377
+  - Add queue flow controller that is triggered by silo load shedding. #2378
+  - Modify JenkinsHash to be stateless. #2403
+  - EventHub flow control customization knobs #2408
+- Performance
+  - Invoker codegen: methods returning Task<object> do not need Box() calls #2221
+  - CodeGen: Avoid wrapping IGrainMethodInvoker.Invoke body in try/catch #2220
+  - Remove contention point in GrainDirectoryPartition #2170
+  - Optimize the scheduler, remove redundant semaphore and interlocked exchange. #2218
+  - Remove delegate allocation #2312
+  - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
+  - Provide better handling in Grain when the GrainRuntime or GrainIdentity is null #2338
+- Bug fixes
+  - Reset client gateway reciever buffer on socket reset. #2316
+  - Removes potential deadlocking and corrupted hashing in ADO.NET storage provider #2395
+  - LoadShedQueueFlowControl cast fix #2405
 
 ### [v1.3.0]
 - Bug fixes:

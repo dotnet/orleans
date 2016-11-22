@@ -13,7 +13,7 @@ namespace UnitTests.Serialization
     {
         public SerializerGenerationTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

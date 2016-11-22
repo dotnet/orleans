@@ -113,7 +113,7 @@ namespace Orleans.Providers
             public StreamPosition GetStreamPosition(MemoryMessageData queueMessage)
             {
                 return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace),
-                    new EventSequenceToken(queueMessage.SequenceNumber));
+                    new EventSequenceTokenV2(queueMessage.SequenceNumber));
             }
 
             public bool ShouldPurge(ref MemoryMessageData cachedMessage, ref MemoryMessageData newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)

@@ -705,12 +705,42 @@ namespace Orleans.CodeGenerator
                     return getValueExpression;
                 }
 
+                // Addressable arguments must be converted to references before passing.
+                // IGrainObserver instances cannot be directly converted to references, therefore they are not included.
+                ExpressionSyntax deepCopyValueExpression;
+                if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
+                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface
+                    && !typeof(IGrainObserver).IsAssignableFrom(this.FieldInfo.FieldType))
+                {
+                    var getAsReference = getValueExpression.Member(
+                        (IAddressable grain) => grain.AsReference<IGrain>(),
+                        this.FieldInfo.FieldType);
+
+                    // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
+                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    deepCopyValueExpression =
+                        SF.ConditionalExpression(
+                            SF.PrefixUnaryExpression(
+                                SyntaxKind.LogicalNotExpression,
+                                SF.ParenthesizedExpression(
+                                    SF.BinaryExpression(
+                                        SyntaxKind.IsExpression,
+                                        getValueExpression,
+                                        typeof(GrainReference).GetTypeSyntax()))),
+                            SF.InvocationExpression(getAsReference),
+                            getValueExpression);
+                }
+                else
+                {
+                    deepCopyValueExpression = getValueExpression;
+                }
+
                 // Deep-copy the value.
                 Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object));
                 var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 return SF.CastExpression(
                     typeSyntax,
-                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getValueExpression)));
+                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(deepCopyValueExpression)));
             }
 
             /// <summary>

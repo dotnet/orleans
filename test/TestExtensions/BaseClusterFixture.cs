@@ -17,7 +17,7 @@ namespace TestExtensions
         protected BaseTestClusterFixture()
         {
             GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             var testCluster = CreateTestCluster();
             if (testCluster.Primary == null)
             {

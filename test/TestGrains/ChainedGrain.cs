@@ -61,6 +61,11 @@ namespace UnitTests.Grains
             return TaskDone.Done;
         }
 
+        public Task SetNextNested(ChainGrainHolder next)
+        {
+            State.Next = next.Next;
+            return TaskDone.Done;
+        }
 
         public Task Validate(bool nextIsSet)
         {
@@ -78,6 +83,11 @@ namespace UnitTests.Grains
         public Task PassThis(IChainedGrain next)
         {
             return next.SetNext(this);
+        }
+
+        public Task PassThisNested(ChainGrainHolder next)
+        {
+            return next.Next.SetNextNested(new ChainGrainHolder { Next = this });
         }
 
         #endregion

@@ -7,13 +7,16 @@ using TestExtensions;
 
 namespace UnitTests
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     public abstract class BaseClusterFixture : IDisposable
     {
         protected BaseClusterFixture()
         {
             TestDefaultConfiguration.InitializeDefaults();
             GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             var hostedCluster = CreateClusterHost();
             this.HostedCluster = hostedCluster;
         }

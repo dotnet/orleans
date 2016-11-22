@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using TestExtensions;
 using UnitTests.Grains;
@@ -671,7 +672,11 @@ namespace UnitTests.SchedulerTests
         internal async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
         {
             var grainId = GrainId.GetGrainId(0, Guid.NewGuid());
-            var grain = new NonReentrentStressGrainWithoutState( grainId, new GrainRuntime(Guid.NewGuid(), null, null, null, null, null, null));
+            var silo = new MockSiloDetails
+            {
+                SiloAddress = SiloAddress.NewLocalAddress(23)
+            };
+            var grain = new NonReentrentStressGrainWithoutState(grainId, new GrainRuntime(new GlobalConfiguration(), silo, null, null, null, null, null, null));
             await grain.OnActivateAsync();
 
             Task wrapped = null;
@@ -751,6 +756,11 @@ namespace UnitTests.SchedulerTests
                 //var st = new StackTrace();
                 //output.WriteLine(st.ToString());
             }
+        }
+
+        private class MockSiloDetails : ILocalSiloDetails
+        {
+            public SiloAddress SiloAddress { get; set; }
         }
     }
 }

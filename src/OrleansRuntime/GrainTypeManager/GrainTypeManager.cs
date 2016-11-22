@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
@@ -12,12 +13,13 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
-        private readonly IGrainFactory grainFactory;
         private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
         private static readonly object lockable = new object();
+
+        private readonly PlacementStrategy defaultPlacementStrategy;
 
         public static GrainTypeManager Instance { get; private set; }
 
@@ -28,11 +30,16 @@ namespace Orleans.Runtime
             Instance = null;
         }
 
-        public GrainTypeManager(bool localTestMode, IGrainFactory grainFactory, SiloAssemblyLoader loader)
+        public GrainTypeManager(SiloInitializationParameters silo, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
+            : this(silo.SiloAddress.Endpoint.Address.Equals(IPAddress.Loopback), loader, defaultPlacementStrategy)
         {
-            this.grainFactory = grainFactory;
+        }
+
+        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, DefaultPlacementStrategy defaultPlacementStrategy)
+        {
+            this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
-            grainInterfaceMap = new GrainInterfaceMap(localTestMode);
+            grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             lock (lockable)
             {
                 if (Instance != null)
@@ -60,7 +67,6 @@ namespace Orleans.Runtime
             InitializeInvokerMap(loader, strict);
 
             InitializeInterfaceMap();
-            StreamingInitialize();
         }
 
         public Dictionary<string, string> GetGrainInterfaceToClassMap()
@@ -160,7 +166,7 @@ namespace Orleans.Runtime
             var grainClassCompleteName = TypeUtils.GetFullName(grainTypeInfo);
             var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
             var grainClassTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
-            var placement = GrainTypeData.GetPlacementStrategy(grainClass);
+            var placement = GrainTypeData.GetPlacementStrategy(grainClass, this.defaultPlacementStrategy);
             var registrationStrategy = GrainTypeData.GetMultiClusterRegistrationStrategy(grainClass);
 
             foreach (var iface in grainInterfaces)
@@ -177,12 +183,6 @@ namespace Orleans.Runtime
                 grainInterfaceMap.AddToUnorderedList(grainClassTypeCode);
         }
 
-        private void StreamingInitialize()
-        {
-            SiloProviderRuntime.StreamingInitialize(grainFactory, new Streams.ImplicitStreamSubscriberTable());
-            Type[] types = grainTypes.Values.Select(t => t.Type).ToArray();
-            SiloProviderRuntime.Instance.ImplicitStreamSubscriberTable.InitImplicitStreamSubscribers(types);
-        }
 
         private static bool IsPrimaryImplementor(Type grainClass, Type iface)
         {

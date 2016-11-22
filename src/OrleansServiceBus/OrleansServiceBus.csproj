@@ -58,6 +58,7 @@
     <Compile Include="Providers\Streams\EventHub\EventHubQueueCache.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubQueueMapper.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSequenceToken.cs" />
+    <Compile Include="Providers\Streams\EventHub\EventHubSequenceTokenV2.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubSettings.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProvider.cs" />
     <Compile Include="Providers\Streams\EventHub\EventHubStreamProviderSettings.cs" />

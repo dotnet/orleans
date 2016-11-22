@@ -8,7 +8,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
     {
         private readonly Logger logger;
 
-        internal MultiClusterOracleFactory()
+        public MultiClusterOracleFactory()
         {
             logger = LogManager.GetLogger("MultiClusterOracleFactory", LoggerType.Runtime);
         }

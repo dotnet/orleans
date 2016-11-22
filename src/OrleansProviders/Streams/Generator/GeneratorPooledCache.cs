@@ -115,12 +115,12 @@ namespace Orleans.Providers.Streams.Generator
                 var stream = new BinaryTokenStreamReader(cachedMessage.Payload);
                 object payloadObject = SerializationManager.Deserialize(stream);
                 return new GeneratedBatchContainer(cachedMessage.StreamGuid, cachedMessage.StreamNamespace,
-                    payloadObject, new EventSequenceToken(cachedMessage.SequenceNumber));
+                    payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
             }
 
             public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
             {
-                return new EventSequenceToken(cachedMessage.SequenceNumber);
+                return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
             }
 
             public StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)

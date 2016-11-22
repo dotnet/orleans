@@ -53,7 +53,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public int Compare(TestCachedMessage cachedMessage, StreamSequenceToken token)
             {
-                var myToken = new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+                var myToken = new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
                 return myToken.CompareTo(token);
             }
 
@@ -88,7 +88,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
             {
-                return new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
+                return new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
             }
 
             public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
@@ -174,12 +174,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 last++;
                 sequenceNumber += 2;
             }
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(0), TestCacheDataComparer.Instance));
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(1), TestCacheDataComparer.Instance));
-            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 2), TestCacheDataComparer.Instance));
-            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber - 3), TestCacheDataComparer.Instance));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2), TestCacheDataComparer.Instance));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceToken(sequenceNumber / 2 + 1), TestCacheDataComparer.Instance));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(0), TestCacheDataComparer.Instance));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(1), TestCacheDataComparer.Instance));
+            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 2), TestCacheDataComparer.Instance));
+            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 3), TestCacheDataComparer.Instance));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2), TestCacheDataComparer.Instance));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2 + 1), TestCacheDataComparer.Instance));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -200,7 +200,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 var message = new TestQueueMessage
                 {
                     StreamGuid = stream.Guid,
-                    SequenceToken = new EventSequenceToken(sequenceNumber)
+                    SequenceToken = new EventSequenceTokenV2(sequenceNumber)
                 };
 
                 // add message to end of block
@@ -246,7 +246,7 @@ namespace UnitTests.OrleansRuntime.Streams
             var message = new TestQueueMessage
             {
                 StreamGuid = StreamGuid,
-                SequenceToken = new EventSequenceToken(sequenceNumber)
+                SequenceToken = new EventSequenceTokenV2(sequenceNumber)
             };
             AddAndCheck(block, dataAdapter, message, first, last);
         }

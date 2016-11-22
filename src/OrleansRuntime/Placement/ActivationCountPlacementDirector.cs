@@ -8,7 +8,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener
+    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector<ActivationCountBasedPlacement>
     {
         private class CachedLocalStat
         {
@@ -41,21 +41,18 @@ namespace Orleans.Runtime.Placement
         // For: SelectSiloPowerOfK
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
-        
-        public ActivationCountPlacementDirector()
+
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig)
         {
             logger = LogManager.GetLogger(this.GetType().Name);
-        }
-
-        public void Initialize(GlobalConfiguration globalConfig)
-        {            
-            DeploymentLoadPublisher.Instance.SubscribeToStatisticsChangeEvents(this);
 
             SelectSilo = SelectSiloPowerOfK;
             if (globalConfig.ActivationCountBasedPlacementChooseOutOf <= 0)
-                throw new ArgumentException("GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
-            
+                throw new ArgumentException(
+                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
+
             chooseHowMany = globalConfig.ActivationCountBasedPlacementChooseOutOf;
+            deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
         private static bool IsSiloOverloaded(SiloRuntimeStatistics stats)
@@ -163,7 +160,7 @@ namespace Orleans.Runtime.Placement
             throw new OrleansException(debugLog);
         }
 
-        internal override Task<PlacementResult> OnAddActivation(
+        public override Task<PlacementResult> OnAddActivation(
             PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             return SelectSilo(strategy, grain, context);

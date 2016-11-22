@@ -14,7 +14,7 @@ namespace UnitTests.Serialization
     {
         public DeepCopyTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

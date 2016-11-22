@@ -15,8 +15,7 @@ namespace UnitTests.Serialization
             FakeTypeToSerialize.Reset();
             FakeSerializer1.Reset();
             FakeSerializer2.Reset();
-            SerializationManager.InitializeForTesting(
-                new List<TypeInfo> { typeof(FakeSerializer1).GetTypeInfo(), typeof(FakeSerializer2).GetTypeInfo() });
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer1).GetTypeInfo(), typeof(FakeSerializer2).GetTypeInfo() }, null);
 
             SerializationManager.Register(typeof(FakeTypeToSerialize), typeof(FakeTypeToSerialize));
         }

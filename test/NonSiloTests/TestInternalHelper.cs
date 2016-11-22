@@ -10,7 +10,7 @@ namespace UnitTests.TesterInternal
         {
             StatisticsCollector.StatisticsCollectionLevel = StatisticsLevel.Info;
             SchedulerStatisticsGroup.Init();
-            var scheduler = new OrleansTaskScheduler(4);
+            var scheduler = OrleansTaskScheduler.CreateTestInstance(4);
             scheduler.Start();
             WorkItemGroup ignore = scheduler.RegisterWorkContext(context);
             return scheduler;

@@ -74,7 +74,7 @@ namespace UnitTests.Serialization
                     throw new InvalidOperationException("Invalid Serializer was selected");
             }
 
-            SerializationManager.Initialize(serializationProviders, fallback);
+            SerializationTestEnvironment.Initialize(serializationProviders, fallback);
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 

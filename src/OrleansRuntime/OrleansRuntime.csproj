@@ -60,6 +60,7 @@
     <Compile Include="Catalog\GrainCreator.cs" />
     <Compile Include="Counters\CounterConfigData.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="Silo\SiloInitializationParameters.cs" />
     <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />
     <Compile Include="Silo\TestHooks\TestHooksSystemTarget.cs" />
     <Compile Include="Startup\ConfigureServicesBuilder.cs" />
@@ -87,7 +88,7 @@
     <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
-    <Compile Include="Placement\PlacementDirector.cs" />
+    <Compile Include="Placement\IPlacementDirector.cs" />
     <Compile Include="Placement\RandomPlacementDirector.cs" />
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
@@ -192,6 +193,7 @@
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
+    <Compile Include="Utilities\ServiceCollectionExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

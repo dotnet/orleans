@@ -50,7 +50,8 @@ namespace UnitTests.StorageTests
             var properties = new Dictionary<string, string>
                 {
                     {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
-                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId}
+                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId},
+                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" }
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
@@ -129,7 +130,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(NumBatches, receivedBatches);
 
             // check to see if all the events are in the cache and we can enumerate through them
-            StreamSequenceToken firstInCache = new EventSequenceToken(0);
+            StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
             foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];

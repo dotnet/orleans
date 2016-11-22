@@ -20,7 +20,7 @@ namespace UnitTests.Serialization
         /// </summary>
         public InternalSerializationTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         /// <summary>

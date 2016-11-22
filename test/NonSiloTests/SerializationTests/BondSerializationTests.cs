@@ -11,7 +11,7 @@ namespace UnitTests.Serialization
     {
         public BondSerializationTests()
         {
-            SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(BondSerializer).GetTypeInfo() });
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(BondSerializer).GetTypeInfo() }, null);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

@@ -52,7 +52,7 @@ namespace Orleans
 
         private readonly GrainFactory grainFactory;
 
-        public GrainFactory InternalGrainFactory
+        public IInternalGrainFactory InternalGrainFactory
         {
             get { return grainFactory; }
         }
@@ -63,6 +63,10 @@ namespace Orleans
         private TimeSpan responseTimeout;
 
         private static readonly Object staticLock = new Object();
+
+        private TypeMetadataCache typeCache;
+
+        private readonly AssemblyProcessor assemblyProcessor;
 
         Logger IRuntimeClient.AppLogger
         {
@@ -117,9 +121,11 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
-        public OutsideRuntimeClient(ClientConfiguration cfg, GrainFactory grainFactory, bool secondary = false)
+        public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            this.grainFactory = grainFactory;
+            this.typeCache = new TypeMetadataCache();
+            this.assemblyProcessor = new AssemblyProcessor(this.typeCache);
+            this.grainFactory = new GrainFactory(this, this.typeCache);
 
             if (cfg == null)
             {
@@ -132,6 +138,8 @@ namespace Orleans
             if (!LogManager.IsInitialized) LogManager.Initialize(config);
             StatisticsCollector.Initialize(config);
             SerializationManager.Initialize(cfg.SerializationProviders, cfg.FallbackSerializationProvider);
+            this.assemblyProcessor.Initialize();
+
             logger = LogManager.GetLogger("OutsideRuntimeClient", LoggerType.Runtime);
             appLogger = LogManager.GetLogger("Application", LoggerType.Application);
 
@@ -141,8 +149,6 @@ namespace Orleans
             try
             {
                 LoadAdditionalAssemblies();
-
-                PlacementStrategy.Initialize();
 
                 callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
                 localObjects = new ConcurrentDictionary<GuidId, LocalObjectData>();
@@ -215,7 +221,7 @@ namespace Orleans
             CurrentStreamProviderManager = streamProviderManager;
         }
 
-        private static void LoadAdditionalAssemblies()
+        private void LoadAdditionalAssemblies()
         {
 #if !NETSTANDARD_TODO
             var logger = LogManager.GetLogger("AssemblyLoader.Client", LoggerType.Runtime);
@@ -240,6 +246,7 @@ namespace Orleans
                         AssemblyLoaderCriteria.LoadTypesAssignableFrom(typeof(IProvider))
                     };
 
+            this.assemblyProcessor.Initialize();
             AssemblyLoader.LoadAssemblies(directories, excludeCriteria, loadProvidersCriteria, logger);
 #endif
         }
@@ -914,6 +921,8 @@ namespace Orleans
             {
                 listeningCts.Dispose();
                 listeningCts = null;
+
+                this.assemblyProcessor.Dispose();
             }
 
             transport.Dispose();

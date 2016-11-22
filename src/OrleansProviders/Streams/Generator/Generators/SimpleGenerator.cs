@@ -57,7 +57,7 @@ namespace Orleans.Providers.Streams.Generator
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report,
             };
-            return new GeneratedBatchContainer(streamGuid, config.StreamNamespace, evt, new EventSequenceToken(sequenceId));
+            return new GeneratedBatchContainer(streamGuid, config.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
         }
     }
 }

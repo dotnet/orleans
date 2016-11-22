@@ -335,12 +335,11 @@ namespace Orleans.Streams
                 }
 
                 if (IsShutdown) return; // timer was already removed, last tick
-                
-                int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
+                    int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we breack out of loop
                     // If read fails, we try again, with backoff policy.
@@ -407,7 +406,7 @@ namespace Orleans.Streams
                     return false;
                 }
 
-                // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
+                // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
                 IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
 
                 if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.

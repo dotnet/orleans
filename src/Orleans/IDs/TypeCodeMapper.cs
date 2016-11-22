@@ -7,10 +7,9 @@ namespace Orleans.Runtime
     /// </summary>
     internal static class TypeCodeMapper
     {
-        internal static GrainClassData GetImplementation(Type interfaceType, string grainClassNamePrefix = null)
+        internal static GrainClassData GetImplementation(IGrainTypeResolver grainTypeResolver, Type interfaceType, string grainClassNamePrefix = null)
         {
             GrainClassData implementation;
-            IGrainTypeResolver grainTypeResolver = RuntimeClient.Current.GrainTypeResolver;
             if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
             {
                 var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();

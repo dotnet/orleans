@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
-        internal ActivationDirectory()
+        public ActivationDirectory()
         {
             activations = new ConcurrentDictionary<ActivationId, ActivationData>();
             systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();

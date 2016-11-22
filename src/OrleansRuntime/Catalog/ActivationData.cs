@@ -148,32 +148,36 @@ namespace Orleans.Runtime
         }
 
         // This is the maximum amount of time we expect a request to continue processing
-        private static TimeSpan maxRequestProcessingTime;
-        private static TimeSpan maxWarningRequestProcessingTime;
-        private static NodeConfiguration nodeConfiguration;
+        private readonly TimeSpan maxRequestProcessingTime;
+        private readonly TimeSpan maxWarningRequestProcessingTime;
+        private readonly NodeConfiguration nodeConfiguration;
         public readonly TimeSpan CollectionAgeLimit;
+        private readonly Logger logger;
         private IGrainMethodInvoker lastInvoker;
 
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
         private HashSet<GrainTimer> timers;
-        private readonly Logger logger;
-
-        public static void Init(ClusterConfiguration config, NodeConfiguration nodeConfig)
-        {
-            maxRequestProcessingTime = config.Globals.MaxRequestProcessingTime;
-            // Consider adding a config parameter for this
-            maxWarningRequestProcessingTime = config.Globals.ResponseTimeout.Multiply(5);
-            nodeConfiguration = nodeConfig;
-        }
-
-        public ActivationData(ActivationAddress addr, string genericArguments, PlacementStrategy placedUsing, MultiClusterRegistrationStrategy registrationStrategy, IActivationCollector collector, TimeSpan ageLimit)
+        
+        public ActivationData(
+            ActivationAddress addr,
+            string genericArguments,
+            PlacementStrategy placedUsing,
+            MultiClusterRegistrationStrategy registrationStrategy,
+            IActivationCollector collector,
+            TimeSpan ageLimit,
+            NodeConfiguration nodeConfiguration,
+            TimeSpan maxWarningRequestProcessingTime,
+			TimeSpan maxRequestProcessingTime)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
             if (null == collector) throw new ArgumentNullException("collector");
 
             logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
+            this.maxRequestProcessingTime = maxRequestProcessingTime;
+            this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
+            this.nodeConfiguration = nodeConfiguration;
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -185,8 +189,8 @@ namespace Orleans.Runtime
             }
             CollectionAgeLimit = ageLimit;
 
-            GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments,
-                Grain.IsSystemTarget ? addr.Silo : null);
+
+            GrainReference = GrainReference.FromGrainId(addr.Grain, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
         }
 
         #region Method invocation

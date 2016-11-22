@@ -95,8 +95,8 @@
     <Compile Include="..\..\..\test\NonSiloTests\Serialization\BuiltInSerializerTests.cs">
       <Link>Serialization\BuiltInSerializerTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\NonSiloTests\Serialization\IlBasedSerializerTests.cs">
-      <Link>Serialization\IlBasedSerializerTests.cs</Link>
+    <Compile Include="..\..\..\test\NonSiloTests\Serialization\ILBasedSerializerTests.cs">
+      <Link>Serialization\ILBasedSerializerTests.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\Serialization\SerializerGenerationTests.cs">
       <Link>Serialization\SerializerGenerationTests.cs</Link>

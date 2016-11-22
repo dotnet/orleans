@@ -5,13 +5,8 @@ namespace Orleans.Runtime
     [Serializable]
     internal class PreferLocalPlacement : PlacementStrategy
     {
-        internal static PreferLocalPlacement Singleton { get; private set; }
-
-        internal static void InitializeClass()
-        {
-            Singleton = new PreferLocalPlacement();
-        }
-
+        internal static PreferLocalPlacement Singleton { get; } = new PreferLocalPlacement();
+        
         private PreferLocalPlacement()
         { }
 

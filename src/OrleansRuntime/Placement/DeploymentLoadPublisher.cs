@@ -19,21 +19,14 @@ namespace Orleans.Runtime
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
         private readonly Logger logger = LogManager.GetLogger("DeploymentLoadPublisher", LoggerType.Runtime);
-
-        public static DeploymentLoadPublisher Instance { get; private set; }
-
+        
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
-
-        public static void CreateDeploymentLoadPublisher(Silo silo, GlobalConfiguration config)
-        {
-            Instance = new DeploymentLoadPublisher(silo, config.DeploymentLoadPublisherRefreshTime);
-        }
-
-        private DeploymentLoadPublisher(Silo silo, TimeSpan freshnessTime)
+        
+        public DeploymentLoadPublisher(Silo silo, GlobalConfiguration config)
             : base(Constants.DeploymentLoadPublisherSystemTargetId, silo.SiloAddress)
         {
             this.silo = silo;
-            statisticsRefreshTime = freshnessTime;
+            statisticsRefreshTime = config.DeploymentLoadPublisherRefreshTime;
             periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
         }

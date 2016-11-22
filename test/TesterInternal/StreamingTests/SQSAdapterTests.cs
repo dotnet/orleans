@@ -36,7 +36,7 @@ namespace UnitTests.Streaming
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         public void Dispose()
@@ -129,7 +129,7 @@ namespace UnitTests.Streaming
             Assert.Equal(NumBatches, receivedBatches);
 
             // check to see if all the events are in the cache and we can enumerate through them
-            StreamSequenceToken firstInCache = new EventSequenceToken(0);
+            StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
             foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];

@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
+using OrleansServiceBus.Providers.Streams.EventHub;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -56,7 +57,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubBatchContainer(EventHubMessage eventHubMessage)
         {
             this.eventHubMessage = eventHubMessage;
-            token = new EventHubSequenceToken(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
+            token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
         /// <summary>
@@ -66,7 +67,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceToken(token.EventHubOffset, token.SequenceNumber, i)));
+            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
         }
 
         /// <summary>

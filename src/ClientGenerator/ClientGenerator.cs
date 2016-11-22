@@ -94,8 +94,6 @@ namespace Orleans.CodeGeneration
         /// </summary>
         private bool CreateGrainClient(CodeGenOptions options)
         {
-            PlacementStrategy.Initialize();
-
             // Load input assembly 
             // special case Orleans.dll because there is a circular dependency.
             var assemblyName = AssemblyName.GetAssemblyName(options.InputLib.FullName);

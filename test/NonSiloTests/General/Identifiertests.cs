@@ -22,7 +22,7 @@ namespace UnitTests.General
         public Identifiertests(ITestOutputHelper output)
         {
             this.output = output;
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
         }
 
@@ -238,7 +238,6 @@ namespace UnitTests.General
         {
             // This tests that our optimized Jenkins hash computes the same value as the reference implementation
             int testCount = 1000;
-            JenkinsHash jenkinsHash = JenkinsHash.Factory.GetHashGenerator(false);
             for (int i = 0; i < testCount; i++)
             {
                 byte[] byteData = new byte[24];
@@ -246,8 +245,8 @@ namespace UnitTests.General
                 ulong u1 = BitConverter.ToUInt64(byteData, 0);
                 ulong u2 = BitConverter.ToUInt64(byteData, 8);
                 ulong u3 = BitConverter.ToUInt64(byteData, 16);
-                var referenceHash = jenkinsHash.ComputeHash(byteData);
-                var optimizedHash = jenkinsHash.ComputeHash(u1, u2, u3);
+                var referenceHash = JenkinsHash.ComputeHash(byteData);
+                var optimizedHash = JenkinsHash.ComputeHash(u1, u2, u3);
                 Assert.Equal(referenceHash,  optimizedHash);  //  "Optimized hash value doesn't match the reference value for inputs {0}, {1}, {2}", u1, u2, u3
             }
         }

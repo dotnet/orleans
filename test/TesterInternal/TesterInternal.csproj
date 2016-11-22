@@ -67,6 +67,7 @@
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTests.cs" />
     <Compile Include="StorageTests\AWSUtils\PersistenceGrainTests_AWSDynamoDBStore.cs" />
     <Compile Include="StorageTests\AWSUtils\UnitTestDynamoDBStorage.cs" />
+    <Compile Include="StorageTests\Relational\AdotNetProviderFunctionalityTests.cs" />
     <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
     <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
@@ -135,7 +136,6 @@
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
     <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
-    <Compile Include="SerializerTests\RoundTripSerializerTests.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
     <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />

@@ -2,6 +2,9 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+
+using Microsoft.Extensions.DependencyInjection;
+
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Providers;
@@ -70,13 +73,17 @@ namespace Orleans.Runtime.Providers
 
         public ImplicitStreamSubscriberTable ImplicitStreamSubscriberTable { get { return implicitStreamSubscriberTable; } }
 
-        public static void StreamingInitialize(IGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public void StreamingInitialize()
         {
-            Instance.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
-            Instance.grainBasedPubSub = new GrainBasedPubSubRuntime(grainFactory);
-            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
-            Instance.implictPubSub = tmp;
-            Instance.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(Instance.grainBasedPubSub, tmp);
+            this.implicitStreamSubscriberTable = new ImplicitStreamSubscriberTable();
+            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
+            var tmp = new ImplicitStreamPubSub(this.implicitStreamSubscriberTable);
+            this.implictPubSub = tmp;
+            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
+
+            var typeManager = this.ServiceProvider.GetRequiredService<GrainTypeManager>();
+            Type[] types = typeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray();
+            this.ImplicitStreamSubscriberTable.InitImplicitStreamSubscribers(types);
         }
 
         public StreamDirectory GetStreamDirectory()

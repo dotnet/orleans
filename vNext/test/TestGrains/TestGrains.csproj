@@ -113,6 +113,9 @@
     <Compile Include="..\..\..\test\TestGrains\ValueTypeTestGrain.cs">
       <Link>ValueTypeTestGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MessageSerializationGrain.cs">
+      <Link>MessageSerializationGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
