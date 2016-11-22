@@ -30,9 +30,10 @@ if "%builduri%" == "" set builduri=Build.cmd
 set PROJ=%CMDHOME%\Orleans.vNext.sln
 
 @echo ===== Building %PROJ% =====
+call %_dotnet% restore "%PROJ%"
+call %_dotnet% restore "%CMDHOME%\.nuget\Tools.csproj"
 
 @echo Build Debug ==============================
-call %_dotnet% restore "%PROJ%"
 
 SET CONFIGURATION=Debug
 SET OutDir=%~dp0..\Binaries\%CONFIGURATION%
