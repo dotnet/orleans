@@ -78,9 +78,6 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 
   <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <PropertyGroup>
-    <OrleansProjectType>Server</OrleansProjectType>
-  </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
   <Choose>
     <When Condition="'$(builduri)' != ''">
