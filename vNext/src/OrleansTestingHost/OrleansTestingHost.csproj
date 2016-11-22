@@ -8,6 +8,7 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
   
