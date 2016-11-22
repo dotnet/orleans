@@ -53,7 +53,6 @@ namespace Orleans
                 }
             }
             assemblies.Add(typeof(Exception).GetTypeInfo().Assembly);
-
             foreach (var assembly in assemblies.ToList())
             {
                 LoadDependencies(assemblies, assembly);

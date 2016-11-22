@@ -1,47 +1,43 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.25920.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans", "Orleans\Orleans.csproj", "{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans", "Orleans\Orleans.csproj", "{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansCodeGenerator", "OrleansCodeGenerator\OrleansCodeGenerator.csproj", "{8D937706-F6DA-4D33-B0A9-24A260BD3080}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansCodeGenerator", "OrleansCodeGenerator\OrleansCodeGenerator.csproj", "{8D937706-F6DA-4D33-B0A9-24A260BD3080}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientGenerator", "ClientGenerator\ClientGenerator.csproj", "{E782DD19-51F7-4F66-8217-BACAC33767E4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClientGenerator", "ClientGenerator\ClientGenerator.csproj", "{E782DD19-51F7-4F66-8217-BACAC33767E4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{22C57246-E750-4254-80D2-9BEF9C241189}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansRuntime", "OrleansRuntime\OrleansRuntime.csproj", "{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}"
-	ProjectSection(ProjectDependencies) = postProject
-		{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A} = {AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}
-		{E782DD19-51F7-4F66-8217-BACAC33767E4} = {E782DD19-51F7-4F66-8217-BACAC33767E4}
-	EndProjectSection
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansRuntime", "OrleansRuntime\OrleansRuntime.csproj", "{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansTestingHost", "OrleansTestingHost\OrleansTestingHost.csproj", "{40EE3B00-D381-485F-9C69-FF706837DEED}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{A03DFE72-F1CA-4E79-8A84-EDF5D277EB1A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{A03DFE72-F1CA-4E79-8A84-EDF5D277EB1A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestExtensions", "..\test\TestExtensions\TestExtensions.csproj", "{AFD242B4-EDA9-42CD-BA39-E410B98ADD2A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestExtensions", "..\test\TestExtensions\TestExtensions.csproj", "{AFD242B4-EDA9-42CD-BA39-E410B98ADD2A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{5478B454-0E48-4631-B338-D45DD21124BF}"
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
-		.nuget\packages.config = .nuget\packages.config
+		.nuget\Tools.csproj = .nuget\Tools.csproj
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalGrains", "..\test\TestInternalGrains\TestInternalGrains.csproj", "{A682ABC1-1A51-4794-8012-DA8E59EBC72A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrains", "..\test\TestInternalGrains\TestInternalGrains.csproj", "{A682ABC1-1A51-4794-8012-DA8E59EBC72A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrainInterfaces", "..\test\TestGrainInterfaces\TestGrainInterfaces.csproj", "{A972213F-189B-41D4-90FE-38D513C1106A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrainInterfaces", "..\test\TestGrainInterfaces\TestGrainInterfaces.csproj", "{A972213F-189B-41D4-90FE-38D513C1106A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester", "..\test\Tester\Tester.csproj", "{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester", "..\test\Tester\Tester.csproj", "{A9C8FFEC-4947-4F04-BA73-1F17B329A55A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestGrains", "..\test\TestGrains\TestGrains.csproj", "{AACE28AE-F301-472A-B633-02B55434871A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestGrains", "..\test\TestGrains\TestGrains.csproj", "{AACE28AE-F301-472A-B633-02B55434871A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestInternalGrainInterfaces", "..\test\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj", "{AAE67055-F38A-45F0-AEA7-5754F4814EAA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "..\test\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj", "{AAE67055-F38A-45F0-AEA7-5754F4814EAA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansProviders", "OrleansProviders\OrleansProviders.csproj", "{A054DB14-2A92-4CC0-959E-A2C51F5E65DA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansProviders", "OrleansProviders\OrleansProviders.csproj", "{A054DB14-2A92-4CC0-959E-A2C51F5E65DA}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184-D9FE-4DD7-85A0-CA52D53A5421}"
 	ProjectSection(SolutionItems) = preProject

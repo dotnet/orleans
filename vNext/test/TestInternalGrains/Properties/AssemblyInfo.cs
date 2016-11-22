@@ -1,13 +1,11 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Microsoft.FSharp.Core;
-using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TestInternalGrainInterfaces")]
+[assembly: AssemblyTitle("TestInternalGrains")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
 // to COM components.  If you need to access a type in this assembly from 
@@ -15,10 +13,4 @@ using Orleans.CodeGeneration;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("314454e5-b572-40aa-9c3e-4ebf7d456c0b")]
-
-[assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("Tester")]
-
-// generate Orleans serializers for types in FSharp.core.dll
-[assembly: KnownAssembly(typeof(FSharpOption<>))]
+[assembly: Guid("775ed7b7-caa7-4267-aa62-d555c74451b2")]
