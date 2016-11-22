@@ -26,7 +26,7 @@
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="NETStandard.Library">
-      <Version>1.6.1</Version>
+      <Version>1.6.0</Version>
     </PackageReference>
   </ItemGroup>
 
