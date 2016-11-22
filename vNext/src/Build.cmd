@@ -32,6 +32,7 @@ set PROJ=%CMDHOME%\Orleans.vNext.sln
 @echo ===== Building %PROJ% =====
 
 @echo Build Debug ==============================
+call %_dotnet% restore "%PROJ%"
 
 SET CONFIGURATION=Debug
 SET OutDir=%~dp0..\Binaries\%CONFIGURATION%
@@ -49,20 +50,20 @@ call %_dotnet% build /m:1 /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-set STEP=VSIX
+REM set STEP=VSIX
 
-if "%VSSDK140Install%" == "" (
-    @echo Visual Studio 2015 SDK not installed - Skipping building VSIX
-    @GOTO :BuildFinished
-)
+REM if "%VSSDK140Install%" == "" (
+REM    @echo Visual Studio 2015 SDK not installed - Skipping building VSIX
+REM     @GOTO :BuildFinished
+REM )
 
-@echo Build VSIX ============================
+REM @echo Build VSIX ============================
 
-set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-SET OutDir=%OutDir%\VSIX
-"%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for VSIX package for %PROJ%
+REM set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
+REM SET OutDir=%OutDir%\VSIX
+REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+REM @if ERRORLEVEL 1 GOTO :ErrorStop
+REM @echo BUILD ok for VSIX package for %PROJ%
 
 :BuildFinished
 @echo ===== Build succeeded for %PROJ% =====
