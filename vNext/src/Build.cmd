@@ -2,6 +2,7 @@
 setlocal
 
 SET CMDHOME=%~dp0.
+SET BUILD_FLAGS=/m:1 /v:m /fl /flp:logfile=build.log;verbosity=detailed
 
 :: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
 :: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
@@ -36,25 +37,25 @@ call %_dotnet% restore "%CMDHOME%\.nuget\Tools.csproj"
 @echo Build Debug ==============================
 
 SET CONFIGURATION=Debug
-SET OutDir=%~dp0..\Binaries\%CONFIGURATION%
+SET OutputPath=%~dp0..\Binaries\%CONFIGURATION%
 
-call %_dotnet% build /m:1 /p:Configuration=%CONFIGURATION% "%PROJ%"
+call %_dotnet% build %BUILD_FLAGS% /p:ArtefactDirectory=%OutputPath%\ /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutDir% %VERSION_FILE% %CMDHOME%\ true
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
 @if ERRORLEVEL 1 GOTO :ErrorStop
 
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
+SET OutputPath=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-call %_dotnet% build /m:1 /p:Configuration=%CONFIGURATION% "%PROJ%"
+call %_dotnet% build %BUILD_FLAGS% /p:ArtefactDirectory=%OutputPath%\ /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutDir% %VERSION_FILE% %CMDHOME%\ true
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
 @if ERRORLEVEL 1 GOTO :ErrorStop
 
 REM set STEP=VSIX
@@ -67,7 +68,7 @@ REM )
 REM @echo Build VSIX ============================
 
 REM set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
-REM SET OutDir=%OutDir%\VSIX
+REM SET OutputPath=%OutputPath%\VSIX
 REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
 REM @if ERRORLEVEL 1 GOTO :ErrorStop
 REM @echo BUILD ok for VSIX package for %PROJ%

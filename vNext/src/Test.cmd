@@ -10,7 +10,7 @@ set CMDHOME=%CMDHOME:~0,-1%
 pushd "%CMDHOME%"
 @cd
 
-SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
+SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%\net462
 
 REM set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\Orleans.NonSiloTests.dll,%OutDir%\Tester.AzureUtils.dll
 set TESTS=%OutDir%\Tester.dll,%OutDir%\Orleans.NonSiloTests.dll,%OutDir%\Tester.AzureUtils.dll,%OutDir%\TesterInternal.dll

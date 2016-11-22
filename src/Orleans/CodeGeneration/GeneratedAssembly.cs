@@ -1,11 +1,17 @@
+using System;
+using System.Reflection;
+
 namespace Orleans.CodeGeneration
 {
     /// <summary>
     /// Represents a generated assembly.
     /// </summary>
-    [System.Serializable]
+    [Serializable]
     public class GeneratedAssembly
     {
+        [NonSerialized]
+        private Assembly assembly;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="GeneratedAssembly"/> class.
         /// </summary>
@@ -21,6 +27,7 @@ namespace Orleans.CodeGeneration
         {
             this.RawBytes = other.RawBytes;
             this.DebugSymbolRawBytes = other.DebugSymbolRawBytes;
+            this.Assembly = other.Assembly;
         }
 
         /// <summary>
@@ -32,5 +39,14 @@ namespace Orleans.CodeGeneration
         /// Gets or sets a serialized representation of the assembly's debug symbol stream.
         /// </summary>
         public byte[] DebugSymbolRawBytes { get; set; }
+
+        /// <summary>
+        /// Gets or sets the assembly.
+        /// </summary>
+        public Assembly Assembly
+        {
+            get { return this.assembly; }
+            set { this.assembly = value; }
+        }
     }
 } 

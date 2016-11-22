@@ -13,12 +13,11 @@
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-    <Compile
-      Include="..\..\..\src\OrleansCodeGenerator\**\*.cs"
-      Exclude="
-        ..\..\..\src\OrleansCodeGenerator\obj\**\*.cs;
-        ..\..\..\src\OrleansCodeGenerator\Properties\**\*.cs" />
+    <Compile Include="..\..\Build\GlobalAssemblyInfo.cs" />
+    <Compile Include="..\..\..\..\src\OrleansEventSourcing\**\*.cs" Exclude="
+      ..\..\..\..\src\OrleansEventSourcing\obj\**\*.cs;
+      ..\..\..\..\src\OrleansEventSourcing\bin\**\*.cs;
+      ..\..\..\..\src\OrleansEventSourcing\Properties\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Sdk">
@@ -28,19 +27,15 @@
     <PackageReference Include="NETStandard.Library">
       <Version>1.6.1</Version>
     </PackageReference>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp">
-      <Version>1.3.2</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection">
+    <PackageReference Include="Microsoft.CSharp">
       <Version>4.3.0</Version>
     </PackageReference>
-    <PackageReference Include="System.Runtime">
+    <PackageReference Include="System.Dynamic.Runtime">
       <Version>4.3.0</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
-    <ProjectReference Include="..\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\Orleans\Orleans.csproj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

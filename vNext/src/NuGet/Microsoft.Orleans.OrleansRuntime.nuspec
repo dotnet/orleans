@@ -21,15 +21,15 @@
       <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
 
-        <dependency id="Microsoft.Extensions.DependencyInjection" version="1.0.0" />
-        <dependency id="System.Runtime" version="4.1.0" />
+        <dependency id="Microsoft.Extensions.DependencyInjection" version="1.1.0" />
+        <dependency id="System.Runtime" version="4.3.0" />
       </group>
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansRuntime.XML" target="lib\netstandard1.5" />
-    <file src="OrleansRuntime.dll" target="lib\netstandard1.5" />
-    <file src="OrleansRuntime.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansRuntime.XML" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansRuntime.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansRuntime.pdb" target="lib\netstandard1.5" />
     <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
   </files>
 </package>

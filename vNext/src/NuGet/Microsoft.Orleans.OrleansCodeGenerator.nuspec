@@ -25,8 +25,8 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansCodeGenerator.XML" target="lib\net462" />
-    <file src="OrleansCodeGenerator.dll" target="lib\net462" />
+    <file src="netstandard1.5\OrleansCodeGenerator.XML" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansCodeGenerator.dll" target="lib\netstandard1.5" />
     <file src="$SRC_DIR$OrleansCodeGenerator\**\*.cs" target="src" />
   </files>
 </package>

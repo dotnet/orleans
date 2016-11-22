@@ -3,11 +3,15 @@
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-	<RestorePackagesPath>..\packages</RestorePackagesPath>
+	  <RestorePackagesPath>..\packages</RestorePackagesPath>
   </PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="xunit.runner.console">
+    <PackageReference Include="Microsoft.NET.Sdk">
+      <Version>1.0.0-alpha-20161104-2</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.runner.console">
       <Version>2.1.0</Version>
     </PackageReference>
   </ItemGroup>

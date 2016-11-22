@@ -27,6 +27,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="Configuration\OrleansConfiguration.xsd" target="tools" />
+    <file src="netstandard1.5\Configuration\OrleansConfiguration.xsd" target="tools" />
   </files>
 </package>
