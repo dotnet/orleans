@@ -1,0 +1,11 @@
+The process cannot access the file 'D:\microsoft\orleans-xiazen\vNext\src\OrleansRuntime\obj\Debug\netstandard1.5\Generated\OrleansRuntime.codegen.cs' because it is being used by another process.
+   at System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)
+   at System.IO.FileStream.Init(String path, FileMode mode, FileAccess access, Int32 rights, Boolean useRights, FileShare share, Int32 bufferSize, FileOptions options, SECURITY_ATTRIBUTES secAttrs, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)
+   at System.IO.StreamWriter.CreateFile(String path, Boolean append, Boolean checkHost)
+   at System.IO.StreamWriter..ctor(String path, Boolean append, Encoding encoding, Int32 bufferSize, Boolean checkHost)
+   at System.IO.StreamWriter..ctor(String path)
+   at Orleans.CodeGeneration.GrainClientGenerator.CreateGrainClient(CodeGenOptions options)
+   at Orleans.CodeGeneration.GrainClientGenerator.CreateGrainClient(CodeGenOptions options)
+   at Orleans.CodeGeneration.GrainClientGenerator.CreateGrainClientAssembly(CodeGenOptions options)
+   at Orleans.CodeGeneration.GrainClientGenerator.RunMain(String[] args)
