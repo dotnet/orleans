@@ -397,7 +397,7 @@ namespace Orleans.Runtime
         public static bool IsSystemTargetClass(Type type)
         {
             Type systemTargetType;
-            if (!TryResolveType("Orleans.Runtime.SystemTarget", out systemTargetType)) return false;
+            if (!TryResolveType("Orleans.Runtime.SystemTarget, OrleansRuntime", out systemTargetType)) return false;
 
             var systemTargetInterfaceType = typeof(ISystemTarget);
             var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
