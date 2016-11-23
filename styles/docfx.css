@@ -806,3 +806,37 @@ footer {
 pre > code .line-highlight {
   background-color: #ffffcc;
 }
+
+/* For Embedded Video */
+div.embeddedvideo {
+    padding-top: 56.25%;
+    position: relative;
+    width: 100%;
+}
+
+div.embeddedvideo iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* For printer */
+@media print{
+  .article.grid-right {
+    margin-top: 0px;
+    margin-left: 0px;
+  }
+  .sideaffix {
+    display: none;
+  }
+  .mobile-hide {
+    display: none;
+  }
+  .footer {
+    display: none;
+  }
+}
