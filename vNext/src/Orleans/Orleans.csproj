@@ -22,6 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Make sure we not include it twice because of globbing.  -->
+    <Compile Remove="Properties\orleans.codegen.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
       <Link>Configuration\OrleansConfiguration.xsd</Link>
       <SubType>Designer</SubType>
