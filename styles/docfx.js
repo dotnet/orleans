@@ -304,10 +304,13 @@ $(function () {
             }
             if (isActive) {
               $(e).parent().addClass(active);
-              breadcrumb.insert({
-                href: e.href,
-                name: e.innerHTML
-              }, 0);
+              if (!breadcrumb.isNavPartLoaded) {
+                breadcrumb.insert({
+                  href: e.href,
+                  name: e.innerHTML
+                }, 0);
+                breadcrumb.isNavPartLoaded = true;
+              }
             } else {
               $(e).parent().removeClass(active)
             }
@@ -338,20 +341,25 @@ $(function () {
           if (getAbsolutePath(e.href) === currentHref) {
             $(e).parent().addClass(active);
             var parent = $(e).parent().parents('li').children('a');
+            if (!breadcrumb.isTocPartLoaded) {
+              if (parent.length > 0) {
+                breadcrumb.push({
+                  href: parent[0].href,
+                  name: parent[0].innerHTML
+                });
+              }
+              breadcrumb.push({
+                href: e.href,
+                name: e.innerHTML
+              });
+              breadcrumb.isTocPartLoaded = true;
+            }
             if (parent.length > 0) {
               parent.addClass(active);
-              breadcrumb.push({
-                href: parent[0].href,
-                name: parent[0].innerHTML
-              });
             }
             // for active li, expand it
             $(e).parents('ul.nav>li').addClass(expanded);
 
-            breadcrumb.push({
-              href: e.href,
-              name: e.innerHTML
-            });
             // Scroll to active item
             var top = 0;
             $(e).parents('li').each(function (i, e) {
@@ -429,6 +437,8 @@ $(function () {
 
     function Breadcrumb() {
       var breadcrumb = [];
+      var isNavPartLoaded = false;
+      var isTocPartLoaded = false;
       this.push = pushBreadcrumb;
       this.insert = insertBreadcrumb;
 

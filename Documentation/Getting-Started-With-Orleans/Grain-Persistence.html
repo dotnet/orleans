@@ -8,7 +8,7 @@
     <title>Grain Persistence | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Grain Persistence | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.7.2.0">
+    <meta name="generator" content="docfx 2.8.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -143,7 +143,7 @@ public class MyGrain&lt;MyGrainState&gt; ...
 <li><strong><code>IndentJSON=&quot;false&quot;</code></strong> (optional) - (if <code>UseJsonFormat=&quot;true&quot;</code>) Indents the serialized json, defaults to <code>false</code></li>
 </ul>
 <h3 id="adonet-storage-provider-sql-storage-provider">ADO.NET Storage Provider (SQL Storage Provider)</h3>
-<p>Note that to use the it is necessary to deploy the database script to the database. It can be found in the The scripts are located in the Nuget library, similar to <code>\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net&lt;version&gt;\SQLServer\</code> depending on version and database vendor.</p>
+<p>Note that to use this it is necessary to deploy the database script to the database. The scripts are located in the NuGet library, similar to <code>\packages\Microsoft.Orleans.OrleansSqlUtils.n.n.n\lib\net&lt;version&gt;\SQLServer\</code> depending on version and database vendor.</p>
 <pre><code class="lang-xml">&lt;Provider Type=&quot;Orleans.SqlUtils.StorageProvider.SqlStorageProvider&quot; Name=&quot;SqlStore&quot; DataConnectionString=&quot;Data Source = (localdb)\MSSQLLocalDB; Database = OrleansTestStorage; Integrated Security = True; Asynchronous Processing = True; Max Pool Size = 200;&quot; /&gt;
 </code></pre><ul>
 <li><strong><code>DataConnectionString=&quot;...&quot;</code></strong> (mandatory) - The SQL connection string to use.</li>

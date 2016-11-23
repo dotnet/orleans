@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Application Bootstrapping within a Silo | Microsoft Orleans Website </title>
+    <title>Code generation | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Application Bootstrapping within a Silo | Microsoft Orleans Website ">
+    <meta name="title" content="Code generation | Microsoft Orleans Website ">
     <meta name="generator" content="docfx 2.8.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
@@ -71,36 +71,17 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="application-bootstrapping-within-a-silo">Application Bootstrapping within a Silo</h1>
+              <h1 id="code-generation">Code Generation</h1>
               
-<p>There are several scenarios where application want to run some &quot;auto-exec&quot; functions when a silo comes online.</p>
-<p>Some examples include, but are not limited to:</p>
-<ul>
-<li>Starting background timers to perform periodic housekeeping tasks</li>
-<li>Pre-loading some cache grains with data downloaded from external backing storage.</li>
-</ul>
-<p>We have now added support for this auto-run functionality through configuring &quot;bootstrap providers&quot; for Orleans silos. For example:</p>
-<pre><code class="lang-xml">&lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
-  &lt;Globals&gt;
-    &lt;BootstrapProviders&gt;
-      &lt;Provider Type=&quot;My.App.BootstrapClass1&quot; Name=&quot;bootstrap1&quot; /&gt;
-      &lt;Provider Type=&quot;My.App.BootstrapClass2&quot; Name=&quot;bootstrap2&quot; /&gt;
-    &lt;/BootstrapProviders&gt;
-  &lt;/Globals&gt;
-&lt;/OrleansConfiguration&gt;
-</code></pre><p>It is also possible to register Bootstrap provider programaticaly, via calling one of the:</p>
-<pre><code class="lang-csharp">public void RegisterBootstrapProvider(string providerTypeFullName, string providerName, IDictionary&lt;string, string&gt; properties = null)
-
-public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&lt;string, string&gt; properties = null) where T : IBootstrapProvider
-</code></pre><p>on the <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/GlobalConfiguration.cs"><code>Orleans.Runtime.Configuration.GlobalConfiguration</code></a> class.</p>
-<p>These bootstrap providers are C# classes that implement the <code>Orleans.Providers.IBootstrapProvider</code> interface.</p>
-<p>When each silo starts up, the Orleans runtime will instantiate each of the listed app bootstrap classes, and then call their Init method in an appropriate runtime execution context that allows those classes to act as a client and send messages to grains.</p>
-<pre><code class="lang-csharp">Task Init(
-    string name,
-    IProviderRuntime providerRuntime,
-    IProviderConfiguration config)
-</code></pre><p>Any Exceptions that are thrown from an Init method of a bootstrap provider will be reported by the Orleans runtime in the silo log, then the silo startup will be halted.</p>
-<p>This fail-fast approach is the standard way that Orleans handles silo start-up issues, and is intended to allow any problems with silo configuration and/or bootstrap logic to be easily detected during testing phases rather than being silently ignored and causing unexpected problems later in the silo lifecycle.</p>
+<p><strong>Efficient code generation is one of the pillars of Orleans Runtime</strong>. The Orleans Runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.</p>
+<p>There are two modes of <code>OrleansCodeGenerator</code>:</p>
+<ol>
+<li><p><strong>Build-time Codegen</strong> - in this mode, codegen will run every time your project is compiled. An <code>MSBuild</code> task is injected in your project&#39;s build pipeline, and the code is generated in the project&#39;s <code>Properties\orleans.codegen.cs</code>. To activate this mode, add the package <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> to your <strong>Grain Interface</strong> project and build it. You will notice that when adding this package no extra references are added to your project but you will see the <code>Properties\orleans.codegen.cs</code> was added. Also if you edit your <code>.csproj</code> file, you will see that an extra <code>MSBuild</code> target was added as well. The good thing about using this mode is that you can step-into the generated code while debugging since the file is physically on the disk. However, your build time will be slower than usual if you have big projects. This is the default mode selected when you create a <strong>Grain Interface</strong> project by using the Visual Studio templates and it was the first codegen mode introduced since the release of Orleans. <strong>Note</strong>: To avoid the hassles of keeping this file under source control, we suggest you to to add it to your <code>.gitignore</code> or whatever ignore mechanism you have on your source control system, so it is not tracked by it, since this file will be re-generated every build.</p>
+</li>
+<li><p><strong>Runtime Codegen</strong> - introduced recently by @reubenbond, different from the build-time, this mode makes <code>OrleansCodeGenerator</code> to generate code when the Silo is starting. The good thing is that there is no <code>.cs</code> file on disk for the generated code, and you don&#39;t have an extra build step on your build pipeline. The bad thing, is that you can&#39;t step-into the generated code while debugging and it may increase your silo start time a bit. To enable this mode, if you were using the <strong>build-time</strong> codegen, remove all the references to <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package and all the <code>Properties\orleans.codegen.cs</code> files then add a reference to <code>Microsoft.Orleans.OrleansCodeGenerator</code> in your <strong>Silo host</strong> project. If you created the project by using the Visual Studio templates, it should already be there otherwise, you can just install <code>icrosoft.Orleans.OrleansCodeGenerator</code> on your silo project. All set! The codegen will run at Silo startup.</p>
+</li>
+</ol>
+<p>Either way the code generated is exactly and there is just a trade-off on whether you want to debug the generated code and slow down your build time or, have faster builds without debug the generated code.</p>
 
             </article>
           </div>
@@ -110,7 +91,7 @@ public void RegisterBootstrapProvider&lt;T&gt;(string providerName, IDictionary&
               <div class="contribution">
                 <ul class="nav">
                   <li>
-                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Application-Bootstrap-within-a-Silo.md/#L1" class="contribution-link">Improve this Doc</a>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Codegen.md/#L1" class="contribution-link">Improve this Doc</a>
                   </li>
                 </ul>
               </div>

@@ -8,7 +8,7 @@
     <title>Stateless Worker Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Stateless Worker Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.7.2.0">
+    <meta name="generator" content="docfx 2.8.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -97,7 +97,7 @@ They will become idle, and eventually deactivated by the standard activation col
 Hence, the pool of activations will eventually shrink to match the load.</p>
 <p>The following example defines a Stateless Worker grain class <code>MyStatelessWorkerGrain</code> with the default maximum activation number limit. </p>
 <pre><code class="lang-csharp">[StatelessWorker]
-public class MyStatelessWorkerGrain() : IMyStatelessWorkerGrain
+public class MyStatelessWorkerGrain : IMyStatelessWorkerGrain
 {
  ...
 }
@@ -108,7 +108,7 @@ Multiple grain IDs can be used when having multiple Stateless Worker grain pools
 await worker.Process(args);
 </code></pre><p>This one defines a Stateless Worker grain class with no more than one grain activation per silo. </p>
 <pre><code class="lang-csharp">[StatelessWorker(1)] // max 1 activation per silo
-public class MyLonelyWorkerGrain() : ILonelyWorkerGrain
+public class MyLonelyWorkerGrain : ILonelyWorkerGrain
 {
  ...
 }
