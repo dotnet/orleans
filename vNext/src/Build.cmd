@@ -42,6 +42,9 @@ call %_dotnet% build /m:1 /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutDir% %VERSION_FILE% %CMDHOME%\ true
+@if ERRORLEVEL 1 GOTO :ErrorStop
+
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
@@ -50,6 +53,9 @@ SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 call %_dotnet% build /m:1 /p:Configuration=%CONFIGURATION% "%PROJ%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
+
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutDir% %VERSION_FILE% %CMDHOME%\ true
+@if ERRORLEVEL 1 GOTO :ErrorStop
 
 REM set STEP=VSIX
 

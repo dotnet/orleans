@@ -39,6 +39,6 @@
     <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
     <file src="Microsoft.CodeAnalysis.dll" target="tools" />
 
-    <file src="Bootstrap\System.*.dll" target="tools" />
+    <file src="System.*.dll" target="tools" />
   </files>
 </package>

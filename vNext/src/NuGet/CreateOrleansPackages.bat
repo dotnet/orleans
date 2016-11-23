@@ -3,17 +3,17 @@
 
 IF %1.==. GOTO Usage
 
-set NUGET_EXE=%~dp0..\..\..\src\.nuget\nuget.exe
+set _dotnet=%1
 
-set BASE_PATH=%1
-set VERSION=%2
-set SRC_DIR=%3
-set PRERELEASE_BUILD=%4
-IF %2 == "" set VERSION=%~dp0..\Build\Version.txt
+set BASE_PATH=%2
+set VERSION=%3
+set SRC_DIR=%4
+set PRERELEASE_BUILD=%5
+IF %3 == "" set VERSION=%~dp0..\Build\Version.txt
 
-@echo CreateOrleansNugetPackages running in directory = %1
+@echo CreateOrleansNugetPackages running in directory = %2
 @cd
-@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_PATH% using nuget location = %NUGET_EXE%
+@echo CreateOrleansNugetPackages version file = %VERSION% from base dir = %BASE_PATH% using nuget location = %_dotnet%
 
 if "%BASE_PATH%" == "." (
 	if EXIST "Release" (
@@ -54,21 +54,21 @@ if "%PRERELEASE_BUILD%" == "true" (
 
 @echo CreateOrleansNugetPackages: Version = !VERSION! -- Drop location = %BASE_PATH% -- SRC_DIR=%SRC_DIR%
 
-@set NUGET_PACK_OPTS= -Version !VERSION!
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -NoPackageAnalysis
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -BasePath "%BASE_PATH%" -OutputDirectory "%BASE_PATH%"
-@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Properties SRC_DIR=%SRC_DIR%
+@set NUGET_PACK_OPTS= --version !VERSION!
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% --no-package-analysis
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% --base-path "%BASE_PATH%" --output-directory "%BASE_PATH%"
+@set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% --properties SRC_DIR=%SRC_DIR%
 REM @set NUGET_PACK_OPTS=%NUGET_PACK_OPTS% -Verbosity detailed -Verbose
 
 FOR %%G IN ("%~dp0*.nuspec") DO (
-  "%NUGET_EXE%" pack "%%G" %NUGET_PACK_OPTS% -Symbols
+  "%_dotnet%" nuget pack "%%G" %NUGET_PACK_OPTS% --symbols
   if ERRORLEVEL 1 EXIT /B 1
 )
 
 FOR %%G IN ("%~dp0*.nuspec-NoSymbols") DO (
   REM %%~dpnG gets the full filename path but without the extension
   move "%%G" "%%~dpnG.nuspec"
-  "%NUGET_EXE%" pack "%%~dpnG.nuspec" %NUGET_PACK_OPTS%
+  "%_dotnet%" nuget pack "%%~dpnG.nuspec" %NUGET_PACK_OPTS%
   if ERRORLEVEL 1 EXIT /B 1
   move "%%~dpnG.nuspec" "%%G"
 )
@@ -77,7 +77,7 @@ GOTO EOF
 
 :Usage
 @ECHO Usage:
-@ECHO    CreateOrleansPackages ^<Path to Orleans SDK folder^> ^<VersionFile^>
+@ECHO    CreateOrleansPackages ^<Path to dotnet.exe^> ^<Path to Orleans SDK folder^> ^<VersionFile^>
 EXIT /B -1
 
 :EOF
