@@ -139,8 +139,7 @@ namespace Orleans.AzureUtils
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
-                var exists = queueRef.ExistsAsync();
-                if (await exists)
+                if (queueRef != null)
                 {
                     await queueRef.DeleteIfExistsAsync();
                     logger.Info(ErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);

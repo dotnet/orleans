@@ -6,10 +6,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
-#if !NETSTANDARD
-// lib not supported in netstandard
-using Microsoft.WindowsAzure.Storage.Table.Queryable;
-#endif
 using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
@@ -333,9 +329,7 @@ namespace Orleans.AzureUtils
                     string queryString = TableQueryFilterBuilder.MatchPartitionKeyAndRowKeyFilter(partitionKey, rowKey);
                     var query = new TableQuery<T>().Where(queryString);
                     TableQuerySegment<T> segment = await tableReference.ExecuteQuerySegmentedAsync(query, null); 
-
                     retrievedResult = segment.Results.SingleOrDefault();
-
                 }
                 catch (StorageException exception)
                 {
@@ -361,9 +355,9 @@ namespace Orleans.AzureUtils
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
         {
-            string query = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey);
+            string query = TableQuery.GenerateFilterCondition(nameof(ITableEntity.PartitionKey), QueryComparisons.Equal, partitionKey);
 
-            return ReadTableEntriesAndEtagsWithFilterStringAsync(query);
+            return ReadTableEntriesAndEtagsAsync(query);
         }
 
         /// <summary>
@@ -373,7 +367,7 @@ namespace Orleans.AzureUtils
         /// <returns>Enumeration of all entries in the table.</returns>
         public Task<IEnumerable<Tuple<T, string>>> ReadAllTableEntriesAsync()
         {
-            return ReadTableEntriesAndEtagsWithFilterStringAsync(null);
+            return ReadTableEntriesAndEtagsAsync(null);
         }
 
         /// <summary>
@@ -435,95 +429,62 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Read data entries and their corresponding eTags from the Azure table.
         /// </summary>
-        /// <param name="predicate">Predicate function to use for querying the table and filtering the results.</param>
+        /// <param name="filter">Filter string to use for querying the table and filtering the results.</param>
         /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-#if !NETSTANDARD
-        //Microsoft.WindowsAzure.Storage.Table.Queryable is not supported in netstandard, so TableQuery with an Expression predicate 
-        // is not supported in netstandard, just keep this method in full dotnet
-        // for full dotnet users consistency
-        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(Expression<Func<T, bool>> predicate)
+        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsAsync(string filter)
         {
             const string operation = "ReadTableEntriesAndEtags";
             var startTime = DateTime.UtcNow;
-            try
-            {
-                TableQuery<T> cloudTableQuery = predicate == null
-                    ? tableReference.CreateQuery<T>()
-                    : tableReference.CreateQuery<T>().Where(predicate).AsTableQuery();
-                return await ReadTableEntriesAndEtagsWithTableQueryAsync(cloudTableQuery);
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
-        }
-#endif
 
-        /// <summary>
-        /// Read data entries and their corresponding eTags from the Azure table.
-        /// </summary>
-        /// <param name="filter">filter string to use for querying the table and filtering the results.</param>
-        /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        public async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsWithFilterStringAsync(string filter)
-        {
-            const string operation = "ReadTableEntriesAndEtags";
-            var startTime = DateTime.UtcNow;
             try
             {
                 TableQuery<T> cloudTableQuery = filter == null
                     ? new TableQuery<T>()
                     : new TableQuery<T>().Where(filter);
-                return await ReadTableEntriesAndEtagsWithTableQueryAsync(cloudTableQuery);
+
+                try
+                {
+                    Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
+                    {
+                        TableQuerySegment<T> querySegment = null;
+                        var list = new List<T>();
+                        //ExecuteSegmentedAsync not supported in "WindowsAzure.Storage": "7.2.1" yet
+                        while (querySegment == null || querySegment.ContinuationToken != null)
+                        {
+                            querySegment = await tableReference.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
+                            list.AddRange(querySegment);
+                        }
+
+                        return list;
+                    };
+
+                    IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
+
+                    List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                        counter => executeQueryHandleContinuations(),
+                        AzureTableDefaultPolicies.MaxTableOperationRetries,
+                        (exc, counter) => AzureStorageUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
+                        AzureTableDefaultPolicies.TableOperationTimeout,
+                        backoff);
+
+                    // Data was read successfully if we got to here                    
+                    return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
+
+            }
+            catch (Exception exc)
+                {
+                    // Out of retries...
+                    var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
+                    if (!AzureStorageUtils.TableStorageDataNotFound(exc))
+                    {
+                        Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
+                    }
+                    throw new OrleansException(errorMsg, exc);
+                }
             }
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
-            }
-        }
-        /// <summary>
-        /// Read data entries and their corresponding eTags from the Azure table.
-        /// </summary>
-        /// <param name="filter">Predicate function to use for querying the table and filtering the results.</param>
-        /// <returns>Enumeration of entries in the table which match the query condition.</returns>
-        private async Task<IEnumerable<Tuple<T, string>>> ReadTableEntriesAndEtagsWithTableQueryAsync(TableQuery<T> cloudTableQuery)
-        {
-            try
-            {
-                Func<Task<List<T>>> executeQueryHandleContinuations = async () =>
-                {
-                    TableQuerySegment<T> querySegment = null;
-                    var list = new List<T>();
-                        
-                    while (querySegment == null || querySegment.ContinuationToken != null)
-                    {
-                        querySegment = await tableReference.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
-                        list.AddRange(querySegment);
-                    }
-                    return list;
-                };
-
-                IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
-
-                List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                    counter => executeQueryHandleContinuations(),
-                    AzureTableDefaultPolicies.MaxTableOperationRetries,
-                    (exc, counter) => AzureStorageUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                    AzureTableDefaultPolicies.TableOperationTimeout,
-                    backoff);
-
-                // Data was read successfully if we got to here                    
-                return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
-
-            }
-            catch (Exception exc)
-            {
-                // Out of retries...
-                var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
-                if (!AzureStorageUtils.TableStorageDataNotFound(exc))
-                {
-                    Logger.Warn(ErrorCode.AzureTable_09, errorMsg, exc);
-                }
-                throw new OrleansException(errorMsg, exc);
             }
         }
 
@@ -569,7 +530,6 @@ namespace Orleans.AzureUtils
 
                 try
                 {
-                    //CloudTable.BeginExecuteBatch/EndExecuteBatch not supported in "WindowsAzure.Storage": "7.2.1" yet
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
                     await tableReference.ExecuteBatchAsync(entityBatch);
                 }

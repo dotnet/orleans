@@ -36,10 +36,7 @@ namespace Orleans.Serialization
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-#if !NETSTANDARD_TODO
-                //Newtonsoft.Json.JsonSerializerSettings.set_TypeNameAssemblyFormat not suppported in netstanard
                 TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
-#endif
                 Formatting = Formatting.None
             };
 
@@ -64,13 +61,10 @@ namespace Orleans.Serialization
             if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
             {
                 bool useFullAssemblyNames;
-#if !NETSTANDARD_TODO
-                //Newtonsoft.Json.JsonSerializerSettings.set_TypeNameAssemblyFormat not suppported in netstanard
                 if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
                 {
                     settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
                 }
-#endif
             }
 
             if (config.Properties.ContainsKey(IndentJsonProperty))
@@ -163,7 +157,7 @@ namespace Orleans.Serialization
         }
     }
 
-#region JsonConverters
+    #region JsonConverters
 
     internal class IPAddressConverter : JsonConverter
     {
@@ -283,5 +277,5 @@ namespace Orleans.Serialization
             return new IPEndPoint(address, port);
         }
     }
-#endregion
+    #endregion
 }

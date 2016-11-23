@@ -2,6 +2,8 @@
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+    <RootNamespace>Tester.AzureUtils</RootNamespace>
+    <AssemblyName>Tester.AzureUtils</AssemblyName>
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
@@ -9,6 +11,7 @@
     <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <Compile Include="**\*.cs" />
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
@@ -23,6 +26,7 @@
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
@@ -39,6 +43,19 @@
     <PackageReference Include="Newtonsoft.Json">
       <Version>9.0.1</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\..\test\TesterAzureUtils\AzureGossipTableTests.cs">
@@ -71,15 +88,6 @@
     <Compile Include="..\..\..\test\TesterAzureUtils\GenericGrainsInAzureStorageTests.cs">
       <Link>GenericGrainsInAzureStorageTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Persistence\PersistenceGrainTests_AzureBlobStore.cs">
-      <Link>Persistence\PersistenceGrainTests_AzureBlobStore.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Persistence\PersistenceGrainTests_AzureStore.cs">
-      <Link>Persistence\PersistenceGrainTests_AzureStore.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterAzureUtils\Persistence\PersistenceGrainTests_AzureTableStore.cs">
-      <Link>Persistence\PersistenceGrainTests_AzureTableStore.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\TesterAzureUtils\Persistence\PersistenceProviderTests.cs">
       <Link>Persistence\PersistenceProviderTests.cs</Link>
     </Compile>
@@ -110,19 +118,6 @@
     <Compile Include="..\..\..\test\TesterAzureUtils\UnitTestAzureTableDataManager.cs">
       <Link>UnitTestAzureTableDataManager.cs</Link>
     </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
-    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
-    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
-    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
-    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
-    <ProjectReference Include="..\Tester\Tester.csproj" />
-    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
-    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

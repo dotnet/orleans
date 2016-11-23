@@ -19,7 +19,7 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <group targetFramework=".NETStandard1.5">
-        <dependency id="Newtonsoft.Json" version="9.0.1" />
+        <dependency id="Newtonsoft.Json" version="9.0.0" />
         <dependency id="System.Collections.Immutable" version="1.2.0" />
         <dependency id="System.ComponentModel.TypeConverter" version="4.1.0" />
         <dependency id="System.Diagnostics.FileVersionInfo" version="4.0.0" />
