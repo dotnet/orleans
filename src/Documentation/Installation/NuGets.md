@@ -55,7 +55,7 @@ The below packages provide additional functionality.
 ```
 PM> Install-Package Microsoft.Orleans.OrleansAzureUtils
 ```
-Contains Azure Table based cluster membership provider, wrapper classes that simplifies instantiation of silos and clients in Azure Worker/Web roles, persistence providers for Azure Tables and Azure Blobs, and a stream providers for Azure Queues.
+Contains Azure Table based cluster membership provider, wrapper classes that simplify instantiation of silos and clients in Azure Worker/Web roles, persistence providers for Azure Tables and Azure Blobs, and a stream provider for Azure Queues.
 
 
 ### [Microsoft Orleans Sql Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansSqlUtils/)
@@ -124,7 +124,7 @@ Includes support for [Bond serializer](https://github.com/microsoft/bond).
 
 ## Hosting and testing
 
-### [Microsoft Orleans Runtime ](https://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/)
+### [Microsoft Orleans Runtime](https://www.nuget.org/packages/Microsoft.Orleans.OrleansRuntime/)
 
 ```
 PM> Install-Package Microsoft.Orleans.OrleansRuntime 
