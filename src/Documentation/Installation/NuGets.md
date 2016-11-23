@@ -5,7 +5,7 @@ title: Orleans NuGet Packages
 
 # Nuget Packages
 
-## Orleans NuGet packages as of [v1.3.1](https://github.com/dotnet/orleans/releases/tag/v1.2.0)
+## Orleans NuGet packages as of [v1.3.1](https://github.com/dotnet/orleans/releases/tag/v1.3.1)
 
 There are 4 key NuGet packages you will need to use in most scenarios:
 
