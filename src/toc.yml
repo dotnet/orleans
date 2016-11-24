@@ -3,7 +3,7 @@
   homepage: Documentation/Introduction.md
 - name: Tutorials
   href: Tutorials/index.md
-  homepage: index.md
+  homepage: Tutorials/index.md
 - name: Community
   href: Community/Contributing.md
   homepage: Community/Contributing.md
