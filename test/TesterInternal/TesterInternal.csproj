@@ -53,6 +53,7 @@
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
+    <Compile Include="General\TimerWheelTest.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
     <Compile Include="MembershipTests\PostgreSqlMembershipTableTests.cs" />

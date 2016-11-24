@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -13,30 +15,51 @@ namespace Orleans.Runtime
         /// This method is called by the timer when the time out is reached.
         /// </summary>
         void OnTimeout();
-        TimeSpan RequestedTimeout();
+
+        DateTime DueTime { get; }
     }
 
-    internal class CallbackData : ITimebound, IDisposable
+    internal class CallbackData : ITimebound
     {
         private readonly Action<Message, TaskCompletionSource<object>> callback;
         private readonly Func<Message, bool> resendFunc;
         private readonly Action unregister;
         private readonly TaskCompletionSource<object> context;
 
+        private TimeSpan? resendPeriod;
         private bool alreadyFired;
-        private TimeSpan timeout; 
-        private SafeTimer timer;
+        private TimeSpan timeout;
         private ITimeInterval timeSinceIssued;
         private IMessagingConfiguration config;
+
+        private readonly TimeSpan _callbacksWheelCheckPeriod = TimeSpan.FromMilliseconds(77);
+
+        [ThreadStatic]
+        private static TimerWheel<CallbackData> resendableCallbacksWheel;
+        [ThreadStatic]
+        private static TimerWheel<CallbackData> callbacksWheel;
+
+        private static readonly Func<CallbackData, bool> timerWheelShouldDequeue = callback => callback.alreadyFired;
+        private static readonly Func<CallbackData, bool> timerWheelShouldReEnqueue = callback =>
+        {
+            if (callback.resendPeriod.HasValue)
+            {
+                callback.DueTime = DateTime.UtcNow + callback.resendPeriod.Value;
+                return true;
+            }
+
+            return false;
+        };
+
         private static readonly Logger logger = LogManager.GetLogger("CallbackData");
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
         public CallbackData(
-            Action<Message, TaskCompletionSource<object>> callback, 
-            Func<Message, bool> resendFunc, 
-            TaskCompletionSource<object> ctx, 
-            Message msg, 
+            Action<Message, TaskCompletionSource<object>> callback,
+            Func<Message, bool> resendFunc,
+            TaskCompletionSource<object> ctx,
+            Message msg,
             Action unregisterDelegate,
             IMessagingConfiguration config)
         {
@@ -58,7 +81,7 @@ namespace Orleans.Runtime
         /// Start this callback timer
         /// </summary>
         /// <param name="time">Timeout time</param>
-        public void StartTimer(TimeSpan time)
+        public void RegisterTimeout(TimeSpan time)
         {
             if (time < TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(time), "The timeout parameter is negative.");
@@ -70,20 +93,18 @@ namespace Orleans.Runtime
             }
 
             TimeSpan firstPeriod = timeout;
-            TimeSpan repeatPeriod = Constants.INFINITE_TIMESPAN; // Single timeout period --> No repeat
             if (config.ResendOnTimeout && config.MaxResendCount > 0)
             {
-                firstPeriod = repeatPeriod = timeout.Divide(config.MaxResendCount + 1);
+                resendPeriod = firstPeriod = timeout.Divide(config.MaxResendCount + 1);
+                DueTime = DateTime.UtcNow.Add(firstPeriod);
+                if(resendableCallbacksWheel == null) resendableCallbacksWheel = new TimerWheel<CallbackData>(_callbacksWheelCheckPeriod, timerWheelShouldReEnqueue, timerWheelShouldDequeue);
+                resendableCallbacksWheel.Register(this);
+                return;
             }
-            // Start time running
-            DisposeTimer();
-            timer = new SafeTimer(TimeoutCallback, null, firstPeriod, repeatPeriod);
 
-        }
-
-        private void TimeoutCallback(object obj)
-        {
-            OnTimeout();
+            DueTime = DateTime.UtcNow.Add(firstPeriod);
+            if (callbacksWheel == null) callbacksWheel = new TimerWheel<CallbackData>(_callbacksWheelCheckPeriod, shouldDequeue: timerWheelShouldDequeue);
+            callbacksWheel.Register(this);
         }
 
         public void OnTimeout()
@@ -100,6 +121,8 @@ namespace Orleans.Runtime
             OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
         }
 
+        public DateTime DueTime { get; private set; }
+
         public void OnTargetSiloFail()
         {
             if (alreadyFired)
@@ -107,7 +130,7 @@ namespace Orleans.Runtime
 
             var msg = Message;
             var messageHistory = msg.GetTargetHistory();
-            string errorMsg = 
+            string errorMsg =
                 $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
@@ -133,7 +156,6 @@ namespace Orleans.Runtime
                 }
 
                 alreadyFired = true;
-                DisposeTimer();
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
                     timeSinceIssued.Stop();
@@ -146,26 +168,6 @@ namespace Orleans.Runtime
             }
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             callback(response, context);
-        }
-
-        public void Dispose()
-        {
-            DisposeTimer();
-            GC.SuppressFinalize(this);
-        }
-
-        private void DisposeTimer()
-        {
-            try
-            {
-                var tmp = timer;
-                if (tmp != null)
-                {
-                    timer = null;
-                    tmp.Dispose();
-                }
-            }
-            catch (Exception) { } // Ignore any problems with Dispose
         }
 
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
@@ -182,7 +184,6 @@ namespace Orleans.Runtime
                 }
 
                 alreadyFired = true;
-                DisposeTimer();
                 if (StatisticsCollector.CollectApplicationRequestsStats)
                 {
                     timeSinceIssued.Stop();
@@ -190,7 +191,7 @@ namespace Orleans.Runtime
 
                 unregister?.Invoke();
             }
-            
+
             if (StatisticsCollector.CollectApplicationRequestsStats)
             {
                 ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);

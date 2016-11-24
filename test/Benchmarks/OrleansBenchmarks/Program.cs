@@ -13,6 +13,10 @@ namespace OrleansBenchmarks
     {
         private static readonly Dictionary<string, Action> _benchmarks = new Dictionary<string, Action>
         {
+            ["TimerWheel"] = () =>
+            {
+                var summary = BenchmarkRunner.Run<TimerWheelBenchmark>();
+            },
             ["MapReduce"] = () =>
             {
                 RunBenchmark(
