@@ -40,8 +40,11 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             var testEnvironment = new SerializationTestEnvironment();
-            storageProviderManager = new StorageProviderManager(testEnvironment.GrainFactory, null);
-            storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
+            storageProviderManager = new StorageProviderManager(
+                testEnvironment.GrainFactory,
+                null,
+                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+            storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
             testEnvironment.InitializeForTesting();
             LocalDataStoreInstance.LocalDataStore = null;

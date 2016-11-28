@@ -58,6 +58,7 @@
     <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
+    <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Counters\CounterConfigData.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Silo\SiloInitializationParameters.cs" />

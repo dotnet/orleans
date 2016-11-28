@@ -51,7 +51,8 @@ namespace UnitTests.General
             Assert.Equal(12, x);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact(Skip = "Grains with multiple constructors are not supported without being explicitly registered.")]
+        [TestCategory("BVT"), TestCategory("Functional")]
         public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
         {
             ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);

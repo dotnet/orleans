@@ -579,7 +579,7 @@ namespace Orleans.Runtime
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, message.TargetGrain, InsideRuntimeClient.Current.Catalog, strategy);
+                message.SendingAddress, message.TargetGrain, this.catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {

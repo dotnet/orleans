@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime.Providers;
+using Orleans.Streams;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
@@ -12,11 +12,18 @@ namespace Orleans.Runtime
         private readonly Logger logger = LogManager.GetLogger("TypeManager");
         private readonly GrainTypeManager grainTypeManager;
         private readonly ISiloStatusOracle statusOracle;
+        private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         private readonly OrleansTaskScheduler scheduler;
         private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
 
-        internal TypeManager(SiloAddress myAddr, GrainTypeManager grainTypeManager, ISiloStatusOracle oracle, OrleansTaskScheduler scheduler, TimeSpan refreshClusterMapTimeout)
+        internal TypeManager(
+            SiloAddress myAddr,
+            GrainTypeManager grainTypeManager,
+            ISiloStatusOracle oracle,
+            OrleansTaskScheduler scheduler,
+            TimeSpan refreshClusterMapTimeout,
+            ImplicitStreamSubscriberTable implicitStreamSubscriberTable)
             : base(Constants.TypeManagerId, myAddr)
         {
             if (grainTypeManager == null)
@@ -25,19 +32,21 @@ namespace Orleans.Runtime
                 throw new ArgumentNullException(nameof(oracle));
             if (scheduler == null)
                 throw new ArgumentNullException(nameof(scheduler));
+            if (implicitStreamSubscriberTable == null)
+                throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
 
             this.grainTypeManager = grainTypeManager;
-            statusOracle = oracle;
+            this.statusOracle = oracle;
+            this.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
             this.scheduler = scheduler;
-            hasToRefreshClusterGrainInterfaceMap = true;
+            this.hasToRefreshClusterGrainInterfaceMap = true;
             this.refreshClusterGrainInterfaceMapTimer = new AsyncTaskSafeTimer(
                     OnRefreshClusterMapTimer,
                     null,
                     TimeSpan.Zero,  // Force to do it once right now
                     refreshClusterMapTimeout); 
         }
-
-
+        
         public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
         {
             return Task.FromResult<IGrainTypeResolver>(grainTypeManager.ClusterGrainInterfaceMap);
@@ -48,14 +57,9 @@ namespace Orleans.Runtime
             return Task.FromResult(grainTypeManager.GetTypeCodeMap());
         }
 
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(SiloAddress silo)
+        public Task<ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(SiloAddress silo)
         {
-            Streams.ImplicitStreamSubscriberTable table = SiloProviderRuntime.Instance.ImplicitStreamSubscriberTable;
-            if (null == table)
-            {
-                throw new InvalidOperationException("the implicit stream subscriber table is not initialized");
-            }
-            return Task.FromResult(table);
+            return Task.FromResult(implicitStreamSubscriberTable);
         }
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
