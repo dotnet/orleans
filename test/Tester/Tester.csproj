@@ -117,7 +117,8 @@
     <Compile Include="StreamingTests\SMSClientStreamTests.cs" />
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
-    <Compile Include="StreamingTests\StreamFilteringTests.cs" />
+    <Compile Include="StreamingTests\StreamFilteringTestsBase.cs" />
+    <Compile Include="StreamingTests\StreamFilteringTests_SMS.cs" />
     <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
     <Compile Include="StreamingTests\TimePurgePredicateTests.cs" />

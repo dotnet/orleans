@@ -7,7 +7,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace UnitTests.General
+namespace Tester.AzureUtils.General
 {
     public class GenericGrainsInAzureStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureStorageTests.Fixture>
     {
