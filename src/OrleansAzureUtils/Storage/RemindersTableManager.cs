@@ -115,6 +115,7 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task<List<Tuple<ReminderTableEntry, string>>> FindReminderEntries(uint begin, uint end)
         {
+            // TODO: Determine whether or not a single query could be used here while avoiding a table scan
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
             string serviceIdStr = ReminderTableEntry.ConstructServiceIdStr(ServiceId);
@@ -140,21 +141,16 @@ namespace Orleans.Runtime.ReminderService
                 var queryResults = await ReadTableEntriesAndEtagsAsync(filterOnServiceIdStr);
                 return queryResults.ToList();
             }
-
+            
             // (begin > end)
-            string filterExtendBeginAndEnd = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, sBegin),
-                    TableOperators.Or,
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThanOrEqual,
-                        sEnd));
-            string query1 = TableQuery.CombineFilters(
+            string queryOnSBegin = TableQuery.CombineFilters(
                 filterOnServiceIdStr, TableOperators.And, TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, sBegin));
-            string query2 = TableQuery.CombineFilters(
+            string queryOnSEnd = TableQuery.CombineFilters(
                 filterOnServiceIdStr, TableOperators.And, TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThanOrEqual, sEnd));
 
-            var results1 = ReadTableEntriesAndEtagsAsync(query1);
-            var results2 = ReadTableEntriesAndEtagsAsync(query2);
-            IEnumerable<Tuple<ReminderTableEntry, string>>[] results = await Task.WhenAll(results1, results2);
+            var resultsOnSBeginQuery = ReadTableEntriesAndEtagsAsync(queryOnSBegin);
+            var resultsOnSEndQuery = ReadTableEntriesAndEtagsAsync(queryOnSEnd);
+            IEnumerable<Tuple<ReminderTableEntry, string>>[] results = await Task.WhenAll(resultsOnSBeginQuery, resultsOnSEndQuery);
             return results[0].Concat(results[1]).ToList();
         }
 

@@ -14,6 +14,7 @@ using Samples.StorageProviders;
 using Tester;
 using TestExtensions;
 using UnitTests.StorageTests;
+using UnitTests.Persistence;
 using Xunit;
 using Xunit.Abstractions;
 
