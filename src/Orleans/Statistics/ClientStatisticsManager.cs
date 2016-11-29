@@ -1,30 +1,32 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager
+    internal class ClientStatisticsManager : IDisposable
     {
+        private readonly ClientConfiguration config;
         private ClientTableStatistics tableStatistics;
         private LogStatistics logStatistics;
         private RuntimeStatisticsGroup runtimeStats;
-        private readonly TraceLogger logger ;
+        private readonly Logger logger;
 
-        internal ClientStatisticsManager(IStatisticsConfiguration config)
+        internal ClientStatisticsManager(ClientConfiguration config)
         {
+            this.config = config;
             runtimeStats = new RuntimeStatisticsGroup();
             logStatistics = new LogStatistics(config.StatisticsLogWriteInterval, false);
-            logger = TraceLogger.GetLogger(GetType().Name);
-        }
+            logger = LogManager.GetLogger(GetType().Name);
 
-        internal async Task Start(ClientConfiguration config, StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
-        {
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
             ApplicationRequestsStatisticsGroup.Init(config.ResponseTimeout);
+        }
 
+        internal async Task Start(StatisticsProviderManager statsManager, IMessageCenter transport, GrainId clientId)
+        {
             runtimeStats.Start();
 
             // Configure Metrics
@@ -83,9 +85,7 @@ namespace Orleans.Runtime
 
         internal void Stop()
         {
-            if (runtimeStats != null)
-                runtimeStats.Stop();
-
+            runtimeStats?.Stop();
             runtimeStats = null;
 
             if (logStatistics != null)
@@ -96,10 +96,18 @@ namespace Orleans.Runtime
 
             logStatistics = null;
 
-            if (tableStatistics != null)
-                tableStatistics.Dispose();
-
+            tableStatistics?.Dispose();
             tableStatistics = null;
+        }
+
+        public void Dispose()
+        {
+            if (runtimeStats != null)
+                runtimeStats.Dispose();
+            runtimeStats = null;
+            if (logStatistics != null)
+                logStatistics.Dispose();
+            logStatistics = null;
         }
     }
 }

@@ -11,8 +11,8 @@ namespace Orleans
     /// </summary>
     public class AsyncSerialExecutor
     {
-        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions;
-        private readonly InterlockedExchangeLock locker;
+        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>> actions = new ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>>();
+        private readonly InterlockedExchangeLock locker = new InterlockedExchangeLock();
 
         private class InterlockedExchangeLock
         {
@@ -29,12 +29,6 @@ namespace Orleans
             {
                 Interlocked.Exchange(ref lockState, Unlocked);
             }
-        }
-
-        public AsyncSerialExecutor()
-        {
-            actions = new ConcurrentQueue<Tuple<TaskCompletionSource<bool>, Func<Task>>>();
-            locker = new InterlockedExchangeLock();
         }
 
         /// <summary>

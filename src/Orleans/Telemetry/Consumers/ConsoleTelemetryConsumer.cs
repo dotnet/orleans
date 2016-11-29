@@ -49,6 +49,9 @@ namespace Orleans.Runtime
         public void TrackTrace(string message, Severity severityLevel, IDictionary<string, string> properties = null)
         {
             TrackTrace(TraceParserUtils.PrintProperties(message, properties));
-        }                
+        }
+
+        public void Flush() { }
+        public void Close() { }
     }
 }

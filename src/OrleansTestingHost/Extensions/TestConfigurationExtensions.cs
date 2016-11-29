@@ -6,34 +6,51 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.TestingHost.Extensions
 {
+    /// <summary>
+    /// Test silo configuration extensions.
+    /// </summary>
     public static class TestConfigurationExtensions
     {
         /// <summary>
         /// This call tweaks the cluster config with settings specific to a test run.
         /// </summary>
-        public static void AdjustForTestEnvironment(this ClusterConfiguration clusterConfig)
+        public static void AdjustForTestEnvironment(this ClusterConfiguration clusterConfig, string dataConnectionStringFallback)
         {
             if (clusterConfig == null)
             {
-                throw new ArgumentNullException("clusterConfig");
+                throw new ArgumentNullException(nameof(clusterConfig));
             }
-
             AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DeploymentId", clusterConfig.Globals.DeploymentId);
-            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
+            if (string.IsNullOrEmpty(clusterConfig.Globals.DataConnectionString))
+            {
+                if (dataConnectionStringFallback != null)
+                {
+                    clusterConfig.Globals.DataConnectionString = dataConnectionStringFallback;
+                }
+            }
+            AdjustProvidersDeploymentId(clusterConfig.Globals.ProviderConfigurations, "DataConnectionString", clusterConfig.Globals.DataConnectionString);
         }
 
         /// <summary>
         /// This call tweaks the client config with settings specific to a test run.
         /// </summary>
-        public static void AdjustForTestEnvironment(this ClientConfiguration clientConfiguration)
+        public static void AdjustForTestEnvironment(this ClientConfiguration clientConfiguration, string dataConnectionStringFallback)
         {
             if (clientConfiguration == null)
             {
-                throw new ArgumentNullException("clientConfiguration");
+                throw new ArgumentNullException(nameof(clientConfiguration));
             }
 
             AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DeploymentId", clientConfiguration.DeploymentId);
-            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", StorageTestConstants.DataConnectionString);
+            if (string.IsNullOrEmpty(clientConfiguration.DataConnectionString))
+            {
+                if (dataConnectionStringFallback != null)
+                {
+                    clientConfiguration.DataConnectionString = dataConnectionStringFallback;
+                }
+            }
+
+            AdjustProvidersDeploymentId(clientConfiguration.ProviderConfigurations, "DataConnectionString", clientConfiguration.DataConnectionString);
         }
 
         private static void AdjustProvidersDeploymentId(IEnumerable<KeyValuePair<string, ProviderCategoryConfiguration>> providerConfigurations, string key, string @value)

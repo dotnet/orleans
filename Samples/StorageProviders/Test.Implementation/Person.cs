@@ -36,7 +36,7 @@ namespace Test.Implementation
         }
     }
 
-    public class PersonState : GrainState
+    public class PersonState
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }

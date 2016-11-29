@@ -1,0 +1,14 @@
+﻿{
+  "dependencies": {
+    "BenchmarkDotNet": "0.9.9",
+    "BenchmarkDotNet.Diagnostics.Windows": "0.9.9",
+    "BenchmarkDotNet.Toolchains.Roslyn": "0.9.9"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

@@ -5,5 +5,7 @@
     /// </summary>
     public interface ITelemetryConsumer
     {
+        void Flush();
+        void Close();
     }
 }

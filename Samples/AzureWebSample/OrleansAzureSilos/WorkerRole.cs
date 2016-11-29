@@ -46,9 +46,9 @@ namespace Orleans.Azure.Silos
 
             Trace.WriteLine("OrleansAzureSilos-OnStart Starting Orleans silo", "Information");
 
-            var config = new ClusterConfiguration();
-            config.StandardLoad();
-
+            var config = AzureSilo.DefaultConfiguration();
+            config.AddMemoryStorageProvider();
+            
             // First example of how to configure an existing provider
             Example_ConfigureExistingStorageProvider(config);
             Example_ConfigureNewStorageProvider(config);

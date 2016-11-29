@@ -1,0 +1,148 @@
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Sdk">
+      <Version>1.0.0-alpha-20161104-2</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>9.0.1</Version>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestGrains\ActivateDeactivateWatcherGrain.cs">
+      <Link>ActivateDeactivateWatcherGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\CircularStateTestGrain.cs">
+      <Link>CircularStateTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ClusterTestGrains.cs">
+      <Link>ClusterTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ConcreteGrainsWithGenericInterfaces.cs">
+      <Link>ConcreteGrainsWithGenericInterfaces.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ExceptionGrain.cs">
+      <Link>ExceptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ExternalTypeGrain.cs">
+      <Link>ExternalTypeGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GenericGrains.cs">
+      <Link>GenericGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GetGrainGrains.cs">
+      <Link>GetGrainGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\GrainInterfaceHierarchyGrains.cs">
+      <Link>GrainInterfaceHierarchyGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\InitialStateGrain.cs">
+      <Link>InitialStateGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\JsonEchoGrain.cs">
+      <Link>JsonEchoGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\KeyExtensionTestGrain.cs">
+      <Link>KeyExtensionTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MethodInterceptionGrain.cs">
+      <Link>MethodInterceptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleConstructorsSimpleGrain.cs">
+      <Link>MultipleConstructorsSimpleGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleImplicitSubscriptionGrain.cs">
+      <Link>MultipleImplicitSubscriptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleSubscriptionConsumerGrain.cs">
+      <Link>MultipleSubscriptionConsumerGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ReminderTestGrain.cs">
+      <Link>ReminderTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SampleStreamingGrain.cs">
+      <Link>SampleStreamingGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleGenericGrain.cs">
+      <Link>SimpleGenericGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleGrain.cs">
+      <Link>SimpleGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimpleObserverableGrain.cs">
+      <Link>SimpleObserverableGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SimplePersistentGrain.cs">
+      <Link>SimplePersistentGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SpecializedSimpleGenericGrain.cs">
+      <Link>SpecializedSimpleGenericGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\StatelessWorkerGrain.cs">
+      <Link>StatelessWorkerGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\ValueTypeTestGrain.cs">
+      <Link>ValueTypeTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MessageSerializationGrain.cs">
+      <Link>MessageSerializationGrain.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\..\src\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

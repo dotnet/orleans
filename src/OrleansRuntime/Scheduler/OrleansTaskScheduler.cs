@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Scheduler
@@ -13,7 +12,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("OrleansTaskScheduler RunQueue={RunQueue.Length}")]
     internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
     {
-        private readonly TraceLogger logger = TraceLogger.GetLogger("Scheduler.OrleansTaskScheduler", TraceLogger.LoggerType.Runtime);
+        private readonly LoggerImpl logger = LogManager.GetLogger("Scheduler.OrleansTaskScheduler", LoggerType.Runtime);
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory; // work group directory
         private bool applicationTurnsStopped;
         
@@ -29,15 +28,20 @@ namespace Orleans.Runtime.Scheduler
         public int RunQueueLength { get { return RunQueue.Length; } }
         
 
-        public OrleansTaskScheduler(int maxActiveThreads)
-            : this(maxActiveThreads, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100),
-            NodeConfiguration.INJECT_MORE_WORKER_THREADS, LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads)
         {
+            return new OrleansTaskScheduler(
+                maxActiveThreads,
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(100),
+                NodeConfiguration.ENABLE_WORKER_THREAD_INJECTION,
+                LimitManager.GetDefaultLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS));
         }
 
-        public OrleansTaskScheduler(GlobalConfiguration globalConfig, NodeConfiguration config)
+        public OrleansTaskScheduler(NodeConfiguration config)
             : this(config.MaxActiveThreads, config.DelayWarningThreshold, config.ActivationSchedulingQuantum,
-                    config.TurnWarningLengthThreshold, config.InjectMoreWorkerThreads, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
+                    config.TurnWarningLengthThreshold, config.EnableWorkerThreadInjection, config.LimitManager.GetLimit(LimitNames.LIMIT_MAX_PENDING_ITEMS))
         {
         }
 
@@ -267,7 +271,10 @@ namespace Orleans.Runtime.Scheduler
         {
             if (context == null)
             {
-                throw new InvalidSchedulingContextException("CheckSchedulingContextValidity was called on a null SchedulingContext.");
+                throw new InvalidSchedulingContextException(
+                    "CheckSchedulingContextValidity was called on a null SchedulingContext."
+                     + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
+                     + "which will be the case if you create it inside Task.Run.");
             }
             GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
         }
@@ -351,24 +358,6 @@ namespace Orleans.Runtime.Scheduler
         public bool CheckHealth(DateTime lastCheckTime)
         {
             return Pool.DoHealthCheck();
-        }
-
-        /// <summary>
-        /// Action to be invoked when there is no more work for this scheduler
-        /// </summary>
-        internal Action OnIdle { get; set; }
-
-        /// <summary>
-        /// Invoked by WorkerPool when all threads go idle
-        /// </summary>
-        internal void OnAllWorkerThreadsIdle()
-        {
-            if (OnIdle == null || RunQueueLength != 0) return;
-
-#if DEBUG
-            if (logger.IsVerbose2) logger.Verbose2("OnIdle");
-#endif
-            OnIdle();
         }
 
         internal void PrintStatistics()

@@ -6,32 +6,43 @@ using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.ServiceBus.Providers.Streams.EventHub;
 using Orleans.Streams;
+using OrleansServiceBus.Providers.Streams.EventHub;
 
-namespace OrleansServiceBusUtils.Providers.Streams.EventHub
+namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
+    /// </summary>
     [Serializable]
-    internal class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer
     {
+        [JsonProperty]
+        private readonly EventHubMessage eventHubMessage;
+
         [JsonProperty]
         private readonly EventHubSequenceToken token;
 
-        [JsonProperty]
-        private readonly byte[] payloadBytes;
+        /// <summary>
+        /// Stream identifier for the stream this batch is part of.
+        /// </summary>
+        public Guid StreamGuid => eventHubMessage.StreamIdentity.Guid;
 
-        public Guid StreamGuid { get; private set; }
-        public string StreamNamespace { get; private set; }
-        public StreamSequenceToken SequenceToken { get { return token; } }
+        /// <summary>
+        /// Stream namespace for the stream this batch is part of.
+        /// </summary>
+        public string StreamNamespace => eventHubMessage.StreamIdentity.Namespace;
+
+        /// <summary>
+        /// Stream Sequence Token for the start of this batch.
+        /// </summary>
+        public StreamSequenceToken SequenceToken => token;
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized]
         private Body payload;
-        private Body Payload
-        {
-            get { return payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(payloadBytes)); }
-        }
-        
+        private Body Payload => payload ?? (payload = SerializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+
         [Serializable]
         private class Body
         {
@@ -39,27 +50,31 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             public Dictionary<string, object> RequestContext { get; set; }
         }
 
-        public EventHubBatchContainer(Guid streamGuid, string streamNamespace, byte[] data)
+        /// <summary>
+        /// Batch container that deliveres events from cached EventHub data associated with an orleans stream
+        /// </summary>
+        /// <param name="eventHubMessage"></param>
+        public EventHubBatchContainer(EventHubMessage eventHubMessage)
         {
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
-            payloadBytes = data;
+            this.eventHubMessage = eventHubMessage;
+            token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
-        public EventHubBatchContainer(Guid streamGuid, string streamNamespace, string offset, long sequenceNumber, byte[] data)
-            : this(streamGuid, streamNamespace, data)
-        {
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
-            token = new EventHubSequenceToken(offset, sequenceNumber, 0);
-            payloadBytes = data;
-        }
-
+        /// <summary>
+        /// Gets events of a specific type from the batch.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceToken(token.EventHubOffset, token.SequenceNumber, i)));
+            return Payload.Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
         }
 
+        /// <summary>
+        /// Gives an opportunity to IBatchContainer to set any data in the RequestContext before this IBatchContainer is sent to consumers.
+        /// It can be the data that was set at the time event was generated and enqueued into the persistent provider or any other data.
+        /// </summary>
+        /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
         public bool ImportRequestContext()
         {
             if (Payload.RequestContext != null)
@@ -70,6 +85,9 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
             return false;
         }
 
+        /// <summary>
+        /// Decide whether this batch should be sent to the specified target.
+        /// </summary>
         public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
             return true;
@@ -89,14 +107,6 @@ namespace OrleansServiceBusUtils.Providers.Streams.EventHub
                 eventData.SetStreamNamespaceProperty(streamNamespace);
             }
             return eventData;
-        }
-
-        internal static IBatchContainer FromEventData(EventData eventData)
-        {
-            Guid streamGuid = Guid.Parse(eventData.PartitionKey);
-            string streamNamespace = eventData.GetStreamNamespaceProperty();
-            byte[] bytes = eventData.GetBytes();
-            return new EventHubBatchContainer(streamGuid, streamNamespace, eventData.Offset, eventData.SequenceNumber, bytes);
         }
     }
 }

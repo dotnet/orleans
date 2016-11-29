@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Orleans.Runtime.Configuration;
 
@@ -13,13 +12,14 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationCollector : IActivationCollector
     {
+        internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets;
         private readonly object nextTicketLock;
         private DateTime nextTicket;
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public ActivationCollector(ClusterConfiguration config)
         {
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = TraceLogger.GetLogger("ActivationCollector", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ActivationCollector", LoggerType.Runtime);
         }
 
         public TimeSpan Quantum { get { return quantum; } }
@@ -193,7 +193,7 @@ namespace Orleans.Runtime
                     ApproximateCount, 
                     buckets.Count,       
                     Utils.EnumerableToString(
-                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => (Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items").ToString(CultureInfo.InvariantCulture)));
+                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
         }
 
         /// <summary>
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
                             logger.Warn(ErrorCode.Catalog_ActivationCollector_BadState_3,
                                 "ActivationCollector found a non stale activation in it's last bucket. This is violation of ActivationCollector invariants. Now: {0}" +
                                 "For now going to defer it's collection. Activation: {1}",
-                                TraceLogger.PrintDate(now),
+                                LogFormatter.PrintDate(now),
                                 activation.ToDetailedString());
                             ScheduleCollection(activation);
                         }
@@ -321,7 +321,7 @@ namespace Orleans.Runtime
             return result ?? nothing;
         }
 
-        private static void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
+        private void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
         {
             if (null == condemned)
             {
@@ -332,10 +332,7 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            if (Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation != null)
-            {
-                Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation(activation.Grain);
-            }
+            this.Debug_OnDecideToCollectActivation?.Invoke(activation.Grain);
         }
 
         private static void ThrowIfTicketIsInvalid(DateTime ticket, TimeSpan quantum)

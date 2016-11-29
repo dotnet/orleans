@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -17,11 +16,9 @@ namespace Orleans.CodeGeneration
         /// Invoker classes in generated code implement this method to provide a method call jump-table to map invoke data to a strongly typed call to the correct method on the correct interface.
         /// </summary>
         /// <param name="grain">Reference to the grain to be invoked.</param>
-        /// <param name="interfaceId">Interface id of the method to be called.</param>
-        /// <param name="methodId">Method id of the method to be called.</param>
-        /// <param name="arguments">Arguments to be passed to the method being invoked.</param>
+        /// <param name="request">The request being invoked.</param>
         /// <returns>Value promise for the result of the method invoke.</returns>
-        Task<object> Invoke(IAddressable grain, int interfaceId, int methodId, object[] arguments);
+        Task<object> Invoke(IAddressable grain, InvokeMethodRequest request);
     }
 
     /// <summary>
@@ -33,10 +30,24 @@ namespace Orleans.CodeGeneration
         /// Invoke a grain extension method.
         /// </summary>
         /// <param name="extension">Reference to the extension to be invoked.</param>
-        /// <param name="interfaceId">Interface id of the method to be called.</param>
-        /// <param name="methodId">Method id of the method to be called.</param>
-        /// <param name="arguments">Arguments to be passed to the method being invoked.</param>
+        /// <param name="request">The request being invoked.</param>
         /// <returns>Value promise for the result of the method invoke.</returns>
-        Task<object> Invoke(IGrainExtension extension, int interfaceId, int methodId, object[] arguments);
+        Task<object> Invoke(IGrainExtension extension, InvokeMethodRequest request);
+    }
+
+    /// <summary>
+    /// Methods for querying a collection of grain extensions.
+    /// </summary>
+    public interface IGrainExtensionMap
+    {
+        /// <summary>
+        /// Gets the extension from this instance if it is available.
+        /// </summary>
+        /// <param name="interfaceId">The interface id.</param>
+        /// <param name="extension">The extension.</param>
+        /// <returns>
+        /// <see langword="true"/> if the extension is found, <see langword="false"/> otherwise.
+        /// </returns>
+        bool TryGetExtension(int interfaceId, out IGrainExtension extension);
     }
 }

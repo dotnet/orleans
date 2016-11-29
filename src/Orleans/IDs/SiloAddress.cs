@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [DebuggerDisplay("SiloAddress {ToString()}")]
-    public class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>
+    public class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
     {
         internal static readonly int SizeBytes = 24; // 16 for the address, 4 for the port, 4 for the generation
 
@@ -186,24 +186,24 @@ namespace Orleans.Runtime
         {
             if (uniformHashCache != null) return uniformHashCache;
 
-            var jenkinsHash = JenkinsHash.Factory.GetHashGenerator();
             var hashes = new List<uint>();
             for (int i = 0; i < numHashes; i++)
             {
-                uint hash = GetUniformHashCode(jenkinsHash, i);
+                uint hash = GetUniformHashCode(i);
                 hashes.Add(hash);
             }
             uniformHashCache = hashes;
             return uniformHashCache;
         }
 
-        private uint GetUniformHashCode(JenkinsHash jenkinsHash, int extraBit)
+        private uint GetUniformHashCode(int extraBit)
         {
             var writer = new BinaryTokenStreamWriter();
             writer.Write(this);
             writer.Write(extraBit);
             byte[] bytes = writer.ToByteArray();
-            return jenkinsHash.ComputeHash(bytes);
+            writer.ReleaseBuffers();
+            return JenkinsHash.ComputeHash(bytes);
         }
 
         /// <summary>
@@ -227,6 +227,14 @@ namespace Orleans.Runtime
         }
 
         #endregion
+
+
+        // non-generic version of CompareTo is needed by some contexts. Just calls generic version.
+        public int CompareTo(object obj)
+        {
+            return CompareTo((SiloAddress)obj);
+        }
+
 
         public int CompareTo(SiloAddress other)
         {
@@ -278,5 +286,6 @@ namespace Orleans.Runtime
             }
             return returnVal;
         }
-    }
+
+      }
 }

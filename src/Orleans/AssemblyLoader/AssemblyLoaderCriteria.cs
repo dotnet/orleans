@@ -1,3 +1,4 @@
+#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,7 +44,7 @@ namespace Orleans.Runtime
                         ignored = null;
                         foreach (var requiredType in requiredTypes)
                         {
-                            if (requiredType.GetTypeInfo().IsAssignableFrom(type))
+                            if (requiredType.IsAssignableFrom(type))
                             {
                                 //  we found a match! load the assembly.
                                 return true;
@@ -103,3 +104,4 @@ namespace Orleans.Runtime
         }
     }
 }
+#endif

@@ -13,7 +13,7 @@ namespace Orleans.Streams
     /// Predicate filter functions must be staic (non-abstract) methods, so full class name and method name are sufficient info to rehydrate.
     /// </summary>
     [Serializable]
-    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper
+    internal class FilterPredicateWrapperData : IStreamFilterPredicateWrapper, ISerializable
     {
         public object FilterData { get; private set; }
 
@@ -26,9 +26,6 @@ namespace Orleans.Streams
 
         [NonSerialized]
         private StreamFilterPredicate predicateFunc;
-
-        // constructor used by serializator
-        private FilterPredicateWrapperData() { }
 
         internal FilterPredicateWrapperData(object filterData, StreamFilterPredicate pred)
         {
@@ -68,7 +65,7 @@ namespace Orleans.Streams
 
         private static StreamFilterPredicate RehydrateStaticFuncion(string funcClassName, string funcMethodName)
         {
-            Type funcClassType = CachedTypeResolver.Instance.ResolveType(funcClassName);
+            Type funcClassType = TypeUtils.ResolveType(funcClassName);
             MethodInfo method = funcClassType.GetMethod(funcMethodName);
             StreamFilterPredicate pred = (StreamFilterPredicate) method.CreateDelegate(typeof(StreamFilterPredicate));
 #if DEBUG
@@ -82,7 +79,7 @@ namespace Orleans.Streams
 #if DEBUG
             CheckFilterPredicateFunc(pred); // Assert expected pre-conditions are always true.
 #endif
-            MethodInfo method = pred.Method;
+            MethodInfo method = pred.GetMethodInfo();
             className = method.DeclaringType.FullName;
             methodName = method.Name;
         }
@@ -91,7 +88,6 @@ namespace Orleans.Streams
         /// Check that the user-supplied stream predicate function is valid.
         /// Stream predicate functions must be static and not abstract.
         /// </summary>
-        /// <param name="func"></param>
         private static void CheckFilterPredicateFunc(StreamFilterPredicate predicate)
         {
             if (predicate == null)
@@ -99,7 +95,7 @@ namespace Orleans.Streams
                 throw new ArgumentNullException("predicate", "Stream Filter predicate function must not be null.");
             }
 
-            MethodInfo method = predicate.Method;
+            MethodInfo method = predicate.GetMethodInfo();
 
             if (!method.IsStatic || method.IsAbstract)
             {

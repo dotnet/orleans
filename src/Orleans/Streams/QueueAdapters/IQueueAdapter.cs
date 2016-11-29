@@ -18,15 +18,17 @@ namespace Orleans.Streams
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamId"></param>
+        /// <param name="streamGuid"></param>
+        /// <param name="streamNamespace"></param>
         /// <param name="events"></param>
+        /// <param name="token"></param>
+        /// <param name="requestContext"></param>
         /// <returns></returns>
         Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
 
         /// <summary>
         /// Creates a quere receiver for the specificed queueId
         /// </summary>
-        /// <param name="requesterId">Id of requester, for monitoring/logging purposes</param>
         /// <param name="queueId"></param>
         /// <returns></returns>
         IQueueAdapterReceiver CreateReceiver(QueueId queueId);
@@ -46,14 +48,7 @@ namespace Orleans.Streams
 
     public static class QueueAdapterExtensions
     {
-        /// <summary>
-        /// Writes a set of events to the queue as a single batch associated with the provided streamId.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="adapter"></param>
-        /// <param name="streamId"></param>
-        /// <param name="evt"></param>
-        /// <returns></returns>
+        /// <summary>Writes a set of events to the queue as a single batch associated with the provided streamId.</summary>
         public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, Guid streamGuid, String streamNamespace, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             return adapter.QueueMessageBatchAsync(streamGuid, streamNamespace, new[] { evt }, token, requestContext);

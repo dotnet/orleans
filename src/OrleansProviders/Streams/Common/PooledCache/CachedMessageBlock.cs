@@ -10,10 +10,8 @@ namespace Orleans.Providers.Streams.Common
     ///   tightly packed to reduced GC pressure.  The tracking data is used by the queue cache to walk the cache serving ordered
     ///   queue messages by stream.
     /// </summary>
-    /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed structure.  Struct should contain only value types.</typeparam>
-    public class CachedMessageBlock<TQueueMessage, TCachedMessage> : PooledResource<CachedMessageBlock<TQueueMessage, TCachedMessage>>
-        where TQueueMessage : class
+    public class CachedMessageBlock<TCachedMessage> : PooledResource<CachedMessageBlock<TCachedMessage>>
         where TCachedMessage : struct
     {
         private const int OneKb = 1024;
@@ -23,40 +21,54 @@ namespace Orleans.Providers.Streams.Common
         private readonly int blockSize;
         private int writeIndex;
         private int readIndex;
-        private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
 
 
         /// <summary>
         /// Linked list node, so this message block can be kept in a linked list
         /// </summary>
-        public LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> Node { get; private set; }
+        public LinkedListNode<CachedMessageBlock<TCachedMessage>> Node { get; private set; }
 
-        public bool HasCapacity { get { return writeIndex < blockSize; } }
+        /// <summary>
+        /// More messages can be added to the blocks
+        /// </summary>
+        public bool HasCapacity => writeIndex < blockSize;
 
-        public bool IsEmpty { get { return readIndex >= writeIndex; } }
+        /// <summary>
+        /// Block is empty
+        /// </summary>
+        public bool IsEmpty => readIndex >= writeIndex;
 
-        public int NewestMessageIndex { get { return writeIndex - 1; } }
-        public int OldestMessageIndex { get { return readIndex; } }
+        /// <summary>
+        /// Index of most recent message added to the block
+        /// </summary>
+        public int NewestMessageIndex => writeIndex - 1;
 
-        public TCachedMessage OldestMessage { get { return this[OldestMessageIndex]; } }
-        public TCachedMessage NewestMessage { get { return this[NewestMessageIndex]; } }
+        /// <summary>
+        /// Index of oldest message in this block
+        /// </summary>
+        public int OldestMessageIndex => readIndex;
 
-        public StreamSequenceToken OldestSequenceToken { get { return GetSequenceToken(OldestMessageIndex); } }
-        public StreamSequenceToken NewestSequenceToken { get { return GetSequenceToken(NewestMessageIndex); } }
+        /// <summary>
+        /// Oldest message in the block
+        /// </summary>
+        public TCachedMessage OldestMessage => cachedMessages[OldestMessageIndex];
 
-        public CachedMessageBlock(IObjectPool<CachedMessageBlock<TQueueMessage, TCachedMessage>> pool, ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, int blockSize = DefaultCachedMessagesPerBlock)
-            : base(pool)
+        /// <summary>
+        /// Newest message in this block
+        /// </summary>
+        public TCachedMessage NewestMessage => cachedMessages[NewestMessageIndex];
+
+        /// <summary>
+        /// Block of cached messages
+        /// </summary>
+        /// <param name="blockSize"></param>
+        public CachedMessageBlock(int blockSize = DefaultCachedMessagesPerBlock)
         {
-            if (cacheDataAdapter == null)
-            {
-                throw new ArgumentNullException("cacheDataAdapter");
-            }
-            this.cacheDataAdapter = cacheDataAdapter;
             this.blockSize = blockSize;
             cachedMessages = new TCachedMessage[blockSize];
             writeIndex = 0;
             readIndex = 0;
-            Node = new LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>>(this);
+            Node = new LinkedListNode<CachedMessageBlock<TCachedMessage>>(this);
         }
 
         /// <summary>
@@ -73,11 +85,20 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
-        public void Add(TQueueMessage queueMessage)
+        /// <summary>
+        /// Add a message from the queue to the block.
+        /// Converts the queue message to a cached message and stores it at the end of the block.
+        /// </summary>
+        /// <typeparam name="TQueueMessage"></typeparam>
+        /// <param name="queueMessage"></param>
+        /// <param name="dequeueTimeUtc"></param>
+        /// <param name="dataAdapter"></param>
+        /// <returns>Returns the position of the queued message in the stream</returns>
+        public StreamPosition Add<TQueueMessage>(TQueueMessage queueMessage, DateTime dequeueTimeUtc, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             if (queueMessage == null)
             {
-                throw new ArgumentNullException("queueMessage");
+                throw new ArgumentNullException(nameof(queueMessage));
             }
             if (!HasCapacity)
             {
@@ -85,9 +106,14 @@ namespace Orleans.Providers.Streams.Common
             }
 
             int index = writeIndex++;
-            cacheDataAdapter.QueueMessageToCachedMessage(ref cachedMessages[index], queueMessage);
+            return dataAdapter.QueueMessageToCachedMessage(ref cachedMessages[index], queueMessage, dequeueTimeUtc);
         }
 
+        /// <summary>
+        /// Access the cached message at the provdied index.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns></returns>
         public TCachedMessage this[int index]
         {
             get
@@ -100,20 +126,55 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        public StreamSequenceToken GetSequenceToken(int index)
+        /// <summary>
+        /// Gets the sequence token of the cached message a the provided index
+        /// </summary>
+        /// <typeparam name="TQueueMessage"></typeparam>
+        /// <param name="index"></param>
+        /// <param name="dataAdapter"></param>
+        /// <returns></returns>
+        public StreamSequenceToken GetSequenceToken<TQueueMessage>(int index, ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
         {
             if (index >= writeIndex || index < readIndex)
             {
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
             }
-            return cacheDataAdapter.GetSequenceToken(ref cachedMessages[index]);
+            return dataAdapter.GetSequenceToken(ref cachedMessages[index]);
         }
 
-        public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token)
+        /// <summary>
+        /// Gets the sequence token of the newest message in this block
+        /// </summary>
+        /// <typeparam name="TQueueMessage"></typeparam>
+        /// <param name="dataAdapter"></param>
+        /// <returns></returns>
+        public StreamSequenceToken GetNewestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
+        {
+            return GetSequenceToken(NewestMessageIndex, dataAdapter);
+        }
+
+        /// <summary>
+        /// Gets the sequence token of the oldest message in this block
+        /// </summary>
+        /// <typeparam name="TQueueMessage"></typeparam>
+        /// <param name="dataAdapter"></param>
+        /// <returns></returns>
+        public StreamSequenceToken GetOldestSequenceToken<TQueueMessage>(ICacheDataAdapter<TQueueMessage, TCachedMessage> dataAdapter)
+        {
+            return GetSequenceToken(OldestMessageIndex, dataAdapter);
+        }
+        
+        /// <summary>
+        /// Gets the index of the first message in this block that has a sequence token at or before the provided token
+        /// </summary>
+        /// <param name="token"></param>
+        /// <param name="comparer"></param>
+        /// <returns></returns>
+        public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token, ICacheDataComparer<TCachedMessage> comparer)
         {
             for (int i = writeIndex - 1; i >= readIndex; i--)
             {
-                if (cacheDataAdapter.CompareCachedMessageToSequenceToken(ref cachedMessages[i], token) <= 0)
+                if (comparer.Compare(cachedMessages[i], token) <= 0)
                 {
                     return i;
                 }
@@ -121,12 +182,27 @@ namespace Orleans.Providers.Streams.Common
             throw new ArgumentOutOfRangeException("token");
         }
 
-        public bool TryFindFirstMessage(Guid streamGuid, string streamNamespace, out int index)
+        /// <summary>
+        /// Tries to find the first message in the block that is part of the provided stream.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="comparer"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public bool TryFindFirstMessage(IStreamIdentity streamIdentity, ICacheDataComparer<TCachedMessage> comparer, out int index)
         {
-            return TryFindNextMessage(readIndex, streamGuid, streamNamespace, out index);
+            return TryFindNextMessage(readIndex, streamIdentity, comparer, out index);
         }
 
-        public bool TryFindNextMessage(int start, Guid streamGuid, string streamNamespace, out int index)
+        /// <summary>
+        /// Tries to get the next message from the provided stream, starting at the start index.
+        /// </summary>
+        /// <param name="start"></param>
+        /// <param name="streamIdentity"></param>
+        /// <param name="comparer"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        public bool TryFindNextMessage(int start, IStreamIdentity streamIdentity, ICacheDataComparer<TCachedMessage> comparer, out int index)
         {
             if (start < readIndex)
             {
@@ -135,7 +211,7 @@ namespace Orleans.Providers.Streams.Common
 
             for (int i = start; i < writeIndex; i++)
             {
-                if (cacheDataAdapter.IsInStream(ref cachedMessages[i], streamGuid, streamNamespace))
+                if (comparer.Equals(cachedMessages[i], streamIdentity))
                 {
                     index = i;
                     return true;
@@ -146,6 +222,9 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
+        /// <summary>
+        /// Resets this blocks state to that of an empty block.
+        /// </summary>
         public override void OnResetState()
         {
             writeIndex = 0;

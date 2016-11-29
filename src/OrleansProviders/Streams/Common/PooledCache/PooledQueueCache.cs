@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -24,79 +25,93 @@ namespace Orleans.Providers.Streams.Common
     /// <typeparam name="TQueueMessage">Queue specific data</typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed cached structure.  Should only contain value types.</typeparam>
     public class PooledQueueCache<TQueueMessage, TCachedMessage>
-        where TQueueMessage : class
         where TCachedMessage : struct
     {
         // linked list of message bocks.  First is newest.
-        private readonly LinkedList<CachedMessageBlock<TQueueMessage, TCachedMessage>> messageBlocks;
+        private readonly LinkedList<CachedMessageBlock<TCachedMessage>> messageBlocks;
         private readonly ConcurrentQueue<IDisposable> purgeQueue;
         private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
         private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
+        private readonly ICacheDataComparer<TCachedMessage> comparer;
+        private readonly Logger logger;
+        private int itemCount;
 
-        private enum CursorStates
+        /// <summary>
+        /// Cached message most recently added
+        /// </summary>
+        public TCachedMessage? Newest
         {
-            Unset, // Not yet set, or points to some data in the future.
-            Set, // Points to a message in the cache
-            Idle, // Has iterated over all relevant events in the cache and is waiting for more data on the stream.
-        }
-
-        private class Cursor
-        {
-            public readonly Guid StreamGuid;
-            public readonly string StreamNamespace;
-
-            public Cursor(Guid streamGuid, string streamNamespace)
+            get
             {
-                StreamGuid = streamGuid;
-                StreamNamespace = streamNamespace;
-                State = CursorStates.Unset;
+                if (IsEmpty)
+                    return null;
+                return messageBlocks.First.Value.NewestMessage;
             }
-
-            public CursorStates State;
-
-            // current sequence token
-            public StreamSequenceToken SequenceToken;
-
-            // reference into cache
-            public LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> CurrentBlock;
-            public int Index;
-
-            // utilities
-            public bool IsNewestInBlock { get { return Index == CurrentBlock.Value.NewestMessageIndex; } }
-            public TCachedMessage Message { get { return CurrentBlock.Value[Index]; } }
         }
 
-        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter)
+        /// <summary>
+        /// Oldest message in cache
+        /// </summary>
+        public TCachedMessage? Oldest
+        {
+            get
+            {
+                if (IsEmpty)
+                    return null;
+                return messageBlocks.Last.Value.OldestMessage;
+            }
+        }
+
+        /// <summary>
+        /// Called with the newest item in the cache and last item purged after a cache purge has run.
+        /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
+        ///   of every set of events that get purged.
+        /// </summary>
+        public Action<TCachedMessage?,TCachedMessage?> OnPurged { get; set; }
+
+        /// <summary>
+        /// Pooled queue cache is a cache of message that obtains resource from a pool
+        /// </summary>
+        /// <param name="cacheDataAdapter"></param>
+        /// <param name="comparer"></param>
+        /// <param name="logger"></param>
+        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, Logger logger)
         {
             if (cacheDataAdapter == null)
             {
                 throw new ArgumentNullException("cacheDataAdapter");
             }
+            if (comparer == null)
+            {
+                throw new ArgumentNullException("comparer");
+            }
+            if (logger == null)
+            {
+                throw new ArgumentNullException("logger");
+            }
             this.cacheDataAdapter = cacheDataAdapter;
+            this.comparer = comparer;
+            this.logger = logger.GetSubLogger("messagecache", "-");
             pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
             purgeQueue = new ConcurrentQueue<IDisposable>();
-            messageBlocks = new LinkedList<CachedMessageBlock<TQueueMessage, TCachedMessage>>();
+            messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
         }
 
-        public bool IsEmpty
-        {
-            get
-            {
-                return messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
-            }
-        }
+        /// <summary>
+        /// Indicates whether the cach is empty
+        /// </summary>
+        public bool IsEmpty => messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
 
         /// <summary>
         /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken, 
         ///   filtered on the specified stream.
         /// </summary>
-        /// <param name="streamGuid">Key to filter to</param>
-        /// <param name="streamNamespace">Namespace to filter to</param>
+        /// <param name="streamIdentity">stream identity</param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken sequenceToken)
+        public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
         {
-            var cursor = new Cursor(streamGuid, streamNamespace);
+            var cursor = new Cursor(streamIdentity);
             SetCursor(cursor, sequenceToken);
             return cursor;
         }
@@ -111,7 +126,7 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> newestBlock = messageBlocks.First;
+            LinkedListNode<CachedMessageBlock<TCachedMessage>> newestBlock = messageBlocks.First;
 
             // if sequenceToken is null, iterate from newest message in cache
             if (sequenceToken == null)
@@ -119,13 +134,13 @@ namespace Orleans.Providers.Streams.Common
                 cursor.State = CursorStates.Idle;
                 cursor.CurrentBlock = newestBlock;
                 cursor.Index = newestBlock.Value.NewestMessageIndex;
-                cursor.SequenceToken = newestBlock.Value.NewestSequenceToken;
+                cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
                 return;
             }
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             TCachedMessage newestMessage = newestBlock.Value.NewestMessage;
-            if (cacheDataAdapter.CompareCachedMessageToSequenceToken(ref newestMessage, sequenceToken) < 0) 
+            if (comparer.Compare(newestMessage, sequenceToken) < 0) 
             {
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
@@ -134,18 +149,20 @@ namespace Orleans.Providers.Streams.Common
 
             // Check to see if sequenceToken is too old to be in cache
             TCachedMessage oldestMessage = messageBlocks.Last.Value.OldestMessage;
-            if (cacheDataAdapter.CompareCachedMessageToSequenceToken(ref oldestMessage, sequenceToken) > 0)
+            if (comparer.Compare(oldestMessage, sequenceToken) > 0)
             {
                 // throw cache miss exception
-                throw new QueueCacheMissException(sequenceToken, messageBlocks.Last.Value.OldestSequenceToken, messageBlocks.First.Value.NewestSequenceToken);
+                throw new QueueCacheMissException(sequenceToken,
+                    messageBlocks.Last.Value.GetOldestSequenceToken(cacheDataAdapter),
+                    messageBlocks.First.Value.GetNewestSequenceToken(cacheDataAdapter));
             }
 
             // Find block containing sequence number, starting from the newest and working back to oldest
-            LinkedListNode<CachedMessageBlock<TQueueMessage, TCachedMessage>> node = messageBlocks.First;
+            LinkedListNode<CachedMessageBlock<TCachedMessage>> node = messageBlocks.First;
             while (true)
             {
                 TCachedMessage oldestMessageInBlock = node.Value.OldestMessage;
-                if (cacheDataAdapter.CompareCachedMessageToSequenceToken(ref oldestMessageInBlock, sequenceToken) <= 0)
+                if (comparer.Compare(oldestMessageInBlock, sequenceToken) <= 0)
                 {
                     break;
                 }
@@ -154,7 +171,7 @@ namespace Orleans.Providers.Streams.Common
 
             // return cursor from start.
             cursor.CurrentBlock = node;
-            cursor.Index = node.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken);
+            cursor.Index = node.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken, comparer);
             // if cursor has been idle, move to next message after message specified by sequenceToken  
             if(cursor.State == CursorStates.Idle)
             {
@@ -175,7 +192,7 @@ namespace Orleans.Providers.Streams.Common
                     return;
                 }
             }
-            cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index);
+            cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index, cacheDataAdapter);
             cursor.State = CursorStates.Set;
         }
 
@@ -211,9 +228,11 @@ namespace Orleans.Providers.Streams.Common
 
             // has this message been purged
             TCachedMessage oldestMessage = messageBlocks.Last.Value.OldestMessage;
-            if (cacheDataAdapter.CompareCachedMessageToSequenceToken(ref oldestMessage, cursor.SequenceToken) > 0)
+            if (comparer.Compare(oldestMessage, cursor.SequenceToken) > 0)
             {
-                throw new QueueCacheMissException(cursor.SequenceToken, messageBlocks.Last.Value.OldestSequenceToken, messageBlocks.First.Value.NewestSequenceToken);
+                throw new QueueCacheMissException(cursor.SequenceToken,
+                    messageBlocks.Last.Value.GetOldestSequenceToken(cacheDataAdapter),
+                    messageBlocks.First.Value.GetNewestSequenceToken(cacheDataAdapter));
             }
 
             // Iterate forward (in time) in the cache until we find a message on the stream or run out of cached messages.
@@ -227,7 +246,7 @@ namespace Orleans.Providers.Streams.Common
                 if (cursor.CurrentBlock == messageBlocks.First && cursor.IsNewestInBlock)
                 {
                     cursor.State = CursorStates.Idle;
-                    cursor.SequenceToken = messageBlocks.First.Value.NewestSequenceToken;
+                    cursor.SequenceToken = messageBlocks.First.Value.GetNewestSequenceToken(cacheDataAdapter);
                 }
                 else // move to next
                 {
@@ -235,20 +254,20 @@ namespace Orleans.Providers.Streams.Common
                     if (cursor.IsNewestInBlock)
                     {
                         cursor.CurrentBlock = cursor.CurrentBlock.Previous;
-                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamGuid, cursor.StreamNamespace, out index);
+                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamIdentity, comparer, out index);
                     }
                     else
                     {
-                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamGuid, cursor.StreamNamespace, out index);
+                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamIdentity, comparer, out index);
                     }
                     cursor.Index = index;
                 }
 
                 // check if this message is in the cursor's stream
-                if (cacheDataAdapter.IsInStream(ref currentMessage, cursor.StreamGuid, cursor.StreamNamespace))
+                if (comparer.Equals(currentMessage, cursor.StreamIdentity))
                 {
                     message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
-                    cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index);
+                    cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index, cacheDataAdapter);
                     return true;
                 }
             }
@@ -256,23 +275,33 @@ namespace Orleans.Providers.Streams.Common
             return false;
         }
 
-        public void Add(TQueueMessage message)
+        /// <summary>
+        /// Add a queue message to the cache
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="dequeueTimeUtc"></param>
+        /// <returns></returns>
+        public StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
         {
             if (message == null)
             {
                 throw new ArgumentNullException("message");
             }
 
-            PerformPendingPurges();
+            PerformPendingPurges(dequeueTimeUtc);
 
+            StreamPosition streamPosition;
             // allocate message from pool
-            CachedMessageBlock<TQueueMessage, TCachedMessage> block = pool.AllocateMessage(message);
+            CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message, dequeueTimeUtc, out streamPosition);
 
             // If new block, add message block to linked list
             if (block != messageBlocks.FirstOrDefault())
                 messageBlocks.AddFirst(block.Node);
+            itemCount++;
 
-            PerformPendingPurges();
+            PerformPendingPurges(dequeueTimeUtc);
+
+            return streamPosition;
         }
 
         /// <summary>
@@ -284,22 +313,33 @@ namespace Orleans.Providers.Streams.Common
             purgeQueue.Enqueue(purgeRequest);
         }
 
-        private void PerformPendingPurges()
+        private void PerformPendingPurges(DateTime nowUtc)
         {
             IDisposable purgeRequest;
+            if (purgeQueue.IsEmpty) return;
             while (purgeQueue.TryDequeue(out purgeRequest))
             {
-                PerformBlockPurge(purgeRequest);
+                int currentItemCount = itemCount;
+                PerformBlockPurge(purgeRequest, nowUtc);
+                ReportBlockPurge(currentItemCount);
             }
         }
 
-        private void PerformBlockPurge(IDisposable purgeRequest)
+        private void PerformBlockPurge(IDisposable purgeRequest, DateTime nowUtc)
         {
-            while (!IsEmpty &&
-                   cacheDataAdapter.ShouldPurge(messageBlocks.Last.Value[messageBlocks.Last.Value.OldestMessageIndex], purgeRequest)) // value has the same resource blockId as the one we are purging
+            TCachedMessage neweswtMessageInCache = messageBlocks.First.Value.NewestMessage;
+            TCachedMessage? lastMessagePurged = null;
+            while (!IsEmpty)
             {
+                var oldestMessageInCache = messageBlocks.Last.Value.OldestMessage;
+                if (!cacheDataAdapter.ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, purgeRequest, nowUtc))
+                {
+                    break;
+                }
+                lastMessagePurged = oldestMessageInCache;
                 messageBlocks.Last.Value.Remove();
-                CachedMessageBlock<TQueueMessage, TCachedMessage> lastCachedMessageBlock = messageBlocks.Last.Value;
+                itemCount--;
+                CachedMessageBlock<TCachedMessage> lastCachedMessageBlock = messageBlocks.Last.Value;
                 // if block is currently empty, but all capacity has been exausted, remove
                 if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
                 {
@@ -308,7 +348,52 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
 
+            if (lastMessagePurged.HasValue)
+            {
+                OnPurged?.Invoke(lastMessagePurged, Newest);
+            }
+
             purgeRequest.Dispose();
+        }
+
+        private void ReportBlockPurge(int startingItemCount)
+        {
+            if (IsEmpty)
+            {
+                logger.Verbose("BlockPurged: cache empty");
+            }
+            logger.Verbose($"BlockPurged: PurgeCount: {startingItemCount - itemCount}, CacheSize: {itemCount}");
+        }
+
+        private enum CursorStates
+        {
+            Unset, // Not yet set, or points to some data in the future.
+            Set, // Points to a message in the cache
+            Idle, // Has iterated over all relevant events in the cache and is waiting for more data on the stream.
+        }
+
+        private class Cursor
+        {
+            public readonly IStreamIdentity StreamIdentity;
+
+            public Cursor(IStreamIdentity streamIdentity)
+            {
+                StreamIdentity = streamIdentity;
+                State = CursorStates.Unset;
+            }
+
+            public CursorStates State;
+
+            // current sequence token
+            public StreamSequenceToken SequenceToken;
+
+            // reference into cache
+            public LinkedListNode<CachedMessageBlock<TCachedMessage>> CurrentBlock;
+            public int Index;
+
+            // utilities
+            public bool IsNewestInBlock => Index == CurrentBlock.Value.NewestMessageIndex;
+            public TCachedMessage Message => CurrentBlock.Value[Index];
         }
     }
 }

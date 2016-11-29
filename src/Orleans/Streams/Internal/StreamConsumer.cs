@@ -21,7 +21,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly AsyncLock                  bindExtLock;
         [NonSerialized]
-        private readonly TraceLogger                logger;
+        private readonly Logger logger;
 
         public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, bool isRewindable)
         {
@@ -29,7 +29,7 @@ namespace Orleans.Streams
             if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
             if (pubSub == null) throw new ArgumentNullException("pubSub");
 
-            logger = TraceLogger.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(string.Format("StreamConsumer<{0}>-{1}", typeof(T).Name, stream), LoggerType.Runtime);
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
@@ -53,7 +53,9 @@ namespace Orleans.Streams
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
-            
+            if (observer is GrainReference)
+                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", "observer");
+
             if (logger.IsVerbose) logger.Verbose("Subscribe Observer={0} Token={1}", observer, token);
             await BindExtensionLazy();
 
@@ -139,7 +141,7 @@ namespace Orleans.Streams
             await BindExtensionLazy();
 
             List<GuidId> subscriptionIds = await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream))
+            return subscriptionIds.Select(id => new StreamSubscriptionHandleImpl<T>(id, stream, IsRewindable))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
 
@@ -162,7 +164,7 @@ namespace Orleans.Streams
 
             } catch (Exception exc)
             {
-                logger.Warn((int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
+                logger.Warn(ErrorCode.StreamProvider_ConsumerFailedToUnregister,
                     "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
             }
             myExtension = null;
@@ -189,7 +191,7 @@ namespace Orleans.Streams
                     {
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
                         var tup = await providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                            () => new StreamConsumerExtension(providerRuntime));
+                            () => new StreamConsumerExtension(providerRuntime, IsRewindable));
                         myExtension = tup.Item1;
                         myGrainReference = tup.Item2;
                         if (logger.IsVerbose) logger.Verbose("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        

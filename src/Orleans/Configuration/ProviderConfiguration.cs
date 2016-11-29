@@ -23,6 +23,8 @@ namespace Orleans.Runtime.Configuration
 
         public string Type { get; private set; }
         public string Name { get; private set; }
+        public IProviderManager ProviderManager {get { return providerManager; } }
+
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
@@ -47,7 +49,7 @@ namespace Orleans.Runtime.Configuration
 
         public ProviderConfiguration(IDictionary<string, string> properties, string providerType, string name)
         {
-            this.properties = properties;
+            this.properties = properties ?? new Dictionary<string, string>(1);
             Type = providerType;
             Name = name;
         }
@@ -55,7 +57,7 @@ namespace Orleans.Runtime.Configuration
         // for testing purposes
         internal ProviderConfiguration(IDictionary<string, string> properties, IList<IProvider> childProviders)
         {
-            this.properties = properties;
+            this.properties = properties ?? new Dictionary<string, string>(1);
             this.childProviders = childProviders;
         }
 

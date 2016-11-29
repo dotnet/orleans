@@ -10,11 +10,15 @@ namespace Orleans.Runtime.Placement
     /// If none exits, it prefers to place a new one in the local silo. If there are no races (only one silo at a time tries to activate this grain),
     /// the the local silo wins. In the case of concurrent activations of the first activation of this grain, only one silo wins.
     /// </summary>
-    internal class PreferLocalPlacementDirector : RandomPlacementDirector
+    internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector<PreferLocalPlacement>
     {
-        internal override Task<PlacementResult> 
+        public override Task<PlacementResult> 
             OnAddActivation(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
+            // if local silo is not active, revert to random placement
+            if (context.LocalSiloStatus != SiloStatus.Active)
+                return base.OnAddActivation(strategy, grain, context);
+
             var grainType = context.GetGrainTypeName(grain);
             return Task.FromResult( 
                 PlacementResult.SpecifyCreation(context.LocalSilo, strategy, grainType));

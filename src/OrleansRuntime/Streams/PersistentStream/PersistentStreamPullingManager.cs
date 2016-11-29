@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
-using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -20,7 +19,7 @@ namespace Orleans.Streams
 
         private readonly PersistentStreamProviderConfig config;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
-        private readonly TraceLogger logger;
+        private readonly LoggerImpl logger;
 
         private int latestRingNotificationSequenceNumber;
         private int latestCommandNumber;
@@ -71,7 +70,7 @@ namespace Orleans.Streams
             this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
-            logger = TraceLogger.GetLogger(GetType().Name + "-" + streamProviderName, TraceLogger.LoggerType.Provider);
+            logger = LogManager.GetLogger(GetType().Name + "-" + streamProviderName, LoggerType.Provider);
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);

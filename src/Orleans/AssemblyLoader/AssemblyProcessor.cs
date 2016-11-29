@@ -2,75 +2,86 @@ namespace Orleans.Runtime
 {
     using System;
     using System.Collections.Generic;
-    using System.Reflection;
     using System.Linq;
-
+    using System.Reflection;
     using Orleans.CodeGeneration;
     using Orleans.Serialization;
 
     /// <summary>
     /// The assembly processor.
     /// </summary>
-    internal class AssemblyProcessor
+    internal class AssemblyProcessor : IDisposable
     {
         /// <summary>
         /// The collection of assemblies which have already been processed.
         /// </summary>
-        private static readonly HashSet<Assembly> ProcessedAssemblies = new HashSet<Assembly>();
+        private readonly HashSet<Assembly> processedAssemblies = new HashSet<Assembly>();
 
         /// <summary>
         /// The logger.
         /// </summary>
-        private static readonly TraceLogger Logger;
+        private readonly Logger logger;
         
         /// <summary>
         /// The initialization lock.
         /// </summary>
-        private static readonly object InitializationLock = new object();
+        private readonly object initializationLock = new object();
+
+        /// <summary>
+        /// The type metadata cache.
+        /// </summary>
+        private readonly TypeMetadataCache typeCache;
 
         /// <summary>
         /// Whether or not this class has been initialized.
         /// </summary>
-        private static bool initialized;
+        private bool initialized;
 
         /// <summary>
-        /// Initializes static members of the <see cref="AssemblyProcessor"/> class.
+        /// Initializes a new instance of the <see cref="AssemblyProcessor"/> class.
         /// </summary>
-        static AssemblyProcessor()
+        /// <param name="typeCache">
+        /// The type cache.
+        /// </param>
+        public AssemblyProcessor(TypeMetadataCache typeCache)
         {
-            Logger = TraceLogger.GetLogger("AssemblyProcessor");
+            this.logger = LogManager.GetLogger("AssemblyProcessor");
+            this.typeCache = typeCache;
         }
 
         /// <summary>
         /// Initializes this instance.
         /// </summary>
-        public static void Initialize()
+        public void Initialize()
         {
-            if (initialized)
+            if (this.initialized)
             {
                 return;
             }
 
-            lock (InitializationLock)
+            lock (this.initializationLock)
             {
-                if (initialized)
+                if (this.initialized)
                 {
                     return;
                 }
 
-                // initialize serialization for all assemblies to be loaded.
-                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
+                // load the code generator before intercepting assembly loading
+                CodeGeneratorManager.Initialize(); 
 
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                // initialize serialization for all assemblies to be loaded.
+                AppDomain.CurrentDomain.AssemblyLoad += this.OnAssemblyLoad;
+
+                Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
                 // initialize serialization for already loaded assemblies.
                 CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
                 foreach (var assembly in assemblies)
                 {
-                    ProcessAssembly(assembly);
+                    this.ProcessAssembly(assembly);
                 }
 
-                initialized = true;
+                this.initialized = true;
             }
         }
 
@@ -79,27 +90,35 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="sender">The sender of the event.</param>
         /// <param name="args">The event arguments.</param>
-        private static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        private void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
         {
-            ProcessAssembly(args.LoadedAssembly);
+            this.ProcessAssembly(args.LoadedAssembly);
         }
 
         /// <summary>
         /// Processes the provided assembly.
         /// </summary>
         /// <param name="assembly">The assembly to process.</param>
-        private static void ProcessAssembly(Assembly assembly)
+        private void ProcessAssembly(Assembly assembly)
         {
+            string assemblyName = assembly.GetName().Name;
+            if (this.logger.IsVerbose3)
+            {
+                this.logger.Verbose3("Processing assembly {0}", assemblyName);
+            }
+
+#if !NETSTANDARD
             // If the assembly is loaded for reflection only avoid processing it.
             if (assembly.ReflectionOnly)
             {
                 return;
             }
+#endif
 
             // Don't bother re-processing an assembly we've already scanned
-            lock (ProcessedAssemblies)
+            lock (this.processedAssemblies)
             {
-                if (!ProcessedAssemblies.Add(assembly))
+                if (!this.processedAssemblies.Add(assembly))
                 {
                     return;
                 }
@@ -113,37 +132,37 @@ namespace Orleans.Runtime
             }
 
             // Process each type in the assembly.
-            var shouldProcessSerialization = SerializationManager.ShouldFindSerializationInfo(assembly);
-            TypeInfo[] assemblyTypes;
-            try
-            {
-                assemblyTypes = assembly.DefinedTypes.ToArray();
-            }
-            catch (Exception exception)
-            {
-                if (Logger.IsWarning)
-                {
-                    var message =
-                        string.Format(
-                            "AssemblyLoader encountered an exception loading types from assembly '{0}': {1}",
-                            assembly.FullName,
-                            exception);
-                    Logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
-                }
-
-                return;
-            }
+            var assemblyTypes = TypeUtils.GetDefinedTypes(assembly, this.logger).ToArray();
 
             // Process each type in the assembly.
-            foreach (var type in assemblyTypes)
+            foreach (TypeInfo typeInfo in assemblyTypes)
             {
-                if (shouldProcessSerialization)
+                try
                 {
-                    SerializationManager.FindSerializationInfo(type);
-                }
+                    var type = typeInfo.AsType();
+                    string typeName = typeInfo.FullName;
+                    if (this.logger.IsVerbose3)
+                    {
+                        this.logger.Verbose3("Processing type {0}", typeName);
+                    }
 
-                GrainFactory.FindSupportClasses(type);
+                    SerializationManager.FindSerializationInfo(type);
+    
+                    this.typeCache.FindSupportClasses(type);
+                }
+                catch (Exception exception)
+                {
+                    this.logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failed to load type " + typeInfo.FullName + " in assembly " + assembly.FullName + ".", exception);
+                }
             }
+        }
+
+        /// <summary>
+        /// Disposes this instance.
+        /// </summary>
+        public void Dispose()
+        {
+            AppDomain.CurrentDomain.AssemblyLoad -= this.OnAssemblyLoad;
         }
     }
 }

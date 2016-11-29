@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.ServiceFabric</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Service Fabric Support</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Support for hosting Microsoft Orleans on Service Fabric.
+    </summary>
+    <description>
+      Support for hosting Microsoft Orleans on Service Fabric.
+    </description>
+    <copyright>Copyright Microsoft 2016</copyright>
+    <tags>Microsoft Orleans ServiceFabric</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Microsoft.ServiceFabric.Services" version="2.1.163" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="Microsoft.Orleans.ServiceFabric.dll" target="lib\net451" />
+    <file src="Microsoft.Orleans.ServiceFabric.pdb" target="lib\net451" />
+    <file src="Microsoft.Orleans.ServiceFabric.xml" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansServiceFabricUtils\**\*.cs" exclude="*\obj\**\*" target="src" />
+  </files>
+</package>

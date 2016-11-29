@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
@@ -8,11 +7,14 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipFactory
     {
-        private readonly TraceLogger logger;
+        private readonly IInternalGrainFactory grainFactory;
 
-        internal MembershipFactory()
+        private readonly Logger logger;
+
+        public MembershipFactory(IInternalGrainFactory grainFactory)
         {
-            logger = TraceLogger.GetLogger("MembershipFactory", TraceLogger.LoggerType.Runtime);
+            this.grainFactory = grainFactory;
+            logger = LogManager.GetLogger("MembershipFactory", LoggerType.Runtime);
         }
 
         internal Task CreateMembershipTableProvider(Catalog catalog, Silo silo)
@@ -28,36 +30,37 @@ namespace Orleans.Runtime.MembershipService
             return TaskDone.Done;
         }
 
-        internal IMembershipOracle CreateMembershipOracle(Silo silo, IMembershipTable membershipTable)
+        internal MembershipOracle CreateMembershipOracle(Silo silo, IMembershipTable membershipTable)
         {
             var livenessType = silo.GlobalConfig.LivenessType;
             logger.Info("Creating membership oracle for type={0}", Enum.GetName(typeof(GlobalConfiguration.LivenessProviderType), livenessType));
             return new MembershipOracle(silo, membershipTable);
         }
 
-        internal IMembershipTable GetMembershipTable(GlobalConfiguration.LivenessProviderType livenessType, string membershipTableAssembly = null)
+        internal IMembershipTable GetMembershipTable(GlobalConfiguration globalConfig)
         {
+            var livenessType = globalConfig.LivenessType;
             IMembershipTable membershipTable;
             if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
             {
                 membershipTable =
-                    GrainReference.FromGrainId(Constants.SystemMembershipTableId).Cast<IMembershipTableGrain>();
+                    this.grainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
             {
-                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, logger);
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger);
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
             {
-                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, logger);
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger);
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
             {
-                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, logger);
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_ZOOKEEPER_UTILS_DLL, this.logger);
             }
             else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.Custom))
             {
-                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(membershipTableAssembly, logger);
+                membershipTable = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(globalConfig.MembershipTableAssembly, this.logger);
             }
             else
             {

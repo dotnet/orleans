@@ -1,0 +1,29 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.Templates.Interfaces</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans VS Templates for Grain Interfaces</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      NuGet package deprecated, please use Microsoft.Orleans.OrleansCodeGenerator.Build instead.
+    </summary>
+    <description>
+      NuGet package deprecated, please use Microsoft.Orleans.OrleansCodeGenerator.Build instead.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags></tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.OrleansCodeGenerator.Build" version="$version$" />
+    </dependencies>
+  </metadata>
+  <files>
+    <!-- installation script just uninstalls this package. Install.ps1 gets run by NuGet automatically -->
+    <file src="deprecated-templates-Install.ps1" target="tools\install.ps1" />
+    <file src="deprecated-templates-Readme.txt" target="content\Microsoft.Orleans.Templates.Readme.txt" />
+  </files>
+</package>

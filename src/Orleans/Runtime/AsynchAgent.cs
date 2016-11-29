@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal abstract class AsynchAgent : MarshalByRefObject, IDisposable
+    internal abstract class AsynchAgent : IDisposable
     {
         public enum FaultBehavior
         {
@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private Thread t;
         protected CancellationTokenSource Cts;
         protected object Lockable;
-        protected TraceLogger Log;
+        protected Logger Log;
         private readonly string type;
         protected FaultBehavior OnFault;
 
@@ -49,8 +49,10 @@ namespace Orleans.Runtime
             Lockable = new object();
             State = ThreadState.Unstarted;
             OnFault = FaultBehavior.IgnoreFault;
-            Log = TraceLogger.GetLogger(Name, TraceLogger.LoggerType.Runtime);
+            Log = LogManager.GetLogger(Name, LoggerType.Runtime);
+#if !NETSTANDARD
             AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
+#endif
 
 #if TRACK_DETAILED_STATS
             if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -118,7 +120,9 @@ namespace Orleans.Runtime
                         State = ThreadState.Stopped;
                     }
                 }
+#if !NETSTANDARD
                 AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
+#endif
             }
             catch (Exception exc)
             {
@@ -128,11 +132,13 @@ namespace Orleans.Runtime
             Log.Verbose("Stopped agent");
         }
 
+#if !NETSTANDARD
         public void Abort(object stateInfo)
         {
             if(t!=null)
                 t.Abort(stateInfo);
         }
+#endif
 
         public void Join(TimeSpan timeout)
         {
@@ -141,7 +147,7 @@ namespace Orleans.Runtime
                 var agentThread = t;
                 if (agentThread != null)
                 {
-                    bool joined = agentThread.Join(timeout);
+                    bool joined = agentThread.Join((int)timeout.TotalMilliseconds);
                     Log.Verbose("{0} the agent thread {1} after {2} time.", joined ? "Joined" : "Did not join", Name, timeout);
                 }
             }catch(Exception exc)
@@ -159,7 +165,7 @@ namespace Orleans.Runtime
             var agent = obj as AsynchAgent;
             if (agent == null)
             {
-                var log = TraceLogger.GetLogger("RuntimeCore.AsynchAgent");
+                var log = LogManager.GetLogger("RuntimeCore.AsynchAgent");
                 log.Error(ErrorCode.Runtime_Error_100022, "Agent thread started with incorrect parameter type");
                 return;
             }
@@ -218,7 +224,7 @@ namespace Orleans.Runtime
             }
         }
 
-        #region IDisposable Members
+#region IDisposable Members
 
         public void Dispose()
         {
@@ -237,14 +243,14 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
+#endregion
 
         public override string ToString()
         {
             return Name;
         }
 
-        private static void LogStatus(TraceLogger log, string msg, params object[] args)
+        private static void LogStatus(Logger log, string msg, params object[] args)
         {
             if (SystemStatus.Current.Equals(SystemStatus.Creating))
             {

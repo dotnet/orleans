@@ -8,7 +8,7 @@ namespace Orleans.Streams
     /// This interface generalizes the standard .NET IObserver interface to allow asynchronous production of items.
     /// <para>
     /// Note that this interface is implemented by item consumers and invoked (used) by item producers.
-    /// This means that the producer endpoint of a stream implements this interface.
+    /// This means that the consumer endpoint of a stream implements this interface.
     /// </para>
     /// </summary>
     /// <typeparam name="T">The type of object consumed by the observer.</typeparam>
@@ -62,7 +62,7 @@ namespace Orleans.Streams
     /// This interface generalizes the IAsyncObserver interface to allow production and consumption of batches of items.
     /// <para>
     /// Note that this interface is implemented by item consumers and invoked (used) by item producers.
-    /// This means that the producer endpoint of a stream implements this interface.
+    /// This means that the consumer endpoint of a stream implements this interface.
     /// </para>
     /// </summary>
     /// <typeparam name="T">The type of object consumed by the observer.</typeparam>

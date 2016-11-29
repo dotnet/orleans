@@ -1,21 +1,33 @@
 ﻿using System;
 using System.Net;
+using System.Runtime.Serialization.Formatters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
-    {
-        private static JsonSerializerSettings settings;
-        private TraceLogger logger;
+    using Orleans.Providers;
 
-        internal static JsonSerializerSettings SerializerSettings { get { return settings; } }
+    public class OrleansJsonSerializer : IExternalSerializer
+    {
+        public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+        public const string IndentJsonProperty = "IndentJSON";
+        private static JsonSerializerSettings defaultSettings;
+        private Logger logger;
 
         static OrleansJsonSerializer()
         {
-            settings = new JsonSerializerSettings
+            defaultSettings = GetDefaultSerializerSettings();
+        }
+
+        /// <summary>
+        /// Returns the default serializer settings.
+        /// </summary>
+        /// <returns>The default serializer settings.</returns>
+        public static JsonSerializerSettings GetDefaultSerializerSettings()
+        {
+            var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.All,
                 PreserveReferencesHandling = PreserveReferencesHandling.Objects,
@@ -23,7 +35,11 @@ namespace Orleans.Serialization
                 DefaultValueHandling = DefaultValueHandling.Ignore,
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
-                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+#if !NETSTANDARD_TODO
+                TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+#endif
+                Formatting = Formatting.None
             };
 
             settings.Converters.Add(new IPAddressConverter());
@@ -31,14 +47,46 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
             settings.Converters.Add(new UniqueKeyConverter());
-            settings.Converters.Add(new GuidJsonConverter());
+
+            return settings;
         }
-        
+
+        /// <summary>
+        /// Customises the given serializer settings using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="settings">The settings to update.</param>
+        /// <param name="config">The provider config.</param>
+        /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
+        {
+            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
+            {
+                bool useFullAssemblyNames;
+                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
+                {
+#if !NETSTANDARD_TODO
+                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+#endif
+                }
+            }
+
+            if (config.Properties.ContainsKey(IndentJsonProperty))
+            {
+                bool indentJson;
+                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
+                {
+                    settings.Formatting = Formatting.Indented;
+                }
+            }
+            return settings;
+        }
+
         /// <summary>
         /// Initializes the serializer
         /// </summary>
         /// <param name="logger">The logger to use to capture any serialization events</param>
-        public void Initialize(TraceLogger logger)
+        public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
@@ -68,6 +116,7 @@ namespace Orleans.Serialization
             var writer = new BinaryTokenStreamWriter();
             Serialize(source, writer, source.GetType());
             var retVal = Deserialize(source.GetType(), new BinaryTokenStreamReader(writer.ToByteArray()));
+            writer.ReleaseBuffers();
             return retVal;
         }
 
@@ -85,7 +134,7 @@ namespace Orleans.Serialization
             }
 
             var str = reader.ReadString();
-            return JsonConvert.DeserializeObject(str, expectedType, settings);
+            return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
 
         /// <summary>
@@ -107,14 +156,14 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var str = JsonConvert.SerializeObject(item, expectedType, settings);
+            var str = JsonConvert.SerializeObject(item, expectedType, defaultSettings);
             writer.Write(str);
         }
     }
 
-    #region JsonConverters
+#region JsonConverters
 
-    class IPAddressConverter : JsonConverter
+    internal class IPAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -134,7 +183,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class GrainIdConverter : JsonConverter
+    internal class GrainIdConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -158,7 +207,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class SiloAddressConverter : JsonConverter
+    internal class SiloAddressConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -182,7 +231,7 @@ namespace Orleans.Serialization
         }
     }
 
-    class UniqueKeyConverter : JsonConverter
+    internal class UniqueKeyConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -205,8 +254,8 @@ namespace Orleans.Serialization
             return addr;
         }
     }
- 
-    class IPEndPointConverter : JsonConverter
+
+    internal class IPEndPointConverter : JsonConverter
     {
         public override bool CanConvert(Type objectType)
         {
@@ -232,94 +281,5 @@ namespace Orleans.Serialization
             return new IPEndPoint(address, port);
         }
     }
-
-    /// <summary>
-    ///     JSON converter for <see cref="Guid"/>.
-    /// </summary>
-    class GuidJsonConverter : JsonConverter
-    {
-        /// <summary>
-        ///     Gets a value indicating whether this <see cref="T:Newtonsoft.Json.JsonConverter"/> can read JSON.
-        /// </summary>
-        /// <value><see langword="true"/> if this <see cref="T:Newtonsoft.Json.JsonConverter"/> can read JSON; otherwise, <see langword="false"/>.
-        /// </value>
-        public override bool CanRead { get { return true; } }
-
-        /// <summary>
-        ///     Gets a value indicating whether this <see cref="T:Newtonsoft.Json.JsonConverter"/> can write JSON.
-        /// </summary>
-        /// <value><see langword="true"/> if this <see cref="T:Newtonsoft.Json.JsonConverter"/> can write JSON; otherwise, <see langword="false"/>.
-        /// </value>
-        public override bool CanWrite { get { return true; } }
-
-        /// <summary>
-        /// Determines whether this instance can convert the specified object type.
-        /// </summary>
-        /// <param name="objectType">
-        /// Kind of the object.
-        /// </param>
-        /// <returns>
-        /// <see langword="true"/> if this instance can convert the specified object type; otherwise,
-        /// .
-        /// </returns>
-        public override bool CanConvert(Type objectType)
-        {
-            return objectType.IsAssignableFrom(typeof(Guid)) || objectType.IsAssignableFrom(typeof(Guid?));
-        }
-
-        /// <summary>
-        /// Writes the JSON representation of the object.
-        /// </summary>
-        /// <param name="writer">
-        /// The <see cref="T:Newtonsoft.Json.JsonWriter"/> to write to.
-        /// </param>
-        /// <param name="value">
-        /// The value.
-        /// </param>
-        /// <param name="serializer">
-        /// The calling serializer.
-        /// </param>
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            if (value == null)
-            {
-                writer.WriteValue(default(string));
-            }
-            else if (value is Guid)
-            {
-                var guid = (Guid)value;
-                writer.WriteValue(guid.ToString("N"));
-            }
-        }
-
-        /// <summary>
-        /// Reads the JSON representation of the object.
-        /// </summary>
-        /// <param name="reader">
-        /// The <see cref="T:Newtonsoft.Json.JsonReader"/> to read from.
-        /// </param>
-        /// <param name="objectType">
-        /// Kind of the object.
-        /// </param>
-        /// <param name="existingValue">
-        /// The existing value of object being read.
-        /// </param>
-        /// <param name="serializer">
-        /// The calling serializer.
-        /// </param>
-        /// <returns>
-        /// The object value.
-        /// </returns>
-        public override object ReadJson(
-            JsonReader reader,
-            Type objectType,
-            object existingValue,
-            JsonSerializer serializer)
-        {
-            var str = reader.Value as string;
-            return str != null ? Guid.Parse(str) : default(Guid);
-        }
-    }
-
-    #endregion
+#endregion
 }

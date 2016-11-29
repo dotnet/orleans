@@ -1,0 +1,42 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansCodeGenerator.Build</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Build-time Code Generation</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.
+    </summary>
+    <description>
+      Microsoft Orleans Build-time Code Generation to install within the grain interfaces and implementation projects.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+    </dependencies>
+  </metadata>
+  <files>
+    <!-- Auto-import MSBuild targets and props files into target project.
+           http://docs.nuget.org/docs/creating-packages/creating-and-publishing-a-package#Import_MSBuild_targets_and_props_files_into_project_(Requires_NuGet_2.5_or_above)
+      -->
+    <file src="Orleans.SDK.targets" target="build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" />
+        
+    <file src="ClientGenerator.exe" target="tools" />
+    <file src="ClientGenerator.pdb" target="tools" />
+    <file src="ClientGenerator.exe.config" target="tools" />
+    <file src="Orleans.dll" target="tools" />
+    <file src="Orleans.pdb" target="tools" />
+    <file src="OrleansCodeGenerator.dll" target="tools" />
+    <file src="OrleansCodeGenerator.pdb" target="tools" />
+    <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
+    <file src="Microsoft.CodeAnalysis.dll" target="tools" />
+    <file src="System.Reflection.Metadata.dll" target="tools" />
+    <file src="System.Collections.Immutable.dll" target="tools" />
+  </files>
+</package>

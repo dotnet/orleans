@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.Samples.Chirper.GrainInterfaces;
 
 namespace Orleans.Samples.Chirper.Client
@@ -26,7 +26,8 @@ namespace Orleans.Samples.Chirper.Client
 
             try 
             {
-                Orleans.GrainClient.Initialize();
+                var config = ClientConfiguration.LocalhostSilo();
+                GrainClient.Initialize(config);
 
                 IChirperAccount account = GrainClient.GrainFactory.GetGrain<IChirperAccount>(UserId);
                 publisher = account;

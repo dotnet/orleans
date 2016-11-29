@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Storage;
 using Orleans.CodeGeneration;
+using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Grain Factory to get and cast grain references.
         /// </summary>
-        GrainFactory InternalGrainFactory { get; }
+        IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
         /// Provides client application code with access to an Orleans logger.
@@ -59,7 +59,7 @@ namespace Orleans.Runtime
 
         Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
-        void Reset();
+        void Reset(bool cleanup);
 
         GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 

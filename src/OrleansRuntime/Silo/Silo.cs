@@ -1,28 +1,30 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Runtime;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
+using Orleans.Runtime.TestHooks;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
@@ -30,28 +32,26 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
-
     /// <summary>
     /// Orleans silo.
     /// </summary>
-    public class Silo : MarshalByRefObject // for hosting multiple silos in app domains of the same process
+    public class Silo
     {
+        /// <summary> Standard name for Primary silo. </summary>
+        public const string PrimarySiloName = "Primary";
+
         /// <summary> Silo Types. </summary>
         public enum SiloType
         {
+            /// <summary> No silo type specified. </summary>
             None = 0,
+            /// <summary> Primary silo. </summary>
             Primary,
+            /// <summary> Secondary silo. </summary>
             Secondary,
         }
-
-        /// <summary> Type of this silo. </summary>
-        public SiloType Type
-        {
-            get { return siloType; }
-        }
-
-        private readonly GlobalConfiguration globalConfig;
-        private NodeConfiguration nodeConfig;
+        
+        private readonly SiloInitializationParameters initializationParams;
         private readonly ISiloMessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -59,44 +59,47 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingAgent;
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly GrainTypeManager typeManager;
         private readonly ManualResetEvent siloTerminatedEvent;
-        private readonly SiloType siloType;
         private readonly SiloStatisticsManager siloStatistics;
         private readonly MembershipFactory membershipFactory;
+        private readonly InsideRuntimeClient runtimeClient;
+        private readonly AssemblyProcessor assemblyProcessor;
         private StorageProviderManager storageProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
         private BootstrapProviderManager bootstrapProviderManager;
-        private readonly LocalReminderServiceFactory reminderFactory;
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
-        private IMembershipOracle membershipOracle;
-        private ClientObserverRegistrar clientRegistrar;
+        private readonly IMembershipOracle membershipOracle;
+        private IMultiClusterOracle multiClusterOracle;
+
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
-        private readonly List<IHealthCheckParticipant> healthCheckParticipants;
+        private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
-        private readonly List<IProvider> allSiloProviders;
-        private readonly IServiceProvider services;
+        private readonly List<IProvider> allSiloProviders = new List<IProvider>();
         
-        internal readonly string Name;
-        internal readonly string SiloIdentity;
-        internal ClusterConfiguration OrleansConfig { get; private set; }
-        internal GlobalConfiguration GlobalConfig { get { return globalConfig; } }
-        internal NodeConfiguration LocalConfig { get { return nodeConfig; } }
-        internal ISiloMessageCenter LocalMessageCenter { get { return messageCenter; } }
+        /// <summary>
+        /// Gets the type of this 
+        /// </summary>
+        public SiloType Type => this.initializationParams.Type;
+        internal string Name => this.initializationParams.Name;
+        internal ClusterConfiguration OrleansConfig => this.initializationParams.ClusterConfig;
+        internal GlobalConfiguration GlobalConfig => this.initializationParams.GlobalConfig;
+        internal NodeConfiguration LocalConfig => this.initializationParams.NodeConfig;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
-        internal GrainTypeManager LocalTypeManager { get { return typeManager; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
+        internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
+        internal IStreamProviderManager StreamProviderManager { get { return grainRuntime.StreamProviderManager; } }
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal static Silo CurrentSilo { get; private set; }
@@ -104,11 +107,18 @@ namespace Orleans.Runtime
         {
             get { return allSiloProviders.AsReadOnly();  }
         }
+        internal ICatalog Catalog => catalog;
 
-        internal IServiceProvider Services { get { return services; } }
+        internal IServiceProvider Services { get; }
+
+        /// <summary> Get the id of the cluster this silo is part of. </summary>
+        public string ClusterId
+        {
+            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : null; } 
+        }
 
         /// <summary> SiloAddress for this silo. </summary>
-        public SiloAddress SiloAddress { get { return messageCenter.MyAddress; } }
+        public SiloAddress SiloAddress => this.initializationParams.SiloAddress;
 
         /// <summary>
         ///  Silo termination event used to signal shutdown of this silo.
@@ -118,198 +128,232 @@ namespace Orleans.Runtime
         /// <summary>
         /// Test hook connection for white-box testing of silo.
         /// </summary>
-        public TestHooks TestHook;
+        internal TestHooksSystemTarget testHook;
         
         /// <summary>
-        /// Creates and initializes the silo from the specified config data.
+        /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
         /// <param name="name">Name of this silo.</param>
         /// <param name="siloType">Type of this silo.</param>
         /// <param name="config">Silo config data to be used for this silo.</param>
         public Silo(string name, SiloType siloType, ClusterConfiguration config)
-            : this(name, siloType, config, null)
-        {}
+            : this(new SiloInitializationParameters(name, siloType, config))
+        {
+        }
 
         /// <summary>
-        /// Creates and initializes the silo from the specified config data.
+        /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
-        /// <param name="name">Name of this silo.</param>
-        /// <param name="siloType">Type of this silo.</param>
-        /// <param name="config">Silo config data to be used for this silo.</param>
-        /// <param name="keyStore">Local data store, mostly used for testing, shared between all silos running in same process.</param>
+        /// <param name="initializationParams">
+        /// The silo initialization parameters.
+        /// </param>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
-        internal Silo(string name, SiloType siloType, ClusterConfiguration config, ILocalDataStore keyStore)
+        internal Silo(SiloInitializationParameters initializationParams)
         {
+            string name = initializationParams.Name;
+            ClusterConfiguration config = initializationParams.ClusterConfig;
+            this.initializationParams = initializationParams;
+
             SystemStatus.Current = SystemStatus.Creating;
 
             CurrentSilo = this;
 
             var startTime = DateTime.UtcNow;
-
-            this.siloType = siloType;
-            Name = name;
-
-            siloTerminatedEvent = new ManualResetEvent(false);
-
-            OrleansConfig = config;
-            globalConfig = config.Globals;
-            config.OnConfigChange("Defaults", () => nodeConfig = config.GetConfigurationForNode(name));
-
-            if (!TraceLogger.IsInitialized)
-                TraceLogger.Initialize(nodeConfig);
-
-            config.OnConfigChange("Defaults/Tracing", () => TraceLogger.Initialize(nodeConfig, true), false);
-
-            ActivationData.Init(config, nodeConfig);
-            StatisticsCollector.Initialize(nodeConfig);
             
-            CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
-            SerializationManager.Initialize(globalConfig.UseStandardSerializer, globalConfig.SerializationProviders, globalConfig.UseJsonFallbackSerializer);
-            initTimeout = globalConfig.MaxJoinAttemptTime;
+            siloTerminatedEvent = new ManualResetEvent(false);
+            
+            if (!LogManager.IsInitialized)
+                LogManager.Initialize(LocalConfig);
+
+            config.OnConfigChange("Defaults/Tracing", () => LogManager.Initialize(LocalConfig, true), false);
+            MultiClusterRegistrationStrategy.Initialize(config.Globals);
+            StatisticsCollector.Initialize(LocalConfig);
+            
+            SerializationManager.Initialize(GlobalConfig.SerializationProviders, this.GlobalConfig.FallbackSerializationProvider);
+            initTimeout = GlobalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
-                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), globalConfig.MaxJoinAttemptTime);
+                initTimeout = StandardExtensions.Max(TimeSpan.FromMinutes(10), GlobalConfig.MaxJoinAttemptTime);
                 stopTimeout = initTimeout;
             }
 
-            IPEndPoint here = nodeConfig.Endpoint;
-            int generation = nodeConfig.Generation;
-            if (generation == 0)
-            {
-                generation = SiloAddress.AllocateNewGeneration();
-                nodeConfig.Generation = generation;
-            }
-            TraceLogger.MyIPEndPoint = here;
-            logger = TraceLogger.GetLogger("Silo", TraceLogger.LoggerType.Runtime);
+            var localEndpoint = this.initializationParams.SiloAddress.Endpoint;
+            LogManager.MyIPEndPoint = localEndpoint;
+            logger = LogManager.GetLogger("Silo", LoggerType.Runtime);
 
             logger.Info(ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC || !GCSettings.LatencyMode.Equals(GCLatencyMode.Batch))
+            {
                 logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on or with GCLatencyMode.Batch enabled - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\"> and <configuration>-<runtime>-<gcConcurrent enabled=\"false\"/>");
+                logger.Warn(ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
+            }
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing {0} silo on host {1} MachineName {2} at {3}, gen {4} --------------",
-                siloType, nodeConfig.DNSHostName, Environment.MachineName, here, generation);
-            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with runtime Version='{1}' .NET version='{2}' Is .NET 4.5={3} OS version='{4}' Config= " + Environment.NewLine + "{5}",
-                name, RuntimeVersion.Current, Environment.Version, ConfigUtilities.IsNet45OrNewer(), Environment.OSVersion, config.ToString(name));
-
-            if (keyStore != null)
-            {
-                // Re-establish reference to shared local key store in this app domain
-                LocalDataStoreInstance.LocalDataStore = keyStore;
-            }
-
-            services = new DefaultServiceProvider();
-            var startupBuilder = AssemblyLoader.TryLoadAndCreateInstance<IStartupBuilder>("OrleansDependencyInjection", logger);
-            if (startupBuilder != null)
-            {
-                logger.Info(ErrorCode.SiloLoadedDI, "Successfully loaded {0} from OrleansDependencyInjection.dll", startupBuilder.GetType().FullName);
-                try
+                this.initializationParams.Type, LocalConfig.DNSHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
+            logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
+                name, config.ToString(name));
+            
+            // Configure DI using Startup type
+            this.Services = StartupBuilder.ConfigureStartup(
+                this.LocalConfig.StartupTypeName,
+                (services, usingCustomServiceProvider) =>
                 {
-                    services = startupBuilder.ConfigureStartup(nodeConfig.StartupTypeName);
-                }
-                catch (FileNotFoundException exc)
-                {
-                    logger.Warn(ErrorCode.SiloFileNotFoundLoadingDI, "Caught a FileNotFoundException calling ConfigureStartup(). Ignoring it. {0}", exc);
-                }
-            }
-            else
-            {
-                logger.Warn(ErrorCode.SiloFailedToLoadDI, "Failed to load an implementation of IStartupBuilder from OrleansDependencyInjection.dll");
-            }
+                    // add system types
+                    // Note: you can replace IGrainFactory with your own implementation, but 
+                    // we don't recommend it, in the aspect of performance and usability
+                    services.TryAddSingleton(sp => sp);
+                    services.TryAddSingleton(this);
+                    services.TryAddSingleton(initializationParams);
+                    services.TryAddSingleton<ILocalSiloDetails>(initializationParams);
+                    services.TryAddSingleton(initializationParams.ClusterConfig);
+                    services.TryAddSingleton(initializationParams.GlobalConfig);
+                    services.TryAddTransient(sp => initializationParams.NodeConfig);
+                    services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
+                    services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
+                    services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
+                    services.TryAddSingleton<GrainRuntime>();
+                    services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
+                    services.TryAddSingleton<OrleansTaskScheduler>();
+                    services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
+                    services.TryAddExisting<IGrainFactory, GrainFactory>();
+                    services.TryAddExisting<IInternalGrainFactory, GrainFactory>();
+                    services.TryAddSingleton<TypeMetadataCache>();
+                    services.TryAddSingleton<AssemblyProcessor>();
+                    services.TryAddSingleton<ActivationDirectory>();
+                    services.TryAddSingleton<LocalGrainDirectory>();
+                    services.TryAddExisting<ILocalGrainDirectory, LocalGrainDirectory>();
+                    services.TryAddSingleton<SiloStatisticsManager>();
+                    services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
+                    services.TryAddSingleton<SiloAssemblyLoader>();
+                    services.TryAddSingleton<GrainTypeManager>();
+                    services.TryAddExisting<IMessagingConfiguration, GlobalConfiguration>();
+                    services.TryAddSingleton<MessageCenter>();
+                    services.TryAddExisting<IMessageCenter, MessageCenter>();
+                    services.TryAddExisting<ISiloMessageCenter, MessageCenter>();
+                    services.TryAddSingleton<Catalog>();
+                    services.TryAddSingleton(sp => sp.GetRequiredService<Catalog>().Dispatcher);
+                    services.TryAddSingleton<InsideRuntimeClient>();
+                    services.TryAddExisting<IRuntimeClient, InsideRuntimeClient>();
+                    services.TryAddSingleton<MembershipFactory>();
+                    services.TryAddSingleton<MultiClusterOracleFactory>();
+                    services.TryAddSingleton<LocalReminderServiceFactory>();
+                    services.TryAddSingleton<DeploymentLoadPublisher>();
+                    services.TryAddSingleton<IMembershipTable>(
+                        sp => sp.GetRequiredService<MembershipFactory>().GetMembershipTable(sp.GetRequiredService<GlobalConfiguration>()));
+                    services.TryAddSingleton<MembershipOracle>(
+                        sp =>
+                        sp.GetRequiredService<MembershipFactory>()
+                          .CreateMembershipOracle(sp.GetRequiredService<Silo>(), sp.GetRequiredService<IMembershipTable>()));
+                    services.TryAddExisting<IMembershipOracle, MembershipOracle>();
+                    services.TryAddExisting<ISiloStatusOracle, MembershipOracle>();
+                    services.TryAddSingleton<Func<ISiloStatusOracle>>(sp => () => sp.GetRequiredService<ISiloStatusOracle>());
+                    services.TryAddSingleton<MultiClusterOracleFactory>();
+                    services.TryAddSingleton<LocalReminderServiceFactory>();
+                    services.TryAddSingleton<ClientObserverRegistrar>();
 
-            healthCheckParticipants = new List<IHealthCheckParticipant>();
-            allSiloProviders = new List<IProvider>();
+                    // Placement
+                    services.TryAddSingleton<PlacementDirectorsManager>();
+                    services.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
+                    services.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
+                    services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
+                    services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
+                    services.TryAddSingleton<DefaultPlacementStrategy>();
+                    services.TryAddSingleton<ClientObserversPlacementDirector>();
+                    
+                    services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
+                    if (usingCustomServiceProvider)
+                    {
+                        services.TryAddSingleton<GrainCreator>();
+                    }
+                    else
+                    {
+                        services.TryAddSingleton(sp => new GrainCreator(null, sp.GetRequiredService<Func<IGrainRuntime>>()));
+                    }
 
-            BufferPool.InitGlobalBufferPool(globalConfig);
-            PlacementStrategy.Initialize(globalConfig);
+                    if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
+                    {
+                        services.TryAddSingleton<IConsistentRingProvider>(
+                            sp =>
+                            new VirtualBucketsRingProvider(
+                                this.initializationParams.SiloAddress,
+                                this.initializationParams.GlobalConfig.NumVirtualBucketsConsistentRing));
+                    }
+                    else
+                    {
+                        services.TryAddSingleton<IConsistentRingProvider>(
+                            sp => new ConsistentRingProvider(this.initializationParams.SiloAddress));
+                    }
+                });
+
+            this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
+            this.assemblyProcessor.Initialize();
+
+            BufferPool.InitGlobalBufferPool(GlobalConfig);
 
             UnobservedExceptionsHandlerClass.SetUnobservedExceptionHandler(UnobservedExceptionHandler);
-            AppDomain.CurrentDomain.UnhandledException +=
-                (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
+            AppDomain.CurrentDomain.UnhandledException += this.DomainUnobservedExceptionHandler;
 
-            grainFactory = new GrainFactory();
-            typeManager = new GrainTypeManager(here.Address.Equals(IPAddress.Loopback), grainFactory);
+            try
+            {
+                grainFactory = Services.GetRequiredService<GrainFactory>();
+            }
+            catch (InvalidOperationException exc)
+            {
+                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container", exc);
+                throw;
+            }
+
+            typeManager = Services.GetRequiredService<GrainTypeManager>();
 
             // Performance metrics
-            siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);
-            config.OnConfigChange("Defaults/LoadShedding", () => siloStatistics.MetricsTable.NodeConfig = nodeConfig, false);
+            siloStatistics = Services.GetRequiredService<SiloStatisticsManager>();
 
             // The scheduler
-            scheduler = new OrleansTaskScheduler(globalConfig, nodeConfig);
+            scheduler = Services.GetRequiredService<OrleansTaskScheduler>();
             healthCheckParticipants.Add(scheduler);
+            
+            runtimeClient = Services.GetRequiredService<InsideRuntimeClient>();
 
             // Initialize the message center
-            var mc = new MessageCenter(here, generation, globalConfig, siloStatistics.MetricsTable);
-            if (nodeConfig.IsGatewayNode)
-                mc.InstallGateway(nodeConfig.ProxyGatewayEndpoint);
-            
-            messageCenter = mc;
-
-            SiloIdentity = SiloAddress.ToLongString();
+            messageCenter = Services.GetRequiredService<MessageCenter>();
+            messageCenter.RerouteHandler = runtimeClient.RerouteMessage;
+            messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             // GrainRuntime can be created only here, after messageCenter was created.
-            grainRuntime = new GrainRuntime(
-                globalConfig.ServiceId,
-                SiloIdentity, 
-                grainFactory,
-                new TimerRegistry(),
-                new ReminderRegistry(),
-                new StreamProviderManager(),
-                Services);
-
+            grainRuntime = Services.GetRequiredService<IGrainRuntime>();
 
             // Now the router/directory service
             // This has to come after the message center //; note that it then gets injected back into the message center.;
-            localGrainDirectory = new LocalGrainDirectory(this); 
-
+            localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>(); 
+            
             // Now the activation directory.
-            // This needs to know which router to use so that it can keep the global directory in synch with the local one.
-            activationDirectory = new ActivationDirectory();
+            activationDirectory = Services.GetRequiredService<ActivationDirectory>();
             
             // Now the consistent ring provider
-            RingProvider = GlobalConfig.UseVirtualBucketsConsistentRing ?
-                (IConsistentRingProvider) new VirtualBucketsRingProvider(SiloAddress, GlobalConfig.NumVirtualBucketsConsistentRing)
-                : new ConsistentRingProvider(SiloAddress);
+            RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
 
-            Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainRuntime, out setDispatcher);
-            var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
-            setDispatcher(dispatcher);
-
-            RuntimeClient.Current = new InsideRuntimeClient(
-                dispatcher, 
-                catalog, 
-                LocalGrainDirectory, 
-                SiloAddress, 
-                config, 
-                RingProvider, 
-                typeManager,
-                grainFactory);
-            messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
-            messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
+            // to preserve backwards compatibility, only use the service provider to inject grain dependencies if the user supplied his own
+            // service provider, meaning that he is explicitly opting into it.
+            catalog = Services.GetRequiredService<Catalog>();
 
             siloStatistics.MetricsTable.Scheduler = scheduler;
             siloStatistics.MetricsTable.ActivationDirectory = activationDirectory;
             siloStatistics.MetricsTable.ActivationCollector = catalog.ActivationCollector;
             siloStatistics.MetricsTable.MessageCenter = messageCenter;
-
-            DeploymentLoadPublisher.CreateDeploymentLoadPublisher(this, globalConfig);
-            PlacementDirectorsManager.CreatePlacementDirectorsManager(globalConfig);
-
-            // Now the incoming message agents
-            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, dispatcher);
-            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, dispatcher);
-            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, dispatcher);
-
-            membershipFactory = new MembershipFactory();
-            reminderFactory = new LocalReminderServiceFactory();
             
+            // Now the incoming message agents
+            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
+            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
+            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
+
+            membershipFactory = Services.GetRequiredService<MembershipFactory>();
+            membershipOracle = Services.GetRequiredService<IMembershipOracle>();
+
             SystemStatus.Current = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
-                () => TraceLogger.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
-
-            TestHook = new TestHooks(this);
+                () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
 
             logger.Info(ErrorCode.SiloInitializingFinished, "-------------- Started silo {0}, ConsistentHashCode {1:X} --------------", SiloAddress.ToLongString(), SiloAddress.GetConsistentHashCode());
         }
@@ -319,24 +363,45 @@ namespace Orleans.Runtime
             logger.Verbose("Creating System Targets for this silo.");
 
             logger.Verbose("Creating {0} System Target", "SiloControl");
-            RegisterSystemTarget(new SiloControl(this));
+            var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
+            RegisterSystemTarget(siloControl);
+
+            logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
+            RegisterSystemTarget(new StreamProviderManagerAgent(this, allSiloProviders));
 
             logger.Verbose("Creating {0} System Target", "DeploymentLoadPublisher");
-            RegisterSystemTarget(DeploymentLoadPublisher.Instance);
-
-            logger.Verbose("Creating {0} System Target", "RemGrainDirectory + CacheValidator");
-            RegisterSystemTarget(LocalGrainDirectory.RemGrainDirectory);
+            RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
+            
+            logger.Verbose("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
+            RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
+            logger.Verbose("Creating {0} System Target", "RemoteClusterGrainDirectory");
+            RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
+
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-            clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalMessageCenter, LocalGrainDirectory, LocalScheduler, OrleansConfig);
-            RegisterSystemTarget(clientRegistrar);
-            RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
+            this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
+            this.RegisterSystemTarget(new TypeManager(this.SiloAddress, this.typeManager));
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
-            RegisterSystemTarget((SystemTarget) membershipOracle);
+            if (this.membershipOracle is SystemTarget)
+            {
+                RegisterSystemTarget((SystemTarget)membershipOracle);
+            }
+
+            if (multiClusterOracle != null && multiClusterOracle is SystemTarget)
+            {
+                logger.Verbose("Creating {0} System Target", "MultiClusterOracle");
+                RegisterSystemTarget((SystemTarget)multiClusterOracle);
+            }
 
             logger.Verbose("Finished creating System Targets for this silo.");
+        }
+
+        internal void InitializeTestHooksSystemTarget()
+        {
+            testHook = new TestHooksSystemTarget(this);
+            RegisterSystemTarget(testHook);
         }
 
         private void InjectDependencies()
@@ -351,12 +416,13 @@ namespace Orleans.Runtime
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
 
-            LocalSiloStatusOracle.SubscribeToSiloStatusEvents(DeploymentLoadPublisher.Instance);
+            LocalSiloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
-            if (!globalConfig.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
+            if (!GlobalConfig.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
             {
                 // start the reminder service system target
-                reminderService = reminderFactory.CreateReminderService(this, grainFactory, initTimeout);
+                reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
+                                          .CreateReminderService(this, grainFactory, initTimeout);
                 RegisterSystemTarget((SystemTarget) reminderService);
             }
 
@@ -371,7 +437,7 @@ namespace Orleans.Runtime
 
         private async Task CreateSystemGrains()
         {
-            if (siloType == SiloType.Primary)
+            if (Type == SiloType.Primary)
                 await membershipFactory.CreateMembershipTableProvider(catalog, this).WithTimeout(initTimeout);
         }
 
@@ -409,7 +475,7 @@ namespace Orleans.Runtime
 
             // This has to start first so that the directory system target factory gets loaded before we start the router.
             typeManager.Start();
-            InsideRuntimeClient.Current.Start();
+            runtimeClient.Start();
 
             // The order of these 4 is pretty much arbitrary.
             scheduler.Start();
@@ -423,8 +489,9 @@ namespace Orleans.Runtime
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
 
-            SiloProviderRuntime.Initialize(GlobalConfig, SiloIdentity, grainFactory, Services);
-            InsideRuntimeClient.Current.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
+            SiloProviderRuntime.Initialize(GlobalConfig, SiloAddress.ToLongString(), grainFactory, Services);
+            SiloProviderRuntime.Instance.StreamingInitialize();
+            runtimeClient.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
             statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
@@ -433,12 +500,14 @@ namespace Orleans.Runtime
             allSiloProviders.AddRange(statisticsProviderManager.GetProviders());
 
             // can call SetSiloMetricsTableDataManager only after MessageCenter is created (dependency on this.SiloAddress).
-            siloStatistics.SetSiloStatsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
-            siloStatistics.SetSiloMetricsTableDataManager(this, nodeConfig).WaitWithThrow(initTimeout);
+            siloStatistics.SetSiloStatsTableDataManager(this, LocalConfig).WaitWithThrow(initTimeout);
+            siloStatistics.SetSiloMetricsTableDataManager(this, LocalConfig).WaitWithThrow(initTimeout);
 
-            IMembershipTable membershipTable = membershipFactory.GetMembershipTable(GlobalConfig.LivenessType, GlobalConfig.MembershipTableAssembly);
-            membershipOracle = membershipFactory.CreateMembershipOracle(this, membershipTable);
+            IMembershipTable membershipTable = Services.GetRequiredService<IMembershipTable>();
             
+            multiClusterOracle =
+                Services.GetRequiredService<MultiClusterOracleFactory>().CreateGossipOracle(this).WaitForResultWithThrow(initTimeout);
+
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
 
@@ -463,24 +532,24 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
-            var siloStreamProviderManager = (StreamProviderManager) grainRuntime.StreamProviderManager;
+            var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
-                () => siloStreamProviderManager.LoadStreamProviders(this.GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
+                () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
-            InsideRuntimeClient.Current.CurrentStreamProviderManager = siloStreamProviderManager;
+            runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
             allSiloProviders.AddRange(siloStreamProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
 
-            bool waitForPrimaryToStart = globalConfig.PrimaryNodeIsRequired && siloType != SiloType.Primary;
+            bool waitForPrimaryToStart = GlobalConfig.PrimaryNodeIsRequired && Type != SiloType.Primary;
             if (waitForPrimaryToStart) // only in MembershipTableGrain case.
             {
                 scheduler.QueueTask(() => membershipFactory.WaitForTableToInit(membershipTable), statusOracleContext)
                         .WaitWithThrow(initTimeout);
             }
-            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(this.GlobalConfig, true, TraceLogger.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
+            scheduler.QueueTask(() => membershipTable.InitializeMembershipTable(GlobalConfig, true, LogManager.GetLogger(membershipTable.GetType().Name)), statusOracleContext)
                 .WaitWithThrow(initTimeout);
           
             scheduler.QueueTask(() => LocalSiloStatusOracle.Start(), statusOracleContext)
@@ -490,84 +559,103 @@ namespace Orleans.Runtime
                 .WaitWithThrow(initTimeout);
             if (logger.IsVerbose) { logger.Verbose("Local silo status oracle became active successfully."); }
 
+            //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
+            if (GlobalConfig.HasMultiClusterNetwork) 
+            {
+                logger.Info("Creating multicluster oracle with my ServiceId={0} and ClusterId={1}.",
+                    GlobalConfig.ServiceId, GlobalConfig.ClusterId);
+
+                ISchedulingContext clusterStatusContext = ((SystemTarget) multiClusterOracle).SchedulingContext;
+                scheduler.QueueTask(() => multiClusterOracle.Start(LocalSiloStatusOracle), clusterStatusContext)
+                                    .WaitWithThrow(initTimeout);
+                if (logger.IsVerbose) { logger.Verbose("multicluster oracle created successfully."); }
+            }
+
             try
             {
-                siloStatistics.Start(LocalConfig);
-                if (logger.IsVerbose) { logger.Verbose("Silo statistics manager started successfully."); }
+                this.siloStatistics.Start(this.LocalConfig);
+                if (this.logger.IsVerbose) { this.logger.Verbose("Silo statistics manager started successfully."); }
 
                 // Finally, initialize the deployment load collector, for grains with load-based placement
-                scheduler.QueueTask(DeploymentLoadPublisher.Instance.Start, DeploymentLoadPublisher.Instance.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Silo deployment load publisher started successfully."); }
+                var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
+                this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
+                    .WaitWithThrow(this.initTimeout);
+                if (this.logger.IsVerbose) { this.logger.Verbose("Silo deployment load publisher started successfully."); }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
-                platformWatchdog = new Watchdog(nodeConfig.StatisticsLogWriteInterval, healthCheckParticipants);
-                platformWatchdog.Start();
-                if (logger.IsVerbose) { logger.Verbose("Silo platform watchdog started successfully."); }
+                this.platformWatchdog = new Watchdog(this.LocalConfig.StatisticsLogWriteInterval, this.healthCheckParticipants);
+                this.platformWatchdog.Start();
+                if (this.logger.IsVerbose) { this.logger.Verbose("Silo platform watchdog started successfully."); }
 
-                if (reminderService != null)
+                if (this.reminderService != null)
                 {
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    scheduler.QueueTask(reminderService.Start, ((SystemTarget) reminderService).SchedulingContext)
-                        .WaitWithThrow(initTimeout);
-                    if (logger.IsVerbose)
+                    this.scheduler.QueueTask(this.reminderService.Start, ((SystemTarget)this.reminderService).SchedulingContext)
+                        .WaitWithThrow(this.initTimeout);
+                    if (this.logger.IsVerbose)
                     {
-                        logger.Verbose("Reminder service started successfully.");
+                        this.logger.Verbose("Reminder service started successfully.");
                     }
                 }
 
-                bootstrapProviderManager = new BootstrapProviderManager();
-                scheduler.QueueTask(
-                    () => bootstrapProviderManager.LoadAppBootstrapProviders(GlobalConfig.ProviderConfigurations),
-                    providerManagerSystemTarget.SchedulingContext)
-                        .WaitWithThrow(initTimeout);
-                BootstrapProviders = bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
-                allSiloProviders.AddRange(BootstrapProviders);
+                this.bootstrapProviderManager = new BootstrapProviderManager();
+                this.scheduler.QueueTask(
+                    () => this.bootstrapProviderManager.LoadAppBootstrapProviders(this.GlobalConfig.ProviderConfigurations),
+                    this.providerManagerSystemTarget.SchedulingContext)
+                        .WaitWithThrow(this.initTimeout);
+                this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
+                this.allSiloProviders.AddRange(this.BootstrapProviders);
 
-                if (logger.IsVerbose) { logger.Verbose("App bootstrap calls done successfully."); }
+                if (this.logger.IsVerbose) { this.logger.Verbose("App bootstrap calls done successfully."); }
 
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
-                scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, providerManagerSystemTarget.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Stream providers started successfully."); }
+                this.scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, this.providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(this.initTimeout);
+                if (this.logger.IsVerbose) { this.logger.Verbose("Stream providers started successfully."); }
 
                 // Now that we're active, we can start the gateway
-                var mc = messageCenter as MessageCenter;
-                if (mc != null)
-                {
-                    mc.StartGateway(clientRegistrar);
-                }
-                if (logger.IsVerbose) { logger.Verbose("Message gateway service started successfully."); }
-
-                scheduler.QueueTask(clientRegistrar.Start, clientRegistrar.SchedulingContext)
-                    .WaitWithThrow(initTimeout);
-                if (logger.IsVerbose) { logger.Verbose("Client registrar service started successfully."); }
+                var mc = this.messageCenter as MessageCenter;
+                mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
+                if (this.logger.IsVerbose) { this.logger.Verbose("Message gateway service started successfully."); }
 
                 SystemStatus.Current = SystemStatus.Running;
             }
             catch (Exception exc)
             {
-                SafeExecute(() => logger.Error(ErrorCode.Runtime_Error_100330, String.Format("Error starting silo {0}. Going to FastKill().", SiloAddress), exc));
-                FastKill(); // if failed after Membership became active, mark itself as dead in Membership abale.
+                this.SafeExecute(() => this.logger.Error(ErrorCode.Runtime_Error_100330, String.Format("Error starting silo {0}. Going to FastKill().", this.SiloAddress), exc));
+                this.FastKill(); // if failed after Membership became active, mark itself as dead in Membership abale.
                 throw;
             }
             if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", SystemStatus.Current); }
         }
 
+        /// <summary>
+        /// Load and initialize newly added stream providers. Remove providers that are not on the list that's being passed in.
+        /// </summary>
+        public async Task UpdateStreamProviders(IDictionary<string, ProviderCategoryConfiguration> streamProviderConfigurations)
+        {
+            IStreamProviderManagerAgent streamProviderUpdateAgent =
+                runtimeClient.InternalGrainFactory.GetSystemTarget<IStreamProviderManagerAgent>(Constants.StreamProviderManagerAgentSystemTargetId, this.SiloAddress);
+
+            await scheduler.QueueTask(() => streamProviderUpdateAgent.UpdateStreamProviders(streamProviderConfigurations), providerManagerSystemTarget.SchedulingContext)
+                    .WithTimeout(initTimeout);
+        }
+
         private void ConfigureThreadPoolAndServicePointSettings()
         {
-            if (nodeConfig.MinDotNetThreadPoolSize > 0)
+#if !NETSTANDARD_TODO
+            if (LocalConfig.MinDotNetThreadPoolSize > 0)
             {
                 int workerThreads;
                 int completionPortThreads;
                 ThreadPool.GetMinThreads(out workerThreads, out completionPortThreads);
-                if (nodeConfig.MinDotNetThreadPoolSize > workerThreads ||
-                    nodeConfig.MinDotNetThreadPoolSize > completionPortThreads)
+                if (LocalConfig.MinDotNetThreadPoolSize > workerThreads ||
+                    LocalConfig.MinDotNetThreadPoolSize > completionPortThreads)
                 {
                     // if at least one of the new values is larger, set the new min values to be the larger of the prev. and new config value.
-                    int newWorkerThreads = Math.Max(nodeConfig.MinDotNetThreadPoolSize, workerThreads);
-                    int newCompletionPortThreads = Math.Max(nodeConfig.MinDotNetThreadPoolSize, completionPortThreads);
+                    int newWorkerThreads = Math.Max(LocalConfig.MinDotNetThreadPoolSize, workerThreads);
+                    int newCompletionPortThreads = Math.Max(LocalConfig.MinDotNetThreadPoolSize, completionPortThreads);
                     bool ok = ThreadPool.SetMinThreads(newWorkerThreads, newCompletionPortThreads);
                     if (ok)
                     {
@@ -588,10 +676,11 @@ namespace Orleans.Runtime
             // http://blogs.msdn.com/b/windowsazurestorage/archive/2010/06/25/nagle-s-algorithm-is-not-friendly-towards-small-requests.aspx
             logger.Info(ErrorCode.SiloConfiguredServicePointManager,
                 "Configured .NET ServicePointManager to Expect100Continue={0}, DefaultConnectionLimit={1}, UseNagleAlgorithm={2} to improve Azure storage performance.",
-                nodeConfig.Expect100Continue, nodeConfig.DefaultConnectionLimit, nodeConfig.UseNagleAlgorithm);
-            ServicePointManager.Expect100Continue = nodeConfig.Expect100Continue;
-            ServicePointManager.DefaultConnectionLimit = nodeConfig.DefaultConnectionLimit;
-            ServicePointManager.UseNagleAlgorithm = nodeConfig.UseNagleAlgorithm;
+                LocalConfig.Expect100Continue, LocalConfig.DefaultConnectionLimit, LocalConfig.UseNagleAlgorithm);
+            ServicePointManager.Expect100Continue = LocalConfig.Expect100Continue;
+            ServicePointManager.DefaultConnectionLimit = LocalConfig.DefaultConnectionLimit;
+            ServicePointManager.UseNagleAlgorithm = LocalConfig.UseNagleAlgorithm;
+#endif
         }
 
         /// <summary>
@@ -694,7 +783,6 @@ namespace Orleans.Runtime
                     SafeExecute(() => catalog.DeactivateAllActivations().WaitWithThrow(stopTimeout));
                 }
 
-
                 // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
@@ -743,8 +831,8 @@ namespace Orleans.Runtime
             finally
             {
                 // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
-                FastKill();
                 logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
+                FastKill();                
             }
         }
 
@@ -767,7 +855,7 @@ namespace Orleans.Runtime
             SafeExecute(incomingAgent.Stop);
 
             // timers
-            SafeExecute(InsideRuntimeClient.Current.Stop);
+            SafeExecute(runtimeClient.Stop);
             if (platformWatchdog != null) 
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
@@ -776,14 +864,18 @@ namespace Orleans.Runtime
             SafeExecute(activationDirectory.PrintActivationDirectory);
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
-            SafeExecute(TraceLogger.Close);
-
             SafeExecute(GrainTypeManager.Stop);
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
-            SystemStatus.Current = SystemStatus.Terminated;
-            siloTerminatedEvent.Set();
+            SafeExecute(() => SystemStatus.Current = SystemStatus.Terminated);
+            SafeExecute(LogManager.Close);
+            SafeExecute(() => AppDomain.CurrentDomain.UnhandledException -= this.DomainUnobservedExceptionHandler);
+            SafeExecute(() => this.assemblyProcessor?.Dispose());
+
+            // Setting the event should be the last thing we do.
+            // Do nothijng after that!
+            siloTerminatedEvent.Set();  
         }
 
         private void SafeExecute(Action action)
@@ -795,7 +887,7 @@ namespace Orleans.Runtime
         {
             // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
             logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            TraceLogger.Flush();
+            LogManager.Flush();
 
             try
             {
@@ -805,222 +897,13 @@ namespace Orleans.Runtime
                     
                     SystemStatus.Current = SystemStatus.Stopping;
                 }
-
-                if (!TestHook.ExecuteFastKillInProcessExit) return;
-
+                
                 logger.Info(ErrorCode.SiloStopping, "Silo.HandleProcessExit() - starting to FastKill()");
                 FastKill();
             }
             finally
             {
-                TraceLogger.Close();
-            }
-        }
-
-        /// <summary>
-        /// Test hook functions for white box testing.
-        /// </summary>
-        public class TestHooks : MarshalByRefObject
-        {
-            private readonly Silo silo;
-            internal bool ExecuteFastKillInProcessExit;
-            
-            internal IConsistentRingProvider ConsistentRingProvider
-            {
-                get { return CheckReturnBoundaryReference("ring provider", silo.RingProvider); }
-            }
-            
-            public bool HasStatisticsProvider { get { return silo.statisticsProviderManager != null; } }
-
-            public object StatisticsProvider
-            {
-                get
-                {
-                    if (silo.statisticsProviderManager == null) return null;
-                    var provider = silo.statisticsProviderManager.GetProvider(silo.LocalConfig.StatisticsProviderName);
-                    return CheckReturnBoundaryReference("statistics provider", provider);
-                }
-            }
-
-            /// <summary>
-            /// Populates the provided <paramref name="collection"/> with the assemblies generated by this silo.
-            /// </summary>
-            /// <param name="collection">The collection to populate.</param>
-            public void UpdateGeneratedAssemblies(GeneratedAssemblies collection)
-            {
-                var generatedAssemblies = CodeGeneratorManager.GetGeneratedAssemblies();
-                foreach (var asm in generatedAssemblies)
-                {
-                    collection.Add(asm.Key, asm.Value);
-                }
-            }
-
-            internal Action<GrainId> Debug_OnDecideToCollectActivation { get; set; }
-
-            internal TestHooks(Silo s)
-            {
-                silo = s;
-                ExecuteFastKillInProcessExit = true;
-            }
-
-            internal Guid ServiceId { get { return silo.GlobalConfig.ServiceId; } }
-
-            /// <summary>
-            /// Get list of providers loaded in this silo.
-            /// </summary>
-            /// <returns></returns>
-            internal IEnumerable<string> GetStorageProviderNames()
-            {
-                return silo.StorageProviderManager.GetProviderNames();
-            }
-
-            /// <summary>
-            /// Find the named storage provider loaded in this silo.
-            /// </summary>
-            /// <returns></returns>
-            internal IStorageProvider GetStorageProvider(string name)
-            {
-                var provider = silo.StorageProviderManager.GetProvider(name) as IStorageProvider;
-                return CheckReturnBoundaryReference("storage provider", provider);
-            }
-
-            internal string PrintSiloConfig()
-            {
-                return silo.OrleansConfig.ToString(silo.Name);
-            }
-
-            internal IBootstrapProvider GetBootstrapProvider(string name)
-            {
-                var provider = silo.BootstrapProviders.First(p => p.Name == name);
-                return CheckReturnBoundaryReference("bootstrap provider", provider);
-            }
-
-            internal void SuppressFastKillInHandleProcessExit()
-            {
-                ExecuteFastKillInProcessExit = false;
-            }
-
-            // store silos for which we simulate faulty communication
-            // number indicates how many percent of requests are lost
-            internal ConcurrentDictionary<IPEndPoint, double> SimulatedMessageLoss; 
-
-            internal void BlockSiloCommunication(IPEndPoint destination, double lost_percentage)
-            {
-                if (SimulatedMessageLoss == null)
-                    SimulatedMessageLoss = new ConcurrentDictionary<IPEndPoint, double>();
-
-                SimulatedMessageLoss[destination] = lost_percentage;
-            }
-
-            internal void UnblockSiloCommunication()
-            {
-                SimulatedMessageLoss = null;
-            }
-
-            SafeRandom random = new SafeRandom();
-
-            internal bool ShouldDrop(Message msg)
-            {
-                if (SimulatedMessageLoss != null)
-                {
-                    double blockedpercentage = 0.0;
-                    Silo.CurrentSilo.TestHook.SimulatedMessageLoss.TryGetValue(msg.TargetSilo.Endpoint, out blockedpercentage);
-                    return (random.NextDouble() * 100 < blockedpercentage);
-                }
-                else
-                    return false;
-            }
-
-            // this is only for white box testing - use RuntimeClient.Current.SendRequest instead
-
-            internal void SendMessageInternal(Message message)
-            {
-                silo.messageCenter.SendMessage(message);
-            }
-
-            // For white-box testing only
-
-            internal int UnregisterGrainForTesting(GrainId grain)
-            {
-                return silo.catalog.UnregisterGrainForTesting(grain);
-            }
-
-            // For white-box testing only
-
-            internal void SetDirectoryLazyDeregistrationDelay_ForTesting(TimeSpan timeSpan)
-            {
-                silo.OrleansConfig.Globals.DirectoryLazyDeregistrationDelay = timeSpan;
-            }
-
-            // For white-box testing only
-
-            internal void SetMaxForwardCount_ForTesting(int val)
-            {
-                silo.OrleansConfig.Globals.MaxForwardCount = val;
-            }
-
-            private static T CheckReturnBoundaryReference<T>(string what, T obj) where T : class
-            {
-                if (obj == null) return null;
-                if (obj is MarshalByRefObject || obj is ISerializable)
-                {
-                    // Referernce to the provider can safely be passed across app-domain boundary in unit test process
-                    return obj;
-                }
-                throw new InvalidOperationException(string.Format("Cannot return reference to {0} {1} if it is not MarshalByRefObject or Serializable",
-                    what, TypeUtils.GetFullName(obj.GetType())));
-            }
-
-            /// <summary>
-            /// Represents a collection of generated assemblies accross an application domain.
-            /// </summary>
-            public class GeneratedAssemblies : MarshalByRefObject
-            {
-                /// <summary>
-                /// Initializes a new instance of the <see cref="GeneratedAssemblies"/> class.
-                /// </summary>
-                public GeneratedAssemblies()
-                {
-                    this.Assemblies = new Dictionary<string, byte[]>();
-                }
-
-                /// <summary>
-                /// Gets the assemblies which were produced by code generation.
-                /// </summary>
-                public Dictionary<string, byte[]> Assemblies { get; private set; }
-
-                /// <summary>
-                /// Adds a new assembly to this collection.
-                /// </summary>
-                /// <param name="key">
-                /// The full name of the assembly which code was generated for.
-                /// </param>
-                /// <param name="value">
-                /// The raw generated assembly.
-                /// </param>
-                public void Add(string key, byte[] value)
-                {
-                    if (!string.IsNullOrWhiteSpace(key))
-                    {
-                        this.Assemblies[key] = value;
-                    }
-                }
-            }
-
-            /// <summary>
-            /// Methods for optimizing the code generator.
-            /// </summary>
-            public class CodeGeneratorOptimizer : MarshalByRefObject
-            {
-                /// <summary>
-                /// Adds a cached assembly to the code generator.
-                /// </summary>
-                /// <param name="targetAssemblyName">The assembly which the cached assembly was generated for.</param>
-                /// <param name="cachedAssembly">The generated assembly.</param>
-                public void AddCachedAssembly(string targetAssemblyName, byte[] cachedAssembly)
-                {
-                    CodeGeneratorManager.AddGeneratedAssembly(targetAssemblyName, cachedAssembly);
-                }
+                LogManager.Close();
             }
         }
 
@@ -1030,7 +913,7 @@ namespace Orleans.Runtime
             if (schedulingContext == null)
             {
                 if (context == null)
-                    logger.Error(ErrorCode.Runtime_Error_100102, String.Format("Silo caught an UnobservedException with context==null."), exception);
+                    logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
                 else
                     logger.Error(ErrorCode.Runtime_Error_100103, String.Format("Silo caught an UnobservedException with context of type different than OrleansContext. The type of the context is {0}. The context is {1}",
                         context.GetType(), context), exception);
@@ -1041,8 +924,9 @@ namespace Orleans.Runtime
             }   
         }
 
-        private void DomainUnobservedExceptionHandler(object context, Exception exception)
+        private void DomainUnobservedExceptionHandler(object context, UnhandledExceptionEventArgs args)
         {
+            var exception = (Exception)args.ExceptionObject;
             if (context is ISchedulingContext)
                 UnobservedExceptionHandler(context as ISchedulingContext, exception);
             else

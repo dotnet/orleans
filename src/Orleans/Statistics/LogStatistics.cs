@@ -1,13 +1,13 @@
+using Orleans.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class LogStatistics
+    internal class LogStatistics : IDisposable
     {
         internal const string STATS_LOG_PREFIX = "Statistics: ^^^";
         internal const string STATS_LOG_POSTFIX = "^^^";
@@ -15,18 +15,18 @@ namespace Orleans.Runtime
         private readonly TimeSpan reportFrequency;
         private AsyncTaskSafeTimer reportTimer;
 
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         public IStatisticsPublisher StatsTablePublisher;
 
         internal LogStatistics(TimeSpan writeInterval, bool isSilo)
         {
             reportFrequency = writeInterval;
-            logger = TraceLogger.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger(isSilo ? "SiloLogStatistics" : "ClientLogStatistics", LoggerType.Runtime);
         }
 
         internal void Start()
         {
-            reportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer. 
+            reportTimer = new AsyncTaskSafeTimer(Reporter, null, reportFrequency, reportFrequency); // Start a new fresh timer.
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -110,7 +110,7 @@ namespace Orleans.Runtime
             int newSize = logMsgBuilder.Length + Environment.NewLine.Length + counterData.Length;
             int newSizeWithPostfix = newSize + STATS_LOG_POSTFIX.Length + Environment.NewLine.Length;
 
-            if (newSizeWithPostfix >= TraceLogger.MAX_LOG_MESSAGE_SIZE)
+            if (newSizeWithPostfix >= LogManager.MAX_LOG_MESSAGE_SIZE)
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);
@@ -161,7 +161,7 @@ namespace Orleans.Runtime
                     () => bodyCopyMillis / numMessages);
 
                 return new List<ICounter>(new FloatValueStatistic[] { numHeadersPerMsg, numHeaderBytesPerMsg, numBodyBytesPerMsg,
-                                    headerSerMillisPerMessage, headerDeserMillisPerMessage, bodySerMillisPerMessage, 
+                                    headerSerMillisPerMessage, headerDeserMillisPerMessage, bodySerMillisPerMessage,
                                     bodyDeserMillisPerMessage, bodyCopyMillisPerMessage });
             }
             else
@@ -173,6 +173,15 @@ namespace Orleans.Runtime
         private static long TicksToMilliSeconds(long ticks)
         {
             return (long)TimeSpan.FromTicks(ticks).TotalMilliseconds;
+        }
+
+        public void Dispose()
+        {
+            if (reportTimer != null)
+            {
+                reportTimer.Dispose();
+                reportTimer = null;
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using HelloEnvironmentInterfaces;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace Orleans.Azure.Samples.Web
@@ -9,37 +10,29 @@ namespace Orleans.Azure.Samples.Web
     {
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (Page.IsPostBack)
-            {
-                if (!AzureClient.IsInitialized)
-                {
-                    FileInfo clientConfigFile = AzureConfigUtils.ClientConfigFileLocation;
-                    if (!clientConfigFile.Exists)
-                    {
-                        throw new FileNotFoundException(string.Format("Cannot find Orleans client config file for initialization at {0}", clientConfigFile.FullName), clientConfigFile.FullName);
-                    }
+            if (!Page.IsPostBack || AzureClient.IsInitialized)
+                return;
 
-                    AzureClient.Initialize(clientConfigFile);
-                }
-            }
+            var config = AzureClient.DefaultConfiguration();
+            AzureClient.Initialize(config);
         }
 
         protected async void ButtonSayHello_Click(object sender, EventArgs e)
         {
-            this.ReplyText.Text = "Talking to Orleans";
+            this.ReplyText.Text += "\n" + "Talking to Orleans";
 
             IHelloEnvironment grainRef = GrainClient.GrainFactory.GetGrain<IHelloEnvironment>(0);
 
             try
             {
                 string reply = await grainRef.RequestDetails();
-                this.ReplyText.Text = "Orleans said: " + reply + " at " + DateTime.UtcNow + " UTC";
+                this.ReplyText.Text += "\n" + "Orleans said: " + reply + " at " + DateTime.UtcNow + " UTC";
             }
             catch (Exception exc)
             {
                 while (exc is AggregateException) exc = exc.InnerException;
                 
-                this.ReplyText.Text = "Error connecting to Orleans: " + exc + " at " + DateTime.Now;
+                this.ReplyText.Text = "\n" + "Error connecting to Orleans: " + exc + " at " + DateTime.Now;
             }
         }
     }

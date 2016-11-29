@@ -1,7 +1,7 @@
-using Microsoft.ApplicationInsights;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using Microsoft.ApplicationInsights;
+using Orleans.Runtime;
 
 namespace Orleans.TelemetryConsumers.AI
 {
@@ -125,5 +125,8 @@ namespace Orleans.TelemetryConsumers.AI
                 _client.TrackTrace(message, sev, properties);
             }
         }
+
+        public void Flush() { }
+        public void Close() { }
     }
 }

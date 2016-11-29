@@ -49,6 +49,11 @@ namespace Orleans.Runtime
 
         protected abstract double BucketEnd(int i);
 
+        protected bool IsLastBucket(int i)
+        {
+            return i == Buckets.Length - 1;
+        }
+
         protected string PrintHistogramImpl(bool inMilliseconds)
         {
             var sb = new StringBuilder();
@@ -62,7 +67,7 @@ namespace Orleans.Runtime
                     if (inMilliseconds)
                     {
                         string one =
-                            Double.MaxValue == end ?
+                            IsLastBucket(i) ?
                                 "EOT" :
                                 TimeSpan.FromTicks((long) end).TotalMilliseconds.ToString();
                         sb.Append(String.Format(CultureInfo.InvariantCulture, "[{0}:{1}]={2}, ", TimeSpan.FromTicks((long)start).TotalMilliseconds, one, bucket));
@@ -124,7 +129,7 @@ namespace Orleans.Runtime
 
         protected override double BucketEnd(int i)
         {
-            if (i == Buckets.Length - 1)
+            if (IsLastBucket(i))
             {
                 return Double.MaxValue;
             }
@@ -191,7 +196,7 @@ namespace Orleans.Runtime
 
         protected override double BucketEnd(int i)
         {
-            if (i == Buckets.Length - 1)
+            if (IsLastBucket(i))
             {
                 return Double.MaxValue;
             }

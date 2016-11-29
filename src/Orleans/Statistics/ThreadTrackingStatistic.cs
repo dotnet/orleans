@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
 using System.Linq;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -34,10 +34,8 @@ namespace Orleans.Runtime
         /// Keep track of thread statistics, mainly timing, can be created outside the thread to be tracked.
         /// </summary>
         /// <param name="threadName">Name used for logging the collected stastistics</param>
-        /// <param name="storage"></param>
         public ThreadTrackingStatistic(string threadName)
         {
-            
             ExecutingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
             ExecutingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
             ProcessingCpuCycleTime = new TimeIntervalThreadCycleCounterBased();
@@ -71,7 +69,7 @@ namespace Orleans.Runtime
             allNumProcessedRequests.Add(
                 FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_PROCESSED_REQUESTS_PER_THREAD, threadName),
                         () => (float)NumRequests, storage));
-                
+
             // aggregate stats
             if (totalExecutingCpuCycleTime == null)
             {
@@ -103,23 +101,23 @@ namespace Orleans.Runtime
                     new StatisticName(StatisticNames.THREADS_PROCESSED_REQUESTS_PER_THREAD, "AllThreads"),
                         () => (float)allNumProcessedRequests.Select(cs => cs.GetCurrentValue()).Sum(), aggrCountersStorage);
             }
-            
+
             if (StatisticsCollector.PerformStageAnalysis)
                 globalStageAnalyzer.AddTracking(this);
-            }
+        }
 
         private float CalculateTotalAverage(List<FloatValueStatistic> allthreasCounters, FloatValueStatistic allNumRequestsCounter)
         {
             float allThreads = allthreasCounters.Select(cs => cs.GetCurrentValue()).Sum();
             float numRequests = allNumRequestsCounter.GetCurrentValue();
-            if (numRequests == 0) return 0;
-            return allThreads/numRequests;
+            if (numRequests > 0) return allThreads / numRequests;
+            return 0;
         }
 
         public static void FirstClientConnectedStartTracking()
         {
             ClientConnected = true;
-            }
+        }
 
         /// <summary>
         /// Call once when the thread is started, must be called from the thread being tracked
@@ -158,7 +156,6 @@ namespace Orleans.Runtime
             // As this function is called constantly, we perform two additional tasks in this function which require calls from the thread being tracked (the constructor is not called from the tracked thread)
             if (firstStart)
             {
-
                 // If this is the first function call where client has connected, we ensure execution timers are started and context switches are tracked
                 firstStart = false;
                 if (StatisticsCollector.CollectContextSwitchesStats)
@@ -181,7 +178,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Call once after processing multiple requests as a batch or a single request, must be called from the thread being tracked
         /// </summary>
-        /// <param name="num">Number of processed requests</param>
         public void OnStopProcessing()
         {
             // Only once a client has connected do we start tracking statistics
@@ -210,13 +206,14 @@ namespace Orleans.Runtime
 
         private void TrackContextSwitches()
         {
+#if !NETSTANDARD_TODO
+            // TODO: this temporary exclusion should be resolved by #2147
             PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
             PerformanceCounter[] performanceCountersForThisThread = null;
 
             // Iterate over all "Thread" category performance counters on system (includes numerous processes)
             foreach (string threadName in allThreadsWithPerformanceCounters.GetInstanceNames())
             {
-
                 // Obtain those performance counters for the OrleansHost
                 if (threadName.Contains("OrleansHost") && threadName.EndsWith("/" + Thread.CurrentThread.ManagedThreadId))
                 {
@@ -231,7 +228,6 @@ namespace Orleans.Runtime
             // Look at all performance counters for this thread
             foreach (PerformanceCounter performanceCounter in performanceCountersForThisThread)
             {
-
                 // Find performance counter for context switches
                 if (performanceCounter.CounterName == CONTEXT_SWTICH_COUNTER_NAME)
                 {
@@ -239,6 +235,7 @@ namespace Orleans.Runtime
                     FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
                 }
             }
+#endif
         }
     }
 }

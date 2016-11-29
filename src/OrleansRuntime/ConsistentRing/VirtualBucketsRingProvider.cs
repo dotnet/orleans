@@ -1,7 +1,6 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
-
+using System.Linq;
 
 namespace Orleans.Runtime.ConsistentRing
 {
@@ -12,35 +11,40 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class VirtualBucketsRingProvider : MarshalByRefObject, IConsistentRingProvider, ISiloStatusListener
+    internal class VirtualBucketsRingProvider :
+#if !NETSTANDARD
+        MarshalByRefObject,
+#endif
+        IConsistentRingProvider, ISiloStatusListener
     {
         private readonly List<IRingRangeListener> statusListeners;
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap;
         private List<Tuple<uint, SiloAddress>> sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
         private readonly object lockable;
         private bool running;
         private IRingRange myRange;
 
-        internal VirtualBucketsRingProvider(SiloAddress siloAddr, int nBucketsPerSilo)
+        internal VirtualBucketsRingProvider(SiloAddress siloAddress, int numVirtualBuckets)
         {
-            if (nBucketsPerSilo <= 0 )
-                throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + nBucketsPerSilo);
+            numBucketsPerSilo = numVirtualBuckets;
 
-            logger = TraceLogger.GetLogger(typeof(VirtualBucketsRingProvider).Name);
+            if (numBucketsPerSilo <= 0 )
+                throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + numBucketsPerSilo);
+
+            logger = LogManager.GetLogger(typeof(VirtualBucketsRingProvider).Name);
                         
             statusListeners = new List<IRingRangeListener>();
             bucketsMap = new SortedDictionary<uint, SiloAddress>();
             sortedBucketsList = new List<Tuple<uint, SiloAddress>>();
-            myAddress = siloAddr;
-            numBucketsPerSilo = nBucketsPerSilo;
+            myAddress = siloAddress;
             lockable = new object();
             running = true;
             myRange = RangeFactory.CreateFullRange();
 
-            logger.Info("Starting {0} on silo {1}.", typeof(VirtualBucketsRingProvider).Name, siloAddr.ToStringWithHashCode());
+            logger.Info("Starting {0} on silo {1}.", typeof(VirtualBucketsRingProvider).Name, siloAddress.ToStringWithHashCode());
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             IntValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RINGSIZE, () => GetRingSize());
@@ -232,7 +236,7 @@ namespace Orleans.Runtime.ConsistentRing
                 {
                     RemoveServer(updatedSilo);
                 }
-                else if (status.Equals(SiloStatus.Active))      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
+                else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Created or SiloStatus.Joining -- wait until it actually becomes active
                 {
                     AddServer(updatedSilo);
                 }

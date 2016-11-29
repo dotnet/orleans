@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Net;
 using System.IO;
-using System.Xml;
-using System.Net.Sockets;
+using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 
 namespace Orleans.Runtime.Configuration
@@ -120,12 +120,13 @@ namespace Orleans.Runtime.Configuration
             CalculateOverrides();
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2202:Do not dispose objects multiple times")]
         private static string WriteXml(XmlElement element)
         {
-            using(var sw = new StringWriter())
+            using (var sw = new StringWriter())
             {
-                using(var xw = XmlWriter.Create(sw))
-                { 
+                using (var xw = XmlWriter.Create(sw))
+                {
                     element.WriteTo(xw);
                     xw.Flush();
                     return sw.ToString();
@@ -179,7 +180,7 @@ namespace Orleans.Runtime.Configuration
                     Globals.SetReminderServiceType(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
                 }
             }
-            
+
             foreach (var p in overrideXml)
             {
                 var n = new NodeConfiguration(Defaults);
@@ -195,6 +196,8 @@ namespace Orleans.Runtime.Configuration
             if (Globals.SeedNodes.Contains(n.Endpoint)) n.IsSeedNode = true;
         }
 
+        /// <summary>Loads the configuration from a file</summary>
+        /// <param name="fileName">The file path.</param>
         public void LoadFromFile(string fileName)
         {
             using (TextReader input = File.OpenText(fileName))
@@ -205,19 +208,38 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Returns the configuration for a given silo.
+        /// Obtains the configuration for a given silo.
         /// </summary>
-        /// <param name="name">Silo name.</param>
-        /// <returns>NodeConfiguration associated with the specified silo.</returns>
-        public NodeConfiguration GetConfigurationForNode(string name)
+        /// <param name="siloName">Silo name.</param>
+        /// <param name="siloNode">NodeConfiguration associated with the specified silo.</param>
+        /// <returns>true if node was found</returns>
+        public bool TryGetNodeConfigurationForSilo(string siloName, out NodeConfiguration siloNode)
         {
-            NodeConfiguration n;
-            if (Overrides.TryGetValue(name, out n)) return n;
+            return Overrides.TryGetValue(siloName, out siloNode);
+        }
 
-            n = new NodeConfiguration(Defaults) {SiloName = name};
-            InitNodeSettingsFromGlobals(n);
-            Overrides[name] = n;
-            return n;
+        /// <summary>
+        /// Creates a configuration node for a given silo.
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration CreateNodeConfigurationForSilo(string siloName)
+        {
+            var siloNode = new NodeConfiguration(Defaults) { SiloName = siloName };
+            InitNodeSettingsFromGlobals(siloNode);
+            Overrides[siloName] = siloNode;
+            return siloNode;
+        }
+
+        /// <summary>
+        /// Creates a node config for the specified silo if one does not exist.  Returns existing node if one already exists
+        /// </summary>
+        /// <param name="siloName">Silo name.</param>
+        /// <returns>NodeConfiguration associated with the specified silo.</returns>
+        public NodeConfiguration GetOrCreateNodeConfigurationForSilo(string siloName)
+        {
+            NodeConfiguration siloNode;
+            return !TryGetNodeConfigurationForSilo(siloName, out siloNode) ? CreateNodeConfigurationForSilo(siloName) : siloNode;
         }
 
         private void SetPrimaryNode(IPEndPoint primary)
@@ -306,7 +328,7 @@ namespace Orleans.Runtime.Configuration
             }
             foreach (var attribute in AttributeNames(test))
             {
-                if (! allowed.HasAttribute(attribute))
+                if (!allowed.HasAttribute(attribute))
                 {
                     disallowed.Add(prefix + "/@" + attribute);
                 }
@@ -318,7 +340,7 @@ namespace Orleans.Runtime.Configuration
                 if (testChild == null)
                     continue;
                 XmlElement allowedChild;
-                if (! allowedChildren.TryGetValue(testChild.LocalName, out allowedChild))
+                if (!allowedChildren.TryGetValue(testChild.LocalName, out allowedChild))
                 {
                     disallowed.Add(prefix + "/" + testChild.LocalName);
                 }
@@ -382,12 +404,15 @@ namespace Orleans.Runtime.Configuration
             var sb = new StringBuilder();
             sb.Append("Config File Name: ").AppendLine(string.IsNullOrEmpty(SourceFile) ? "" : Path.GetFullPath(SourceFile));
             sb.Append("Host: ").AppendLine(Dns.GetHostName());
-            sb.Append("Start time: ").AppendLine(TraceLogger.PrintDate(DateTime.UtcNow));
+            sb.Append("Start time: ").AppendLine(LogFormatter.PrintDate(DateTime.UtcNow));
             sb.Append("Primary node: ").AppendLine(PrimaryNode == null ? "null" : PrimaryNode.ToString());
             sb.AppendLine("Platform version info:").Append(ConfigUtilities.RuntimeVersionInfo());
             sb.AppendLine("Global configuration:").Append(Globals.ToString());
-            NodeConfiguration nc = GetConfigurationForNode(siloName);
-            sb.AppendLine("Silo configuration:").Append(nc.ToString());
+            NodeConfiguration nc;
+            if (TryGetNodeConfigurationForSilo(siloName, out nc))
+            {
+                sb.AppendLine("Silo configuration:").Append(nc);
+            }
             sb.AppendLine();
             return sb.ToString();
         }
@@ -459,7 +484,7 @@ namespace Orleans.Runtime.Configuration
                 }
                 else
                 {
-                    if(CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
+                    if (CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
                         chosen = addr;
                 }
             }
@@ -476,7 +501,7 @@ namespace Orleans.Runtime.Configuration
 
             // compare starting from most significant octet.
             // 10.68.20.21 < 10.98.05.04
-            for (int i = 0; i < lbytes.Length; i++) 
+            for (int i = 0; i < lbytes.Length; i++)
             {
                 if (lbytes[i] != rbytes[i])
                 {
@@ -500,10 +525,10 @@ namespace Orleans.Runtime.Configuration
 
             var candidates = new List<IPAddress>();
             // loop through interfaces
-            for (int i=0; i < netInterfaces.Length; i++)
+            for (int i = 0; i < netInterfaces.Length; i++)
             {
                 NetworkInterface netInterface = netInterfaces[i];
-                
+
                 if (netInterface.OperationalStatus != OperationalStatus.Up)
                 {
                     // Skip network interfaces that are not operational
@@ -522,7 +547,7 @@ namespace Orleans.Runtime.Configuration
                     if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
                     {
                         //don't pick loopback address, unless we were asked for a loopback interface
-                        if(!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                        if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
                         {
                             candidates.Add(ip.Address); // collect all candidates.
                         }
@@ -539,6 +564,29 @@ namespace Orleans.Runtime.Configuration
             var xmlReader = XmlReader.Create(input);
             doc.Load(xmlReader);
             return doc.DocumentElement;
+        }
+
+        /// <summary>
+        /// Returns a prepopulated ClusterConfiguration object for a primary local silo (for testing)
+        /// </summary>
+        /// <param name="siloPort">TCP port for silo to silo communication</param>
+        /// <param name="gatewayPort">Client gateway TCP port</param>
+        /// <returns>ClusterConfiguration object that can be passed to Silo or SiloHost classes for initialization</returns>
+        public static ClusterConfiguration LocalhostPrimarySilo(int siloPort = 22222, int gatewayPort = 40000)
+        {
+            var config = new ClusterConfiguration();
+            var siloAddress = new IPEndPoint(IPAddress.Loopback, siloPort);
+            config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
+            config.Globals.SeedNodes.Add(siloAddress);
+            config.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain;
+
+            config.Defaults.HostNameOrIPAddress = "localhost";
+            config.Defaults.Port = siloPort;
+            config.Defaults.ProxyGatewayEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+
+            config.PrimaryNode = siloAddress;
+
+            return config;
         }
     }
 }

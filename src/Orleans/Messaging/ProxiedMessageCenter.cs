@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -57,7 +57,7 @@ namespace Orleans.Messaging
     // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
     // so there's no need to worry about the order in which we take and release those locks.
     // </summary>
-    internal class ProxiedMessageCenter : IMessageCenter
+    internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
         #region Constants
 
@@ -78,7 +78,7 @@ namespace Orleans.Messaging
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference[] grainBuckets;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
@@ -96,7 +96,7 @@ namespace Orleans.Messaging
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
-            logger = TraceLogger.GetLogger("Messaging.ProxiedMessageCenter", TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("Messaging.ProxiedMessageCenter", LoggerType.Runtime);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, () =>
                 {
@@ -129,6 +129,11 @@ namespace Orleans.Messaging
         public void Stop()
         {
             Running = false;
+
+            Utils.SafeExecute(() =>
+            {
+                PendingInboundMessages.CompleteAdding();
+            });
 
             if (StatisticsCollector.CollectQueueStats)
             {
@@ -270,7 +275,7 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<GrainInterfaceMap> GetTypeCodeMap(GrainFactory grainFactory)
+        public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
@@ -287,6 +292,12 @@ namespace Orleans.Messaging
         {
             try
             {
+                if (ct.IsCancellationRequested)
+                {
+                    return null;
+                }
+
+                // Don't pass CancellationToken to Take. It causes too much spinning.
                 Message msg = PendingInboundMessages.Take();
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
@@ -296,16 +307,28 @@ namespace Orleans.Messaging
 #endif
                 return msg;
             }
-            catch (ThreadAbortException tae)
+#if !NETSTANDARD
+            catch (ThreadAbortException exc)
             {
                 // Silo may be shutting-down, so downgrade to verbose log
-                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", tae);
+                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
                 Thread.ResetAbort();
                 return null;
             }
-            catch (OperationCanceledException oce)
+#endif
+            catch (OperationCanceledException exc)
             {
-                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", oce);
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
+                return null;
+            }
+            catch (ObjectDisposedException exc)
+            {
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
+                return null;
+            }
+            catch (InvalidOperationException exc)
+            {
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
                 return null;
             }
             catch (Exception ex)
@@ -389,6 +412,28 @@ namespace Orleans.Messaging
             }
 
             return gateway.ToSiloAddress();
+        }
+
+        internal void UpdateClientId(GrainId clientId)
+        {
+            if (ClientId.Category != UniqueKey.Category.Client)
+                throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
+
+            if (clientId.Category != UniqueKey.Category.GeoClient)
+                throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
+
+            ClientId = clientId;
+        }
+
+        public void Dispose()
+        {
+            PendingInboundMessages.Dispose();
+            if (gatewayConnections != null)
+                foreach (var item in gatewayConnections)
+                {
+                    item.Value.Dispose();
+                }
+            GatewayManager.Dispose();
         }
     }
 }

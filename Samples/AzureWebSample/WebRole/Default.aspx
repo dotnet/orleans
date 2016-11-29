@@ -12,7 +12,7 @@
     <asp:UpdatePanel ID="UpdatePanel1" runat="server">
         <ContentTemplate>
             <p id="InputSpace">
-                <asp:Button ID="ButtonSayHello" runat="server" Text="Ask Orleans it's details" 
+                <asp:Button ID="ButtonSayHello" runat="server" Text="Ask Orleans its details" 
                     onclick="ButtonSayHello_Click" />
             </p>
             <p id="ReplySpace">

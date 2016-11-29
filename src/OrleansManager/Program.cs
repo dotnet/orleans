@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 using Orleans;
 using Orleans.Runtime;
 
@@ -10,7 +9,6 @@ namespace OrleansManager
     class Program
     {
         private static IManagementGrain systemManagement;
-        const int RETRIES = 3;
 
         static void Main(string[] args)
         {
@@ -40,7 +38,7 @@ namespace OrleansManager
         {
             GrainClient.Initialize();
 
-            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
             Dictionary<string, string> options = args.Skip(1)
                 .Where(s => s.StartsWith("-"))
                 .Select(s => s.Substring(1).Split('='))
@@ -167,8 +165,8 @@ namespace OrleansManager
 
             var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
 
-            WriteStatus(string.Format("**Calling DeleteGrain({0}, {1}, {2})", silo, grainId, RETRIES));
-            directory.DeleteGrain(grainId, RETRIES).Wait();
+            WriteStatus(string.Format("**Calling DeleteGrain({0}, {1})", silo, grainId));
+            directory.DeleteGrainAsync(grainId).Wait();
             WriteStatus(string.Format("**DeleteGrain finished OK."));
         }
 
@@ -181,11 +179,12 @@ namespace OrleansManager
 
             var directory = GrainClient.InternalGrainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
   
-            WriteStatus(string.Format("**Calling LookupGrain({0}, {1}, {2})", silo, grainId, RETRIES));
-            Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.LookUp(grainId, RETRIES);
+            WriteStatus(string.Format("**Calling LookupGrain({0}, {1})", silo, grainId));
+            //Tuple<List<Tuple<SiloAddress, ActivationId>>, int> lookupResult = await directory.FullLookUp(grainId, true);
+            var lookupResult = await directory.LookupAsync(grainId);
 
             WriteStatus(string.Format("**LookupGrain finished OK. Lookup result is:"));
-            List<Tuple<SiloAddress, ActivationId>> list = lookupResult.Item1;
+            var list = lookupResult.Addresses;
             if (list == null)
             {
                 WriteStatus(string.Format("**The returned activation list is null."));
@@ -197,9 +196,9 @@ namespace OrleansManager
                 return;
             }
             Console.WriteLine("**There {0} {1} activations registered in the directory for this grain. The activations are:", (list.Count > 1) ? "are" : "is", list.Count);
-            foreach (Tuple<SiloAddress, ActivationId> tuple in list)
+            foreach (var tuple in list)
             {
-                WriteStatus(string.Format("**Activation {0} on silo {1}", tuple.Item2, tuple.Item1));
+                WriteStatus(string.Format("**Activation {0} on silo {1}", tuple.Activation, tuple.Silo));
             }
         }
 

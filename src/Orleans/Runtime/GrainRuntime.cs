@@ -1,5 +1,5 @@
 ﻿using System;
-using Orleans.Core;
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.Timers;
 
@@ -7,10 +7,21 @@ namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        public GrainRuntime(Guid serviceId, string siloId, IGrainFactory grainFactory, ITimerRegistry timerRegistry, IReminderRegistry reminderRegistry, IStreamProviderManager streamProviderManager, IServiceProvider serviceProvider)
+        private readonly IRuntimeClient runtimeClient;
+
+        public GrainRuntime(
+            GlobalConfiguration globalConfig,
+            ILocalSiloDetails localSiloDetails,
+            IGrainFactory grainFactory,
+            ITimerRegistry timerRegistry,
+            IReminderRegistry reminderRegistry,
+            IStreamProviderManager streamProviderManager,
+            IServiceProvider serviceProvider,
+            IRuntimeClient runtimeClient)
         {
-            ServiceId = serviceId;
-            SiloIdentity = siloId;
+            this.runtimeClient = runtimeClient;
+            ServiceId = globalConfig.ServiceId;
+            SiloIdentity = localSiloDetails.SiloAddress.ToLongString();
             GrainFactory = grainFactory;
             TimerRegistry = timerRegistry;
             ReminderRegistry = reminderRegistry;
@@ -18,27 +29,28 @@ namespace Orleans.Runtime
             ServiceProvider = serviceProvider;
         }
 
-        public Guid ServiceId { get; private set; }
+        public Guid ServiceId { get; }
 
-        public string SiloIdentity { get; private set; }
+        public string SiloIdentity { get; }
 
-        public IGrainFactory GrainFactory { get; private set; }
+        public IGrainFactory GrainFactory { get; }
         
-        public ITimerRegistry TimerRegistry { get; private set; }
+        public ITimerRegistry TimerRegistry { get; }
         
-        public IReminderRegistry ReminderRegistry { get; private set; }
+        public IReminderRegistry ReminderRegistry { get; }
         
-        public IStreamProviderManager StreamProviderManager { get; private set;}
-        public IServiceProvider ServiceProvider { get; private set; }
+        public IStreamProviderManager StreamProviderManager { get; }
 
-        public Logger GetLogger(string loggerName, TraceLogger.LoggerType logType)
+        public IServiceProvider ServiceProvider { get; }
+
+        public Logger GetLogger(string loggerName)
         {
-            return TraceLogger.GetLogger(loggerName, logType);
+            return LogManager.GetLogger(loggerName, LoggerType.Grain);
         }
 
         public void DeactivateOnIdle(Grain grain)
         {
-            RuntimeClient.Current.DeactivateOnIdle(grain.Data.ActivationId);
+            this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
         }
 
         public void DelayDeactivation(Grain grain, TimeSpan timeSpan)

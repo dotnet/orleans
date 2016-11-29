@@ -1,5 +1,7 @@
 using System;
-
+using System.Linq;
+using System.Reflection;
+using Orleans.GrainDirectory;
 namespace Orleans
 {
     namespace Concurrency
@@ -74,6 +76,28 @@ namespace Orleans
         }
 
         /// <summary>
+        /// The MayInterleaveAttribute attribute is used to mark classes 
+        /// that want to control request interleaving via supplied method callback.
+        /// </summary>
+        /// <remarks>
+        /// The callback method name should point to a public static function declared on the same class 
+        /// and having the following signature: <c>public static bool MayInterleave(InvokeMethodRequest req)</c>
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class MayInterleaveAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the callback method
+            /// </summary>
+            internal string CallbackMethodName { get; private set; }
+
+            public MayInterleaveAttribute(string callbackMethodName)
+            {
+                CallbackMethodName = callbackMethodName;
+            }
+        }
+
+        /// <summary>
         /// The Immutable attribute indicates that instances of the marked class or struct are never modified
         /// after they are created.
         /// </summary>
@@ -83,6 +107,47 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
         public sealed class ImmutableAttribute : Attribute
         {
+        }
+    }
+
+    namespace MultiCluster
+    {
+        /// <summary>
+        /// base class for multi cluster registration strategies.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public abstract class RegistrationAttribute : Attribute
+        {
+            internal MultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
+
+            internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
+            {
+                RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class will have a single instance across all available clusters. Any requests in any clusters will be forwarded to the single activation instance.
+        /// </summary>
+        public class GlobalSingleInstanceAttribute : RegistrationAttribute
+        {
+            public GlobalSingleInstanceAttribute()
+                : base(GlobalSingleInstanceRegistration.Singleton)
+            {
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class
+        /// will have an independent instance for each cluster with 
+        /// no coordination. 
+        /// </summary>
+        public class OneInstancePerClusterAttribute : RegistrationAttribute
+        {
+            public OneInstancePerClusterAttribute()
+                : base(ClusterLocalRegistration.Singleton)
+            {
+            }
         }
     }
 
@@ -100,7 +165,9 @@ namespace Orleans
 
             internal PlacementAttribute(PlacementStrategy placement)
             {
-                PlacementStrategy = placement ?? PlacementStrategy.GetDefault();
+                if (placement == null) throw new ArgumentNullException(nameof(placement));
+
+                PlacementStrategy = placement;
             }
         }
 
@@ -237,7 +304,7 @@ namespace Orleans
 
         internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
         {
-            var attribs = type.GetCustomAttributes(typeof(FactoryAttribute), inherit: true);
+            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
 
             // if no attributes are specified, we default to FactoryTypes.Grain.
             if (0 == attribs.Length)

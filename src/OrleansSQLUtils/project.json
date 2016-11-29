@@ -1,0 +1,11 @@
+﻿{
+  "dependencies": {
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

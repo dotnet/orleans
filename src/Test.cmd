@@ -1,33 +1,27 @@
 @setlocal
 @ECHO off
 
-if .%TEST_CATEGORIES%. == .. set TEST_CATEGORIES="TestCategory=BVT"
-
 SET CONFIGURATION=Release
 
 SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
-if "%FrameworkDir%" == "" set FrameworkDir=%WINDIR%\Microsoft.NET\Framework
-if "%FrameworkVersion%" == "" set FrameworkVersion=v4.0.30319
-
-if NOT "%VS120COMNTOOLS%" == "" set VSIDEDIR=%VS120COMNTOOLS%..\IDE
-if NOT "%VS140COMNTOOLS%" == "" set VSIDEDIR=%VS140COMNTOOLS%..\IDE
-SET VSTESTEXEDIR=%VSIDEDIR%\CommonExtensions\Microsoft\TestWindow
-SET VSTESTEXE=%VSTESTEXEDIR%\VSTest.console.exe
-
-cd "%CMDHOME%"
+pushd "%CMDHOME%"
 @cd
 
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-set TESTS=%OutDir%\Tester.dll %OutDir%\TesterInternal.dll 
+set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\Orleans.NonSiloTests.dll
+if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=SlowBVT'
+
 @Echo Test assemblies = %TESTS%
-
-set TEST_ARGS= /Settings:%CMDHOME%\Local.testsettings
-set TEST_ARGS= %TEST_ARGS% /TestCaseFilter:%TEST_CATEGORIES%
-
+@Echo Test filters = %TEST_FILTERS%
 @echo on
+call "%CMDHOME%\SetupTestScript.cmd" "%OutDir%"
 
-"%VSTESTEXE%" %TEST_ARGS% %TESTS%
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -assemblies %TESTS% -testFilter \"%TEST_FILTERS%\" -outDir '%OutDir%'"
+set testresult=%errorlevel%
+popd
+endlocal&set testresult=%testresult%
+exit /B %testresult%

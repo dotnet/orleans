@@ -1,3 +1,4 @@
+#if !NETSTANDARD
 using System;
 using System.IO;
 using System.Reflection;
@@ -6,12 +7,12 @@ namespace Orleans.Runtime
 {
     internal class CachedReflectionOnlyTypeResolver : CachedTypeResolver
     {
-        private static readonly TraceLogger logger;
+        private static readonly Logger logger;
 
         static CachedReflectionOnlyTypeResolver()
         {
             Instance = new CachedReflectionOnlyTypeResolver();
-            logger = TraceLogger.GetLogger("AssemblyLoader.CachedReflectionOnlyTypeResolver");
+            logger = LogManager.GetLogger("AssemblyLoader.CachedReflectionOnlyTypeResolver");
         }
 
         public static new CachedReflectionOnlyTypeResolver Instance { get; private set; }
@@ -97,3 +98,4 @@ namespace Orleans.Runtime
         }
     }
 }
+#endif

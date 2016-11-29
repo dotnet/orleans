@@ -8,16 +8,13 @@ namespace Orleans.CodeGenerator
     using System.Reflection;
     using System.Runtime.Serialization;
     using System.Text.RegularExpressions;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Concurrency;
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -62,7 +59,9 @@ namespace Orleans.CodeGenerator
             var attributes = new List<AttributeSyntax>
             {
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                 SF.Attribute(typeof(SerializerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
                         SF.AttributeArgument(SF.TypeOfExpression(type.GetTypeSyntax(includeGenericParameters: false))))
@@ -78,7 +77,7 @@ namespace Orleans.CodeGenerator
                 onEncounteredType(fieldType);
             }
 
-            var members = new List<MemberDeclarationSyntax>(GetStaticFields(fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateStaticFields(fields))
             {
                 GenerateDeepCopierMethod(type, fields),
                 GenerateSerializerMethod(type, fields),
@@ -117,18 +116,24 @@ namespace Orleans.CodeGenerator
                                         .Select(_ => SF.OmittedTypeArgument())
                                         .Cast<TypeSyntax>()
                                         .ToArray()));
+                var registererClassName = className + "_" +
+                                          string.Join("_",
+                                              type.GetTypeInfo().GenericTypeParameters.Select(_ => _.Name)) + "_" +
+                                          RegistererClassSuffix;
                 classes.Add(
-                    SF.ClassDeclaration(className + RegistererClassSuffix)
+                    SF.ClassDeclaration(registererClassName)
                         .AddModifiers(SF.Token(SyntaxKind.InternalKeyword))
                         .AddAttributeLists(
                             SF.AttributeList()
                                 .AddAttributes(
                                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
+#if !NETSTANDARD
                                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
+#endif
                                     SF.Attribute(typeof(RegisterSerializerAttribute).GetNameSyntax())))
                         .AddMembers(
                             GenerateMasterRegisterMethod(type, serializerType),
-                            GenerateConstructor(className + RegistererClassSuffix)));
+                            GenerateConstructor(registererClassName)));
             }
 
             return classes;
@@ -282,12 +287,6 @@ namespace Orleans.CodeGenerator
                                 SF.VariableDeclarator("result")
                                     .WithInitializer(SF.EqualsValueClause(GetObjectCreationExpressionSyntax(type))))));
 
-                // Copy all members from the input to the result.
-                foreach (var field in fields)
-                {
-                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
-                }
-
                 // Record this serialization.
                 Expression<Action> recordObject =
                     () => SerializationContext.Current.RecordObject(default(object), default(object));
@@ -302,6 +301,12 @@ namespace Orleans.CodeGenerator
                     SF.ExpressionStatement(
                         recordObject.Invoke(currentSerializationContext)
                             .AddArgumentListArguments(SF.Argument(originalVariable), SF.Argument(resultVariable))));
+
+                // Copy all members from the input to the result.
+                foreach (var field in fields)
+                {
+                    body.Add(SF.ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable))));
+                }
 
                 body.Add(SF.ReturnStatement(resultVariable));
             }
@@ -321,12 +326,13 @@ namespace Orleans.CodeGenerator
         /// </summary>
         /// <param name="fields">The fields.</param>
         /// <returns>Syntax for the static fields of the serializer class.</returns>
-        private static MemberDeclarationSyntax[] GetStaticFields(List<FieldInfoMember> fields)
+        private static MemberDeclarationSyntax[] GenerateStaticFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Expression<Action<Type>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<TypeInfo>> getField = _ => _.GetField(string.Empty, BindingFlags.Default);
+            Expression<Action<Type>> getTypeInfo = _ => _.GetTypeInfo();
             Expression<Action> getGetter = () => SerializationManager.GetGetter(default(FieldInfo));
             Expression<Action> getReferenceSetter = () => SerializationManager.GetReferenceSetter(default(FieldInfo));
             Expression<Action> getValueSetter = () => SerializationManager.GetValueSetter(default(FieldInfo));
@@ -342,7 +348,7 @@ namespace Orleans.CodeGenerator
             foreach (var field in fields)
             {
                 var fieldInfo =
-                    getField.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax()))
+                    getField.Invoke(getTypeInfo.Invoke(SF.TypeOfExpression(field.FieldInfo.DeclaringType.GetTypeSyntax())))
                         .AddArgumentListArguments(
                             SF.Argument(field.FieldInfo.Name.GetLiteralExpression()),
                             SF.Argument(bindingFlags));
@@ -457,63 +463,17 @@ namespace Orleans.CodeGenerator
             else
             {
                 // Create an unformatted object.
-#if DNXCORE50
-                var bindingFlags = SyntaxFactoryExtensions.GetBindingFlagsParenthesizedExpressionSyntax(
-                    SyntaxKind.BitwiseOrExpression,
-                    BindingFlags.Instance,
-                    BindingFlags.NonPublic,
-                    BindingFlags.Public);
-                var nullLiteralExpressionArgument = SF.Argument(SF.LiteralExpression(SyntaxKind.NullLiteralExpression));
-                var typeArg = SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()));
-                var bindingFlagsArg = SF.Argument(bindingFlags);
-                var binderArg = nullLiteralExpressionArgument;
-                ArgumentSyntax ctorArgumentsArg;
-                var cons = typeInfo.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                    .OrderBy(p => p.GetParameters().Count()).FirstOrDefault();
-                var consParameters = cons != null ? cons.GetParameters().Select(p => p.ParameterType).ToArray() : null;
-                if (consParameters != null && consParameters.Length > 0)
-                {
-                    var separatedSyntaxList = new SeparatedSyntaxList<ExpressionSyntax>();
-                    separatedSyntaxList = consParameters
-                        .Aggregate(separatedSyntaxList, (current, t) => current.Add(SF.DefaultExpression(t.GetTypeInfo().GetTypeSyntax())));
-                    ctorArgumentsArg = SF.Argument(separatedSyntaxList.GetArrayCreationWithInitializerSyntax(
-                        SF.PredefinedType(SF.Token(SyntaxKind.ObjectKeyword))));
-                }
-                else
-                {
-                    ctorArgumentsArg = nullLiteralExpressionArgument;
-                }
-
-                var cultureInfoArg = SF.Argument(
-                    SF.IdentifierName("System").Member("Globalization").Member("CultureInfo").Member("InvariantCulture"));
-                var createInstanceArguments = new []
-                {
-                    typeArg,
-                    bindingFlagsArg,
-                    binderArg,
-                    ctorArgumentsArg,
-                    cultureInfoArg
-                };
-
-                Expression<Func<object>> getUninitializedObject = () => Activator.CreateInstance(
-                    default(Type), 
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                    null,
-                    null,
-                    System.Globalization.CultureInfo.InvariantCulture);
-                result = SF.CastExpression(
-                    type.GetTypeSyntax(),
-                    getUninitializedObject.Invoke()
-                        .AddArgumentListArguments(createInstanceArguments));
+                Expression<Func<object>> getUninitializedObject =
+#if NETSTANDARD
+                    () => SerializationManager.GetUninitializedObjectWithFormatterServices(default(Type));
 #else
-                Expression<Func<object>> getUninitializedObject = 
                     () => FormatterServices.GetUninitializedObject(default(Type));
+#endif
                 result = SF.CastExpression(
                     type.GetTypeSyntax(),
                     getUninitializedObject.Invoke()
                         .AddArgumentListArguments(
                             SF.Argument(SF.TypeOfExpression(typeInfo.GetTypeSyntax()))));
-#endif
             }
 
             return result;
@@ -594,7 +554,7 @@ namespace Orleans.CodeGenerator
         {
             var result =
                 type.GetAllFields()
-                    .Where(field => !field.IsNotSerialized)
+                    .Where(field => field.GetCustomAttribute<NonSerializedAttribute>() == null)
                     .Select((info, i) => new FieldInfoMember { FieldInfo = info, FieldNumber = i })
                     .ToList();
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -745,12 +705,42 @@ namespace Orleans.CodeGenerator
                     return getValueExpression;
                 }
 
+                // Addressable arguments must be converted to references before passing.
+                // IGrainObserver instances cannot be directly converted to references, therefore they are not included.
+                ExpressionSyntax deepCopyValueExpression;
+                if (typeof(IAddressable).IsAssignableFrom(this.FieldInfo.FieldType)
+                    && this.FieldInfo.FieldType.GetTypeInfo().IsInterface
+                    && !typeof(IGrainObserver).IsAssignableFrom(this.FieldInfo.FieldType))
+                {
+                    var getAsReference = getValueExpression.Member(
+                        (IAddressable grain) => grain.AsReference<IGrain>(),
+                        this.FieldInfo.FieldType);
+
+                    // If the value is not a GrainReference, convert it to a strongly-typed GrainReference.
+                    // C#: !(value is GrainReference) ? value.AsReference<TInterface>() : value;
+                    deepCopyValueExpression =
+                        SF.ConditionalExpression(
+                            SF.PrefixUnaryExpression(
+                                SyntaxKind.LogicalNotExpression,
+                                SF.ParenthesizedExpression(
+                                    SF.BinaryExpression(
+                                        SyntaxKind.IsExpression,
+                                        getValueExpression,
+                                        typeof(GrainReference).GetTypeSyntax()))),
+                            SF.InvocationExpression(getAsReference),
+                            getValueExpression);
+                }
+                else
+                {
+                    deepCopyValueExpression = getValueExpression;
+                }
+
                 // Deep-copy the value.
                 Expression<Action> deepCopyInner = () => SerializationManager.DeepCopyInner(default(object));
                 var typeSyntax = this.FieldInfo.FieldType.GetTypeSyntax();
                 return SF.CastExpression(
                     typeSyntax,
-                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(getValueExpression)));
+                    deepCopyInner.Invoke().AddArgumentListArguments(SF.Argument(deepCopyValueExpression)));
             }
 
             /// <summary>

@@ -1,0 +1,15 @@
+﻿{
+  "dependencies": {
+    "FluentAssertions": "4.14.0",
+    "Microsoft.ServiceFabric.Services": "2.1.163",
+    "NSubstitute": "1.10.0",
+    "System.Runtime.Numerics": "4.0.1",
+    "xunit": "2.1.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-x64": {}
+  }
+}

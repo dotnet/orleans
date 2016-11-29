@@ -8,7 +8,7 @@ namespace Orleans.Streams
     /// This class is a [Serializable] holder for a logical-or composite predicate function.
     /// </summary>
     [Serializable]
-    internal class OrFilter : IStreamFilterPredicateWrapper
+    internal class OrFilter : IStreamFilterPredicateWrapper, ISerializable
     {
         public object FilterData
         {

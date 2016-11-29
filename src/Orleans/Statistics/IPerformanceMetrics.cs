@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime.Configuration;
 
 
@@ -9,34 +10,98 @@ namespace Orleans.Runtime
 {
     public interface ICorePerformanceMetrics
     {
+        /// <summary>
+        /// CPU utilization
+        /// </summary>
         float CpuUsage { get; }
+
+        /// <summary>
+        /// Amount of memory available to processes running on the machine
+        /// </summary>
         long AvailablePhysicalMemory { get; }
+
+        /// <summary>
+        /// Current memory usage
+        /// </summary>
         long MemoryUsage { get; }
+
+        /// <summary>
+        /// Amount of physical memory on the machine
+        /// </summary>
         long TotalPhysicalMemory { get; }
+
+        /// <summary>
+        /// the current size of the send queue (number of messages waiting to be sent). 
+        /// Only captures remote messages to other silos (not including messages to the clients).
+        /// </summary>
         int SendQueueLength { get; }
+
+        /// <summary>
+        /// the current size of the receive queue (number of messages that arrived to this silo and 
+        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
+        /// as well as from the clients.
+        /// </summary>
         int ReceiveQueueLength { get; }
+
+        /// <summary>
+        /// total number of remote messages sent to other silos as well as to the clients.
+        /// </summary>
         long SentMessages { get; }
+
+        /// <summary>
+        /// total number of remote received messages, from other silos as well as from the clients.
+        /// </summary>
         long ReceivedMessages { get; }
     }
 
+    /// <summary>
+    /// A small set of per-silo important key performance metrics
+    /// </summary>
     public interface ISiloPerformanceMetrics : ICorePerformanceMetrics
-    {
+    {   
+        /// <summary>
+        /// the current size of the receive queue (number of messages that arrived to this silo and 
+        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
+        /// as well as from the clients.
+        /// </summary>
         long RequestQueueLength { get; }
+
+        /// <summary>
+        /// number of activations on this silo
+        /// </summary>
         int ActivationCount { get; }
+
+        /// <summary>
+        /// Number of activations on this silo that were used in the last 10 minutes 
+        /// (Note: this number may currently not be accurate if different age limits 
+        /// are used for different grain types).
+        /// </summary>
         int RecentlyUsedActivationCount { get; }
+
+        /// <summary>
+        /// Number of currently connected clients
+        /// </summary>
         long ClientCount { get; }
-        // More TBD
 
-        bool IsOverloaded { get; }
+        /// <summary>
+        /// whether this silo is currently overloaded and is in the load shedding mode.
+        /// </summary>
+        bool IsOverloaded { get; } 
 
-        void LatchIsOverload(bool overloaded);
-        void UnlatchIsOverloaded();
-        void LatchCpuUsage(float value);
-        void UnlatchCpuUsage();
+        void LatchIsOverload(bool overloaded); // For testing only
+        void UnlatchIsOverloaded(); // For testing only
+        void LatchCpuUsage(float value); // For testing only
+        void UnlatchCpuUsage(); // For testing only
     }
 
+    /// <summary>
+    /// A small set of per-Orleans-client important key performance metrics.
+    /// </summary>
     public interface IClientPerformanceMetrics : ICorePerformanceMetrics
     {
+        /// <summary>
+        /// number of gateways that this client is currently connected to.
+        /// </summary>
         long ConnectedGatewayCount { get; }
     }
 
@@ -240,35 +305,67 @@ namespace Orleans.Runtime
     }
 
     [Serializable]
+    public class DetailedGrainStatistic
+    {
+        /// <summary>
+        /// The type of the grain for this DetailedGrainStatistic.
+        /// </summary>
+        public string GrainType { get; set; }
+
+        /// <summary>
+        /// The silo address for this DetailedGrainStatistic.
+        /// </summary>
+        public SiloAddress SiloAddress { get; set; }
+
+        /// <summary>
+        /// Unique Id for the grain.
+        /// </summary>
+        public IGrainIdentity GrainIdentity { get; set; }
+
+        /// <summary>
+        /// The grains Category
+        /// </summary>
+        public string Category { get; set; }
+    }
+
+    [Serializable]
     internal class DetailedGrainReport
     {
-        public GrainId Grain { get; set; } 
-        public SiloAddress SiloAddress { get; set; } // silo on which these statistics come from
-        public string SiloName { get; set; }        // silo on which these statistics come from
-        public List<ActivationAddress> LocalCacheActivationAddresses { get; set; } // activation addresses in the local directory cache
-        public List<ActivationAddress> LocalDirectoryActivationAddresses { get; set; } // activation addresses in the local directory.
-        public SiloAddress PrimaryForGrain { get; set; } // primary silo for this grain
-        public string GrainClassTypeName { get; set; }   // the name of the class that implements this grain.
-        public List<string> LocalActivations { get; set; } // activations on this silo
+        public GrainId Grain { get; set; }
+        /// <summary>silo on which these statistics come from</summary>
+        public SiloAddress SiloAddress { get; set; }
+        /// <summary>silo on which these statistics come from</summary>
+        public string SiloName { get; set; }
+        /// <summary>activation addresses in the local directory cache</summary>
+        public List<ActivationAddress> LocalCacheActivationAddresses { get; set; }
+        /// <summary>activation addresses in the local directory.</summary>
+        public List<ActivationAddress> LocalDirectoryActivationAddresses { get; set; }
+        /// <summary>primary silo for this grain</summary>
+        public SiloAddress PrimaryForGrain { get; set; }
+        /// <summary>the name of the class that implements this grain.</summary>
+        public string GrainClassTypeName { get; set; }
+        /// <summary>activations on this silo</summary>
+        public List<string> LocalActivations { get; set; }
 
         public override string ToString()
         {
             return string.Format(Environment.NewLine 
                 + "**DetailedGrainReport for grain {0} from silo {1} SiloAddress={2}" + Environment.NewLine 
-                + "   LocalCacheActivationAddresses={4}" + Environment.NewLine
-                + "   LocalDirectoryActivationAddresses={5}"  + Environment.NewLine
-                + "   PrimaryForGrain={6}" + Environment.NewLine 
-                + "   GrainClassTypeName={7}" + Environment.NewLine
+                + "   LocalCacheActivationAddresses={3}" + Environment.NewLine
+                + "   LocalDirectoryActivationAddresses={4}"  + Environment.NewLine
+                + "   PrimaryForGrain={5}" + Environment.NewLine 
+                + "   GrainClassTypeName={6}" + Environment.NewLine
                 + "   LocalActivations:" + Environment.NewLine
-                + "{3}." + Environment.NewLine,
-                        Grain.ToDetailedString(), 
-                        SiloName,
-                        SiloAddress.ToLongString(),
-                        Utils.EnumerableToString(LocalCacheActivationAddresses),
-                        Utils.EnumerableToString(LocalDirectoryActivationAddresses),
-                        PrimaryForGrain,
-                        GrainClassTypeName, 
-                        Utils.EnumerableToString(LocalActivations, str => string.Format("      {0}", str), "\n"));
+                + "{7}." + Environment.NewLine,
+                    Grain.ToDetailedString(),                                   // {0}
+                    SiloName,                                                   // {1}
+                    SiloAddress.ToLongString(),                                 // {2}
+                    Utils.EnumerableToString(LocalCacheActivationAddresses),    // {3}
+                    Utils.EnumerableToString(LocalDirectoryActivationAddresses),// {4}
+                    PrimaryForGrain,                                            // {5}
+                    GrainClassTypeName,                                         // {6}
+                    Utils.EnumerableToString(LocalActivations,                  // {7}
+                        str => string.Format("      {0}", str), "\n"));
         }
     }
 }

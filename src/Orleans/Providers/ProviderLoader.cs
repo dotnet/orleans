@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Xml;
-
 using System.Threading.Tasks;
+using System.Xml;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -34,38 +33,67 @@ namespace Orleans.Providers
     {
         private readonly Dictionary<string, TProvider> providers;
         private IDictionary<string, IProviderConfiguration> providerConfigs;
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
 
         public ProviderLoader()
         {
-            logger = TraceLogger.GetLogger("ProviderLoader/" + typeof(TProvider).Name, TraceLogger.LoggerType.Runtime);
+            logger = LogManager.GetLogger("ProviderLoader/" + typeof(TProvider).Name, LoggerType.Runtime);
             providers = new Dictionary<string, TProvider>();
         }
 
         public void LoadProviders(IDictionary<string, IProviderConfiguration> configs, IProviderManager providerManager)
         {
-
             providerConfigs = configs ?? new Dictionary<string, IProviderConfiguration>();
 
-            foreach (var provider in providerConfigs.Values)
-                ((ProviderConfiguration)provider).SetProviderManager(providerManager);
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
+            {
+                ((ProviderConfiguration) providerConfig).SetProviderManager(providerManager);
+            }
 
             // Load providers
             ProviderTypeLoader.AddProviderTypeManager(t => typeof(TProvider).IsAssignableFrom(t), RegisterProviderType);
+
             ValidateProviders();
         }
 
+        // Close providers and then remove them from the list
+        public async Task RemoveProviders(IList<string> providerNames)
+        {
+            List<Task> tasks = new List<Task>();
+            int count = providers.Count;
+
+            if (providerConfigs != null) count = providerConfigs.Count;
+            foreach (string providerName in providerNames)
+            {
+                if (providerConfigs.ContainsKey(providerName)) providerConfigs.Remove(providerName);
+
+                if (providers.ContainsKey(providerName))
+                {
+                    tasks.Add(providers[providerName].Close());
+                    providers.Remove(providerName);
+                }
+            }
+            
+            await Task.WhenAll(tasks);
+        }
 
         private void ValidateProviders()
         {
-            foreach (var providerConfig in providerConfigs.Values)
+            foreach (IProviderConfiguration providerConfig in providerConfigs.Values)
             {
                 TProvider provider;
-                var fullConfig = (ProviderConfiguration) providerConfig;
-                if (providers.TryGetValue(fullConfig.Name, out provider)) continue;
+                ProviderConfiguration fullConfig = (ProviderConfiguration) providerConfig;
+                if (providers.TryGetValue(providerConfig.Name, out provider))
+                {
+                    logger.Verbose(ErrorCode.Provider_ProviderLoadedOk, 
+                        "Provider of type {0} name {1} located ok.", 
+                        fullConfig.Type, fullConfig.Name);
+                    continue;
+                }
 
-                var msg = String.Format("Provider of type {0} name {1} was not loaded." +
-                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", fullConfig.Type, fullConfig.Name);
+                string msg = string.Format("Provider of type {0} name {1} was not loaded." +
+                    "Please check that you deployed the assembly in which the provider class is defined to the execution folder.", 
+                    fullConfig.Type, fullConfig.Name);
                 logger.Error(ErrorCode.Provider_ConfiguredProviderNotLoaded, msg);
                 throw new OrleansException(msg);
             }
@@ -89,8 +117,14 @@ namespace Orleans.Providers
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.Provider_ErrorFromInit, string.Format("Exception initializing provider Name={0} Type={1}", name, provider), exc);
+                    string exceptionMsg = string.Format("Exception initializing provider Name={0} Type={1}", name, provider);
+                    logger.Error(ErrorCode.Provider_ErrorFromInit, exceptionMsg, exc);
+#if !NETSTANDARD_TODO
+                    //deserialize constructor of ProviderInitializationException not port to vNext yet
+                    throw new ProviderInitializationException(exceptionMsg, exc);
+#else
                     throw;
+#endif
                 }
             }
         }
@@ -172,6 +206,12 @@ namespace Orleans.Providers
         {
             // First, figure out the provider type name
             var typeName = TypeUtils.GetFullName(t);
+            IList<String> providerNames;
+
+            lock (providers)
+            {
+                providerNames = providers.Keys.ToList();
+            }
 
             // Now see if we have any config entries for that type 
             // If there's no config entry, then we don't load the type
@@ -180,21 +220,27 @@ namespace Orleans.Providers
             {
                 var fullConfig = (ProviderConfiguration) entry;
 
+                // Check if provider is already initialized. Skip loading it if so.
+                if (providerNames.Contains(fullConfig.Name)) continue;
+
                 if (fullConfig.Type != typeName) continue;
                 
                 // Found one! Now look for an appropriate constructor; try TProvider(string, Dictionary<string,string>) first
-                var constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, constructorBindingTypes, null);
+                var constructor = TypeUtils.GetConstructorThatMatches(t, constructorBindingTypes);
                 var parms = new object[] { typeName, entry.Properties };
 
                 if (constructor == null)
                 {
                     // See if there's a default constructor to use, if there's no two-parameter constructor
-                    constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                        null, Type.EmptyTypes, null);
+                    constructor = TypeUtils.GetConstructorThatMatches(t, Type.EmptyTypes);
                     parms = new object[0];
                 }
-                if (constructor == null) continue;
+                if (constructor == null)
+                {
+                    logger.Warn(ErrorCode.Provider_InstanceConstructionError1, $"Accessible constructor does not exist for type {t.Name}");
+
+                    continue;
+                }
 
                 TProvider instance;
                 try

@@ -1,75 +1,70 @@
 @REM This script is run automaticaly by the MSBuild framework specified by Local.testsettings
-@ECHO on
-
-SET CMDHOME=%~dp0.
-
-if exist "%CMDHOME%\..\..\..\Test" (
-  SET DEFAULT_FILE="%CMDHOME%\..\..\..\Test\OrleansTestStorageKey.txt"
-) else (
-  SET DEFAULT_FILE="%CMDHOME%\..\..\src\Test\OrleansTestStorageKey.txt"
-)
-
-if exist "%CMDHOME%\..\..\..\Test" (
-  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\..\Test\OrleansTestSecrets.json"
-) else (
-  SET DEFAULT_SECRETS_FILE="%CMDHOME%\..\..\src\Test\OrleansTestSecrets.json"
-)
+@ECHO off
+setlocal EnableDelayedExpansion
+SET CMDHOME=%~dp0
+if not [%1]==[] (SET TargetDir=%1%) else (SET TargetDir=.)
+if not [%2]==[] pushd %2
 
 echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH is %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH% >> SetupTestScriptOutput.txt 
 echo CMDHOME is %CMDHOME% >> SetupTestScriptOutput.txt
-echo DEFAULT_FILE is %DEFAULT_FILE% >> SetupTestScriptOutput.txt
-echo DEFAULT_SECRETS_FILE is %DEFAULT_SECRETS_FILE% >> SetupTestScriptOutput.txt
+echo Current directory is "%CD%" (search will be started from here) >> SetupTestScriptOutput.txt
+echo Target directory is "%TargetDir%" (file will be copied here) >> SetupTestScriptOutput.txt
 
-if not exist %DEFAULT_FILE% (
-echo DEFAULT_FILE %DEFAULT_FILE% does not exist!! >> SetupTestScriptOutput.txt 
+if NOT "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%" == "" (
+  if exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json" (
+	SET SECRETS_FILE=%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json
+	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "!SECRETS_FILE!". Taking it. >> SetupTestScriptOutput.txt
+	goto Copy
+  ) else (
+	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but not secret files where found in them. >> SetupTestScriptOutput.txt
+  )
 ) else (
-echo DEFAULT_FILE %DEFAULT_FILE% does exist!! >> SetupTestScriptOutput.txt 
+  echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. >> SetupTestScriptOutput.txt
 )
 
-if not exist %DEFAULT_SECRETS_FILE% (
-echo DEFAULT_SECRETS_FILE %DEFAULT_SECRETS_FILE% does not exist!! >> SetupTestScriptOutput.txt 
-) else (
-echo DEFAULT_SECRETS_FILE %DEFAULT_SECRETS_FILE% does exist!! >> SetupTestScriptOutput.txt 
+call:GetDirectoryNameOfFileAbove OrleansTestSecrets.json
+IF NOT "!result!"=="" (
+   SET SECRETS_FILE=!result!OrleansTestSecrets.json
 )
 
+:Copy
 echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
-echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
-
-
-if "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%" == "" (
-
-echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is not set. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
-copy /y %DEFAULT_FILE% . >> SetupTestScriptOutput.txt 
-
+if not exist "!SECRETS_FILE!" (
+	echo SECRETS_FILE !SECRETS_FILE! does not exist. No secrets will be copied. >> SetupTestScriptOutput.txt 
 ) else (
-
-  if not exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt" (
-
-    echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt does not exist. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
-    copy /y %DEFAULT_FILE% . >> SetupTestScriptOutput.txt 
-
-	) else (
-
-	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt". Taking it. >> SetupTestScriptOutput.txt 
-	copy /y "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestStorageKey.txt"  . >> SetupTestScriptOutput.txt 
-
-	)
-
-  if not exist "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json" (
-
-    echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set but %ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json does not exist. Taking %DEFAULT_FILE%. >> SetupTestScriptOutput.txt
-    copy /y %DEFAULT_SECRETS_FILE% . >> SetupTestScriptOutput.txt 
-
-	) else (
-
-	echo ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH env var is set and found "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json". Taking it. >> SetupTestScriptOutput.txt 
-	copy /y "%ORLEANS_TEST_STORAGE_KEY_FOLDER_PATH%\OrleansTestSecrets.json"  . >> SetupTestScriptOutput.txt 
-
-	)
-
+	echo SECRETS_FILE !SECRETS_FILE! exists and will be copied. >> SetupTestScriptOutput.txt 
+	copy /y "!SECRETS_FILE!" %TargetDir% >> SetupTestScriptOutput.txt 
 )
 
 echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
-echo "-----------------------------------------------" >> SetupTestScriptOutput.txt 
+set >> SetupTestScriptOutput.txt
 
-set >> SetupTestScriptOutput.txt 
+if not [%2]==[] popd
+endlocal
+goto:eof
+
+:GetDirectoryNameOfFileAbove
+@echo off
+REM This script emulates the behavior of the GetDirectoryNameOfFileAbove MSBuild property function that finds 
+REM the first ancestor directory that includes certain file, and returns the full path to that directory.
+REM the resulting path is set in the %result% variable
+setlocal EnableDelayedExpansion
+set "theFile=%~1"
+rem Get the path of this Batch file, i.e. "c:\projects\everything\foo\bar\"
+set "myPath=%~DP0"
+rem Process it as a series of ancestor directories
+rem i.e. "c:\" "c:\projects\" "c:\projects\everything\" etc...
+rem and search the file in each ancestor, taking as result the last one
+
+set "result="
+set "thisParent="
+set "myPath=%myPath:~0,-1%"
+for %%a in ("%myPath:\=" "%") do (
+   set "thisParent=!thisParent!%%~a\"
+   if exist "!thisParent!%theFile%" set "result=!thisParent!"
+)
+endlocal&set result=%result%
+goto:eof
+
+
+

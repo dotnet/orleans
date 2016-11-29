@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
- 
+
 namespace Orleans.Messaging
 {
     /// <summary>
@@ -13,6 +13,7 @@ namespace Orleans.Messaging
     {
         private readonly GatewayConnection gatewayConnection;
         private readonly IncomingMessageBuffer buffer;
+        private Socket socket;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
             : base(gateway.Address.ToString())
@@ -40,7 +41,7 @@ namespace Orleans.Messaging
             {
                 while (!Cts.IsCancellationRequested)
                 {
-                    int bytesRead = FillBuffer(buffer.ReceiveBuffer);
+                    int bytesRead = FillBuffer(buffer.BuildReceiveBuffer());
                     if (bytesRead == 0)
                     {
                         continue;
@@ -58,25 +59,29 @@ namespace Orleans.Messaging
             }
             catch (Exception ex)
             {
+                buffer.Reset();
                 Log.Warn(ErrorCode.ProxyClientUnhandledExceptionWhileReceiving, String.Format("Unexpected/unhandled exception while receiving: {0}. Restarting gateway receiver for {1}.",
                     ex, gatewayConnection.Address), ex);
                 throw;
             }
         }
 
-        private int FillBuffer(List<ArraySegment<byte>> buffer)
+        private int FillBuffer(List<ArraySegment<byte>> bufferSegments)
         {
-            Socket socketCapture = null;
             try
             {
                 if (gatewayConnection.Socket == null || !gatewayConnection.Socket.Connected)
                 {
                     gatewayConnection.Connect();
                 }
-                socketCapture = gatewayConnection.Socket;
-                if (socketCapture != null && socketCapture.Connected)
+                if(!Equals(socket, gatewayConnection.Socket))
                 {
-                    var bytesRead = socketCapture.Receive(buffer);
+                    buffer.Reset();
+                    socket = gatewayConnection.Socket;
+                }
+                if (socket != null && socket.Connected)
+                {
+                    var bytesRead = socket.Receive(bufferSegments);
                     if (bytesRead == 0)
                     {
                         throw new EndOfStreamException("Socket closed");
@@ -86,11 +91,13 @@ namespace Orleans.Messaging
             }
             catch (Exception ex)
             {
+                buffer.Reset();
                 // Only try to reconnect if we're not shutting down
                 if (Cts.IsCancellationRequested) return 0;
 
                 Log.Warn(ErrorCode.Runtime_Error_100158, String.Format("Exception receiving from gateway {0}: {1}", gatewayConnection.Address, ex.Message));
-                gatewayConnection.MarkAsDisconnected(socketCapture);
+                gatewayConnection.MarkAsDisconnected(socket);
+                socket = null;
                 return 0;
             }
             return 0;

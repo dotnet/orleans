@@ -14,15 +14,17 @@ namespace Orleans.Providers.Streams.Common
         private readonly int blockSize;
         private Action<IDisposable> purgeAction;
 
-        public object Id { get { return buffer; } }
+        /// <summary>
+        /// Unique identifier of this buffer
+        /// </summary>
+        public object Id => buffer;
 
-        public FixedSizeBuffer(int blockSize, IObjectPool<FixedSizeBuffer> pool)
-            : base(pool)
+        /// <summary>
+        /// Manages access to a fixed size byte buffer.
+        /// </summary>
+        /// <param name="blockSize"></param>
+        public FixedSizeBuffer(int blockSize)
         {
-            if (pool == null)
-            {
-                throw new ArgumentNullException("pool");
-            }
             if (blockSize < 0)
             {
                 throw new ArgumentOutOfRangeException("blockSize", "blockSize must be positive value.");
@@ -76,10 +78,7 @@ namespace Orleans.Providers.Streams.Common
         public override void SignalPurge()
         {
             count = 0;
-            if (purgeAction != null)
-            {
-                purgeAction(this);
-            }
+            purgeAction?.Invoke(this);
             purgeAction = null;
         }
     }

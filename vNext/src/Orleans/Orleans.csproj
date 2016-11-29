@@ -1,0 +1,166 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>netstandard1.5</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
+    <Compile Include="..\..\..\src\Orleans\**\*.cs" Exclude="..\..\..\src\Orleans\Properties\**\*.cs;..\..\..\src\Orleans\Statistics\RuntimeStatisticsGroup.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Make sure we not include it twice because of globbing.  -->
+    <Compile Remove="Properties\orleans.codegen.cs" />
+    <Compile Include="Properties\orleans.codegen.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
+      <Link>Configuration\OrleansConfiguration.xsd</Link>
+      <SubType>Designer</SubType>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\Build\Version.txt">
+      <Link>Version.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="..\Orleans.SDK.targets">
+      <Link>Orleans.SDK.targets</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Sdk">
+      <Version>1.0.0-alpha-20161104-2</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="NETStandard.Library">
+      <Version>1.6.0</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection">
+      <Version>1.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>9.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Collections.Immutable">
+      <Version>1.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.ComponentModel.TypeConverter">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Diagnostics.FileVersionInfo">
+      <Version>4.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Diagnostics.Process">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Diagnostics.TraceSource">
+      <Version>4.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Linq.Expressions">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Net.NameResolution">
+      <Version>4.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Net.NetworkInformation">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Reflection.Emit">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Reflection.Emit.Lightweight">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Reflection.TypeExtensions">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime">
+      <Version>4.1.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.Serialization.Formatters">
+      <Version>4.0.0-rc3-24212-01</Version>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.Serialization.Primitives">
+      <Version>4.1.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Algorithms">
+      <Version>4.2.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Threading.Thread">
+      <Version>4.0.0</Version>
+    </PackageReference>
+    <PackageReference Include="System.Threading.ThreadPool">
+      <Version>4.0.10</Version>
+    </PackageReference>
+    <PackageReference Include="System.Xml.XmlDocument">
+      <Version>4.0.1</Version>
+    </PackageReference>
+    <PackageReference Include="System.Xml.XPath.XmlDocument">
+      <Version>4.0.1</Version>
+    </PackageReference>
+  </ItemGroup>
+  <PropertyGroup>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Bootstrap)' == 'true'">
+    <OutputPath>$(BootstrapOutputPath)</OutputPath>
+    <OutDir>$(BootstrapOutputPath)</OutDir>
+    <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
+  </PropertyGroup>
+  <Target Name="GenerateVersionNumber" BeforeTargets="VersionInit" Condition="'$(BuildingInsideVisualStudio)' != 'true'" Outputs="$(SolutionDir)Build\Version.txt">
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>1</BuildNumber>
+    </PropertyGroup>
+  </Target>
+  <Target Name="VersionInit" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="$(SolutionDir)NuGet\EmptyFile.cs" DestinationFolder="$(TargetDir)" ContinueOnError="true" />
+  </Target>
+  <Target Name="LogBuildProperties" BeforeTargets="CoreCompile" AfterTargets="VersionInit">
+    <!-- Show values of some useful properties -->
+    <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
+  </Target>
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" Condition="'$(Bootstrap)' != 'true'">
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
+    <!-- Clean Generated directory -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
+    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
+    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
+    <PropertyGroup>
+      <BootstrapOutputPath>$(ProjectDir)\$(IntermediateOutputPath)Bootstrap\</BootstrapOutputPath>
+      <BootstrapOutputPath Condition="'$(BuildingInsideVisualStudio)' == 'true'">$(ProjectDir)$(IntermediateOutputPath)Bootstrap\</BootstrapOutputPath>
+      <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
+    </PropertyGroup>
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - OutputPath: $(BootstrapOutputPath)" Importance="high" />
+    <!-- Compile code generator -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling Orleans.dll for bootstrap" Importance="high" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
+    <MSBuild Projects="$(ProjectDir)\..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen);TargetFramework=net462" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <MSBuild Projects="$(ProjectDir)\..\ClientGenerator\ClientGenerator.csproj" Targets="Build" Properties="Bootstrap=true;BootstrapOutputPath=$(BootstrapOutputPath);OutputPath=$(BootstrapOutputPath);OutDir=$(BootstrapOutputPath);DefineConstants=$(ExcludeCodeGen);TargetFramework=net462" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <!-- Finally invoke code generator on the recently built Orleans.dll -->
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
+    <PropertyGroup>
+      <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <CodeGenArgs Include="/bootstrap" />
+      <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
+      <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
+      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')" />
+    </ItemGroup>
+    <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
+    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
+    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" />
+  </Target>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

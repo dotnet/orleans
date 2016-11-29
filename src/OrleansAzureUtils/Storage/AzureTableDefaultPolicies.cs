@@ -41,14 +41,14 @@ namespace Orleans.AzureUtils
 
             MaxBusyRetries = 120;
             PauseBetweenBusyRetries = TimeSpan.FromMilliseconds(500);
-#if DEBUG
+            
             if (Debugger.IsAttached)
             {
                 PauseBetweenTableCreationRetries = PauseBetweenTableCreationRetries.Multiply(100);
                 PauseBetweenTableOperationRetries = PauseBetweenTableOperationRetries.Multiply(100);
                 PauseBetweenBusyRetries = PauseBetweenBusyRetries.Multiply(10);
             }
-#endif
+            
             TableCreationRetryPolicy = new LinearRetry(PauseBetweenTableCreationRetries, MaxTableCreationRetries); // 60 x 1s
             TableCreationTimeout = PauseBetweenTableCreationRetries.Multiply(MaxTableCreationRetries).Multiply(3);    // 3 min
 

@@ -26,13 +26,17 @@ namespace Orleans.Providers.Streams.Common
         }
     }
 
-    internal struct SimpleQueueCacheItem
+    internal class SimpleQueueCacheItem
     {
         internal IBatchContainer Batch;
+        internal bool DeliveryFailure;
         internal StreamSequenceToken SequenceToken;
         internal CacheBucket CacheBucket;
     }
 
+    /// <summary>
+    /// A queue cache that keeps items in memory
+    /// </summary>
     public class SimpleQueueCache : IQueueCache
     {
         private readonly LinkedList<SimpleQueueCacheItem> cachedMessages;
@@ -43,16 +47,24 @@ namespace Orleans.Providers.Streams.Common
         private const int NUM_CACHE_HISTOGRAM_BUCKETS = 10;
         private readonly int CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
-        public int Size 
+        /// <summary>
+        /// Number of items in the cache
+        /// </summary>
+        public int Size => cachedMessages.Count;
+
+        /// <summary>
+        /// The limit of the maximum number of items that can be added
+        /// </summary>
+        public int GetMaxAddCount()
         {
-            get { return cachedMessages.Count; }
+            return CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
         }
 
-        public int MaxAddCount
-        {
-            get { return CACHE_HISTOGRAM_MAX_BUCKET_SIZE; }
-        }
-
+        /// <summary>
+        /// SimpleQueueCache Constructor
+        /// </summary>
+        /// <param name="cacheSize"></param>
+        /// <param name="logger"></param>
         public SimpleQueueCache(int cacheSize, Logger logger)
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
@@ -63,6 +75,9 @@ namespace Orleans.Providers.Streams.Common
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets
         }
 
+        /// <summary>
+        /// Returns true if this cache is under pressure.
+        /// </summary>
         public virtual bool IsUnderPressure()
         {
             if (cachedMessages.Count == 0) return false; // empty cache
@@ -74,6 +89,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
 
+        /// <summary>
+        /// Ask the cache if it has items that can be purged from the cache 
+        /// (so that they can be subsequently released them the underlying queue).
+        /// </summary>
+        /// <param name="purgedItems"></param>
         public virtual bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
@@ -102,7 +122,10 @@ namespace Orleans.Providers.Streams.Common
                 SimpleQueueCacheItem item = cachedMessages.Last.Value;
                 if (item.CacheBucket.Equals(bucket))
                 {
-                    itemsToRelease.Add(item.Batch);
+                    if (!item.DeliveryFailure)
+                    {
+                        itemsToRelease.Add(item.Batch);
+                    }
                     bucket.UpdateNumItems(-1);
                     cachedMessages.RemoveLast();
                 }
@@ -115,6 +138,10 @@ namespace Orleans.Providers.Streams.Common
             return itemsToRelease;
         }
 
+        /// <summary>
+        /// Add a list of message to the cache
+        /// </summary>
+        /// <param name="msgs"></param>
         public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException("msgs");
@@ -127,7 +154,14 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
-        public virtual IQueueCacheCursor GetCacheCursor(Guid streamGuid, string streamNamespace, StreamSequenceToken token)
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public virtual IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             if (token != null && !(token is EventSequenceToken))
             {
@@ -135,7 +169,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException("token", "token must be of type EventSequenceToken");
             }
 
-            var cursor = new SimpleQueueCacheCursor(this, streamGuid, streamNamespace, logger);
+            var cursor = new SimpleQueueCacheCursor(this, streamIdentity, logger);
             InitializeCursor(cursor, token, true);
             return cursor;
         }
@@ -146,7 +180,7 @@ namespace Orleans.Providers.Streams.Common
            
             if (cachedMessages.Count == 0) // nothing in cache
             {
-                StreamSequenceToken tokenToReset = sequenceToken ?? (lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null);
+                StreamSequenceToken tokenToReset = sequenceToken ?? ((EventSequenceToken) lastSequenceTokenAddedToCache)?.NextSequenceNumber();
                 ResetCursor(cursor, tokenToReset);
                 return;
             }
@@ -154,7 +188,7 @@ namespace Orleans.Providers.Streams.Common
             // if offset is not set, iterate from newest (first) message in cache, but not including the irst message itself
             if (sequenceToken == null)
             {
-                StreamSequenceToken tokenToReset = lastSequenceTokenAddedToCache != null ? ((EventSequenceToken)lastSequenceTokenAddedToCache).NextSequenceNumber() : null;
+                StreamSequenceToken tokenToReset = ((EventSequenceToken) lastSequenceTokenAddedToCache)?.NextSequenceNumber();
                 ResetCursor(cursor, tokenToReset);
                 return;
             }
@@ -275,7 +309,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (batch == null) throw new ArgumentNullException("batch");
 
-            CacheBucket cacheBucket = null;
+            CacheBucket cacheBucket;
             if (cacheCursorHistogram.Count == 0)
             {
                 cacheBucket = new CacheBucket();

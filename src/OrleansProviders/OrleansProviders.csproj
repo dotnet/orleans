@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform>AnyCPU</Platform>
@@ -13,7 +13,7 @@
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -26,6 +26,7 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -36,12 +37,18 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansProviders.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
+    <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
+    <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterConfig.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterFactory.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessageBlock.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeObjectPool.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeBuffer.cs" />
@@ -50,6 +57,7 @@
     <Compile Include="Streams\Common\PooledCache\PooledQueueCache.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessagePool.cs" />
     <Compile Include="Streams\Common\PooledCache\ObjectPool.cs" />
+    <Compile Include="Streams\Common\PooledCache\StreamPosition.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCache.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleCache\SimpleQueueAdapterCache.cs" />
@@ -64,6 +72,22 @@
     <Compile Include="Storage\MemoryStorage.cs" />
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
     <Compile Include="Storage\ShardedStorageProvider.cs" />
+    <Compile Include="Streams\Generator\GeneratorAdapterConfig.cs" />
+    <Compile Include="Streams\Generator\GeneratorAdapterFactory.cs" />
+    <Compile Include="Streams\Generator\GeneratorPooledCache.cs" />
+    <Compile Include="Streams\Generator\GeneratorStreamProvider.cs" />
+    <Compile Include="Streams\Generator\Generators\GeneratedBatchContainer.cs" />
+    <Compile Include="Streams\Generator\Generators\GeneratedEvent.cs" />
+    <Compile Include="Streams\Generator\Generators\SimpleGenerator.cs" />
+    <Compile Include="Streams\Generator\Generators\SimpleGeneratorConfig.cs" />
+    <Compile Include="Streams\Generator\IStreamGenerator.cs" />
+    <Compile Include="Streams\Memory\MemoryAdapterReceiver.cs" />
+    <Compile Include="Streams\Memory\MemoryBatchContainer.cs" />
+    <Compile Include="Streams\Memory\MemoryMessageBody.cs" />
+    <Compile Include="Streams\Memory\MemoryMessageData.cs" />
+    <Compile Include="Streams\Memory\MemoryPooledCache.cs" />
+    <Compile Include="Streams\Memory\MemoryStreamProvider.cs" />
+    <Compile Include="Streams\Memory\MemoryStreamQueueGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
@@ -72,7 +96,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

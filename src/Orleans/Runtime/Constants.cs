@@ -1,6 +1,6 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System;
 
 namespace Orleans.Runtime
 {
@@ -26,6 +26,8 @@ namespace Orleans.Runtime
 
         public const string ORLEANS_ZOOKEEPER_UTILS_DLL = "OrleansZooKeeperUtils";
 
+        public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
+
         public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
         public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
         public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);
@@ -36,7 +38,11 @@ namespace Orleans.Runtime
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId ProviderManagerSystemTargetId = GrainId.GetSystemTargetGrainId(19);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
-       
+        public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
+        public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
+        public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
+        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
+
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
@@ -65,6 +71,8 @@ namespace Orleans.Runtime
 
         public const int DEFAULT_LOGGER_BULK_MESSAGE_LIMIT = 5;
 
+        public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
+
         private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
         {
             {DirectoryServiceId, "DirectoryService"},
@@ -73,6 +81,7 @@ namespace Orleans.Runtime
             {ClientObserverRegistrarId,"ClientObserverRegistrar"},
             {CatalogId,"Catalog"},
             {MembershipOracleId,"MembershipOracle"},
+            {MultiClusterOracleId,"MultiClusterOracle"},
             {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},

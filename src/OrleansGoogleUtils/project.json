@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "Google.Protobuf": "3.0.0"
+  },
+  "frameworks": {
+    "net451": {}
+  },
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
+}

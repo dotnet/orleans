@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    internal class ClientTableStatistics : MarshalByRefObject, IClientPerformanceMetrics
+    internal class ClientTableStatistics : IClientPerformanceMetrics, IDisposable
     {
         private readonly IMessageCenter mc;
         private readonly IClientMetricsDataPublisher metricsDataPublisher;
@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private readonly RuntimeStatisticsGroup runtimeStats;
 
         private AsyncTaskSafeTimer reportTimer;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("ClientTableStatistics", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("ClientTableStatistics", LoggerType.Runtime);
 
         internal ClientTableStatistics(IMessageCenter mc, IClientMetricsDataPublisher metricsDataPublisher, RuntimeStatisticsGroup runtime)
         {
@@ -28,25 +28,25 @@ namespace Orleans.Runtime
 
         #region IClientPerformanceMetrics Members
 
-        public float CpuUsage 
+        public float CpuUsage
         {
             get { return runtimeStats.CpuUsage; }
         }
-        
-        public long AvailablePhysicalMemory 
+
+        public long AvailablePhysicalMemory
         {
-            get { return runtimeStats.AvailableMemory; } 
+            get { return runtimeStats.AvailableMemory; }
         }
 
-        public long MemoryUsage 
+        public long MemoryUsage
         {
-            get { return runtimeStats.MemoryUsage; } 
+            get { return runtimeStats.MemoryUsage; }
         }
         public long TotalPhysicalMemory
         {
             get { return runtimeStats.TotalPhysicalMemory; }
         }
-        
+
         public int SendQueueLength
         {
             get { return mc.SendQueueLength; }
@@ -108,7 +108,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if(metricsDataPublisher != null)
+                if (metricsDataPublisher != null)
                 {
                     await metricsDataPublisher.ReportMetrics(this);
                 }
@@ -124,7 +124,7 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            if (this.reportTimer != null)
+            if (reportTimer != null)
                 reportTimer.Dispose();
             reportTimer = null;
         }

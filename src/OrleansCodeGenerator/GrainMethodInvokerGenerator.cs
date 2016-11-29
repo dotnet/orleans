@@ -7,17 +7,14 @@ namespace Orleans.CodeGenerator
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Async;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
-
-    using GrainInterfaceData = Orleans.CodeGeneration.GrainInterfaceData;
+    using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
     /// <summary>
@@ -51,7 +48,7 @@ namespace Orleans.CodeGenerator
                                    : new TypeParameterSyntax[0];
 
             // Create the special method invoker marker attribute.
-            var interfaceId = GrainInterfaceData.GetGrainInterfaceId(grainType);
+            var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(grainType);
             var interfaceIdArgument = SF.LiteralExpression(SyntaxKind.NumericLiteralExpression, SF.Literal(interfaceId));
             var grainTypeArgument = SF.TypeOfExpression(grainType.GetTypeSyntax(includeGenericParameters: false));
             var attributes = new List<AttributeSyntax>
@@ -59,10 +56,11 @@ namespace Orleans.CodeGenerator
                 CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
                 SF.Attribute(typeof(MethodInvokerAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
-                        SF.AttributeArgument(grainType.GetParseableName().GetLiteralExpression()),
-                        SF.AttributeArgument(interfaceIdArgument),
-                        SF.AttributeArgument(grainTypeArgument)),
+                        SF.AttributeArgument(grainTypeArgument),
+                        SF.AttributeArgument(interfaceIdArgument)),
+#if !NETSTANDARD
                 SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax())
+#endif
             };
 
             var members = new List<MemberDeclarationSyntax>
@@ -104,7 +102,7 @@ namespace Orleans.CodeGenerator
             var property = TypeUtils.Member((IGrainMethodInvoker _) => _.InterfaceId);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
-                SF.Literal(GrainInterfaceData.GetGrainInterfaceId(grainType)));
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceId(grainType)));
             return
                 SF.PropertyDeclaration(typeof(int).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
@@ -128,7 +126,7 @@ namespace Orleans.CodeGenerator
             var invokeMethod =
                 TypeUtils.Method(
                     (IGrainMethodInvoker x) =>
-                    x.Invoke(default(IAddressable), default(int), default(int), default(object[])));
+                    x.Invoke(default(IAddressable), default(InvokeMethodRequest)));
 
             return GenerateInvokeMethod(grainType, invokeMethod);
         }
@@ -148,7 +146,7 @@ namespace Orleans.CodeGenerator
             var invokeMethod =
                 TypeUtils.Method(
                     (IGrainExtensionMethodInvoker x) =>
-                    x.Invoke(default(IGrainExtension), default(int), default(int), default(object[])));
+                    x.Invoke(default(IGrainExtension), default(InvokeMethodRequest)));
 
             return GenerateInvokeMethod(grainType, invokeMethod);
         }
@@ -167,31 +165,56 @@ namespace Orleans.CodeGenerator
         /// </returns>
         private static MethodDeclarationSyntax GenerateInvokeMethod(Type grainType, MethodInfo invokeMethod)
         {
-            var methodDeclaration = invokeMethod.GetDeclarationSyntax();
             var parameters = invokeMethod.GetParameters();
 
             var grainArgument = parameters[0].Name.ToIdentifierName();
-            var interfaceIdArgument = parameters[1].Name.ToIdentifierName();
-            var methodIdArgument = parameters[2].Name.ToIdentifierName();
-            var argumentsArgument = parameters[3].Name.ToIdentifierName();
+            var requestArgument = parameters[1].Name.ToIdentifierName();
+            
+            // Store the relevant values from the request in local variables.
+            var interfaceIdDeclaration =
+                SF.LocalDeclarationStatement(
+                    SF.VariableDeclaration(typeof(int).GetTypeSyntax())
+                        .AddVariables(
+                            SF.VariableDeclarator("interfaceId")
+                                .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.InterfaceId)))));
+            var interfaceIdVariable = SF.IdentifierName("interfaceId");
+
+            var methodIdDeclaration =
+                SF.LocalDeclarationStatement(
+                    SF.VariableDeclaration(typeof(int).GetTypeSyntax())
+                        .AddVariables(
+                            SF.VariableDeclarator("methodId")
+                                .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.MethodId)))));
+            var methodIdVariable = SF.IdentifierName("methodId");
+
+            var argumentsDeclaration =
+                SF.LocalDeclarationStatement(
+                    SF.VariableDeclaration(typeof(object[]).GetTypeSyntax())
+                        .AddVariables(
+                            SF.VariableDeclarator("arguments")
+                                .WithInitializer(SF.EqualsValueClause(requestArgument.Member((InvokeMethodRequest _) => _.Arguments)))));
+            var argumentsVariable = SF.IdentifierName("arguments");
+
+            var methodDeclaration = invokeMethod.GetDeclarationSyntax()
+                .AddBodyStatements(interfaceIdDeclaration, methodIdDeclaration, argumentsDeclaration);
 
             var interfaceCases = CodeGeneratorCommon.GenerateGrainInterfaceAndMethodSwitch(
                 grainType,
-                methodIdArgument,
-                methodType => GenerateInvokeForMethod(grainType, grainArgument, methodType, argumentsArgument));
+                methodIdVariable,
+                methodType => GenerateInvokeForMethod(grainType, grainArgument, methodType, argumentsVariable));
 
             // Generate the default case, which will throw a NotImplementedException.
             var errorMessage = SF.BinaryExpression(
                 SyntaxKind.AddExpression,
                 "interfaceId=".GetLiteralExpression(),
-                interfaceIdArgument);
+                interfaceIdVariable);
             var throwStatement =
                 SF.ThrowStatement(
                     SF.ObjectCreationExpression(typeof(NotImplementedException).GetTypeSyntax())
                         .AddArgumentListArguments(SF.Argument(errorMessage)));
             var defaultCase = SF.SwitchSection().AddLabels(SF.DefaultSwitchLabel()).AddStatements(throwStatement);
             var interfaceIdSwitch =
-                SF.SwitchStatement(interfaceIdArgument).AddSections(interfaceCases.ToArray()).AddSections(defaultCase);
+                SF.SwitchStatement(interfaceIdVariable).AddSections(interfaceCases.ToArray()).AddSections(defaultCase);
 
             // If the provided grain is null, throw an argument exception.
             var argumentNullException =
@@ -204,23 +227,8 @@ namespace Orleans.CodeGenerator
                         grainArgument,
                         SF.LiteralExpression(SyntaxKind.NullLiteralExpression)),
                     SF.ThrowStatement(argumentNullException));
-
-            // Wrap everything in a try-catch block.
-            var faulted = (Expression<Func<Task<object>>>)(() => TaskUtility.Faulted(null));
-            const string Exception = "exception";
-            var exception = SF.Identifier(Exception);
-            var body =
-                SF.TryStatement()
-                    .AddBlockStatements(grainArgumentCheck, interfaceIdSwitch)
-                    .AddCatches(
-                        SF.CatchClause()
-                            .WithDeclaration(
-                                SF.CatchDeclaration(typeof(Exception).GetTypeSyntax()).WithIdentifier(exception))
-                            .AddBlockStatements(
-                                SF.ReturnStatement(
-                                    faulted.Invoke().AddArgumentListArguments(SF.Argument(SF.IdentifierName(Exception))))));
-
-            return methodDeclaration.AddBodyStatements(body);
+            
+            return methodDeclaration.AddBodyStatements(grainArgumentCheck, interfaceIdSwitch);
         }
 
         /// <summary>
@@ -245,7 +253,7 @@ namespace Orleans.CodeGenerator
             Type grainType,
             IdentifierNameSyntax grain,
             MethodInfo method,
-            IdentifierNameSyntax arguments)
+            ExpressionSyntax arguments)
         {
             var castGrain = SF.ParenthesizedExpression(SF.CastExpression(grainType.GetTypeSyntax(), grain));
 
@@ -267,7 +275,8 @@ namespace Orleans.CodeGenerator
             var grainMethodCall =
                 SF.InvocationExpression(castGrain.Member(method.Name))
                     .AddArgumentListArguments(parameters.Select(SF.Argument).ToArray());
-
+            
+            // For void methods, invoke the method and return a completed task.
             if (method.ReturnType == typeof(void))
             {
                 var completed = (Expression<Func<Task<object>>>)(() => TaskUtility.Completed());
@@ -275,6 +284,12 @@ namespace Orleans.CodeGenerator
                 {
                     SF.ExpressionStatement(grainMethodCall), SF.ReturnStatement(completed.Invoke())
                 };
+            }
+
+            // For methods which return the expected type, Task<object>, simply return that.
+            if (method.ReturnType == typeof(Task<object>))
+            {
+                return new StatementSyntax[] { SF.ReturnStatement(grainMethodCall) };
             }
 
             // The invoke method expects a Task<object>, so we need to upcast the returned value.

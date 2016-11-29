@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform>AnyCPU</Platform>
@@ -13,7 +13,6 @@
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -29,6 +28,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Debug\OrleansRuntime.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <OutputPath>bin\Release\</OutputPath>
@@ -43,6 +43,7 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>bin\Release\OrleansRuntime.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
@@ -54,8 +55,29 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
-    <Compile Include="Counters\PerfCounterConfigData.cs" />
+    <Compile Include="Catalog\GrainCreator.cs" />
+    <Compile Include="Counters\CounterConfigData.cs" />
+    <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="Silo\SiloInitializationParameters.cs" />
+    <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />
+    <Compile Include="Silo\TestHooks\TestHooksSystemTarget.cs" />
+    <Compile Include="Startup\ConfigureServicesBuilder.cs" />
+    <Compile Include="Startup\StartupBuilder.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleData.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
+    <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
+    <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterGrainDirectory.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceActivationMaintainer.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceResponseTracker.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\GlobalSingleInstanceRegistrar.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\MultiClusterUtils.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\RegistrarManager.cs" />
+    <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterLocalRegistrar.cs" />
     <Compile Include="GrainTypeManager\GenericGrainTypeData.cs" />
     <Compile Include="MembershipService\ISiloStatusListener.cs" />
     <Compile Include="MembershipService\ISiloStatusOracle.cs" />
@@ -66,7 +88,7 @@
     <Compile Include="Placement\ClientObserversPlacementDirector.cs" />
     <Compile Include="Placement\PreferLocalPlacementDirector.cs" />
     <Compile Include="Placement\StatelessWorkerDirector.cs" />
-    <Compile Include="Placement\PlacementDirector.cs" />
+    <Compile Include="Placement\IPlacementDirector.cs" />
     <Compile Include="Placement\RandomPlacementDirector.cs" />
     <Compile Include="Catalog\ActivationData.cs" />
     <Compile Include="Core\BootstrapProviderManager.cs" />
@@ -76,7 +98,7 @@
     <Compile Include="ConsistentRing\IConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\ConsistentRingProvider.cs" />
     <Compile Include="ConsistentRing\VirtualBucketsRingProvider.cs" />
-    <Compile Include="ConsistentRing\EquallyDevidedRangeRingProvider.cs" />
+    <Compile Include="ConsistentRing\EquallyDividedRangeRingProvider.cs" />
     <Compile Include="Core\IHealthCheckParticipant.cs" />
     <Compile Include="MembershipService\IMembershipOracle.cs" />
     <Compile Include="MembershipService\MembershipOracleData.cs" />
@@ -89,9 +111,6 @@
     <Compile Include="Messaging\IncomingMessageAcceptor.cs" />
     <Compile Include="Messaging\MessageCenter.cs" />
     <Compile Include="Messaging\OutboundMessageQueue.cs" />
-    <Compile Include="Counters\OrleansPerformanceCounterInstaller.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="ReminderService\MockReminderTable.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
     <Compile Include="Silo\IStartupBuilder.cs" />
@@ -114,8 +133,8 @@
     <Compile Include="Scheduler\IWorkItem.cs" />
     <Compile Include="Scheduler\SchedulingContext.cs" />
     <Compile Include="Placement\IPlacementContext.cs" />
-    <Compile Include="Counters\PerfCountersStatistics.cs" />
-    <Compile Include="Counters\OrleansPerfCounterManager.cs" />
+    <Compile Include="Counters\CountersStatistics.cs" />
+    <Compile Include="Counters\OrleansCounterManager.cs" />
     <Compile Include="GrainDirectory\AdaptiveGrainDirectoryCache.cs" />
     <Compile Include="GrainDirectory\AdaptiveDirectoryCacheMaintainer.cs" />
     <Compile Include="GrainDirectory\GrainDirectoryCacheFactory.cs" />
@@ -151,6 +170,7 @@
     <Compile Include="Silo\SiloControl.cs" />
     <Compile Include="Storage\MemoryStorageGrain.cs" />
     <Compile Include="Storage\StorageProviderManager.cs" />
+    <Compile Include="Streams\LoadShedQueueFlowController.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingManager.cs" />
     <Compile Include="Streams\PersistentStream\PersistentStreamPullingAgent.cs" />
     <Compile Include="Streams\PubSub\PubSubRendezvousGrain.cs" />
@@ -164,7 +184,7 @@
     <Compile Include="Silo\Silo.cs" />
     <Compile Include="Catalog\Catalog.cs" />
     <Compile Include="Core\Dispatcher.cs" />
-    <Compile Include="Core\InsideGrainClient.cs" />
+    <Compile Include="Core\InsideRuntimeClient.cs" />
     <Compile Include="GrainTypeManager\TypeManager.cs" />
     <Compile Include="Silo\Watchdog.cs" />
     <Compile Include="Streams\QueueBalancer\BestFitBalancer.cs" />
@@ -172,6 +192,8 @@
     <Compile Include="Streams\QueueBalancer\ConsistentRingQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
+    <Compile Include="Streams\StreamProviderManagerAgent.cs" />
+    <Compile Include="Utilities\ServiceCollectionExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
@@ -179,8 +201,9 @@
       <Name>Orleans</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
-    <Folder Include="Startup\" />
+    <None Include="project.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- Begin Orleans: Without these lines the project won't build properly -->

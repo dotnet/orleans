@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.SqlUtils
@@ -17,6 +18,8 @@ namespace Orleans.SqlUtils
         /// <param name="query">The query to execute.</param>
         /// <param name="parameterProvider">Adds parameters to the query. The parameters must be in the same order with same names as defined in the query.</param>
         /// <param name="selector">This function transforms the raw <see cref="IDataRecord"/> results to type <see paramref="TResult"/> the <see cref="int"/> parameter being the resultset number.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
+        /// <param name="commandBehavior">The command behavior that should be used. Defaults to <see cref="CommandBehavior.Default"/>.</param>
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
         /// <example>This sample shows how to make a hand-tuned database call.
         /// <code>
@@ -57,13 +60,15 @@ namespace Orleans.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>        
         /// </example>
-        Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, TResult> selector);
+        Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default);
 
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
         /// </summary>
         /// <param name="query">The query to execute.</param>
         /// <param name="parameterProvider">Adds parameters to the query. Parameter names must match those defined in the query.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
+        /// <param name="commandBehavior">The command behavior that should be used. Defaults to <see cref="CommandBehavior.Default"/>.</param>
         /// <returns>Affected rows count.</returns>
         /// <example>This sample shows how to make a hand-tuned database call.
         /// <code>
@@ -78,7 +83,7 @@ namespace Orleans.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);                
         /// </code>
         /// </example>
-        Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider);
+        Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default);
 
         /// <summary>
         /// The well known invariant name of the underlying database.

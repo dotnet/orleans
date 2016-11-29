@@ -44,7 +44,7 @@ namespace Orleans.Runtime
 
         private static SystemStatus currentStatus;
 
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("SystemStatus", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("SystemStatus", LoggerType.Runtime);
 
         /// <summary>Status = Unknown</summary>
         [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]

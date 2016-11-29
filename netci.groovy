@@ -2,33 +2,38 @@
 
 import jobs.generation.Utilities;
 
-def project = 'dotnet/orleans'
+def project = GithubProject
+def branch = GithubBranchName
 // Define build string
-def buildString = '''call "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\Tools\\VsDevCmd.bat" && Build.cmd && Test.cmd'''
+def buildString = '''call Build.cmd && Test.cmd'''
 
 // Generate the builds for debug and release
 
-def commitJob = job(Utilities.getFullJobName(project, '', false)) {
-  label('windows')
-  steps {
-    batchFile(buildString)
-  }
+[true, false].each { isPR ->
+    ['netfx', 'netstandard-win'].each { platform ->
+	    def newJobName = platform
+		def newJob = job(Utilities.getFullJobName(project, newJobName, isPR)) {
+			steps {
+				batchFile("call Build.cmd ${platform} && Test.cmd ${platform}")
+			}
+		}
+		
+        if (platform == 'netfx') {
+            Utilities.setMachineAffinity(newJob, 'Windows_NT', 'latest-or-auto')
+        } else {
+            // need to use a machine that has .NET 4.6.2 installed in the system
+            Utilities.setMachineAffinity(newJob, 'Windows_NT', '20161027')
+        }
+		
+		Utilities.standardJobSetup(newJob, project, isPR, "*/${branch}")
+		Utilities.addXUnitDotNETResults(newJob, '**/xUnit-Results*.xml')
+		// Archive only on commit builds.
+		if (!isPR) {
+			Utilities.addArchival(newJob, 'Binaries/**')
+			Utilities.addGithubPushTrigger(newJob)
+		}
+		else {
+			Utilities.addGithubPRTriggerForBranch(newJob, branch, "${platform} Windows Debug and Release")
+		}
+	}
 }
-             
-def PRJob = job(Utilities.getFullJobName(project, '', true)) {
-  label('windows')
-  steps {
-    batchFile(buildString)
-  }
-}
-
-Utilities.addScm(commitJob, project)
-Utilities.addStandardOptions(commitJob)
-Utilities.addStandardNonPRParameters(commitJob)
-Utilities.addGithubPushTrigger(commitJob)
-Utilities.addArchival(commitJob, 'Binaries/**')
-
-Utilities.addPRTestSCM(PRJob, project)
-Utilities.addStandardOptions(PRJob)
-Utilities.addStandardPRParameters(PRJob, project)
-Utilities.addGithubPRTrigger(PRJob, 'Debug and Release')

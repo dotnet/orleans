@@ -1,8 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -18,6 +17,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="T">The type of the list elements.</typeparam>
         /// <param name="collection">The IEnumerable to describe.</param>
+        /// <param name="toString">Converts the element to a string. If none specified, <see cref="object.ToString"/> will be used.</param>
+        /// <param name="separator">The separator to use.</param>
+        /// <param name="putInBrackets">Puts elements within brackets</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// elements with square brackets and separating them with commas.</returns>
         public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null, 
@@ -61,8 +63,9 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="T1">The type of the dictionary keys.</typeparam>
         /// <typeparam name="T2">The type of the dictionary elements.</typeparam>
-        /// <param name="separateWithNewLine">Whether the elements should appear separated by a new line.</param>
         /// <param name="dict">The dictionary to describe.</param>
+        /// <param name="toString">Converts the element to a string. If none specified, <see cref="object.ToString"/> will be used.</param>
+        /// <param name="separator">The separator to use. If none specified, the elements should appear separated by a new line.</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// pairs with square brackets and separating them with commas.
         /// Each key-value pair is represented as the string description of the key followed by
@@ -284,7 +287,8 @@ namespace Orleans.Runtime
                         }
                         foreach (var e in exc.FlattenAggregate())
                         {
-                            logger.Warn((int)ErrorCode.Runtime_Error_100325, String.Format("Ignoring {0} exception thrown from an action called by {1}.", e.GetType().FullName, caller ?? String.Empty), exc);
+                            logger.Warn(ErrorCode.Runtime_Error_100325,
+                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.", exc);
                         }
                     }
                 }
@@ -309,31 +313,6 @@ namespace Orleans.Runtime
         public static TimeSpan Since(DateTime start)
         {
             return DateTime.UtcNow.Subtract(start);
-        }
-
-        public static List<T> ObjectToList<T>(object data)
-        {
-            if (data is List<T>) return (List<T>) data;
-
-            T[] dataArray;
-            if (data is ArrayList)
-            {
-                dataArray = (T[]) (data as ArrayList).ToArray(typeof(T));
-            }
-            else if (data is ICollection<T>)
-            {
-                dataArray = (data as ICollection<T>).ToArray();
-            }
-            else
-            {
-                throw new InvalidCastException(string.Format(
-                    "Cannot convert type {0} to type List<{1}>",
-                    TypeUtils.GetFullName(data.GetType()),
-                    TypeUtils.GetFullName(typeof(T))));
-            }
-            var list = new List<T>();
-            list.AddRange(dataArray);
-            return list;
         }
 
         public static List<Exception> FlattenAggregate(this Exception exc)
@@ -376,42 +355,21 @@ namespace Orleans.Runtime
             }
         }
 
-        internal static MethodInfo GetStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static string GetStackTrace(int skipFrames = 0)
         {
-            var asm = Assembly.Load(new AssemblyName(assemblyName));
-            if (asm == null)
-                throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null)
-                throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            MethodInfo method;
-            method = argumentTypes == null
-                ? cl.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static).Where(m=>m.Name == methodName).FirstOrDefault()
-                : cl.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, argumentTypes, null);
-
-            if (method == null)
-                throw new InvalidOperationException(string.Format("Cannot find static method {0} of class {1} in assembly {2}", methodName, className, assemblyName));
-
-            return method;
-        }
-
-        internal static object InvokeStaticMethodThroughReflection(string assemblyName, string className, string methodName, Type[] argumentTypes, object[] arguments)
-        {
-            var method = GetStaticMethodThroughReflection(assemblyName, className, methodName, argumentTypes);
-            return method.Invoke(null, arguments);
-        }
-
-        internal static Type LoadTypeThroughReflection(string assemblyName, string className)
-        {
-            var asm = Assembly.Load(new AssemblyName(assemblyName));
-            if (asm == null) throw new InvalidOperationException(string.Format("Cannot find assembly {0}", assemblyName));
-
-            var cl = asm.GetType(className);
-            if (cl == null) throw new InvalidOperationException(string.Format("Cannot find class {0} in assembly {1}", className, assemblyName));
-
-            return cl;
+            skipFrames += 1; //skip this method from the stack trace
+#if NETSTANDARD
+            skipFrames += 2; //skip the 2 Environment.StackTrace related methods.
+            var stackTrace = Environment.StackTrace;
+            for (int i = 0; i < skipFrames; i++)
+            {
+                stackTrace = stackTrace.Substring(stackTrace.IndexOf(Environment.NewLine) + Environment.NewLine.Length);
+            }
+            return stackTrace;
+#else
+            return new System.Diagnostics.StackTrace(skipFrames).ToString();
+#endif
         }
     }
 }

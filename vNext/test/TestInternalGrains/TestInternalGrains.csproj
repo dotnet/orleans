@@ -1,0 +1,107 @@
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="Microsoft.CSharp" />
+</ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Sdk">
+      <Version>1.0.0-alpha-20161104-2</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.assert">
+      <Version>2.1.0</Version>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TestInternalGrains\ActivateDeactivateTestGrain.cs">
+      <Link>ActivateDeactivateTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\EchoTaskGrain.cs">
+      <Link>EchoTaskGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\ExtensionTestGrain.cs">
+      <Link>ExtensionTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\InterlockedFlag.cs">
+      <Link>InterlockedFlag.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
+      <Link>PersistenceTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamingGrain.cs">
+      <Link>StreamingGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamingImmutabilityTestGrain.cs">
+      <Link>StreamingImmutabilityTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
+      <Link>StreamLifecycleTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamTestsConstants.cs">
+      <Link>StreamTestsConstants.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\TestExtension.cs">
+      <Link>TestExtension.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\TestGrain.cs">
+      <Link>TestGrain.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\..\src\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
+  <!--End Orleans -->
+</Project>

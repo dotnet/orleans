@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
@@ -82,7 +81,6 @@ namespace Orleans.Runtime.Messaging
         private void ReceiveMessage(Message msg)
         {
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
-            if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.DequeueIncoming);
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
@@ -102,13 +100,11 @@ namespace Orleans.Runtime.Messaging
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
-                        if (Message.WriteMessagingTraces) msg.AddTimestamp(Message.LifecycleTag.EnqueueWorkItem);
                         MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
                         scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
@@ -127,7 +123,7 @@ namespace Orleans.Runtime.Messaging
                     lock (targetActivation)
                     {
                         var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.State.Equals(ActivationState.Valid))
+                        if (target.State == ActivationState.Valid)
                         {
                             var overloadException = target.CheckOverloaded(Log);
                             if (overloadException != null)

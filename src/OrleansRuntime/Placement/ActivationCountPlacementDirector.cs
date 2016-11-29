@@ -1,15 +1,14 @@
 using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
-
+using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener
+    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector<ActivationCountBasedPlacement>
     {
         private class CachedLocalStat
         {
@@ -37,26 +36,23 @@ namespace Orleans.Runtime.Placement
         
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> localCache = new ConcurrentDictionary<SiloAddress, CachedLocalStat>();
-        private readonly TraceLogger logger;
+        private readonly Logger logger;
         private readonly bool useLocalCache = true;
         // For: SelectSiloPowerOfK
         private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
-        
-        public ActivationCountPlacementDirector()
-        {
-            logger = TraceLogger.GetLogger(this.GetType().Name);
-        }
 
-        public void Initialize(GlobalConfiguration globalConfig)
-        {            
-            DeploymentLoadPublisher.Instance.SubscribeToStatisticsChangeEvents(this);
+        public ActivationCountPlacementDirector(DeploymentLoadPublisher deploymentLoadPublisher, GlobalConfiguration globalConfig)
+        {
+            logger = LogManager.GetLogger(this.GetType().Name);
 
             SelectSilo = SelectSiloPowerOfK;
             if (globalConfig.ActivationCountBasedPlacementChooseOutOf <= 0)
-                throw new ArgumentException("GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
-            
+                throw new ArgumentException(
+                    "GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + globalConfig.ActivationCountBasedPlacementChooseOutOf);
+
             chooseHowMany = globalConfig.ActivationCountBasedPlacementChooseOutOf;
+            deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
         private static bool IsSiloOverloaded(SiloRuntimeStatistics stats)
@@ -164,7 +160,7 @@ namespace Orleans.Runtime.Placement
             throw new OrleansException(debugLog);
         }
 
-        internal override Task<PlacementResult> OnAddActivation(
+        public override Task<PlacementResult> OnAddActivation(
             PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
             return SelectSilo(strategy, grain, context);

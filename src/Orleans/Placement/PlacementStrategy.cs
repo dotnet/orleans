@@ -6,35 +6,24 @@ namespace Orleans.Runtime
     [Serializable]
     internal abstract class PlacementStrategy
     {
-        private static PlacementStrategy defaultStrategy;
+    }
 
-        internal static void Initialize()
+    internal class DefaultPlacementStrategy
+    {
+        public DefaultPlacementStrategy(GlobalConfiguration config) : this(config.DefaultPlacementStrategy)
         {
-            InitializePlacements();
-            defaultStrategy = GetDefaultStrategy(GlobalConfiguration.DEFAULT_PLACEMENT_STRATEGY);
         }
 
-        internal static void Initialize(GlobalConfiguration config)
+        protected DefaultPlacementStrategy(string placement)
         {
-            InitializePlacements();
-            GrainStrategy.InitDefaultGrainStrategies();
-            defaultStrategy = GetDefaultStrategy(config.DefaultPlacementStrategy);
+            this.PlacementStrategy = GetDefaultStrategy(placement);
         }
 
-        internal static PlacementStrategy GetDefault()
-        {
-            return defaultStrategy;
-        }
-
-        private static void InitializePlacements()
-        {
-            RandomPlacement.InitializeClass();
-            PreferLocalPlacement.InitializeClass();
-            StatelessWorkerPlacement.InitializeClass(NodeConfiguration.DEFAULT_MAX_LOCAL_ACTIVATIONS);
-            SystemPlacement.InitializeClass();
-            ActivationCountBasedPlacement.InitializeClass();
-        }
-
+        /// <summary>
+        /// Gets the default placement strategy.
+        /// </summary>
+        public PlacementStrategy PlacementStrategy { get; }
+        
         private static PlacementStrategy GetDefaultStrategy(string str)
         {
             if (str.Equals(typeof(RandomPlacement).Name))

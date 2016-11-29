@@ -15,8 +15,8 @@ namespace Orleans.Messaging
         /// Initializes the provider, will be called before all other methods
         /// </summary>
         /// <param name="clientConfiguration">the given client configuration</param>
-        /// <param name="traceLogger">the logger to be used by the provider</param>
-        Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, TraceLogger traceLogger);
+        /// <param name="logger">the logger to be used by the provider</param>
+        Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger);
         /// <summary>
         /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
         /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.

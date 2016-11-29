@@ -1,62 +1,91 @@
+
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
-using Orleans.Runtime;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
     public class AzureQueueAdapterFactory : IQueueAdapterFactory
     {
-        private const int DEFAULT_CACHE_SIZE = 4096;
-        private const string NUM_QUEUES_PARAM = "NumQueues";
+        internal const int CacheSizeDefaultValue = 4096;
+        internal const string NumQueuesPropertyName = "NumQueues";
 
-        /// <summary> Default number oi\f Azure Queue used in this stream provider.</summary>
-        public const int DEFAULT_NUM_QUEUES = 8; // keep as power of 2.
+        /// <summary> Default number of Azure Queue used in this stream provider.</summary>
+        public const int NumQueuesDefaultValue = 8; // keep as power of 2.
         
         private string deploymentId;
         private string dataConnectionString;
         private string providerName;
         private int cacheSize;
         private int numQueues;
+        private TimeSpan? messageVisibilityTimeout;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
         /// <summary>"DataConnectionString".</summary>
-        public const string DATA_CONNECTION_STRING = "DataConnectionString";
+        public const string DataConnectionStringPropertyName = "DataConnectionString";
         /// <summary>"DeploymentId".</summary>
-        public const string DEPLOYMENT_ID = "DeploymentId";
+        public const string DeploymentIdPropertyName = "DeploymentId";
+        /// <summary>"MessageVisibilityTimeout".</summary>
+        public const string MessageVisibilityTimeoutPropertyName = "VisibilityTimeout";
+
+        /// <summary>
+        /// Application level failure handler override.
+        /// </summary>
+        protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
         /// <summary> Init the factory.</summary>
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
             if (config == null) throw new ArgumentNullException("config");
-            if (!config.Properties.TryGetValue(DATA_CONNECTION_STRING, out dataConnectionString))
-                throw new ArgumentException(String.Format("{0} property not set", DATA_CONNECTION_STRING));
-            if (!config.Properties.TryGetValue(DEPLOYMENT_ID, out deploymentId))
-                throw new ArgumentException(String.Format("{0} property not set", DEPLOYMENT_ID));
+            if (!config.Properties.TryGetValue(DataConnectionStringPropertyName, out dataConnectionString))
+                throw new ArgumentException(String.Format("{0} property not set", DataConnectionStringPropertyName));
+            if (!config.Properties.TryGetValue(DeploymentIdPropertyName, out deploymentId))
+                throw new ArgumentException(String.Format("{0} property not set", DeploymentIdPropertyName));
+            string messageVisibilityTimeoutRaw;
+            if (config.Properties.TryGetValue(MessageVisibilityTimeoutPropertyName, out messageVisibilityTimeoutRaw))
+            {
+                TimeSpan messageVisibilityTimeoutTemp;
+                if (!TimeSpan.TryParse(messageVisibilityTimeoutRaw, out messageVisibilityTimeoutTemp))
+                {
+                    throw new ArgumentException(String.Format("Failed to parse {0} value '{1}' as a TimeSpan",
+                        MessageVisibilityTimeoutPropertyName, messageVisibilityTimeoutRaw));
+                }
 
-            cacheSize = SimpleQueueAdapterCache.ParseSize(config, DEFAULT_CACHE_SIZE);
+                messageVisibilityTimeout = messageVisibilityTimeoutTemp;
+            }
+            else
+            {
+                messageVisibilityTimeout = null;
+            }
+            
+            cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
 
             string numQueuesString;
-            numQueues = DEFAULT_NUM_QUEUES;
-            if (config.Properties.TryGetValue(NUM_QUEUES_PARAM, out numQueuesString))
+            numQueues = NumQueuesDefaultValue;
+            if (config.Properties.TryGetValue(NumQueuesPropertyName, out numQueuesString))
             {
                 if (!int.TryParse(numQueuesString, out numQueues))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NUM_QUEUES_PARAM));
+                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NumQueuesPropertyName));
             }
 
             this.providerName = providerName;
             streamQueueMapper = new HashRingBasedStreamQueueMapper(numQueues, providerName);
             adapterCache = new SimpleQueueAdapterCache(cacheSize, logger);
+            if (StreamFailureHandlerFactory == null)
+            {
+                StreamFailureHandlerFactory =
+                    qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+            }
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName);
+            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 
@@ -79,7 +108,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler(false));
+            return StreamFailureHandlerFactory(queueId);
         }
     }
 }

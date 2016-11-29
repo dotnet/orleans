@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Telemetry Consumer - Performance Counters</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Microsoft Orleans Telemetry Consumer for Windows Performance Counters
+    </summary>
+    <description>
+      Windows Performance Counters implementation of Orleans Telemetry API.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="OrleansTelemetryConsumers.Counters.dll" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.Counters.XML" target="lib\net451" />
+    <file src="OrleansTelemetryConsumers.Counters.pdb" target="lib\net451" />
+    <file src="$SRC_DIR$OrleansTelemetryConsumers.Counters\**\*.cs" target="src" />
+  </files>
+</package>

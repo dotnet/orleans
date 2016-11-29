@@ -21,7 +21,6 @@ Namespace $rootnamespace$
     End Class
 
     Public Interface I$safeitemname$State
-        Inherits IGrainState
         ' TODO: add a property for each item of the persisted grain state
     End Interface
 

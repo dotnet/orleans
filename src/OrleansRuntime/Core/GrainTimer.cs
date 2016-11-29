@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,7 +14,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan timerFrequency;
         private DateTime previousTickTime;
         private int totalNumTicks;
-        private static readonly TraceLogger logger = TraceLogger.GetLogger("GrainTimer", TraceLogger.LoggerType.Runtime);
+        private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
         private readonly ActivationData activationData;
 
@@ -23,7 +24,8 @@ namespace Orleans.Runtime
 
         private GrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.Current.ActivationContext;
+            var ctxt = RuntimeContext.CurrentActivationContext;
+            InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
             activationData = (ActivationData) RuntimeClient.Current.CurrentActivationData;
 
             this.Name = name;
@@ -143,10 +145,24 @@ namespace Orleans.Runtime
 
         private string GetFullName()
         {
-            return String.Format("GrainTimer.{0} TimerCallbackHandler:{1}->{2}",
-               Name == null ? "" : Name + ".",
-               (asyncCallback != null && asyncCallback.Target != null) ? asyncCallback.Target.ToString() : "",
-               (asyncCallback != null && asyncCallback.Method != null) ? asyncCallback.Method.ToString() : "");
+            var callbackTarget = string.Empty;
+            var callbackMethodInfo = string.Empty;
+            if (asyncCallback != null)
+            {
+                if (asyncCallback.Target != null)
+                {
+                    callbackTarget = asyncCallback.Target.ToString();
+                }
+
+                var methodInfo = asyncCallback.GetMethodInfo();
+                if (methodInfo != null)
+                {
+                    callbackMethodInfo = methodInfo.ToString();
+                }
+            }
+
+            return string.Format("GrainTimer.{0} TimerCallbackHandler:{1}->{2}",
+                Name == null ? "" : Name + ".", callbackTarget, callbackMethodInfo);
         }
 
         internal int GetNumTicks()
