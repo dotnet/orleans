@@ -60,9 +60,10 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Ensures code for all currently loaded assemblies has been generated and loaded.
         /// </summary>
-        public static IReadOnlyList<GeneratedAssembly> GenerateAndCacheCodeForAllAssemblies()
+        /// <param name="inputs">The assemblies to generate code for.</param>
+        public static IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(Assembly[] inputs)
         {
-            return codeGeneratorInstance?.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
+            return codeGeneratorInstance?.GenerateAndLoadForAssemblies(inputs);
         }
 
         /// <summary>

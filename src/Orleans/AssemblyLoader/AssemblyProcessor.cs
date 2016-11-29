@@ -75,7 +75,7 @@ namespace Orleans.Runtime
                 Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
                 // initialize serialization for already loaded assemblies.
-                var generated = CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+                var generated = CodeGeneratorManager.GenerateAndLoadForAssemblies(assemblies);
                 if (generated != null)
                 {
                     foreach (var generatedAssembly in generated)
