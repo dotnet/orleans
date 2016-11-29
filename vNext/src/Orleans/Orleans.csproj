@@ -17,12 +17,6 @@
     <Compile Include="..\..\..\src\Orleans\**\*.cs" Exclude="..\..\..\src\Orleans\Properties\**\*.cs;..\..\..\src\Orleans\Statistics\RuntimeStatisticsGroup.cs" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Make sure we not include it twice because of globbing.  -->
-    <Compile Remove="Properties\orleans.codegen.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="..\..\..\src\Orleans\Configuration\OrleansConfiguration.xsd">
       <Link>Configuration\OrleansConfiguration.xsd</Link>
       <SubType>Designer</SubType>
@@ -134,7 +128,6 @@
     <!-- Clean Generated directory -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
     <MakeDir Directories="$(IntermediateOutputPath)Generated" />
-    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
     <PropertyGroup>
       <BootstrapOutputPath>$(ProjectDir)\$(IntermediateOutputPath)Bootstrap\</BootstrapOutputPath>
       <BootstrapOutputPath Condition="'$(BuildingInsideVisualStudio)' == 'true'">$(ProjectDir)$(IntermediateOutputPath)Bootstrap\</BootstrapOutputPath>
@@ -151,6 +144,7 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <CodeGenFilename>$(BootstrapOutputPath)Generated\orleans.codegen.cs</CodeGenFilename>
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/bootstrap" />
@@ -160,7 +154,10 @@
     </ItemGroup>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
-    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" />
+    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
+       <Output TaskParameter="Outputs" ItemName="Compile" />
+       <Output TaskParameter="Outputs" ItemName="FileWrites" />
+    </Exec>
   </Target>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
