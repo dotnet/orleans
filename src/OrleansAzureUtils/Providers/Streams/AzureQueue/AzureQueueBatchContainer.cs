@@ -95,7 +95,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var azureQueueBatch = SerializationManager.DeserializeFromByteArray<AzureQueueBatchContainer>(cloudMsg.AsBytes);
             azureQueueBatch.CloudQueueMessage = cloudMsg;
-            azureQueueBatch.sequenceToken = new EventSequenceToken(sequenceId);
+            azureQueueBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
             return azureQueueBatch;
         }
 
