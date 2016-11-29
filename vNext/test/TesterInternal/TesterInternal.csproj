@@ -42,6 +42,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
@@ -59,6 +60,7 @@
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <Content Include="..\..\..\test\TesterInternal\TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

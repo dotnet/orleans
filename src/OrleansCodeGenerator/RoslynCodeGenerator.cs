@@ -606,10 +606,8 @@ namespace Orleans.CodeGenerator
                 CompiledAssemblies.TryAdd(target.AssemblyName, new CachedAssembly { Loaded = true });
             }
         }
-
-#if !NETSTANDARD
+        
         [Serializable]
-#endif
         private class CachedAssembly : GeneratedAssembly
         {
             public CachedAssembly()
