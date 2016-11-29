@@ -60,8 +60,17 @@
     <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
       <Link>PersistenceTestGrains.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamingGrain.cs">
+      <Link>StreamingGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamingImmutabilityTestGrain.cs">
+      <Link>StreamingImmutabilityTestGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
       <Link>StreamLifecycleTestGrains.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestInternalGrains\StreamTestsConstants.cs">
+      <Link>StreamTestsConstants.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestInternalGrains\TestExtension.cs">
       <Link>TestExtension.cs</Link>

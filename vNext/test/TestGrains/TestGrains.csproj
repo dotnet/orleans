@@ -83,8 +83,17 @@
     <Compile Include="..\..\..\test\TestGrains\MultipleConstructorsSimpleGrain.cs">
       <Link>MultipleConstructorsSimpleGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleImplicitSubscriptionGrain.cs">
+      <Link>MultipleImplicitSubscriptionGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\MultipleSubscriptionConsumerGrain.cs">
+      <Link>MultipleSubscriptionConsumerGrain.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestGrains\ReminderTestGrain.cs">
       <Link>ReminderTestGrain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestGrains\SampleStreamingGrain.cs">
+      <Link>SampleStreamingGrain.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\TestGrains\SimpleGenericGrain.cs">
       <Link>SimpleGenericGrain.cs</Link>

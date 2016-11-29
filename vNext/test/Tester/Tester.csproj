@@ -1,25 +1,26 @@
 ﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
-
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
-
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="**\*.cs" />
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
-
   <ItemGroup>
+    <Compile Remove="..\..\..\test\Tester\StreamingTests\StreamFilteringTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTestsBase.cs">
+      <Link>StreamingTests\StreamFilteringTestsBase.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -30,7 +31,6 @@
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Sdk">
       <Version>1.0.0-alpha-20161104-2</Version>
@@ -58,7 +58,6 @@
       <Version>9.0.1</Version>
     </PackageReference>
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
@@ -66,8 +65,9 @@
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
       <Link>BasicActivationTests.cs</Link>
@@ -120,6 +120,21 @@
     <Compile Include="..\..\..\test\Tester\ObserverTests.cs">
       <Link>ObserverTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\ClientStreamTestRunner.cs">
+      <Link>StreamingTests\ClientStreamTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\SampleStreamingTests.cs">
+      <Link>StreamingTests\SampleStreamingTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\SubscriptionMultiplicityTestRunner.cs">
+      <Link>StreamingTests\SubscriptionMultiplicityTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\TestStreamProviders\FailureInjectionStreamProvider.cs">
+      <Link>TestStreamProviders\FailureInjectionStreamProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs">
+      <Link>TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
@@ -139,7 +154,6 @@
       <Link>StatelessWorkerTests.cs</Link>
     </Compile>
   </ItemGroup>
-
   <ItemGroup>
     <None Include="App.config" />
     <None Include="..\..\..\test\Tester\Tester.xunit.runner.json">
@@ -147,10 +161,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

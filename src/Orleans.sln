@@ -208,6 +208,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestServiceFabric", "..\tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.NonSiloTests", "..\test\NonSiloTests\Orleans.NonSiloTests.csproj", "{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterAzureUtils", "..\test\TesterAzureUtils\TesterAzureUtils.csproj", "{DEE80624-685B-4C84-99EC-C0A637B6FB34}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -518,6 +520,14 @@ Global
 		{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}.Release|Any CPU.Build.0 = Release|Any CPU
 		{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}.Release|x64.ActiveCfg = Release|Any CPU
 		{003DFE72-F1CA-4E79-8A84-EDF5D277EB16}.Release|x64.Build.0 = Release|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Debug|x64.Build.0 = Debug|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Release|x64.ActiveCfg = Release|Any CPU
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -565,5 +575,6 @@ Global
 		{29A8C5E0-8129-40B9-B57B-5B9A8C6D004E} = {24596567-5805-4493-B4F0-46BA4811C0AA}
 		{B93B3853-FD54-4615-891A-9AFA3D9D32A2} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{003DFE72-F1CA-4E79-8A84-EDF5D277EB16} = {01F3CC7E-F996-411E-AFD6-72673A826549}
+		{DEE80624-685B-4C84-99EC-C0A637B6FB34} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 	EndGlobalSection
 EndGlobal

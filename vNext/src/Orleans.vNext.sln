@@ -46,6 +46,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184
 		NuGet\EmptyFile.cs = NuGet\EmptyFile.cs
 		NuGet\Microsoft.Orleans.Client.nuspec = NuGet\Microsoft.Orleans.Client.nuspec
 		NuGet\Microsoft.Orleans.Core.nuspec = NuGet\Microsoft.Orleans.Core.nuspec
+		NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec = NuGet\Microsoft.Orleans.OrleansAzureUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
@@ -54,6 +55,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184
 		NuGet\Microsoft.Orleans.TestingHost.nuspec = NuGet\Microsoft.Orleans.TestingHost.nuspec
 		NuGet\ServerInstall.ps1 = NuGet\ServerInstall.ps1
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{3B55F20F-F1FF-42C9-8D5D-8F8D00F9C082}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansAzureUtils", "OrleansAzureUtils\OrleansAzureUtils.csproj", "{A92818EF-B3F8-4CE2-9886-4808713B15CA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterAzureUtils", "..\test\TesterAzureUtils\TesterAzureUtils.csproj", "{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterInternal", "..\test\TesterInternal\TesterInternal.csproj", "{A9610024-F5B9-4065-9557-BD9E36A3242A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -113,6 +122,18 @@ Global
 		{A054DB14-2A92-4CC0-959E-A2C51F5E65DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A054DB14-2A92-4CC0-959E-A2C51F5E65DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A054DB14-2A92-4CC0-959E-A2C51F5E65DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A92818EF-B3F8-4CE2-9886-4808713B15CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A92818EF-B3F8-4CE2-9886-4808713B15CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A92818EF-B3F8-4CE2-9886-4808713B15CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A92818EF-B3F8-4CE2-9886-4808713B15CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9610024-F5B9-4065-9557-BD9E36A3242A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9610024-F5B9-4065-9557-BD9E36A3242A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9610024-F5B9-4065-9557-BD9E36A3242A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9610024-F5B9-4065-9557-BD9E36A3242A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -131,5 +152,9 @@ Global
 		{AACE28AE-F301-472A-B633-02B55434871A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{AAE67055-F38A-45F0-AEA7-5754F4814EAA} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{A054DB14-2A92-4CC0-959E-A2C51F5E65DA} = {22C57246-E750-4254-80D2-9BEF9C241189}
+		{3B55F20F-F1FF-42C9-8D5D-8F8D00F9C082} = {22C57246-E750-4254-80D2-9BEF9C241189}
+		{A92818EF-B3F8-4CE2-9886-4808713B15CA} = {3B55F20F-F1FF-42C9-8D5D-8F8D00F9C082}
+		{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
+		{A9610024-F5B9-4065-9557-BD9E36A3242A} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal
