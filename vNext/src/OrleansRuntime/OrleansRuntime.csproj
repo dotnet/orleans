@@ -18,7 +18,7 @@
   
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-    <Compile Include="..\..\..\src\OrleansRuntime\**\*.cs" Exclude="..\..\..\src\OrleansRuntime\Properties\*.cs" />
+    <Compile Include="..\..\..\src\OrleansRuntime\**\*.cs" Exclude="..\..\..\src\OrleansRuntime\Properties\*.cs;..\..\..\src\OrleansRuntime\bin\**\*.cs;..\..\..\src\OrleansRuntime\obj\**\*.cs" />
   </ItemGroup>
   
   <ItemGroup>

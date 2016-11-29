@@ -19,7 +19,7 @@
   
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-    <Compile Include="..\..\..\src\OrleansTestingHost\**\*.cs" Exclude="..\..\..\src\OrleansTestingHost\Properties\*.cs;..\..\..\src\OrleansTestingHost\TestingSiloHost.cs;..\..\..\src\OrleansTestingHost\TestingSiloOptions.cs" />
+    <Compile Include="..\..\..\src\OrleansTestingHost\**\*.cs" Exclude="..\..\..\src\OrleansTestingHost\Properties\*.cs;..\..\..\src\OrleansTestingHost\bin\**\*.cs;..\..\..\src\OrleansTestingHost\obj\**\*.cs;..\..\..\src\OrleansTestingHost\TestingSiloHost.cs;..\..\..\src\OrleansTestingHost\TestingSiloOptions.cs" />
   </ItemGroup>
   
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
