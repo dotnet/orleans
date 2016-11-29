@@ -21,7 +21,7 @@ namespace UnitTests.CodeGeneration
             Assert.False(TypeUtils.IsGrainClass(t), t.FullName + " is not grain class");
             t = typeof(Orleans.Runtime.GrainDirectory.RemoteGrainDirectory);
             Assert.False(TypeUtils.IsGrainClass(t), t.FullName + " should not be a grain class");
-            Assert.True(TypeUtils.IsSystemTargetClass(t), t.FullName + " should be a system target class");
+            Assert.True(IsSystemTargetClass(t), t.FullName + " should be a system target class");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
@@ -77,6 +77,19 @@ namespace UnitTests.CodeGeneration
             var id2 = GrainInterfaceUtils.ComputeInterfaceId(typeof(IFullySpecified<long>));
 
             Assert.NotEqual(id1, id2);
+        }
+
+        private static bool IsSystemTargetClass(Type type)
+        {
+            Type systemTargetType = typeof(SystemTarget);
+            var systemTargetInterfaceType = typeof(ISystemTarget);
+            var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
+            if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
+                !systemTargetType.IsAssignableFrom(type)) return false;
+
+            // exclude generated classes.
+            return !TypeUtils.IsGeneratedType(type);
         }
     }
 }
