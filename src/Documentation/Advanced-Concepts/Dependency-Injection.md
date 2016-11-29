@@ -110,3 +110,51 @@ public class InjectedService : IInjectedService
     }
 }
 ```
+
+# Test Framework Integration
+
+DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our [tutorials](../../Tutorials/Unit-Testing-Grains.md).
+
+You will need to do two things setup DI with tests. First you will need to implement mocks of your services. This is done in our example using [Moq](https://github.com/moq/), a popular mocking framework for .NET. Here is an example of doing mocking of a service.
+
+
+``` csharp
+public class MockServices
+{
+    public IServiceProvider ConfigureServices(IServiceCollection services)
+    {
+        var mockInjectedService = new Mock<IInjectedService>();
+
+        mockInjectedService.Setup(t => t.GetTicks()).Returns(knownDateTime);
+        services.AddSingleton<IInjectedService>(mockInjectedService.Object);
+        return services.BuildServiceProvider();
+    }
+}
+```
+
+To include these services in your test silo, you will need to specify MockServices as the silo startup class. Here is an example of doing this.
+
+``` csharp
+[TestClass]
+public class IInjectedServiceTests: TestingSiloHost
+{
+    private static TestingSiloHost host;
+
+    [TestInitialize]
+    public void Setup()
+    {
+        if (host == null)
+        {
+            host = new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartSecondary = false,
+                    AdjustConfig = clusterConfig =>
+                    {
+                        clusterConfig.UseStartupType<MockServices>();
+                    }
+                });
+        }
+    }
+}
+```
