@@ -405,8 +405,8 @@ namespace Orleans.Runtime.Configuration
                 providerTypeInfo.IsGenericType ||
                 providerTypeInfo.IsGenericType ||
                 !(
-                typeof(IStatisticsPublisher).IsAssignableFrom(providerTypeInfo) &&
-                typeof(IClientMetricsDataPublisher).IsAssignableFrom(providerTypeInfo)
+                typeof(IStatisticsPublisher).IsAssignableFrom(typeof(T)) &&
+                typeof(IClientMetricsDataPublisher).IsAssignableFrom(typeof(T))
                 ))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStatisticsPublisher, IClientMetricsDataPublisher interface", "typeof(T)");
 
