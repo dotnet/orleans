@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 
 namespace Orleans.SqlUtils
 {
@@ -66,7 +67,7 @@ namespace Orleans.SqlUtils
                 //The following assumes the property names will be retrieved in the same
                 //order as is the index iteration done.                                
                 var onlyOnceRow = new List<string>();
-                var properties = parameters.First().GetType().GetProperties();
+                var properties = parameters.First().GetType().GetTypeInfo().GetProperties();
                 columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.ContainsKey(pn.Name) ? nameMap[pn.Name] : pn.Name), endEscapeIndicator)));
                 if(onlyOnceColumns != null && onlyOnceColumns.Any())
                 {
