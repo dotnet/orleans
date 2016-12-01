@@ -55,7 +55,7 @@ call %_dotnet% build %BUILD_FLAGS% /p:ArtefactDirectory=%OutputPath%\ /p:Configu
 @if ERRORLEVEL 1 GOTO :ErrorStop
 @echo BUILD ok for %CONFIGURATION% %PROJ%
 
-call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
+call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ false
 @if ERRORLEVEL 1 GOTO :ErrorStop
 
 REM set STEP=VSIX
