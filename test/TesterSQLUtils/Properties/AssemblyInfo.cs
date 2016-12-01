@@ -1,13 +1,11 @@
-using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System.Reflection;
 using System.Runtime.InteropServices;
-using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TesterInternal")]
-[assembly: AssemblyDescription("Orleans Internal Tests")]
+[assembly: AssemblyTitle("TesterSQLUtils")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
@@ -16,9 +14,4 @@ using Orleans.CodeGeneration;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("6fac9056-5fb2-44ef-a3ba-63aa58f09428")]
-[assembly: SkipCodeGeneration]
-[assembly: InternalsVisibleTo("UnitTests")]
-[assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
-[assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: Guid("29F44309-65C6-4D22-BD45-CD6E21845446")]
