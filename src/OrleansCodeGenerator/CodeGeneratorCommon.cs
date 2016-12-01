@@ -16,6 +16,7 @@ namespace Orleans.CodeGenerator
     using Orleans.Runtime;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+    using Microsoft.CodeAnalysis.Emit;
 
     /// <summary>
     /// Methods common to multiple code generators.
@@ -108,7 +109,10 @@ namespace Orleans.CodeGenerator
             var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
             try
             {
-                var compilationResult = compilation.Emit(outputStream, symbolStream);
+                var emitOptions = new EmitOptions()
+                    .WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
+
+                var compilationResult = compilation.Emit(outputStream, symbolStream, options: emitOptions);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
