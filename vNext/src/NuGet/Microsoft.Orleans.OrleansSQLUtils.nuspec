@@ -32,9 +32,9 @@
     <file src="netstandard1.5\OrleansSqlUtils.dll" target="lib\netstandard1.5" />
     <file src="netstandard1.5\OrleansSqlUtils.pdb" target="lib\netstandard1.5" />
     <file src="netstandard1.5\OrleansSqlUtils.xml" target="lib\netstandard1.5" />
-    <file src="CreateOrleansTables_SqlServer.sql" target="lib\net451\SQLServer" />
-    <file src="CreateOrleansTables_MySql.sql" target="lib\netstandard1.5\MySql" />
-    <file src="CreateOrleansTables_PostgreSql.sql" target="lib\netstandard1.5\PostgreSql" />
+    <file src="netstandard1.5\CreateOrleansTables_SqlServer.sql" target="lib\netstandard1.5\SQLServer" />
+    <file src="netstandard1.5\CreateOrleansTables_MySql.sql" target="lib\netstandard1.5\MySql" />
+    <file src="netstandard1.5\CreateOrleansTables_PostgreSql.sql" target="lib\netstandard1.5\PostgreSql" />
     <file src="$SRC_DIR$OrleansSqlUtils\**\*.cs" exclude="$SRC_DIR$OrleansSqlUtils\obj\**\*.*;$SRC_DIR$OrleansSqlUtils\bin\**\*.*" target="src" />
   </files>
 </package>
