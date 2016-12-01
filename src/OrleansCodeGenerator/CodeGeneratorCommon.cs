@@ -72,6 +72,18 @@ namespace Orleans.CodeGenerator
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
 
+#if NETSTANDARD
+            // CoreFX bug https://github.com/dotnet/corefx/issues/5540 
+            // to workaround it, we are calling internal WithTopLevelBinderFlags(BinderFlags.IgnoreCorLibraryDuplicatedTypes) 
+            // TODO: this API will be public in the future releases of Roslyn. 
+            // This work is tracked in https://github.com/dotnet/roslyn/issues/5855 
+            // Once it's public, we should replace the internal reflection API call by the public one. 
+            var method = typeof(CSharpCompilationOptions).GetMethod("WithTopLevelBinderFlags", BindingFlags.NonPublic | BindingFlags.Instance);
+            // we need to pass BinderFlags.IgnoreCorLibraryDuplicatedTypes, but it's an internal class 
+            // http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/BinderFlags.cs,00f268571bb66b73 
+            options = (CSharpCompilationOptions)method.Invoke(options, new object[] { 1u << 26 });
+#endif
+
             string source = null;
             if (logger.IsVerbose3)
             {
