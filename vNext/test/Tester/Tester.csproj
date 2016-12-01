@@ -1,4 +1,4 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
@@ -72,6 +72,9 @@
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\MembershipTests\LivenessTests.cs">
+      <Link>MembershipTests\LivenessTests.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
       <Link>BasicActivationTests.cs</Link>
     </Compile>

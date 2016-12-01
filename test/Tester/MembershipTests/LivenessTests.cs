@@ -3,16 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Threading.Tasks;
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+#if !NETSTANDARD_TODO
 using OrleansAWSUtils.Storage;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
+#endif
 using Tester;
 using TestExtensions;
 using UnitTests.General;
@@ -230,6 +232,7 @@ namespace UnitTests.MembershipTests
         }
     }
 
+#if !NETSTANDARD_TODO
     public class LivenessTests_AzureTable : LivenessTestsBase
     {
         public LivenessTests_AzureTable(ITestOutputHelper output) : base(output)
@@ -303,7 +306,7 @@ namespace UnitTests.MembershipTests
             }
             catch (Exception exc)
             {
-                if(exc.InnerException is TimeoutException)
+                if (exc.InnerException is TimeoutException)
                     return false;
 
                 throw;
@@ -405,5 +408,6 @@ namespace UnitTests.MembershipTests
         {
             await Do_Liveness_OracleTest_2(2, false, true);
         }
-    }
+    } 
+#endif
 }
