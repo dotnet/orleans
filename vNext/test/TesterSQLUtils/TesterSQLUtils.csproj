@@ -1,4 +1,4 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
@@ -33,57 +33,6 @@
       <Version>1.0.0-alpha-20161104-2</Version>
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="System.ComponentModel.TypeConverter">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Console">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Data.Common">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Diagnostics.FileVersionInfo">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Diagnostics.TraceSource">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.IO">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.IO.FileSystem">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.NameResolution">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.NetworkInformation">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Net.Sockets">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Reflection.TypeExtensions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime.Extensions">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.Primitives">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.Thread">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Threading.ThreadPool">
-      <Version>4.3.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.Xml.XmlDocument">
-      <Version>4.3.0</Version>
-    </PackageReference>
     <PackageReference Include="xunit.runner.visualstudio">
       <Version>2.1.0</Version>
     </PackageReference>
@@ -104,9 +53,6 @@
     </PackageReference>
     <PackageReference Include="MySql.Data">
       <Version>7.0.6-IR31</Version>
-    </PackageReference>
-    <PackageReference Include="System.Runtime">
-      <Version>4.3.0</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
