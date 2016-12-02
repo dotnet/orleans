@@ -1,4 +1,4 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
@@ -14,7 +14,6 @@
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\OrleansSQLUtils\**\*.sql" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
     <Compile Include="..\..\..\src\OrleansSQLUtils\**\*.cs" Exclude="..\..\..\src\OrleansSQLUtils\Properties\*.cs;..\..\..\src\OrleansSQLUtils\obj\**\*.cs;..\..\..\src\OrleansSQLUtils\bin\**\*.cs" />
   </ItemGroup>
@@ -42,13 +41,13 @@
     <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
