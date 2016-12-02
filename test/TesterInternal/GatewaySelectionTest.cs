@@ -1,5 +1,5 @@
 ﻿//#define USE_SQL_SERVER
-
+#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -128,7 +128,7 @@ namespace UnitTests.MessageCenterTests
                 list = gatewayUris;
             }
 
-            #region Implementation of IGatewayListProvider
+#region Implementation of IGatewayListProvider
 
             public Task<IList<Uri>> GetGateways()
             {
@@ -149,9 +149,10 @@ namespace UnitTests.MessageCenterTests
                 return TaskDone.Done;
             }
 
-            #endregion
+#endregion
 
 
         }
     }
 }
+#endif

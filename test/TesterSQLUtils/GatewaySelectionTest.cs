@@ -1,4 +1,5 @@
-﻿using Orleans;
+﻿#if !NETSTANDARD_TODO
+using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -17,10 +18,9 @@ namespace UnitTests.MessageCenterTests
 
         }
 
-        [SkippableFact, TestCategory("Gateway"), TestCategory("SqlServer")]
+        [Fact, TestCategory("Gateway"), TestCategory("SqlServer")]
         public async Task GatewaySelection_SqlServer()
         {
-            Skip.If(true, "Test always failed before. It still uses old .mdf file, need rework.");
             string testName = Guid.NewGuid().ToString();// TestContext.TestName;
 
             Guid serviceId = Guid.NewGuid();
@@ -77,3 +77,5 @@ namespace UnitTests.MessageCenterTests
         }
     }
 }
+
+#endif
