@@ -178,7 +178,7 @@ namespace UnitTests.GeoClusterTests
                 GrainClient.Logger.Info("Call Grain {0}", grainRef);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
-                return toWait.Result;
+                return toWait.GetResult();
             }
             public string GetRuntimeId(int i)
             {
@@ -186,14 +186,14 @@ namespace UnitTests.GeoClusterTests
                 GrainClient.Logger.Info("GetRuntimeId {0}", grainRef);
                 Task<string> toWait = grainRef.GetRuntimeId();
                 toWait.Wait();
-                return toWait.Result;
+                return toWait.GetResult();
             }
             public void Deactivate(int i)
             {
                 var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("Deactivate {0}", grainRef);
                 Task toWait = grainRef.Deactivate();
-                toWait.Wait();
+                toWait.GetResult();
             }
 
             public void EnableStreamNotifications(int i)
@@ -201,7 +201,7 @@ namespace UnitTests.GeoClusterTests
                 var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("EnableStreamNotifications {0}", grainRef);
                 Task toWait = grainRef.EnableStreamNotifications();
-                toWait.Wait();
+                toWait.GetResult();
             }
 
             // observer-based notification
@@ -214,7 +214,7 @@ namespace UnitTests.GeoClusterTests
                 listeners.Add(obj);
                 GrainClient.Logger.Info("Subscribe {0}", grainRef);
                 Task toWait = grainRef.Subscribe(obj);
-                toWait.Wait();
+                toWait.GetResult();
             }
             List<IClusterTestListener> listeners = new List<IClusterTestListener>(); // keep them from being GCed
 
@@ -224,7 +224,7 @@ namespace UnitTests.GeoClusterTests
                 IStreamProvider streamProvider = GrainClient.GetStreamProvider("SMSProvider");
                 Guid guid = new Guid(i, 0, 0, new byte[8]);
                 IAsyncStream<int> stream = streamProvider.GetStream<int>(guid, "notificationtest");
-                handle = stream.SubscribeAsync(listener).Result;
+                handle = stream.SubscribeAsync(listener).GetResult();
             }
             StreamSubscriptionHandle<int> handle;
 

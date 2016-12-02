@@ -31,22 +31,22 @@ namespace Tests.GeoClusterTests
 
             public MultiClusterConfiguration InjectMultiClusterConf(params string[] clusters)
             {
-                return systemManagement.InjectMultiClusterConfiguration(clusters).Result;
+                return systemManagement.InjectMultiClusterConfiguration(clusters).GetResult();
             }
 
             public MultiClusterConfiguration GetMultiClusterConfiguration()
             {
-                return systemManagement.GetMultiClusterConfiguration().Result;
+                return systemManagement.GetMultiClusterConfiguration().GetResult();
             }
 
             public List<IMultiClusterGatewayInfo> GetMultiClusterGateways()
             {
-                return systemManagement.GetMultiClusterGateways().Result;
+                return systemManagement.GetMultiClusterGateways().GetResult();
             }
 
             public Dictionary<SiloAddress,SiloStatus> GetHosts()
             {
-                return systemManagement.GetHosts().Result;
+                return systemManagement.GetHosts().GetResult();
             }
         }
 

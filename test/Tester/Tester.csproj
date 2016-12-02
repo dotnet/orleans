@@ -47,6 +47,7 @@
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DeploymentTests\DeployTest.cs" />
+    <Compile Include="EventSourcingTests\JournaledGrainTests.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="General\JsonGrainTests.cs" />

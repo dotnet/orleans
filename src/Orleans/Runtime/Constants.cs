@@ -18,7 +18,9 @@ namespace Orleans.Runtime
         public const string ADO_INVARIANT_NAME = "AdoInvariant";
         public const string DATA_CONNECTION_FOR_REMINDERS_STRING_NAME = "DataConnectionStringForReminders";
         public const string ADO_INVARIANT_FOR_REMINDERS_NAME = "AdoInvariantForReminders";
-        
+
+        public const string DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME = "Default";
+
         public const string ORLEANS_AZURE_UTILS_DLL = "OrleansAzureUtils";
 
         public const string ORLEANS_SQL_UTILS_DLL = "OrleansSQLUtils";
@@ -42,6 +44,7 @@ namespace Orleans.Runtime
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
         public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
         public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
+        public static readonly GrainId ProtocolGatewayId = GrainId.GetSystemTargetGrainId(27);
 
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
@@ -84,6 +87,7 @@ namespace Orleans.Runtime
             {MultiClusterOracleId,"MultiClusterOracle"},
             {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
+            {ProtocolGatewayId,"ProtocolGateway"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},
             {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},
         };

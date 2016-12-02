@@ -344,6 +344,10 @@ namespace Orleans
         {
             return task.GetAwaiter().GetResult();
         }
+        internal static void GetResult(this Task task)
+        {
+            task.GetAwaiter().GetResult();
+        }
     }
 }
 

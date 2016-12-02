@@ -3,7 +3,11 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonRegistered
+    // we use a marker interface, so we get a bit more typechecking than with plain objects
+    public interface IPersonEvent { } 
+
+
+    public class PersonRegistered : IPersonEvent
     {
         public string FirstName { get; private set; }
         public string LastName { get; private set; }
@@ -17,7 +21,7 @@ namespace TestGrains
         }
     }
 
-    public class PersonMarried
+    public class PersonMarried : IPersonEvent
     {
         public Guid SpouseId { get; private set; }
         public string SpouseFirstName { get; private set; }
@@ -31,7 +35,7 @@ namespace TestGrains
         }
     }
 
-    public class PersonLastNameChanged
+    public class PersonLastNameChanged : IPersonEvent
     {
         public string LastName { get; private set; }
 

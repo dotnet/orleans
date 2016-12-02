@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using Orleans.Core;
+using Orleans.LogConsistency;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -21,6 +23,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
@@ -67,6 +70,7 @@ namespace Orleans.Runtime
         private readonly InsideRuntimeClient runtimeClient;
         private readonly AssemblyProcessor assemblyProcessor;
         private StorageProviderManager storageProviderManager;
+        private LogConsistencyProviderManager logConsistencyProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
         private BootstrapProviderManager bootstrapProviderManager;
         private IReminderService reminderService;
@@ -97,6 +101,7 @@ namespace Orleans.Runtime
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
+        internal ILogConsistencyProviderManager LogConsistencyProviderManager { get { return logConsistencyProviderManager; } }
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
         internal IStreamProviderManager StreamProviderManager { get { return grainRuntime.StreamProviderManager; } }
@@ -369,6 +374,9 @@ namespace Orleans.Runtime
             logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
             RegisterSystemTarget(new StreamProviderManagerAgent(this, allSiloProviders));
 
+            logger.Verbose("Creating {0} System Target", "ProtocolGateway");
+            RegisterSystemTarget(new ProtocolGateway(this.SiloAddress));
+
             logger.Verbose("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
             
@@ -530,6 +538,15 @@ namespace Orleans.Runtime
             catalog.SetStorageManager(storageProviderManager);
             allSiloProviders.AddRange(storageProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
+
+            // Initialize log consistency providers once we have a basic silo runtime environment operating
+            logConsistencyProviderManager = new LogConsistencyProviderManager(grainFactory, Services);
+            scheduler.QueueTask(
+                () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
+                providerManagerSystemTarget.SchedulingContext)
+                    .WaitWithThrow(initTimeout);
+            catalog.SetLogConsistencyManager(logConsistencyProviderManager);
+            if (logger.IsVerbose) { logger.Verbose("Log consistency provider manager created successfully."); }
 
             // Load and init stream providers before silo becomes active
             var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;

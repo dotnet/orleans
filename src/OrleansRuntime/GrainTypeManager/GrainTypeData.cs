@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
@@ -25,6 +26,7 @@ namespace Orleans.Runtime
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
+        internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
    
         public GrainTypeData(Type type, Type stateObjectType)
         {

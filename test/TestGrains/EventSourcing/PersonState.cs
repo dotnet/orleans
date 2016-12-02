@@ -1,9 +1,12 @@
+using System;
+using Orleans;
 using Orleans.EventSourcing;
 using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class PersonState : JournaledGrainState<PersonState>
+    [Serializable]
+    public class PersonState
     {
         public string FirstName { get; set; }
         public string LastName { get; set; }
@@ -14,7 +17,7 @@ namespace TestGrains
         {
             this.FirstName = @event.FirstName;
             this.LastName = @event.LastName;
-            this.Gender = @event. Gender;
+            this.Gender = @event.Gender;
         }
 
         public void Apply(PersonMarried @event)

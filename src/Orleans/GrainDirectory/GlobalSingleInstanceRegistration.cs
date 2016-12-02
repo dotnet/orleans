@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory
 {
@@ -41,9 +43,11 @@ namespace Orleans.GrainDirectory
             return GetType().GetHashCode();
         }
 
-        internal override bool IsSingleInstance()
+        private static List<string> emptyList = new List<string>();
+
+        public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)
         {
-            return true;
+            return emptyList; // there is only one instance, so no remote instances
         }
     }
 }
