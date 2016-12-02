@@ -30,7 +30,8 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException(nameof(invariantName));
             }
 
-            if (!providerFactoryTypeMap.TryGetValue(invariantName, out Tuple<string, string> providerFactoryDefinition))
+            Tuple<string, string> providerFactoryDefinition;
+            if (!providerFactoryTypeMap.TryGetValue(invariantName, out providerFactoryDefinition))
                 throw new InvalidOperationException($"Database provider factory with '{invariantName}' invariant name not supported.");
 
             Assembly asm;
