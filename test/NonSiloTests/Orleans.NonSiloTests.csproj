@@ -68,7 +68,6 @@
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerAdvancedTests_Set2.cs" />
     <Compile Include="SchedulerTests\OrleansTaskSchedulerBasicTests.cs" />
-    <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\ConfigurationTests\SerializationProviderTests.cs" />
     <Compile Include="SerializationTests\ExternalSerializerTest.cs" />
     <Compile Include="SerializationTests\SerializationOrderTests.cs" />
@@ -172,14 +171,6 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
-      <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
-      <Name>OrleansAzureUtils</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansBondUtils\OrleansBondUtils.csproj">
-      <Project>{7a6b8051-5d99-483c-b9b7-444ed57918ec}</Project>
-      <Name>OrleansBondUtils</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
       <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
       <Name>OrleansCodeGenerator</Name>
@@ -203,6 +194,10 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
       <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
       <Name>Orleans</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Tester\Tester.csproj">
+      <Project>{a9c8ffec-4947-4f04-ba73-1f17b329a55d}</Project>
+      <Name>Tester</Name>
     </ProjectReference>
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
       <Project>{3972213f-189b-41d4-90fe-38d513c1106d}</Project>

@@ -47,11 +47,13 @@
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DeploymentTests\DeployTest.cs" />
+    <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="PSClientTests\PSClientTests.cs" />
+    <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\RoundTripSerializerTests.cs" />

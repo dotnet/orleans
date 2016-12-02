@@ -39,4 +39,5 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]

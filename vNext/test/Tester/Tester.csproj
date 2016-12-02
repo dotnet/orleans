@@ -72,6 +72,9 @@
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\FakeSerializer.cs">
+      <Link>FakeSerializer.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\MembershipTests\LivenessTests.cs">
       <Link>MembershipTests\LivenessTests.cs</Link>
     </Compile>

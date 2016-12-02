@@ -71,6 +71,7 @@
     <Compile Include="Streaming\SampleAzureQueueStreamingTests.cs" />
     <Compile Include="Streaming\AQStreamFilteringTests.cs" />
     <Compile Include="Streaming\TestAzureQueueStreamProvider.cs" />
+    <Compile Include="StreamTypeSerializationTests.cs" />
     <Compile Include="UnitTestAzureTableDataManager.cs" />
   </ItemGroup>
   <ItemGroup>

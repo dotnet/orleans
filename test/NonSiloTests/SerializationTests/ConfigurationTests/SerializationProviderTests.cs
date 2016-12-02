@@ -3,6 +3,7 @@ using System.Linq;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Tester.Serialization;
 using Xunit;
 
 namespace UnitTests.Serialization
