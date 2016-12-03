@@ -16,7 +16,15 @@ You don't control this by using construction/destruction keywords and instead Or
 All possible grains in the whole key space virtually always exist
 and it means whenever you call a method of a grain, if it is not active, it will get activated by the runtime.
 Also after the grain passes a certain amount of time in idle state, the runtime will deactivate the grain (i.e. destroys it).
-A grain is in idle state if it is not currently processing a message and its cueue of messages is empty.
+A grain is in idle state if it is not currently processing a message and its queue of messages is empty.
+
+When you get a grain reference in a client or in another grain by using `GetGrain`,
+you only get a reference to a grain and you don't get the activation.
+When you call a method using the reference,then the grain will be activated in a silo (if it is not already active)
+and your reference sends messages to the activation by calling methods and points to the activation logically.
+
+`GetGrain` itself is not asynchronous, can not fail and only returns the logical reference which points to the activation.
+Resolving the reference->activation map is one of the many things that runtime does for you 
 
 ## callbacks 
 
@@ -27,7 +35,8 @@ Just like the class which can have constructors and (destructors in some languag
 
 Your grains can be persistent and store their state in storage
 or have no state which is stored in storage. 
-In case of the later, all activations are created equal and there is no difference between them.
+In case of the later, all activations are created equal and there is no difference between them but in case of the former
+each activation reads the state from storage so the `State` contains latest stored state.
 For grains which store their state and derive from `Grain<T>` there is a point which you should consider.
 
 > `ReadStateAsync` is called before calling `OnActivateAsync` and if it fails then the grain will not be activated.
@@ -46,7 +55,7 @@ So the life cycle of a grain is like this
 - Runtime will call `OnDeactivateAsync`
 - Runtime removes the grain from memory
 
-Now if a Silo gets a shutdown request gracefully, the message cueues of all activated grains will be forwarded to another silo with the grain activation,
+Now if a Silo gets a shutdown request gracefully, the message queues of all activated grains will be forwarded to another silo with the grain activation,
 but if a silo crashes, `OnDeactivateAsync` will not be called so you can not rely on it to store state for fault tolerance unless you can live with losing some state.
 
 ## Next
