@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Stateless Worker Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Stateless Worker Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.5.4.0">
+    <meta name="generator" content="docfx 2.8.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,23 +71,23 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="stateless-worker-grains" sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="6" sourceendlinenumber="6">Stateless Worker Grains</h1>
+              <h1 id="stateless-worker-grains">Stateless Worker Grains</h1>
               
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="8" sourceendlinenumber="11">By default, the Orleans runtime creates no more than one activation of a grain within the cluster.
+<p>By default, the Orleans runtime creates no more than one activation of a grain within the cluster.
 This is the most intuitive expression of the Virtual Actor model with each grain corresponding to an entity with a unique type/identity.
 However, there are also cases when an application needs to perform functional stateless operations that are not tied to a particular entity in the system.
 For example, if client sends requests with compressed payloads that need to be decompressed before they could be routed to the target grain for processing, such decompression/routing logic is not tied to a specific entity in the application, and can easily scale out.</p>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="13" sourceendlinenumber="14">When the <code>[StatelessWorker]</code> attribute is applied to a grain class, it indicates to the Orleans runtime that grains of that class should be treated as <strong>Stateless Worker</strong> grains.
+<p>When the <code>[StatelessWorker]</code> attribute is applied to a grain class, it indicates to the Orleans runtime that grains of that class should be treated as <strong>Stateless Worker</strong> grains.
 <strong>Stateless Worker</strong> grains have the following properties that make their execution very different from that of normal grain classes.</p>
-<ol sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="16" sourceendlinenumber="21">
-<li sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="16" sourceendlinenumber="16">The Orleans runtime can and will create multiple activations of a Stateless Worker grain on different silos of the cluster.</li>
-<li sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="17" sourceendlinenumber="18">Requests made to Stateless Worker grains are always executed locally, that is on the same silo where the request originated, either made by a grain running on the silo or received by the silo&#39;s client gateway.
+<ol>
+<li>The Orleans runtime can and will create multiple activations of a Stateless Worker grain on different silos of the cluster.</li>
+<li>Requests made to Stateless Worker grains are always executed locally, that is on the same silo where the request originated, either made by a grain running on the silo or received by the silo&#39;s client gateway.
 Hence, calls to Stateless Worker grains from other grains or from client gateways never incur a remote message.</li>
-<li sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="19" sourceendlinenumber="20">The Orleans Runtime automatically creates additional activations of a Stateless Worker grain if the already existing ones are busy.
+<li>The Orleans Runtime automatically creates additional activations of a Stateless Worker grain if the already existing ones are busy.
 The maximum number of activations of a Stateless Worker grain the runtime creates per silo is limited by default by the number of CPU cores on the machine, unless specified explicitly by the optional <code>maxLocalWorkers</code> argument.</li>
-<li sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="21" sourceendlinenumber="21">Because of 2 and 3, Stateless Worker grain activations are not individually addressable. Two subsequent requests to a Stateless Worker grain may be processed by different activations of it.</li>
+<li>Because of 2 and 3, Stateless Worker grain activations are not individually addressable. Two subsequent requests to a Stateless Worker grain may be processed by different activations of it.</li>
 </ol>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="23" sourceendlinenumber="30">Stateless Worker grains provide a straightforward way of creating an auto-managed pool of grain activations that automatically scales up and down based on the actual load.
+<p>Stateless Worker grains provide a straightforward way of creating an auto-managed pool of grain activations that automatically scales up and down based on the actual load.
 The runtime always scans for available Stateless Worker grain activations in the same order.
 Because of that, it always dispatches a requests to the first idle local activation it can find, and only gets to the last one if all previous activations are busy.
 If all activations are busy and the activation limit hasn&#39;t been reached, it creates one more activation at the end of the list, and dispatches the request to it.
@@ -95,37 +95,37 @@ That means that when the rate of requests to a Stateless Worker grain increases,
 Conversely, when the load drops, and it can be handled by a smaller number of activations of the Stateless Worker grain, the activations at the tail of the list will not be getting requests dispatched to them.
 They will become idle, and eventually deactivated by the standard activation collection process.
 Hence, the pool of activations will eventually shrink to match the load.</p>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="32" sourceendlinenumber="32">The following example defines a Stateless Worker grain class <code>MyStatelessWorkerGrain</code> with the default maximum activation number limit. </p>
-<pre sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="33" sourceendlinenumber="39"><code class="lang-csharp">[StatelessWorker]
+<p>The following example defines a Stateless Worker grain class <code>MyStatelessWorkerGrain</code> with the default maximum activation number limit. </p>
+<pre><code class="lang-csharp">[StatelessWorker]
 public class MyStatelessWorkerGrain : IMyStatelessWorkerGrain
 {
  ...
 }
-</code></pre><p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="41" sourceendlinenumber="43">Making a call to a Stateless Worker grain is the same as to any other grain.
+</code></pre><p>Making a call to a Stateless Worker grain is the same as to any other grain.
 The only difference is that in most cases a single grain ID is used, 0 or <code>Guid.Empty</code>.
 Multiple grain IDs can be used when having multiple Stateless Worker grain pools, one per ID, is desirable.</p>
-<pre sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="45" sourceendlinenumber="48"><code class="lang-csharp">var worker = GrainFactory.GetGrain&lt;IMyStatelessWorkerGrain&gt;(0);
+<pre><code class="lang-csharp">var worker = GrainFactory.GetGrain&lt;IMyStatelessWorkerGrain&gt;(0);
 await worker.Process(args);
-</code></pre><p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="51" sourceendlinenumber="51">This one defines a Stateless Worker grain class with no more than one grain activation per silo. </p>
-<pre sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="52" sourceendlinenumber="58"><code class="lang-csharp">[StatelessWorker(1)] // max 1 activation per silo
+</code></pre><p>This one defines a Stateless Worker grain class with no more than one grain activation per silo. </p>
+<pre><code class="lang-csharp">[StatelessWorker(1)] // max 1 activation per silo
 public class MyLonelyWorkerGrain : ILonelyWorkerGrain
 {
  ...
 }
-</code></pre><p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="60" sourceendlinenumber="62">Note that <code>[StatelessWorker]</code> attribute does not change reentrancy of the target grain class.
+</code></pre><p>Note that <code>[StatelessWorker]</code> attribute does not change reentrancy of the target grain class.
 Just like any other grains, Stateless Worker grains are non-reentrant by default.
 They can be explicitly made reentrant by adding a <code>[Reentrant]</code> attribute to the grain class.</p>
-<h2 id="state" sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="64" sourceendlinenumber="64">State</h2>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="66" sourceendlinenumber="68">The &quot;Stateless&quot; part of &quot;Stateless Worker&quot; does not mean that a Stateless Worker cannot have state and is limited only to executing functional operations.
+<h2 id="state">State</h2>
+<p>The &quot;Stateless&quot; part of &quot;Stateless Worker&quot; does not mean that a Stateless Worker cannot have state and is limited only to executing functional operations.
 Like any other grain, a Stateless Worker grain can load and keep in memory any state it needs.
 It&#39;s just because multiple activations of a Stateless Worker grain can be created on the same and different silos of the cluster, there is no easy mechanism to coordinate state held by different activations.</p>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="70" sourceendlinenumber="70">There are several useful patterns that involve Stateless Worker holding state.</p>
-<h3 id="scaled-out-hot-cache-items" sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="72" sourceendlinenumber="72">Scaled out hot cache items</h3>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="74" sourceendlinenumber="76">For hot cache items that experience high throughput, holding each such item in a Stateless Worker grain makes it 
+<p>There are several useful patterns that involve Stateless Worker holding state.</p>
+<h3 id="scaled-out-hot-cache-items">Scaled out hot cache items</h3>
+<p>For hot cache items that experience high throughput, holding each such item in a Stateless Worker grain makes it 
 a) automatically scale out within a silo and across all silos in the cluster; 
 and b) makes the data always locally available on the silo that received the client request via its client gateway, so that the requests can be answered without an extra network hop to another silo.</p>
-<h3 id="reduce-style-aggregation" sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="79" sourceendlinenumber="79">Reduce style aggregation</h3>
-<p sourcefile="Documentation/Advanced-Concepts/StatelessWorker.md" sourcestartlinenumber="81" sourceendlinenumber="89">In some scenarios applications need to calculate certain metrics across all grains of a particular type in the cluster, and report the aggregates periodically.
+<h3 id="reduce-style-aggregation">Reduce style aggregation</h3>
+<p>In some scenarios applications need to calculate certain metrics across all grains of a particular type in the cluster, and report the aggregates periodically.
 Examples are reporting number of players per game map, average duration of a VoIP call, etc.
 If each of the many thousands or millions of grains were to report their metrics to a single global aggregator, the aggregator would get immediately overloaded unable to process the flood of reports.
 The alternative approach is to turn this task into a 2 (or more) step reduce style aggregation.
@@ -170,7 +170,6 @@ can send their aggregated reports to the global final aggregator (or to another 
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
   </body>

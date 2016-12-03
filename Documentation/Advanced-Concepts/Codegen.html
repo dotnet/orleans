@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Code generation | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Code generation | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.5.4.0">
+    <meta name="generator" content="docfx 2.8.0.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,17 +71,17 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="code-generation" sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="6" sourceendlinenumber="6">Code Generation</h1>
+              <h1 id="code-generation">Code Generation</h1>
               
-<p sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="8" sourceendlinenumber="8"><strong>Efficient code generation is one of the pillars of Orleans Runtime</strong>. The Orleans Runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.</p>
-<p sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="10" sourceendlinenumber="10">There are two modes of <code>OrleansCodeGenerator</code>:</p>
-<ol sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="12" sourceendlinenumber="14">
-<li sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="12" sourceendlinenumber="12"><p sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="12" sourceendlinenumber="12"><strong>Build-time Codegen</strong> - in this mode, codegen will run every time your project is compiled. An <code>MSBuild</code> task is injected in your project&#39;s build pipeline, and the code is generated in the project&#39;s <code>Properties\orleans.codegen.cs</code>. To activate this mode, add the package <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> to your <strong>Grain Interface</strong> project and build it. You will notice that when adding this package no extra references are added to your project but you will see the <code>Properties\orleans.codegen.cs</code> was added. Also if you edit your <code>.csproj</code> file, you will see that an extra <code>MSBuild</code> target was added as well. The good thing about using this mode is that you can step-into the generated code while debugging since the file is physically on the disk. However, your build time will be slower than usual if you have big projects. This is the default mode selected when you create a <strong>Grain Interface</strong> project by using the Visual Studio templates and it was the first codegen mode introduced since the release of Orleans. <strong>Note</strong>: To avoid the hassles of keeping this file under source control, we suggest you to to add it to your <code>.gitignore</code> or whatever ignore mechanism you have on your source control system, so it is not tracked by it, since this file will be re-generated every build.</p>
+<p><strong>Efficient code generation is one of the pillars of Orleans Runtime</strong>. The Orleans Runtime makes use of generated code in order to ensure proper serialization of types that are used across the cluster as well as for generating boilerplate which abstracts away the implementation details of method shipping, exception propagation, and other internal runtime concepts.</p>
+<p>There are two modes of <code>OrleansCodeGenerator</code>:</p>
+<ol>
+<li><p><strong>Build-time Codegen</strong> - in this mode, codegen will run every time your project is compiled. An <code>MSBuild</code> task is injected in your project&#39;s build pipeline, and the code is generated in the project&#39;s <code>Properties\orleans.codegen.cs</code>. To activate this mode, add the package <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> to your <strong>Grain Interface</strong> project and build it. You will notice that when adding this package no extra references are added to your project but you will see the <code>Properties\orleans.codegen.cs</code> was added. Also if you edit your <code>.csproj</code> file, you will see that an extra <code>MSBuild</code> target was added as well. The good thing about using this mode is that you can step-into the generated code while debugging since the file is physically on the disk. However, your build time will be slower than usual if you have big projects. This is the default mode selected when you create a <strong>Grain Interface</strong> project by using the Visual Studio templates and it was the first codegen mode introduced since the release of Orleans. <strong>Note</strong>: To avoid the hassles of keeping this file under source control, we suggest you to to add it to your <code>.gitignore</code> or whatever ignore mechanism you have on your source control system, so it is not tracked by it, since this file will be re-generated every build.</p>
 </li>
-<li sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="14" sourceendlinenumber="14"><p sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="14" sourceendlinenumber="14"><strong>Runtime Codegen</strong> - introduced recently by @reubenbond, different from the build-time, this mode makes <code>OrleansCodeGenerator</code> to generate code when the Silo is starting. The good thing is that there is no <code>.cs</code> file on disk for the generated code, and you don&#39;t have an extra build step on your build pipeline. The bad thing, is that you can&#39;t step-into the generated code while debugging and it may increase your silo start time a bit. To enable this mode, if you were using the <strong>build-time</strong> codegen, remove all the references to <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package and all the <code>Properties\orleans.codegen.cs</code> files then add a reference to <code>Microsoft.Orleans.OrleansCodeGenerator</code> in your <strong>Silo host</strong> project. If you created the project by using the Visual Studio templates, it should already be there otherwise, you can just install <code>icrosoft.Orleans.OrleansCodeGenerator</code> on your silo project. All set! The codegen will run at Silo startup.</p>
+<li><p><strong>Runtime Codegen</strong> - introduced recently by @reubenbond, different from the build-time, this mode makes <code>OrleansCodeGenerator</code> to generate code when the Silo is starting. The good thing is that there is no <code>.cs</code> file on disk for the generated code, and you don&#39;t have an extra build step on your build pipeline. The bad thing, is that you can&#39;t step-into the generated code while debugging and it may increase your silo start time a bit. To enable this mode, if you were using the <strong>build-time</strong> codegen, remove all the references to <code>Microsoft.Orleans.OrleansCodeGenerator.Build</code> package and all the <code>Properties\orleans.codegen.cs</code> files then add a reference to <code>Microsoft.Orleans.OrleansCodeGenerator</code> in your <strong>Silo host</strong> project. If you created the project by using the Visual Studio templates, it should already be there otherwise, you can just install <code>icrosoft.Orleans.OrleansCodeGenerator</code> on your silo project. All set! The codegen will run at Silo startup.</p>
 </li>
 </ol>
-<p sourcefile="Documentation/Advanced-Concepts/Codegen.md" sourcestartlinenumber="16" sourceendlinenumber="16">Either way the code generated is exactly and there is just a trade-off on whether you want to debug the generated code and slow down your build time or, have faster builds without debug the generated code.</p>
+<p>Either way the code generated is exactly and there is just a trade-off on whether you want to debug the generated code and slow down your build time or, have faster builds without debug the generated code.</p>
 
             </article>
           </div>
@@ -118,7 +118,6 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
   </body>
