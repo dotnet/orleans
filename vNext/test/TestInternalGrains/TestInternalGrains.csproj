@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="      ..\..\..\test\TestInternalGrains\obj\**\*.cs;       ..\..\..\test\TestInternalGrains\bin\**\*.cs;       ..\..\..\test\TestInternalGrains\Properties\*.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
 
@@ -42,42 +43,9 @@
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TestInternalGrains\ActivateDeactivateTestGrain.cs">
-      <Link>ActivateDeactivateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\EchoTaskGrain.cs">
-      <Link>EchoTaskGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\ExtensionTestGrain.cs">
-      <Link>ExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\InterlockedFlag.cs">
-      <Link>InterlockedFlag.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
-      <Link>PersistenceTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamingGrain.cs">
-      <Link>StreamingGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamingImmutabilityTestGrain.cs">
-      <Link>StreamingImmutabilityTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
-      <Link>StreamLifecycleTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamTestsConstants.cs">
-      <Link>StreamTestsConstants.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestExtension.cs">
-      <Link>TestExtension.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestGrain.cs">
-      <Link>TestGrain.cs</Link>
-    </Compile>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -18,3 +18,4 @@ using System.Runtime.InteropServices;
 [assembly: Guid("a8df0713-6001-4830-af7e-dcb114bfb340")]
 
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]

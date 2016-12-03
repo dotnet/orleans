@@ -61,12 +61,13 @@ namespace Orleans.CodeGenerator
             var attributes = SF.AttributeList()
                 .AddAttributes(
                     CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax(),
-#if !NETSTANDARD
-                    // we could add Serializable attribute if we want, but that would require that the target
-                    // project depends on System.Runtime.Serialization.Formatters, which is currently in preview
+
                     SF.Attribute(typeof(SerializableAttribute).GetNameSyntax()),
+#if !NETSTANDARD_TODO
+                    //ExcludeFromCodeCoverageAttribute became an internal class in netstandard
                     SF.Attribute(typeof(ExcludeFromCodeCoverageAttribute).GetNameSyntax()),
 #endif
+
                     markerAttribute);
 
             var className = CodeGeneratorCommon.ClassPrefix + TypeUtils.GetSuitableClassName(grainType) + ClassSuffix;

@@ -40,4 +40,5 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
