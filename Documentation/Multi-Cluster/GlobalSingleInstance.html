@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Global-Single-Instance Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Global-Single-Instance Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.8.0.0">
+    <meta name="generator" content="docfx 2.5.4.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,11 +71,11 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h3 id="grain-coordination-attributes">Grain Coordination Attributes</h3>
+              <h3 id="grain-coordination-attributes" sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="6" sourceendlinenumber="6">Grain Coordination Attributes</h3>
               
-<p>Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  <code>[GlobalSingleInstance]</code> attribute means we want the same behavior as as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the <code>[OneInstancePerCluster]</code> attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.</p>
-<p>The attributes are placed on grain implementations. For example: </p>
-<pre><code class="lang-csharp">using Orleans.MultiCluster;
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="8" sourceendlinenumber="8">Developers can indicate when and how clusters should coordinate their grain directories with respect to a particular grain class. The  <code>[GlobalSingleInstance]</code> attribute means we want the same behavior as as when running Orleans in a single global cluster: that is, route all calls to a single activation of the grain. Conversely, the <code>[OneInstancePerCluster]</code> attribute indicates that each cluster can have its own independent activation. This is appropriate if communication between clusters is undesired.</p>
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="10" sourceendlinenumber="10">The attributes are placed on grain implementations. For example: </p>
+<pre sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="11" sourceendlinenumber="23"><code class="lang-csharp">using Orleans.MultiCluster;
 
 [GlobalSingleInstance]
 public class MyGlobalGrain : Orleans.Grain, IMyGrain {
@@ -86,14 +86,14 @@ public class MyGlobalGrain : Orleans.Grain, IMyGrain {
 public class MyLocalGrain : Orleans.Grain, IMyGrain {
    ...
 }
-</code></pre><p>If a grain class does not specify either one of those attributes, it defaults to <code>[OneInstancePerCluster]</code>, or <code>[GlobalSingleInstance]</code> if the  configuration parameter <code>UseGlobalSingleInstanceByDefault</code> is set to true.</p>
-<h4 id="protocol-for-global-single-instance-grains">Protocol for Global-Single-Instance Grains</h4>
-<p>When a global-single-instance (GSI) grain is accessed, and no activation is known to exist, a special GSI activation protocol is executed before activating a new instance. Specifically, a request is sent to all other clusters in the current <a href="MultiClusterConfiguration.html">multi-cluster configuration</a> to check if they already have an activation for this grain. If all responses are negative, a new activation is created in this cluster. Otherwise, the remote activation is used (and a reference to it is cached in the local directory).</p>
-<h4 id="protocol-for-one-instance-per-cluster-grains">Protocol for One-Instance-Per-Cluster Grains</h4>
-<p>There is no inter-cluster communication for One-Instance-Per-Cluster grains. They simply use the standard Orleans mechanism independently within each cluster. Inside the Orleans framework itself, the following grain classes are marked with the <code>[OneInstancePerCluster]</code> attribute: <code>ManagementGrain</code>, <code>GrainBasedMembershipTable</code>,  and <code>GrainBasedReminderTable</code>. </p>
-<h4 id="doubtful-activations">Doubtful Activations</h4>
-<p>If the GSI protocol does not receive conclusive responses from all clusters after 3 retries (or whatever number is specified by the configuration parameter <code>GlobalSingleInstanceNumberRetries</code>), it creates a new local &quot;doubtful&quot; activation optimistically, favoring availability over consistency.</p>
-<p>Doubtful activations may be duplicates (because some remote cluster that did not respond during the GSI protocol activation may nevertheless have  an activation of this grain). Therefore, periodically every 30 seconds (or whatever interval is specified by the configuration parameter <code>GlobalSingleInstanceRetryInterval</code>) the GSI protocol is run again for all doubtful activations. This ensures that once communication between clusters is restored, duplicate activations can be detected and removed. </p>
+</code></pre><p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="25" sourceendlinenumber="25">If a grain class does not specify either one of those attributes, it defaults to <code>[OneInstancePerCluster]</code>, or <code>[GlobalSingleInstance]</code> if the  configuration parameter <code>UseGlobalSingleInstanceByDefault</code> is set to true.</p>
+<h4 id="protocol-for-global-single-instance-grains" sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="27" sourceendlinenumber="27">Protocol for Global-Single-Instance Grains</h4>
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="29" sourceendlinenumber="29">When a global-single-instance (GSI) grain is accessed, and no activation is known to exist, a special GSI activation protocol is executed before activating a new instance. Specifically, a request is sent to all other clusters in the current <a href="MultiClusterConfiguration.html" sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="29" sourceendlinenumber="29">multi-cluster configuration</a> to check if they already have an activation for this grain. If all responses are negative, a new activation is created in this cluster. Otherwise, the remote activation is used (and a reference to it is cached in the local directory).</p>
+<h4 id="protocol-for-one-instance-per-cluster-grains" sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="31" sourceendlinenumber="31">Protocol for One-Instance-Per-Cluster Grains</h4>
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="33" sourceendlinenumber="33">There is no inter-cluster communication for One-Instance-Per-Cluster grains. They simply use the standard Orleans mechanism independently within each cluster. Inside the Orleans framework itself, the following grain classes are marked with the <code>[OneInstancePerCluster]</code> attribute: <code>ManagementGrain</code>, <code>GrainBasedMembershipTable</code>,  and <code>GrainBasedReminderTable</code>. </p>
+<h4 id="doubtful-activations" sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="35" sourceendlinenumber="35">Doubtful Activations</h4>
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="37" sourceendlinenumber="37">If the GSI protocol does not receive conclusive responses from all clusters after 3 retries (or whatever number is specified by the configuration parameter <code>GlobalSingleInstanceNumberRetries</code>), it creates a new local &quot;doubtful&quot; activation optimistically, favoring availability over consistency.</p>
+<p sourcefile="Documentation/Multi-Cluster/GlobalSingleInstance.md" sourcestartlinenumber="39" sourceendlinenumber="39">Doubtful activations may be duplicates (because some remote cluster that did not respond during the GSI protocol activation may nevertheless have  an activation of this grain). Therefore, periodically every 30 seconds (or whatever interval is specified by the configuration parameter <code>GlobalSingleInstanceRetryInterval</code>) the GSI protocol is run again for all doubtful activations. This ensures that once communication between clusters is restored, duplicate activations can be detected and removed. </p>
 
             </article>
           </div>
@@ -130,6 +130,7 @@ public class MyLocalGrain : Orleans.Grain, IMyGrain {
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
   </body>

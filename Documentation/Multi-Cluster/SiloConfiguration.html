@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--[if IE]><![endif]-->
 <html>
   
@@ -8,7 +8,7 @@
     <title>Multi-Cluster Silo Configuration | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Multi-Cluster Silo Configuration | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.8.0.0">
+    <meta name="generator" content="docfx 2.5.4.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -71,10 +71,10 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h2 id="orleans-silo-configuration">Orleans Silo Configuration</h2>
+              <h2 id="orleans-silo-configuration" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="6" sourceendlinenumber="6">Orleans Silo Configuration</h2>
               
-<p>To get a quick overview, we show all relevant configuration parameters (including optional ones) in XML syntax below:</p>
-<pre><code class="lang-html">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="8" sourceendlinenumber="8">To get a quick overview, we show all relevant configuration parameters (including optional ones) in XML syntax below:</p>
+<pre sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="10" sourceendlinenumber="28"><code class="lang-html">&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;OrleansConfiguration xmlns=&quot;urn:orleans&quot;&gt;
   &lt;Globals&gt;
     &lt;MultiClusterNetwork
@@ -91,15 +91,15 @@
     &lt;SystemStore ... ServiceId=&quot;some-guid&quot; .../&gt;
   &lt;/Globals&gt;
 &lt;/OrleansConfiguration&gt;
-</code></pre><p>As usual, all configuration settings can also be read and written programmatically, via the respective members of the <code>GlobalConfiguration</code> class.</p>
-<p>The <code>Service Id</code> is an arbitrary Guid for identifying this service. It must be the same for all clusters and all silos. If not specified, the default Guid (containing all zeroes) is used.</p>
-<p>The <code>MultiClusterNetwork</code> section is optional - if not present, all multi-cluster support is disabled for this silo.</p>
-<p>The <strong>required parameters</strong> <code>ClusterId</code> and <code>GossipChannel</code> are explained in the section on <a href="GossipChannels.html">Multi-Cluster Communication</a>.</p>
-<p>The  optional parameters <code>MaxMultiClusterGateways</code> and <code>BackgroundGossipInterval</code>  are explained in the section on <a href="GossipChannels.html">Multi-Cluster Communication</a>.</p>
-<p>The optional parameter <code>DefaultMultiCluster</code> is explained in the section on <a href="MultiClusterConfiguration.html">Multi-Cluster Configuration</a>.</p>
-<p>The optional parameters <code>UseGlobalSingleInstanceByDefault</code>,  <code>GlobalSingleInstanceRetryInterval</code> and <code>GlobalSingleInstanceNumberRetries</code> are explained in the section on <a href="GlobalSingleInstance.html">Global-Single-Instance Grains</a>.</p>
-<h2 id="orleans-client-configuration">Orleans Client Configuration</h2>
-<p>No extra configuration is required for Orleans client. The same client may not connect to silos in different clusters (the silo refuses the connection in that situation). </p>
+</code></pre><p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="30" sourceendlinenumber="30">As usual, all configuration settings can also be read and written programmatically, via the respective members of the <code>GlobalConfiguration</code> class.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="33" sourceendlinenumber="33">The <code>Service Id</code> is an arbitrary Guid for identifying this service. It must be the same for all clusters and all silos. If not specified, the default Guid (containing all zeroes) is used.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="35" sourceendlinenumber="35">The <code>MultiClusterNetwork</code> section is optional - if not present, all multi-cluster support is disabled for this silo.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="37" sourceendlinenumber="37">The <strong>required parameters</strong> <code>ClusterId</code> and <code>GossipChannel</code> are explained in the section on <a href="GossipChannels.html" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="37" sourceendlinenumber="37">Multi-Cluster Communication</a>.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="39" sourceendlinenumber="39">The  optional parameters <code>MaxMultiClusterGateways</code> and <code>BackgroundGossipInterval</code>  are explained in the section on <a href="GossipChannels.html" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="39" sourceendlinenumber="39">Multi-Cluster Communication</a>.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="41" sourceendlinenumber="41">The optional parameter <code>DefaultMultiCluster</code> is explained in the section on <a href="MultiClusterConfiguration.html" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="41" sourceendlinenumber="41">Multi-Cluster Configuration</a>.</p>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="43" sourceendlinenumber="43">The optional parameters <code>UseGlobalSingleInstanceByDefault</code>,  <code>GlobalSingleInstanceRetryInterval</code> and <code>GlobalSingleInstanceNumberRetries</code> are explained in the section on <a href="GlobalSingleInstance.html" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="43" sourceendlinenumber="43">Global-Single-Instance Grains</a>.</p>
+<h2 id="orleans-client-configuration" sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="46" sourceendlinenumber="46">Orleans Client Configuration</h2>
+<p sourcefile="Documentation/Multi-Cluster/SiloConfiguration.md" sourcestartlinenumber="48" sourceendlinenumber="48">No extra configuration is required for Orleans client. The same client may not connect to silos in different clusters (the silo refuses the connection in that situation). </p>
 
             </article>
           </div>
@@ -136,6 +136,7 @@
     </div>
     
     <script type="text/javascript" src="../../styles/docfx.vendor.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script type="text/javascript" src="../../styles/docfx.js"></script>
     <script type="text/javascript" src="../../styles/main.js"></script>
   </body>
