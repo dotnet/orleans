@@ -20,8 +20,6 @@
     <dependencies>
       <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
-        <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-        <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
         <dependency id="System.Data.Common" version="4.3.0" />
         <dependency id="System.Reflection" version="4.3.0" />
         <dependency id="System.Xml.XmlSerializer" version="4.3.0" />

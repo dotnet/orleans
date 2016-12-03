@@ -37,8 +37,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
-    <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj" />
-    <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
