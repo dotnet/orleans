@@ -135,9 +135,6 @@
     <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\TestEnvironmentInvariant.cs">
       <Link>StorageTests\Relational\TestEnvironmentInvariant.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterSQLUtils\GatewaySelectionTest.cs">
-      <Link>GatewaySelectionTest.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\TesterSQLUtils\LivenessTests.cs">
       <Link>LivenessTests.cs</Link>
     </Compile>

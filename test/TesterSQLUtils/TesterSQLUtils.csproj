@@ -58,7 +58,6 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="MySqlMembershipTableTests.cs" />
     <Compile Include="MySqlRemindersTableTests.cs" />
     <Compile Include="PostgreSqlMembershipTableTests.cs" />
@@ -91,6 +90,7 @@
     <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
     <None Include="Tester.SQLUtils.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
