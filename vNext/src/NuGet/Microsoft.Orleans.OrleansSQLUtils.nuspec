@@ -1,0 +1,38 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansSqlUtils</id>
+    <version>$version$</version>
+    <title>icrosoft Orleans Sql Utilities</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Sql Utilities Library of Microsoft Orleans - OrleansSqlUtils.dll
+    </summary>
+    <description>
+      Library of utility types for relational storage of Microsoft Orleans.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.5">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+        <dependency id="System.Data.Common" version="4.3.0" />
+        <dependency id="System.Reflection" version="4.3.0" />
+        <dependency id="System.Xml.XmlSerializer" version="4.3.0" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansSqlUtils.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansSqlUtils.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansSqlUtils.xml" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\CreateOrleansTables_SqlServer.sql" target="lib\netstandard1.5\SQLServer" />
+    <file src="netstandard1.5\CreateOrleansTables_MySql.sql" target="lib\netstandard1.5\MySql" />
+    <file src="netstandard1.5\CreateOrleansTables_PostgreSql.sql" target="lib\netstandard1.5\PostgreSql" />
+    <file src="$SRC_DIR$OrleansSqlUtils\**\*.cs" exclude="$SRC_DIR$OrleansSqlUtils\obj\**\*.*;$SRC_DIR$OrleansSqlUtils\bin\**\*.*" target="src" />
+  </files>
+</package>

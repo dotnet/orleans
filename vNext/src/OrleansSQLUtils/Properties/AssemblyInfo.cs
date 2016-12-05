@@ -1,12 +1,13 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TestExtensions")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("OrleansSqlUtils")]
+[assembly: AssemblyDescription("Orleans - Sql Server Helper Classes")]
 [assembly: AssemblyConfiguration("")]
 
 // Setting ComVisible to false makes the types in this assembly not visible 
@@ -15,9 +16,10 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("8380c2c1-dcac-43bd-a1e9-74bf8f904cc7")]
+[assembly: Guid("e0846a49-0ddc-4c53-ab74-364c269879a5")]
 
-[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
-[assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: SkipCodeGeneration]

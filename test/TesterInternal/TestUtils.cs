@@ -36,7 +36,7 @@ namespace UnitTests.TestHelper
             //Console.WriteLine("DB file = {0}", dbFile.FullName);
 
             string connectionString = string.Format(
-                @"Data Source=(LocalDB)\v11.0;"
+                @"Data Source=(localdb)\mssqllocaldb;"
                 + @"AttachDbFilename={0};"
                 + @"Integrated Security=True;"
                 + @"Connect Timeout=30",
