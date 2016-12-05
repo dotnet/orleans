@@ -287,38 +287,6 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
-        public void ID_Intern_derived_class()
-        {
-            Interner<int, A> interner = new Interner<int, A>();
-            var obj1 = new A();
-            var obj2 = new B();
-            var obj3 = new B();
-
-            var r1 = interner.InternAndUpdateWithMoreDerived(1, obj1);
-            Assert.Equal(obj1, r1); // Objects should be equal
-            Assert.Same(obj1, r1); // Objects should be same / intern'ed
-
-            var r2 = interner.InternAndUpdateWithMoreDerived(2, obj2);
-            Assert.Equal(obj2, r2); // Objects should be equal
-            Assert.Same(obj2, r2); // Objects should be same / intern'ed
-
-            // Interning should not replace instances of same class
-            var r3 = interner.InternAndUpdateWithMoreDerived(2, obj3);
-            Assert.Same(obj2, r3); // Interning should return previous object
-            Assert.NotSame(obj3, r3); // Interning should not replace previous object of same class
-
-            // Interning should return instances of most derived class
-            var r4 = interner.InternAndUpdateWithMoreDerived(1, obj2);
-            Assert.Same(obj2, r4); // Interning should return most derived object
-            Assert.NotSame(obj1, r4); // Interning should replace cached instances of less derived object
-
-            // Interning should not return instances of less derived class
-            var r5 = interner.InternAndUpdateWithMoreDerived(2, obj1);
-            Assert.NotSame(obj1, r5); // Interning should not return less derived object
-            Assert.Same(obj2, r5); // Interning should return previously cached instances of more derived object
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Identifiers")]
         public void ID_Intern_FindOrCreate_derived_class()
         {
             Interner<int, A> interner = new Interner<int, A>();
