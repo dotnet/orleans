@@ -96,13 +96,13 @@ namespace Orleans
         /// <param name="key">key to find</param>
         /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
         /// <returns>Object with specified key - either previous cached copy or newly created</returns>
-        public T FindOrCreate(K key, Func<T> creatorFunc)
+        public T FindOrCreate(K key, Func<K, T> creatorFunc)
         {
             T obj = null;
             WeakReference cacheEntry = internCache.GetOrAdd(key,
-                (k) =>
+                k =>
                 {
-                    obj = creatorFunc();
+                    obj = creatorFunc(k);
                     return new WeakReference(obj);
                 });
             if (cacheEntry != null)
@@ -116,7 +116,7 @@ namespace Orleans
             if (obj == null)
             {
                 // Create new object
-                obj = creatorFunc();
+                obj = creatorFunc(key);
                 cacheEntry = new WeakReference(obj);
                 obj = internCache.AddOrUpdate(key, cacheEntry, (k, w) => cacheEntry).Target as T;
             }
@@ -154,7 +154,7 @@ namespace Orleans
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, () => obj);
+            return FindOrCreate(key, _ => obj);
         }
 
         /// <summary>
@@ -205,10 +205,7 @@ namespace Orleans
         public void StopAndClear()
         {
             internCache.Clear();
-            if (cacheCleanupTimer != null)
-            {
-                cacheCleanupTimer.Dispose();
-            }
+            cacheCleanupTimer?.Dispose();
         }
 
         public List<T> AllValues()

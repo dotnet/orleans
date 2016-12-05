@@ -150,7 +150,7 @@ namespace Orleans.Runtime
         private static GrainId FindOrCreateGrainId(UniqueKey key)
         {
             // Note: This is done here to avoid a wierd cyclic dependency / static initialization ordering problem involving the GrainId, Constants & Interner classes
-            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, () => new GrainId(key));
+            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
 
             lock (lockable)
             {
@@ -159,7 +159,7 @@ namespace Orleans.Runtime
                     grainIdInternCache = new Interner<UniqueKey, GrainId>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
                 }
             }
-            return grainIdInternCache.FindOrCreate(key, () => new GrainId(key));
+            return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
         }
 
         #region IEquatable<GrainId> Members
