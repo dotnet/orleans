@@ -243,6 +243,7 @@ namespace Tester.CodeGenTests
             Assert.Equal(input, output);
         }
 
+#if !NETSTANDARD_TODO
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("FSharp")]
         public async Task CodeGenDerivedFromFSharpInterfaceInDifferentAssembly()
         {
@@ -251,5 +252,6 @@ namespace Tester.CodeGenTests
             var output = await grain.Echo(input);
             Assert.Equal(input, output);
         }
+#endif
     }
 }

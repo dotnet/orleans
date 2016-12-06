@@ -10,6 +10,10 @@ namespace Orleans
 {
     internal sealed class AppDomain
     {
+        private readonly object assemblyLoadLock = new object();
+        private Assembly[] loadedAssembliesArray;
+        private HashSet<Assembly> loadedAssembliesHashSet;
+
         public delegate void AssemblyLoadEventHandler(object sender, AssemblyLoadEventArgs args);
 
         public delegate void UnhandledExceptionEventHandler(object sender, UnhandledExceptionEventArgs e);
@@ -35,7 +39,44 @@ namespace Orleans
             //};
         }
 
-        private readonly Lazy<Assembly[]> assembliesList = new Lazy<Assembly[]>(() =>
+        public Assembly[] GetAssemblies()
+        {
+            lock (assemblyLoadLock)
+            {
+                if (loadedAssembliesHashSet == null)
+                {
+                    loadedAssembliesHashSet = GetAssembliesList();
+                    loadedAssembliesArray = loadedAssembliesHashSet.ToArray();
+                }
+
+                // TODO: very naive approach to be replaced with IAssemblyCatalog or something like that.
+                return loadedAssembliesArray;
+            }
+        }
+
+        public void AddAssembly(Assembly asm)
+        {
+            lock (assemblyLoadLock)
+            {
+                if (loadedAssembliesHashSet == null)
+                {
+                    loadedAssembliesHashSet = GetAssembliesList();
+                }
+
+                if (loadedAssembliesHashSet.Add(asm) || loadedAssembliesArray == null)
+                {
+                    loadedAssembliesArray = loadedAssembliesHashSet.ToArray();
+                }
+            }
+
+            var handler = this.AssemblyLoad;
+            if (handler != null)
+            { 
+                handler(this, new AssemblyLoadEventArgs(asm));
+            }
+        }
+
+        private static HashSet<Assembly> GetAssembliesList()
         {
             string path = AppContext.BaseDirectory;
             var assemblyFiles = Directory.EnumerateFiles(path, "*.dll");
@@ -52,19 +93,14 @@ namespace Orleans
                     Console.WriteLine($"WARNING: Failed to load assembly '{assemblyName}'. Skipping. {ex}");
                 }
             }
-            assemblies.Add(typeof(Exception).GetTypeInfo().Assembly);
 
+            assemblies.Add(typeof(Exception).GetTypeInfo().Assembly);
             foreach (var assembly in assemblies.ToList())
             {
                 LoadDependencies(assemblies, assembly);
             }
-            return assemblies.ToArray();
-        });
 
-        public Assembly[] GetAssemblies()
-        {
-            // TODO: very naive approach to be replaced with IAssemblyCatalog or something like that.
-            return assembliesList.Value;
+            return assemblies;
         }
 
         private static void LoadDependencies(HashSet<Assembly> loadedAssemblies, Assembly fromAssembly)

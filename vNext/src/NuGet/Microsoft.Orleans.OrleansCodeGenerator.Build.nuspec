@@ -27,18 +27,18 @@
     <!-- Auto-import MSBuild targets and props files into target project.
            http://docs.nuget.org/docs/creating-packages/creating-and-publishing-a-package#Import_MSBuild_targets_and_props_files_into_project_(Requires_NuGet_2.5_or_above)
       -->
-    <file src="Orleans.SDK.targets" target="build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" />
+    <file src="net462\Orleans.SDK.targets" target="build\Microsoft.Orleans.OrleansCodeGenerator.Build.targets" />
         
-    <file src="ClientGenerator.exe" target="tools" />
-    <file src="ClientGenerator.pdb" target="tools" />
-    <file src="ClientGenerator.exe.config" target="tools" />
-    <file src="Orleans.dll" target="tools" />
-    <file src="Orleans.pdb" target="tools" />
-    <file src="OrleansCodeGenerator.dll" target="tools" />
-    <file src="OrleansCodeGenerator.pdb" target="tools" />
-    <file src="Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
-    <file src="Microsoft.CodeAnalysis.dll" target="tools" />
+    <file src="net462\ClientGenerator.exe" target="tools" />
+    <file src="net462\ClientGenerator.pdb" target="tools" />
+    <file src="net462\ClientGenerator.exe.config" target="tools" />
+    <file src="net462\Orleans.dll" target="tools" />
+    <file src="net462\Orleans.pdb" target="tools" />
+    <file src="net462\OrleansCodeGenerator.dll" target="tools" />
+    <file src="net462\OrleansCodeGenerator.pdb" target="tools" />
+    <file src="net462\Microsoft.CodeAnalysis.CSharp.dll" target="tools" />
+    <file src="net462\Microsoft.CodeAnalysis.dll" target="tools" />
 
-    <file src="Bootstrap\System.*.dll" target="tools" />
+    <file src="net462\System.*.dll" target="tools" />
   </files>
 </package>

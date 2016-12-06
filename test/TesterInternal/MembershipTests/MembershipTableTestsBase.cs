@@ -13,6 +13,16 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
+    internal static class SiloInstanceTableTestConstants
+    {
+        internal static readonly TimeSpan Timeout = TimeSpan.FromMinutes(1);
+
+        internal static readonly bool DeleteEntriesAfterTest = true; // false; // Set to false for Debug mode
+
+        internal static readonly string INSTANCE_STATUS_CREATED = SiloStatus.Created.ToString();  //"Created";
+        internal static readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
+        internal static readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
+    }
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
         private static readonly string hostName = Dns.GetHostName();

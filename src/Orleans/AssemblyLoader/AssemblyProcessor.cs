@@ -75,7 +75,20 @@ namespace Orleans.Runtime
                 Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
                 // initialize serialization for already loaded assemblies.
-                CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
+                var generated = CodeGeneratorManager.GenerateAndLoadForAssemblies(assemblies);
+                if (generated != null)
+                {
+                    foreach (var generatedAssembly in generated)
+                    {
+                        this.ProcessAssembly(generatedAssembly?.Assembly);
+                    }
+                }
+
+                foreach (var generatedAssembly in CodeGeneratorManager.GetGeneratedAssemblies().Values)
+                {
+                    this.ProcessAssembly(generatedAssembly?.Assembly);
+                }
+
                 foreach (var assembly in assemblies)
                 {
                     this.ProcessAssembly(assembly);
@@ -101,6 +114,8 @@ namespace Orleans.Runtime
         /// <param name="assembly">The assembly to process.</param>
         private void ProcessAssembly(Assembly assembly)
         {
+            if (assembly == null) return;
+             
             string assemblyName = assembly.GetName().Name;
             if (this.logger.IsVerbose3)
             {
@@ -128,7 +143,8 @@ namespace Orleans.Runtime
             if (TypeUtils.IsOrleansOrReferencesOrleans(assembly))
             {
                 // Code generation occurs in a self-contained assembly, so invoke it separately.
-                CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
+                var generated = CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
+                this.ProcessAssembly(generated?.Assembly);
             }
 
             // Process each type in the assembly.

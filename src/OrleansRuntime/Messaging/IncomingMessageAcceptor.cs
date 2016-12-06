@@ -256,8 +256,6 @@ namespace Orleans.Runtime.Messaging
             // then a new Socket object will be created by .NET. 
             try
             {
-                if (Log.IsVerbose3) Log.Verbose3($"Starting accept from {AcceptingSocket.RemoteEndPoint}");
-
                 // AcceptAsync returns true if the I / O operation is pending.The SocketAsyncEventArgs.Completed event 
                 // on the e parameter will be raised upon completion of the operation.Returns false if the I/O operation 
                 // completed synchronously. The SocketAsyncEventArgs.Completed event on the e parameter will not be raised 

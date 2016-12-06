@@ -52,23 +52,18 @@ namespace Orleans.CodeGeneration
         /// <param name="input">
         /// The input assembly.
         /// </param>
-        public static void GenerateAndCacheCodeForAssembly(Assembly input)
+        public static GeneratedAssembly GenerateAndCacheCodeForAssembly(Assembly input)
         {
-            if (codeGeneratorInstance != null)
-            {
-                codeGeneratorInstance.GenerateAndLoadForAssembly(input);
-            }
+            return codeGeneratorInstance?.GenerateAndLoadForAssembly(input);
         }
 
         /// <summary>
         /// Ensures code for all currently loaded assemblies has been generated and loaded.
         /// </summary>
-        public static void GenerateAndCacheCodeForAllAssemblies()
+        /// <param name="inputs">The assemblies to generate code for.</param>
+        public static IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(Assembly[] inputs)
         {
-            if (codeGeneratorInstance != null)
-            {
-                codeGeneratorInstance.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
-            }
+            return codeGeneratorInstance?.GenerateAndLoadForAssemblies(inputs);
         }
 
         /// <summary>

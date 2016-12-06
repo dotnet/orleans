@@ -122,12 +122,14 @@ namespace Orleans.CodeGeneration
 
             ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", outputFileName);
 
+#if !NETSTANDARD
             // Copy intermediate file to permanent location, if newer.
             ConsoleText.WriteStatus(
                 "Orleans-CodeGen - Updating IntelliSense file {0} -> {1}",
                 outputFileName,
                 options.CodeGenFile);
             UpdateIntellisenseFile(options.CodeGenFile, outputFileName);
+#endif
 
             return true;
         }
@@ -345,6 +347,7 @@ namespace Orleans.CodeGeneration
                     return 2;
                 }
 
+#if !NETSTANDARD
                 if (string.IsNullOrEmpty(options.CodeGenFile))
                 {
                     Console.WriteLine(
@@ -352,6 +355,7 @@ namespace Orleans.CodeGeneration
                         Path.Combine("Properties", "orleans.codegen.cs"));
                     return 2;
                 }
+#endif
 
                 options.SourcesDir = Path.Combine(options.InputLib.DirectoryName, "Generated");
 
@@ -376,7 +380,6 @@ namespace Orleans.CodeGeneration
             }
             catch (Exception ex)
             {
-                File.WriteAllText("error.txt", ex.Message + Environment.NewLine + ex.StackTrace);
                 Console.WriteLine("-- Code-gen FAILED -- \n{0}", LogFormatter.PrintException(ex));
                 return 3;
             }

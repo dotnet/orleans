@@ -119,7 +119,12 @@ namespace Orleans.Providers
                 {
                     string exceptionMsg = string.Format("Exception initializing provider Name={0} Type={1}", name, provider);
                     logger.Error(ErrorCode.Provider_ErrorFromInit, exceptionMsg, exc);
+#if !NETSTANDARD_TODO
+                    //deserialize constructor of ProviderInitializationException not port to vNext yet
                     throw new ProviderInitializationException(exceptionMsg, exc);
+#else
+                    throw;
+#endif
                 }
             }
         }

@@ -1,158 +1,69 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform>AnyCPU</Platform>
-    <ProductVersion>10.0.20506</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{AACE28AE-F301-472A-B633-02B55434871A}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>UnitTests.Grains</RootNamespace>
-    <AssemblyName>TestGrains</AssemblyName>
-    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <TargetFramework>net462</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <DebugSymbols>true</DebugSymbols>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-    <DebugType>full</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
-    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <Prefer32Bit>false</Prefer32Bit>
-    <WarningsAsErrors>4014</WarningsAsErrors>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
-    <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
-    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
-    <ErrorReport>prompt</ErrorReport>
-    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <Prefer32Bit>false</Prefer32Bit>
-    <WarningsAsErrors>4014</WarningsAsErrors>
-  </PropertyGroup>
+
   <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+    Include="..\..\..\test\TestGrains\**\*.cs"
+    Exclude="
+      ..\..\..\test\TestGrains\GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;
+      ..\..\..\test\TestGrains\obj\**\*.cs;
+      ..\..\..\test\TestGrains\bin\**\*.cs;
+      ..\..\..\test\TestGrains\Properties\*.cs" />
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.XML" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\test\TestGrains\ActivateDeactivateWatcherGrain.cs">
-      <Link>ActivateDeactivateWatcherGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\CircularStateTestGrain.cs">
-      <Link>CircularStateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ClusterTestGrains.cs">
-      <Link>ClusterTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ConcreteGrainsWithGenericInterfaces.cs">
-      <Link>ConcreteGrainsWithGenericInterfaces.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ExceptionGrain.cs">
-      <Link>ExceptionGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ExternalTypeGrain.cs">
-      <Link>ExternalTypeGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\GenericGrains.cs">
-      <Link>GenericGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\GetGrainGrains.cs">
-      <Link>GetGrainGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\GrainInterfaceHierarchyGrains.cs">
-      <Link>GrainInterfaceHierarchyGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\InitialStateGrain.cs">
-      <Link>InitialStateGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\JsonEchoGrain.cs">
-      <Link>JsonEchoGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\KeyExtensionTestGrain.cs">
-      <Link>KeyExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\MethodInterceptionGrain.cs">
-      <Link>MethodInterceptionGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\MultipleConstructorsSimpleGrain.cs">
-      <Link>MultipleConstructorsSimpleGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ReminderTestGrain.cs">
-      <Link>ReminderTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\SimpleGenericGrain.cs">
-      <Link>SimpleGenericGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\SimpleGrain.cs">
-      <Link>SimpleGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\SimpleObserverableGrain.cs">
-      <Link>SimpleObserverableGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\SimplePersistentGrain.cs">
-      <Link>SimplePersistentGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\SpecializedSimpleGenericGrain.cs">
-      <Link>SpecializedSimpleGenericGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\StatelessWorkerGrain.cs">
-      <Link>StatelessWorkerGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\ValueTypeTestGrain.cs">
-      <Link>ValueTypeTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrains\MessageSerializationGrain.cs">
-      <Link>MessageSerializationGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
-      <Link>Properties\GlobalAssemblyInfo.cs</Link>
-    </Compile>
+    <PackageReference Include="Microsoft.NET.Sdk">
+      <Version>1.0.0-alpha-20161104-2</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>9.0.1</Version>
+    </PackageReference>
   </ItemGroup>
+
   <ItemGroup>
-    <None Include="project.json" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\Extensions\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
-      <Project>{ac1bd60c-e7d8-4452-a21c-290aec8e2e7a}</Project>
-      <Name>Orleans</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj">
-      <Project>{a972213f-189b-41d4-90fe-38d513c1106a}</Project>
-      <Name>TestGrainInterfaces</Name>
-    </ProjectReference>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
+
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
   <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <PropertyGroup>
-    <OrleansProjectType>Server</OrleansProjectType>
-  </PropertyGroup>
   <!-- Set path to ClientGenerator.exe -->
-  <Choose>
-    <When Condition="'$(builduri)' != ''">
-      <PropertyGroup>
-        <!-- TFS build -->
-        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup>
-        <!-- Visual Studio or MsBuild .sln build -->
-        <OrleansReferencesBase>$(ProjectDir)..\..\src\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(TargetDir)</OrleansReferencesBase>
+  </PropertyGroup>
   <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>

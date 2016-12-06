@@ -73,8 +73,8 @@ namespace Orleans.Runtime
                 }
             }
 
-            type = null;
-            return false;
+            type = Type.GetType(fullName, throwOnError: false);
+            return type != null;
         }
     }
 }
