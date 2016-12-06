@@ -384,7 +384,7 @@ namespace Orleans.Runtime
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshTimeout);
+            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval);
             this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");

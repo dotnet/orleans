@@ -15,14 +15,14 @@ namespace Tester.HeterogeneousSilosTests
     public class HeterogeneousTests : OrleansTestingBase, IDisposable
     {
         private TestCluster cluster;
-        private readonly TimeSpan refreshTimeout = TimeSpan.FromMilliseconds(200);
+        private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
 
         private void SetupAndDeployCluster(string defaultPlacementStrategy, params Type[] blackListedTypes)
         {
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.Globals.TypeMapRefreshTimeout = refreshTimeout;
+            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
             options.ClusterConfiguration.Overrides[Silo.PrimarySiloName].ExcludedGrainTypes = typesName;
             cluster = new TestCluster(options);
@@ -61,7 +61,7 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
-            var delayTimeout = refreshTimeout.Add(refreshTimeout);
+            var delayTimeout = refreshInterval.Add(refreshInterval);
 
             // Should fail
             var exception = Assert.Throws<ArgumentException>(() => GrainFactory.GetGrain<ITestGrain>(0));
