@@ -70,16 +70,6 @@ namespace Orleans.Runtime.Placement
             return grainClass;
         }
 
-        public static string GetGrainTypeNameAndSupportedSilos(this IPlacementContext @this, GrainId grainId, out IList<SiloAddress> supportedSiloAddresses, string genericArguments = null)
-        {
-            string grainClass;
-            PlacementStrategy unused;
-            MultiClusterRegistrationStrategy unusedActivationStrategy;
-            @this.GetGrainTypeInfo(grainId.GetTypeCode(), out grainClass, out unused, out unusedActivationStrategy, genericArguments);
-            supportedSiloAddresses = @this.GetCompatibleSiloList(grainId);
-            return grainClass;
-        }
-
         public static string GetGrainTypeName(this IPlacementContext @this, GrainId grainId, string genericArguments = null)
         {
             return @this.GetGrainTypeName(grainId.GetTypeCode(), genericArguments);
