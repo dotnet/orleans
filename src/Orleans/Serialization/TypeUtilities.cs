@@ -269,6 +269,26 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Returns <see langword="true"/> if the provided <paramref name="type"/> is publicly accessible and <see langword="false"/> otherwise.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// <see langword="true"/> if the provided <paramref name="type"/> is publicly accessible and <see langword="false"/> otherwise.
+        /// </returns>
+        public static bool IsTypePublic(Type type)
+        {
+            while (true)
+            {
+                var typeInfo = type.GetTypeInfo();
+
+                if (!typeInfo.IsPublic) return false;
+                if (typeInfo.BaseType == null) return true;
+
+                type = typeInfo.BaseType;
+            }
+        }
+
+        /// <summary>
         /// Returns true if <paramref name="fromAssembly"/> has exposed its internals to <paramref name="toAssembly"/>, false otherwise.
         /// </summary>
         /// <param name="fromAssembly">The assembly containing internal types.</param>
