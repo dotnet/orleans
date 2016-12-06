@@ -48,6 +48,7 @@ So the life cycle of a grain is like this
 
 - another grain or a client calls a method of a grain
 - the grain gets activated and brought to memory
+  - Constructor of the grain will be executed and DI will setup (If you have DI)
   - the grain state will be read from storage if any
   - if successful then `OnActivateAsync` is called
 - The grain will process some messages
