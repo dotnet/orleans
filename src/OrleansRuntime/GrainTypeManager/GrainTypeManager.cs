@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
-        private IDictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
+        private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, IList<SiloAddress>> supportedSilosByTypeCode;
         private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
@@ -24,9 +24,9 @@ namespace Orleans.Runtime
         private static readonly object lockable = new object();
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        internal IDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
+        internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
         {
-            get { return new Dictionary<SiloAddress, GrainInterfaceMap>(grainInterfaceMapsBySilo); }
+            get { return grainInterfaceMapsBySilo; }
         }
 
         public static GrainTypeManager Instance { get; private set; }
@@ -150,7 +150,7 @@ namespace Orleans.Runtime
                 throw new OrleansException(String.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
         }
 
-        internal void SetInterfaceMapsBySilo(IDictionary<SiloAddress, GrainInterfaceMap> value)
+        internal void SetInterfaceMapsBySilo(Dictionary<SiloAddress, GrainInterfaceMap> value)
         {
             grainInterfaceMapsBySilo = value;
             RebuildFullGrainInterfaceMap();
