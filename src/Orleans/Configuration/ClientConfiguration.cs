@@ -206,7 +206,7 @@ namespace Orleans.Runtime.Configuration
 
             DefaultTraceLevel = Severity.Info;
             TraceLevelOverrides = new List<Tuple<string, Severity>>();
-            TraceToConsole = true;
+            TraceToConsole = ConsoleText.IsConsoleAvailable;
             TraceFilePattern = "{0}-{1}.log";
             LargeMessageWarningThreshold = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
             PropagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
