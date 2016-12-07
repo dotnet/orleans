@@ -112,6 +112,7 @@
     <Compile Include="IStreamLifecycleTestGrains.cs" />
     <Compile Include="IStreamLifecycleTestInternalGrains.cs" />
     <Compile Include="IStreamReliabilityTestGrains.cs" />
+    <Compile Include="IStuckGrain.cs" />
     <Compile Include="ITestExtension.cs" />
     <Compile Include="ITestGrain.cs" />
     <Compile Include="IStreaming_ProducerGrain.cs" />

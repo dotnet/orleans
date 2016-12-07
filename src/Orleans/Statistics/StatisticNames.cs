@@ -217,6 +217,7 @@ namespace Orleans.Runtime
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION                             = new StatisticName("Catalog.Activation.Shutdown.ViaCollection");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE                     = new StatisticName("Catalog.Activation.Shutdown.ViaDeactivateOnIdle");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN                        = new StatisticName("Catalog.Activation.Shutdown.ViaDirectShutdown");
+        public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION            = new StatisticName("Catalog.Activation.Shutdown.ViaDeactivateStuckActivation");
         public static readonly StatisticName CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS                            = new StatisticName("Catalog.Activation.NonExistentActivations");
         public static readonly StatisticName CATALOG_ACTIVATION_DUPLICATE_ACTIVATIONS                               = new StatisticName("Catalog.Activation.DuplicateActivations");
 

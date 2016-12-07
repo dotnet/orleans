@@ -827,8 +827,9 @@ namespace Orleans
         Dispatcher_InvalidActivation            = DispatcherBase + 38,
         InvokeWorkItem_UnhandledExceptionInInvoke = DispatcherBase + 39,
         Dispatcher_ErrorCreatingActivation      = DispatcherBase + 40,
+        Dispatcher_StuckActivation = DispatcherBase + 41,
 
-        SerializationBase                       = Runtime + 1600,
+        SerializationBase = Runtime + 1600,
         Ser_IncompatibleIntermediateType        = Runtime_Error_100033, // Backward compatability
         Ser_CannotConstructBaseObj              = Runtime_Error_100034, // Backward compatability
         Ser_IncompatibleType                    = Runtime_Error_100035, // Backward compatability

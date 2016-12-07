@@ -77,6 +77,7 @@
     <Compile Include="StorageTests\TestDataSets\TestState1.cs" />
     <Compile Include="StorageTests\TestDataSets\TestStateGeneric1.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
+    <Compile Include="OrleansRuntime\StuckGrainTests.cs" />
     <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
     <Compile Include="ClientAddressableTests.cs" />
