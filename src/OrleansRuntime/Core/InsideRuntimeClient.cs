@@ -688,7 +688,7 @@ namespace Orleans.Runtime
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             // Schedule call back to grain context
-            await OrleansTaskScheduler.Instance.QueueNamedTask(asyncFunction, context, activityName);
+            await this.Scheduler.QueueNamedTask(asyncFunction, context, activityName);
         }
 
         public void Reset(bool cleanup)
