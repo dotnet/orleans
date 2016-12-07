@@ -25,8 +25,11 @@ namespace UnitTests.StorageTests.AWSUtils
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
             var testEnvironment = new SerializationTestEnvironment();
-            DefaultProviderRuntime = new StorageProviderManager(testEnvironment.GrainFactory, null);
-            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
+            DefaultProviderRuntime = new StorageProviderManager(
+                testEnvironment.GrainFactory,
+                null,
+                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+            ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             testEnvironment.InitializeForTesting();
 
             var properties = new Dictionary<string, string>();
@@ -36,7 +39,7 @@ namespace UnitTests.StorageTests.AWSUtils
             provider.Init("DynamoDBStorageProviderTests", DefaultProviderRuntime, config).Wait();
             PersistenceStorageTests = new CommonStorageTests(provider);
         }
-        
+
         [SkippableFact, TestCategory("Functional")]
         internal async Task WriteReadCyrillic()
         {

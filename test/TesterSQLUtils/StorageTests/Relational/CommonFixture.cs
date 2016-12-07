@@ -57,9 +57,11 @@ namespace UnitTests.StorageTests.Relational
         public CommonFixture()
         {
             var testEnvironment = new SerializationTestEnvironment();
-            DefaultProviderRuntime = new StorageProviderManager(testEnvironment.GrainFactory, null);
-            ((StorageProviderManager)DefaultProviderRuntime).LoadEmptyStorageProviders(
-                new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
+            DefaultProviderRuntime = new StorageProviderManager(
+                testEnvironment.GrainFactory,
+                null,
+                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+            ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
 
             testEnvironment.InitializeForTesting();
         }

@@ -4,6 +4,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Streams;
@@ -52,9 +53,14 @@ namespace UnitTests.Grains
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    public class StreamLifecycleConsumerInternalGrain : StreamLifecycleConsumerGrain, IStreamLifecycleConsumerInternalGrain
+    internal class StreamLifecycleConsumerInternalGrain : StreamLifecycleConsumerGrain, IStreamLifecycleConsumerInternalGrain
     {
-       public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string providerName)
+        public StreamLifecycleConsumerInternalGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+            : base(runtimeClient, streamProviderRuntime)
+        {
+        }
+
+        public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string providerName)
         {
             InitStream(streamIdGuid, null, providerName);
             var observer = new MyStreamObserver<int>(logger);
@@ -65,8 +71,8 @@ namespace UnitTests.Grains
 #if USE_CAST
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
-            var tup = await SiloProviderRuntime.Instance.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(SiloProviderRuntime.Instance, _streamProvider.IsRewindable));
+            var tup = await this.runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                        () => new StreamConsumerExtension(this.streamProviderRuntime, _streamProvider.IsRewindable));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
