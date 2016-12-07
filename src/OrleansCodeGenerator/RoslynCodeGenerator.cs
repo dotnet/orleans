@@ -37,27 +37,7 @@ namespace Orleans.CodeGenerator
         /// The serializer generation manager.
         /// </summary>
         private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
-
-        /// <summary>
-        /// The generic interface types whose type arguments needs serializators generation
-        /// </summary>
-        private static readonly HashSet<Type> KnownGenericIntefaceTypes = new HashSet<Type>
-        {
-            typeof(Streams.IAsyncObserver<>),
-            typeof(Streams.IAsyncStream<>),
-            typeof(Streams.IAsyncObservable<>)
-        };
-
-        /// <summary>
-        /// The generic base types whose type arguments needs serializators generation
-        /// </summary>
-        private static readonly HashSet<Type> KnownGenericBaseTypes = new HashSet<Type>
-        {
-            typeof(Grain<>),
-            typeof(Streams.StreamSubscriptionHandleImpl<>),
-            typeof(Streams.StreamSubscriptionHandle<>)
-        };
-
+        
         /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
@@ -539,7 +519,6 @@ namespace Orleans.CodeGenerator
         {
             if (typeInfo.BaseType == null) return;
             if (!typeInfo.BaseType.IsConstructedGenericType) return;
-            if (!KnownGenericBaseTypes.Contains(typeInfo.BaseType.GetGenericTypeDefinition())) return;
 
             foreach (var type in typeInfo.BaseType.GetGenericArguments())
             {
@@ -553,9 +532,7 @@ namespace Orleans.CodeGenerator
             Assembly targetAssembly,
             ISet<Type> includedTypes)
         {
-            var interfaces = typeInfo.GetInterfaces().Where(x =>
-                x.IsConstructedGenericType
-                && KnownGenericIntefaceTypes.Contains(x.GetGenericTypeDefinition()));
+            var interfaces = typeInfo.GetInterfaces().Where(x => x.IsConstructedGenericType);
             foreach (var type in interfaces.SelectMany(v => v.GetTypeInfo().GetGenericArguments()))
             {
                 RecordType(type, module, targetAssembly, includedTypes);
