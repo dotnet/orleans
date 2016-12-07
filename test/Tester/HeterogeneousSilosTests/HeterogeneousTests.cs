@@ -12,6 +12,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests
 {
+    [TestCategory("Functional")]
     public class HeterogeneousTests : OrleansTestingBase, IDisposable
     {
         private TestCluster cluster;
