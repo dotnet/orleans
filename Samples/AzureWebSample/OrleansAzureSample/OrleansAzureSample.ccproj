@@ -12,7 +12,6 @@
     <AssemblyName>OrleansAzureSample</AssemblyName>
     <StartDevelopmentStorage>True</StartDevelopmentStorage>
     <Name>OrleansAzureSample</Name>
-    <UseIISExpressByDefault>False</UseIISExpressByDefault>
     <UseEmulatorExpressByDefault>False</UseEmulatorExpressByDefault>
     <UseWebProjectPorts>True</UseWebProjectPorts>
   </PropertyGroup>
