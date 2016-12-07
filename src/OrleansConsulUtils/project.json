@@ -1,6 +1,6 @@
-{
+﻿{
   "dependencies": {
-    "Consul": "0.6.4.1"
+    "Consul": "0.7.0.3"
   },
   "frameworks": {
     "net451": {}
