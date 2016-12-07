@@ -33,6 +33,7 @@
                 var options = new TestClusterOptions(2);
                 options.ClientConfiguration.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
                 options.ClusterConfiguration.Globals.SerializationProviders.Add(typeof(OneWaySerializer).GetTypeInfo());
+                options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(200);
                 return new TestCluster(options);
             }
         }

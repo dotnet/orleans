@@ -89,11 +89,13 @@ namespace Orleans.Runtime.Placement
 
         public Task<PlacementResult> SelectSiloPowerOfK(PlacementStrategy strategy, GrainId grain, IPlacementContext context)
         {
-            // Exclude overloaded silos
+            var compatibleSilos = context.GetCompatibleSiloList(grain);
+            // Exclude overloaded and non-compatible silos
             var relevantSilos = new List<CachedLocalStat>();
             foreach (CachedLocalStat current in localCache.Values)
             {
                 if (IsSiloOverloaded(current.SiloStats)) continue;
+                if (!compatibleSilos.Contains(current.Address)) continue;
 
                 relevantSilos.Add(current);
             }
