@@ -99,9 +99,6 @@
     <Compile Include="..\..\..\test\TesterInternal\StorageTests\LocalStoreTests.cs">
       <Link>StorageTests\LocalStoreTests.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\TesterInternal\StorageTests\PersistenceGrainTests.cs">
-      <Link>StorageTests\PersistenceGrainTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\TesterInternal\StorageTests\RandomUtilities.cs">
       <Link>StorageTests\RandomUtilities.cs</Link>
     </Compile>
@@ -154,5 +151,6 @@
       <Link>StreamingTests\StreamTestUtils.cs</Link>
     </Compile>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
