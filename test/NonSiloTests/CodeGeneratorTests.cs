@@ -73,8 +73,8 @@ namespace UnitTests.CodeGeneration
         [Fact(Skip = "Currently unsupported"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Generics")]
         public void CodeGen_EncounteredFullySpecifiedInterfacesAreEncodedDistinctly() 
         {
-            var id1 = GrainInterfaceUtils.ComputeInterfaceId(typeof(IFullySpecified<int>));
-            var id2 = GrainInterfaceUtils.ComputeInterfaceId(typeof(IFullySpecified<long>));
+            var id1 = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IFullySpecified<int>));
+            var id2 = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IFullySpecified<long>));
 
             Assert.NotEqual(id1, id2);
         }

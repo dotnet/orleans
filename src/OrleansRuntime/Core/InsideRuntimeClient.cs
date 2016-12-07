@@ -885,7 +885,7 @@ namespace Orleans.Runtime
             if (interfaces.Count != 1)
                 throw new InvalidOperationException($"Extension type {handlerType.FullName} implements more than one grain interface.");
 
-            var interfaceId = GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
+            var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(interfaces.First());
             var invoker = typeManager.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker)invoker;
