@@ -12,7 +12,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 using TestExtensions;
-using Orleans.EventSourcing.Protocols;
+using Orleans.EventSourcing.Common;
 
 namespace Tests.GeoClusterTests
 {

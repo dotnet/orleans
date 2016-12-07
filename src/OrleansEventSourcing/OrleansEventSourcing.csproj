@@ -45,19 +45,24 @@
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="CustomVersionedStateStorage\LogViewAdaptor.cs" />
-    <Compile Include="CustomVersionedStateStorage\LogConsistencyProvider.cs" />
-    <Compile Include="CustomVersionedStateStorage\ICustomStorageInterface.cs" />
-    <Compile Include="VersionedStateStorage\DefaultAdaptorFactory.cs" />
-    <Compile Include="VersionedStateStorage\LogConsistencyProvider.cs" />
+    <Compile Include="CustomStorage\LogViewAdaptor.cs" />
+    <Compile Include="CustomStorage\LogConsistencyProvider.cs" />
+    <Compile Include="CustomStorage\ICustomStorageInterface.cs" />
+    <Compile Include="LogStorage\DefaultAdaptorFactory.cs" />
+    <Compile Include="LogStorage\LogConsistencyProvider.cs" />
+    <Compile Include="LogStorage\LogViewAdaptor.cs" />
+    <Compile Include="Common\StringEncodedWriteVector.cs" />
+    <Compile Include="StateStorage\DefaultAdaptorFactory.cs" />
+    <Compile Include="StateStorage\GrainStateWithMetaData.cs" />
+    <Compile Include="StateStorage\LogConsistencyProvider.cs" />
     <Compile Include="JournaledGrain.cs" />
-    <Compile Include="Protocols\ConnectionIssues.cs" />
-    <Compile Include="VersionedStateStorage\GrainStateWithMetaData.cs" />
-    <Compile Include="Protocols\NotificationMessage.cs" />
-    <Compile Include="Protocols\NotificationTracker.cs" />
-    <Compile Include="Protocols\PrimaryBasedLogViewAdaptor.cs" />
-    <Compile Include="Protocols\RecordedConnectionIssue.cs" />
-    <Compile Include="VersionedStateStorage\LogViewAdaptor.cs" />
+    <Compile Include="Common\ConnectionIssues.cs" />
+    <Compile Include="LogStorage\LogStateWithMetaData.cs" />
+    <Compile Include="Common\NotificationMessage.cs" />
+    <Compile Include="Common\NotificationTracker.cs" />
+    <Compile Include="Common\PrimaryBasedLogViewAdaptor.cs" />
+    <Compile Include="Common\RecordedConnectionIssue.cs" />
+    <Compile Include="StateStorage\LogViewAdaptor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

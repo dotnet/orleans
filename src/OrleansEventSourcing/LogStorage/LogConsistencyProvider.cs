@@ -11,7 +11,7 @@ using Orleans.Storage;
 using System.Threading;
 using Orleans.Providers;
 
-namespace Orleans.EventSourcing.VersionedStateStorage
+namespace Orleans.EventSourcing.LogStorage
 {
     /// <summary>
     /// A log-consistency provider that stores the latest view in primary storage, using any standard storage provider.

@@ -1,10 +1,11 @@
-﻿using System;
+﻿using Orleans.EventSourcing.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.EventSourcing.VersionedStateStorage
+namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a grain with log-view consistency
@@ -112,15 +113,6 @@ namespace Orleans.EventSourcing.VersionedStateStorage
             WriteVector = "";
         }
 
-        // BitVector of replicas is implemented as a set of replica strings encoded within a string
-        // The bitvector is represented as the set of replica ids whose bit is 1
-        // This set is written as a string that contains the replica ids preceded by a comma each
-        //
-        // Assuming our replicas are named A, B, and BB, then
-        // ""     represents    {}        represents 000 
-        // ",A"   represents    {A}       represents 100 
-        // ",A,B" represents    {A,B}     represents 110 
-        // ",BB,A,B" represents {A,B,BB}  represents 111 
 
         /// <summary>
         /// Gets one of the bits in <see cref="WriteVector"/>
@@ -129,8 +121,7 @@ namespace Orleans.EventSourcing.VersionedStateStorage
         /// <returns></returns>
         public bool GetBit(string Replica)
         {
-            var pos = WriteVector.IndexOf(Replica);
-            return pos != -1 && WriteVector[pos - 1] == ',';
+            return StringEncodedWriteVector.GetBit(WriteVector, Replica);
         }
 
         /// <summary>
@@ -140,21 +131,10 @@ namespace Orleans.EventSourcing.VersionedStateStorage
         /// <returns>the state of the bit after flipping it</returns>
         public bool FlipBit(string Replica)
         {
-            var pos = WriteVector.IndexOf(Replica);
-            if (pos != -1 && WriteVector[pos - 1] == ',')
-            {
-                var pos2 = WriteVector.IndexOf(',', pos + 1);
-                if (pos2 == -1)
-                    pos2 = WriteVector.Length;
-                WriteVector = WriteVector.Remove(pos - 1, pos2 - pos + 1);
-                return false;
-            }
-            else
-            {
-                WriteVector = string.Format(",{0}{1}", Replica, WriteVector);
-                return true;
-            }
+            var str = WriteVector;
+            var rval = StringEncodedWriteVector.FlipBit(ref str, Replica);
+            WriteVector = str;
+            return rval;
         }
-
     }
 }

@@ -30,9 +30,15 @@ namespace Tests.GeoClusterTests
         const int phases = 100;
 
         [Fact, TestCategory("GeoCluster")]
-        public async Task TestBattery_SharedStorageProvider()
+        public async Task TestBattery_SharedStateStorageProvider()
         {
-            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainSharedStorage", true, phases);
+            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainSharedStateStorage", true, phases);
+        }
+
+        [Fact, TestCategory("GeoCluster")]
+        public async Task TestBattery_SharedLogStorageProvider()
+        {
+            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainSharedLogStorage", true, phases);
         }
 
         [Fact, TestCategory("GeoCluster")]

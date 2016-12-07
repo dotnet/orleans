@@ -8,7 +8,7 @@ using System.Diagnostics;
 using Orleans.Serialization;
 using Orleans.MultiCluster;
 
-namespace Orleans.EventSourcing.Protocols
+namespace Orleans.EventSourcing.Common
 {
     /// <summary>
     /// A general template for constructing log view adaptors that are based on

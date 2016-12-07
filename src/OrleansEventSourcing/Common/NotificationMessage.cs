@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.MultiCluster;
 
-namespace Orleans.EventSourcing.Protocols
+namespace Orleans.EventSourcing.Common
 {
     /// <summary>
     /// Base class for notification messages that are sent by log view adaptors to other 

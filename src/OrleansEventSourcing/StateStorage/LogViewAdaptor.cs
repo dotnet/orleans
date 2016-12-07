@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.LogConsistency;
 using Orleans.Storage;
-using Orleans.EventSourcing.Protocols;
+using Orleans.EventSourcing.Common;
 
-namespace Orleans.EventSourcing.VersionedStateStorage
+namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
     /// A log view adaptor that wraps around a traditional storage adaptor, and uses batching and e-tags
@@ -88,7 +88,7 @@ namespace Orleans.EventSourcing.VersionedStateStorage
                 }
                 catch (Exception e)
                 {
-                    LastPrimaryIssue.Record(new ReadFromStorageFailed() { Exception = e }, Host, Services);
+                    LastPrimaryIssue.Record(new ReadFromStateStorageFailed() { Exception = e }, Host, Services);
                 }
 
                 Services.Verbose("read failed {0}", LastPrimaryIssue);
@@ -133,7 +133,7 @@ namespace Orleans.EventSourcing.VersionedStateStorage
             }
             catch (Exception e)
             {
-                LastPrimaryIssue.Record(new UpdateStorageFailed() { Exception = e }, Host, Services);
+                LastPrimaryIssue.Record(new UpdateStateStorageFailed() { Exception = e }, Host, Services);
             }
 
             if (!batchsuccessfullywritten)
@@ -157,7 +157,7 @@ namespace Orleans.EventSourcing.VersionedStateStorage
                     }
                     catch (Exception e)
                     {
-                        LastPrimaryIssue.Record(new ReadFromStorageFailed() { Exception = e }, Host, Services);
+                        LastPrimaryIssue.Record(new ReadFromStateStorageFailed() { Exception = e }, Host, Services);
                     }
 
                     Services.Verbose("read failed {0}", LastPrimaryIssue);
@@ -199,12 +199,12 @@ namespace Orleans.EventSourcing.VersionedStateStorage
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
         [Serializable]
-        public class UpdateStorageFailed : PrimaryOperationFailed
+        public class UpdateStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
             {
-                return $"update storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
+                return $"write state to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
             }
         }
 
@@ -213,12 +213,12 @@ namespace Orleans.EventSourcing.VersionedStateStorage
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
         [Serializable]
-        public class ReadFromStorageFailed : PrimaryOperationFailed
+        public class ReadFromStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
             public override string ToString()
             {
-                return $"read from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
+                return $"read state from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
             }
         }
 

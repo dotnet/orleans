@@ -9,9 +9,9 @@ using Orleans.LogConsistency;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.MultiCluster;
-using Orleans.EventSourcing.Protocols;
+using Orleans.EventSourcing.Common;
 
-namespace Orleans.EventSourcing.CustomVersionedStateStorage
+namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// A log consistency adaptor that uses the user-provided storage interface <see cref="ICustomStorageInterface{T,E}"/>. 

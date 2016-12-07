@@ -31,16 +31,20 @@ namespace Orleans.TestingHost
             }
             {
                 var props = new Dictionary<string, string>();
-                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.VersionedStateStorage.LogConsistencyProvider", "VersionedStateStorage", props);
+                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.StateStorage.LogConsistencyProvider", "StateStorage", props);
             }
             {
                 var props = new Dictionary<string, string>();
-                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomVersionedStateStorage.LogConsistencyProvider", "CustomStorage", props);
+                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.LogStorage.LogConsistencyProvider", "LogStorage", props);
+            }
+            {
+                var props = new Dictionary<string, string>();
+                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomStorage.LogConsistencyProvider", "CustomStorage", props);
             }
             {
                 var props = new Dictionary<string, string>();
                 props.Add("PrimaryCluster", "A");
-                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomVersionedStateStorage.LogConsistencyProvider", "CustomStoragePrimaryCluster", props);
+                config.Globals.RegisterLogConsistencyProvider("Orleans.EventSourcing.CustomStorage.LogConsistencyProvider", "CustomStoragePrimaryCluster", props);
             }
 
             // logging  

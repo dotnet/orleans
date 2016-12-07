@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.EventSourcing.CustomVersionedStateStorage
+namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
-    /// The storage interface exposed by grains that want to use the CustomVersionedStateStorage log-consistency provider
+    /// The storage interface exposed by grains that want to use the CustomStorage log-consistency provider
     /// <typeparam name="TState">The type for the state of the grain.</typeparam>
     /// <typeparam name="TDelta">The type for delta objects that represent updates to the state.</typeparam>
     /// </summary>
@@ -21,8 +21,8 @@ namespace Orleans.EventSourcing.CustomVersionedStateStorage
         Task<KeyValuePair<int,TState>> ReadStateFromStorageAsync();
 
         /// <summary>
-        /// Applies the given array of deltas to storage, if the version in storage matches the expected version. 
-        /// Otherwise, does nothing. If successful, the version of storage increases by the number of deltas.
+        /// Applies the given array of deltas to storage, and returns true, if the version in storage matches the expected version. 
+        /// Otherwise, does nothing and returns false. If successful, the version of storage must be increased by the number of deltas.
         /// </summary>
         /// <returns>true if the deltas were applied, false otherwise</returns>
         Task<bool> ApplyUpdatesToStorageAsync(IReadOnlyList<TDelta> updates, int expectedversion);

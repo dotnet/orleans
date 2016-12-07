@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.EventSourcing.VersionedStateStorage
+namespace Orleans.EventSourcing.StateStorage
 {
     internal class DefaultAdaptorFactory : ILogViewAdaptorFactory
     {

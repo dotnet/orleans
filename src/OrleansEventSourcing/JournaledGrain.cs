@@ -257,7 +257,7 @@ namespace Orleans.EventSourcing
         {
             get
             {
-                return new VersionedStateStorage.DefaultAdaptorFactory();
+                return new StateStorage.DefaultAdaptorFactory();
             }
         }
 

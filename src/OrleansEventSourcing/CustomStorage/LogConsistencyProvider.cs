@@ -11,11 +11,11 @@ using Orleans.Runtime;
 using Orleans.Providers;
 using Orleans.Storage;
 
-namespace Orleans.EventSourcing.CustomVersionedStateStorage
+namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// A log-consistency provider that relies on grain-specific custom code for 
-    /// loading states from storage, and writing deltas to storage.
+    /// reading states from storage, and appending deltas to storage.
     /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
     /// interface, to define how state is read and how deltas are written.
     /// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster

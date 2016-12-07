@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.LogConsistency;
 
-namespace Orleans.EventSourcing.Protocols
+namespace Orleans.EventSourcing.Common
 {
 
     /// <summary>

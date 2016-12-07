@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.EventSourcing.Protocols
+namespace Orleans.EventSourcing.Common
 {
 
     /// <summary>
