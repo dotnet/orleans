@@ -1,3 +1,5 @@
+using Orleans.Serialization;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -504,15 +506,20 @@ namespace Orleans.CodeGenerator
                 RecordType(type, module, targetAssembly, includedTypes);
             }
             
+            // Consider generic arguments to base types and implemented interfaces for code generation.
             ConsiderGenericBaseTypeArguments(typeInfo, module, targetAssembly, includedTypes);
             ConsiderGenericInterfacesArguments(typeInfo, module, targetAssembly, includedTypes);
-
-            // Collect the types which require code generation.
+            
+            // Include grain interface types.
             if (GrainInterfaceUtils.IsGrainInterface(type))
             {
-                if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
-                
-                includedTypes.Add(type);
+                // If code generation is being performed at runtime, the interface must be accessible to the generated code.
+                if (!runtime || TypeUtilities.IsTypePublic(type))
+                {
+                    if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
+
+                    includedTypes.Add(type);
+                }
             }
         }
 

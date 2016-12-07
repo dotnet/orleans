@@ -8,6 +8,11 @@ namespace UnitTests.GrainInterfaces
 {
     using Orleans.Concurrency;
 
+    internal interface IInternalPingGrain : IGrainWithIntegerKey
+    {
+        Task Ping();
+    }
+
     public interface ISomeGrain : IGrainWithIntegerKey
     {
         Task Do(Outsider o);
