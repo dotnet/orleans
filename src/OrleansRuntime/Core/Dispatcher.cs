@@ -392,11 +392,22 @@ namespace Orleans.Runtime
                 RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 return;
             }
-            
-            bool enqueuedOk = targetActivation.EnqueueMessage(message);
-            if (!enqueuedOk)
+
+            switch (targetActivation.EnqueueMessage(message))
             {
-                ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
+                case ActivationData.EnqueueMessageResult.Success:
+                    // Great, nothing to do
+                    break;
+                case ActivationData.EnqueueMessageResult.ErrorInvalidActivation:
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
+                    break;
+                case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
+                    // Avoid any new call to this activation
+                    catalog.DeactivateStuckActivation(targetActivation);
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
             // Dont count this as end of processing. The message will come back after queueing via HandleIncomingRequest.
@@ -568,7 +579,7 @@ namespace Orleans.Runtime
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, message.TargetGrain, InsideRuntimeClient.Current.Catalog, strategy);
+                message.SendingAddress, message.TargetGrain, this.catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {

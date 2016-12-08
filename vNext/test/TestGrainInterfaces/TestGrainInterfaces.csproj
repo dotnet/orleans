@@ -13,6 +13,14 @@
 
   <ItemGroup>
     <Compile Include="**\*.cs" />
+    <Compile
+      Include="..\..\..\test\TestGrainInterfaces\**\*.cs"
+      Exclude="
+        ..\..\..\test\TestGrainInterfaces\IFSharpParametersGrain.cs;
+        ..\..\..\test\TestGrainInterfaces\IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain.cs;
+        ..\..\..\test\TestGrainInterfaces\Properties\*.cs;
+        ..\..\..\test\TestGrainInterfaces\obj\**\*.cs;
+        ..\..\..\test\TestGrainInterfaces\bin\**\*.cs"/>
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
 
@@ -38,114 +46,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\CodegenTestInterfaces.cs">
-      <Link>CodegenTestInterfaces.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\GetGrainInterfaces.cs">
-      <Link>GetGrainInterfaces.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\GrainInterfaceHierarchyIGrains.cs">
-      <Link>GrainInterfaceHierarchyIGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IActivateDeactivateTestGrain.cs">
-      <Link>IActivateDeactivateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IActivateDeactivateWatcherGrain.cs">
-      <Link>IActivateDeactivateWatcherGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ICircularStateTestGrain.cs">
-      <Link>ICircularStateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IClusterTestGrains.cs">
-      <Link>IClusterTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IExceptionGrain.cs">
-      <Link>IExceptionGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IExtensionTestGrain.cs">
-      <Link>IExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IExternalTypeGrain.cs">
-      <Link>IExternalTypeGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IInitialStateGrain.cs">
-      <Link>IInitialStateGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IJsonEchoGrain.cs">
-      <Link>IJsonEchoGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IKeyExtensionTestGrain.cs">
-      <Link>IKeyExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IMethodInterceptionGrain.cs">
-      <Link>IMethodInterceptionGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IMultipleImplicitSubscriptionGrain.cs">
-      <Link>IMultipleImplicitSubscriptionGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IMultipleSubscriptionConsumerGrain.cs">
-      <Link>IMultipleSubscriptionConsumerGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IPersistenceTestGrains.cs">
-      <Link>IPersistenceTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IReminderTestGrain.cs">
-      <Link>IReminderTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISampleStreamingGrain.cs">
-      <Link>ISampleStreamingGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISerializationGeneratorTests.cs">
-      <Link>ISerializationGeneratorTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleGenericGrain.cs">
-      <Link>ISimpleGenericGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleObserverableGrain.cs">
-      <Link>ISimpleObserverableGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimplePersistentGrain.cs">
-      <Link>ISimplePersistentGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStatelessWorkerGrain.cs">
-      <Link>IStatelessWorkerGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamingGrain.cs">
-      <Link>IStreamingGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamingImmutabilityTestGrain.cs">
-      <Link>IStreamingImmutabilityTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreaming_ProducerGrain.cs">
-      <Link>IStreaming_ProducerGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IStreamLifecycleTestGrains.cs">
-      <Link>IStreamLifecycleTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ITestExtension.cs">
-      <Link>ITestExtension.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ITestGrain.cs">
-      <Link>ITestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IValueTypeTestGrain.cs">
-      <Link>IValueTypeTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\SerializerExclusions.cs">
-      <Link>SerializerExclusions.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IEchoTaskGrain.cs">
-      <Link>IEchoTaskGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\IGenericInterfaces.cs">
-      <Link>IGenericInterfaces.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestGrainInterfaces\ISimpleGrain.cs">
-      <Link>ISimpleGrain.cs</Link>
-    </Compile>
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -156,20 +57,12 @@
 
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to ClientGenerator.exe -->
-  <Choose>
-    <When Condition="'$(builduri)' != ''">
-      <PropertyGroup>
-        <!-- TFS build -->
-        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
-      </PropertyGroup>
-    </When>
-    <Otherwise>
-      <PropertyGroup>
-        <!-- Visual Studio or MsBuild .sln build -->
-        <OrleansReferencesBase>$(ProjectDir)..\..\src\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
-      </PropertyGroup>
-    </Otherwise>
-  </Choose>
+  <PropertyGroup>
+    <!-- Visual Studio or MsBuild .sln build -->
+    <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
+    <!-- TFS build -->
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(TargetDir)</OrleansReferencesBase>
+  </PropertyGroup>
   <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
   <!--End Orleans -->
 </Project>

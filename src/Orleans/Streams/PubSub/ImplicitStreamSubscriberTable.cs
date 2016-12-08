@@ -11,7 +11,7 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<string, HashSet<int>> table;
 
-        internal ImplicitStreamSubscriberTable()
+        public ImplicitStreamSubscriberTable()
         {
             table = new Dictionary<string, HashSet<int>>();
         }

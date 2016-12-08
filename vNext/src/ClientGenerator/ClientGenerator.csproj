@@ -2,17 +2,20 @@
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
 
   <PropertyGroup Label="Configuration">
-    <DefineConstants></DefineConstants>
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <OutputType>Exe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Orleans.CodeGeneration</RootNamespace>
     <AssemblyName>ClientGenerator</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net462'">
+    <RuntimeIdentifier>win</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,12 +25,12 @@
   
   <ItemGroup>
     <Compile Include="..\Build\GlobalAssemblyInfo.cs" />
-    <Compile Include="..\..\..\src\ClientGenerator\**\*.cs" Exclude="..\..\..\src\ClientGenerator\Properties\**\*.cs" />
-  </ItemGroup>
- 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
+    <Compile
+      Include="..\..\..\src\ClientGenerator\**\*.cs"
+      Exclude="
+        ..\..\..\src\ClientGenerator\obj\**\*.cs;
+        ..\..\..\src\ClientGenerator\bin\**\*.cs;
+        ..\..\..\src\ClientGenerator\Properties\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,19 +38,16 @@
       <Version>1.0.0-alpha-20161104-2</Version>
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.Runtime">
+      <Version>4.3.0</Version>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
   </ItemGroup>
-
-  <PropertyGroup Condition="'$(Bootstrap)' == 'true'">
-    <OutputPath>$(BootstrapOutputPath)</OutputPath>
-    <OutDir>$(BootstrapOutputPath)</OutDir>
-    <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
-    <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
-  </PropertyGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

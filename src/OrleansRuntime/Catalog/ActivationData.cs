@@ -147,12 +147,12 @@ namespace Orleans.Runtime
             }
         }
 
-        public readonly TimeSpan CollectionAgeLimit;
-        private readonly NodeConfiguration nodeConfiguration;
-        private readonly Logger logger;
-
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
+        private readonly TimeSpan maxWarningRequestProcessingTime;
+        private readonly NodeConfiguration nodeConfiguration;
+        public readonly TimeSpan CollectionAgeLimit;
+        private readonly Logger logger;
         private IGrainMethodInvoker lastInvoker;
 
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
@@ -167,7 +167,8 @@ namespace Orleans.Runtime
             IActivationCollector collector,
             TimeSpan ageLimit,
             NodeConfiguration nodeConfiguration,
-            TimeSpan maxRequestProcessingTime)
+            TimeSpan maxWarningRequestProcessingTime,
+			TimeSpan maxRequestProcessingTime)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
@@ -175,6 +176,7 @@ namespace Orleans.Runtime
 
             logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
+            this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.nodeConfiguration = nodeConfiguration;
             ResetKeepAliveRequest();
             Address = addr;
@@ -487,11 +489,18 @@ namespace Orleans.Runtime
             }
         }
 
+        public enum EnqueueMessageResult
+        {
+            Success,
+            ErrorInvalidActivation,
+            ErrorStuckActivation,
+        }
+
         /// <summary>
         /// Insert in a FIFO order
         /// </summary>
         /// <param name="message"></param>
-        public bool EnqueueMessage(Message message)
+        public EnqueueMessageResult EnqueueMessage(Message message)
         {
             lock (this)
             {
@@ -499,14 +508,19 @@ namespace Orleans.Runtime
                 {
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
-                    return false;
+                    return EnqueueMessageResult.ErrorInvalidActivation;
                 }
-                // If maxRequestProcessingTime is never set, then we will skip this check
-                if (maxRequestProcessingTime.TotalMilliseconds > 0 && Running != null)
+                if (Running != null)
                 {
-                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
+                    {
+                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
+                        return EnqueueMessageResult.ErrorStuckActivation;
+                    }
+                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
+                    else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
                     {
                         logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
@@ -516,7 +530,7 @@ namespace Orleans.Runtime
 
                 waiting = waiting ?? new List<Message>();
                 waiting.Add(message);
-                return true;
+                return EnqueueMessageResult.Success;
             }
         }
 

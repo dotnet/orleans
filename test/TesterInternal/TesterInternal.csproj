@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="ActivationsLifeCycleTests\ActivationCollectorTests.cs" />
     <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
+    <Compile Include="CodeGeneratorTests_AccessibilityChecks.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
@@ -54,10 +55,7 @@
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
-    <Compile Include="MembershipTests\PostgreSqlMembershipTableTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
-    <Compile Include="RemindersTest\PostgreSqlRemindersTableTests.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />
@@ -66,31 +64,22 @@
     <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTests.cs" />
     <Compile Include="StorageTests\AWSUtils\PersistenceGrainTests_AWSDynamoDBStore.cs" />
     <Compile Include="StorageTests\AWSUtils\UnitTestDynamoDBStorage.cs" />
-    <Compile Include="StorageTests\Relational\AdotNetProviderFunctionalityTests.cs" />
-    <Compile Include="StorageTests\Relational\StreamingTestRelationalStoragePicker.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\StorageDateSetGenericHuge.cs" />
+    <Compile Include="StorageTests\CommonStorageTests.cs" />
+    <Compile Include="StorageTests\CommonStorageUtilities.cs" />
+    <Compile Include="StorageTests\SymbolSet.cs" />
+    <Compile Include="StorageTests\TestDataSets\GrainTypeGenerator.cs" />
+    <Compile Include="StorageTests\RandomUtilities.cs" />
+    <Compile Include="StorageTests\Range.cs" />
+    <Compile Include="StorageTests\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs" />
+    <Compile Include="StorageTests\TestDataSets\StorageDataSetGeneric.cs" />
+    <Compile Include="StorageTests\TestDataSets\StorageDataSetPlain.cs" />
+    <Compile Include="StorageTests\TestDataSets\StorageDateSetGenericHuge.cs" />
+    <Compile Include="StorageTests\TestDataSets\TestState1.cs" />
+    <Compile Include="StorageTests\TestDataSets\TestStateGeneric1.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs" />
+    <Compile Include="OrleansRuntime\StuckGrainTests.cs" />
     <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
     <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
-    <Compile Include="StorageTests\RelationalStoreTests.cs" />
-    <Compile Include="StorageTests\Relational\CommonFixture.cs" />
-    <Compile Include="StorageTests\Relational\CommonStorageTests.cs" />
-    <Compile Include="StorageTests\Relational\CommonStorageUtilities.cs" />
-    <Compile Include="StorageTests\Relational\ConstantHasher.cs" />
-    <Compile Include="StorageTests\Relational\MySqlStorageTests.cs" />
-    <Compile Include="StorageTests\Relational\RandomUtilities.cs" />
-    <Compile Include="StorageTests\Relational\Range.cs" />
-    <Compile Include="StorageTests\Relational\RelationalStorageTests.cs" />
-    <Compile Include="StorageTests\Relational\SqlServerStorageTests.cs" />
-    <Compile Include="StorageTests\Relational\SymbolSet.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetPlain.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSetGeneric.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\GrainTypeGenerator.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\TestState1.cs" />
-    <Compile Include="StorageTests\Relational\TestDataSets\TestStateGeneric1.cs" />
-    <Compile Include="StorageTests\Relational\TestEnvironmentInvariant.cs" />
     <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
     <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
@@ -118,21 +107,14 @@
     <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
     <Compile Include="OrleansRuntime\Streams\ObjectPoolTests.cs" />
     <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs" />
     <Compile Include="GrainReferenceCacheTests.cs" />
     <Compile Include="GrainReferenceCastTests.cs" />
     <Compile Include="GrainReferenceTest.cs" />
-    <Compile Include="MembershipTests\MySqlMembershipTableTests.cs" />
     <Compile Include="LocalErrorGrain.cs" />
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
     <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
     <Compile Include="SerializerTests\SerializationTests.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\DummyCounter.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs" />
-    <Compile Include="SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs" />
     <Compile Include="StorageTests\HierarchicalKeyStoreTests.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
     <Compile Include="MultifacetGrainTest.cs" />
@@ -142,10 +124,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="MembershipTests\SqlServerMembershipTableTests.cs" />
-    <Compile Include="RemindersTest\MySqlRemindersTableTests.cs" />
     <Compile Include="RemindersTest\ReminderTableTestsBase.cs" />
-    <Compile Include="RemindersTest\SqlServerRemindersTableTests.cs" />
     <Compile Include="StatsTests.cs" />
     <Compile Include="MembershipTests\MembershipTableTestsBase.cs" />
     <Compile Include="StorageTests\PersistenceGrainTests.cs" />
@@ -175,7 +154,6 @@
     <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
     <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />
-    <Compile Include="TimerTests\ReminderTests_SqlServer.cs" />
     <Compile Include="TimerTests\ReminderTests_Base.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -206,10 +184,6 @@
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
-      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
-      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
@@ -269,10 +243,6 @@
     <None Include="ClientConfig_SQSStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <Content Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
-      <Link>CreateOrleansTables_PostgreSql.sql</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -288,14 +258,6 @@
     <Content Include="..\..\src\Build\Version.txt">
       <Link>Version.txt</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
-      <Link>CreateOrleansTables_MySql.sql</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
-      <Link>CreateOrleansTables_SqlServer.sql</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\ClientConfigurationForTesting.xml">
       <Link>ClientConfigurationForTesting.xml</Link>
@@ -326,13 +288,6 @@
     </Content>
     <Content Include="Config_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Data\TestDb.mdf">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Data\TestDb_log.ldf">
-      <DependentUpon>TestDb.mdf</DependentUpon>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ClientConfiguration.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -800,14 +800,15 @@ namespace UnitTests.Grains
             new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Info)
         };
 
-        public NonReentrentStressGrainWithoutState()
-        {
-        }
+        public NonReentrentStressGrainWithoutState() { }
 
-        public NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
+        private NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
             : base(identity, runtime)
         {
         }
+
+        public static NonReentrentStressGrainWithoutState Create(IGrainIdentity identity, IGrainRuntime runtime)
+            => new NonReentrentStressGrainWithoutState(identity, runtime);
 
         public override Task OnActivateAsync()
         {

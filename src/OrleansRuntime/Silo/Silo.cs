@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Runtime;
 using System.Text;
@@ -60,7 +61,8 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
         private readonly Logger logger;
-        private readonly GrainTypeManager typeManager;
+        private readonly GrainTypeManager grainTypeManager;
+        private TypeManager typeManager;
         private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloStatisticsManager siloStatistics;
         private readonly MembershipFactory membershipFactory;
@@ -93,6 +95,7 @@ namespace Orleans.Runtime
         internal GlobalConfiguration GlobalConfig => this.initializationParams.GlobalConfig;
         internal NodeConfiguration LocalConfig => this.initializationParams.NodeConfig;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
+        internal GrainTypeManager LocalGrainTypeManager { get { return grainTypeManager; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
@@ -235,6 +238,7 @@ namespace Orleans.Runtime
                     services.TryAddSingleton(sp => sp.GetRequiredService<Catalog>().Dispatcher);
                     services.TryAddSingleton<InsideRuntimeClient>();
                     services.TryAddExisting<IRuntimeClient, InsideRuntimeClient>();
+                    services.TryAddExisting<ISiloRuntimeClient, InsideRuntimeClient>();
                     services.TryAddSingleton<MembershipFactory>();
                     services.TryAddSingleton<MultiClusterOracleFactory>();
                     services.TryAddSingleton<LocalReminderServiceFactory>();
@@ -251,6 +255,9 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<MultiClusterOracleFactory>();
                     services.TryAddSingleton<LocalReminderServiceFactory>();
                     services.TryAddSingleton<ClientObserverRegistrar>();
+                    services.TryAddSingleton<SiloProviderRuntime>();
+                    services.TryAddExisting<IStreamProviderRuntime, SiloProviderRuntime>();
+                    services.TryAddSingleton<ImplicitStreamSubscriberTable>();
 
                     // Placement
                     services.TryAddSingleton<PlacementDirectorsManager>();
@@ -262,14 +269,7 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<ClientObserversPlacementDirector>();
                     
                     services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
-                    if (usingCustomServiceProvider)
-                    {
-                        services.TryAddSingleton<GrainCreator>();
-                    }
-                    else
-                    {
-                        services.TryAddSingleton(sp => new GrainCreator(null, sp.GetRequiredService<Func<IGrainRuntime>>()));
-                    }
+                    services.TryAddSingleton<GrainCreator>();
 
                     if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
                     {
@@ -304,7 +304,7 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            typeManager = Services.GetRequiredService<GrainTypeManager>();
+            grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
 
             // Performance metrics
             siloStatistics = Services.GetRequiredService<SiloStatisticsManager>();
@@ -349,7 +349,7 @@ namespace Orleans.Runtime
 
             membershipFactory = Services.GetRequiredService<MembershipFactory>();
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
-
+            
             SystemStatus.Current = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
@@ -367,7 +367,8 @@ namespace Orleans.Runtime
             RegisterSystemTarget(siloControl);
 
             logger.Verbose("Creating {0} System Target", "StreamProviderUpdateAgent");
-            RegisterSystemTarget(new StreamProviderManagerAgent(this, allSiloProviders));
+            RegisterSystemTarget(
+                new StreamProviderManagerAgent(this, allSiloProviders, Services.GetRequiredService<IStreamProviderRuntime>()));
 
             logger.Verbose("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
@@ -380,8 +381,11 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
 
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
+
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            this.RegisterSystemTarget(new TypeManager(this.SiloAddress, this.typeManager));
+            var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
+            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable);
+            this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
             if (this.membershipOracle is SystemTarget)
@@ -415,6 +419,8 @@ namespace Orleans.Runtime
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
+
+            LocalSiloStatusOracle.SubscribeToSiloStatusEvents(typeManager);
 
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
@@ -474,7 +480,7 @@ namespace Orleans.Runtime
             ConfigureThreadPoolAndServicePointSettings();
 
             // This has to start first so that the directory system target factory gets loaded before we start the router.
-            typeManager.Start();
+            grainTypeManager.Start();
             runtimeClient.Start();
 
             // The order of these 4 is pretty much arbitrary.
@@ -488,11 +494,14 @@ namespace Orleans.Runtime
 
             // Set up an execution context for this thread so that the target creation steps can use asynch values.
             RuntimeContext.InitializeMainThread();
+            
+            // Initialize the implicit stream subscribers table.
+            var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
+            implicitStreamSubscriberTable.InitImplicitStreamSubscribers(this.grainTypeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray());
 
-            SiloProviderRuntime.Initialize(GlobalConfig, SiloAddress.ToLongString(), grainFactory, Services);
-            SiloProviderRuntime.Instance.StreamingInitialize();
-            runtimeClient.CurrentStreamProviderRuntime = SiloProviderRuntime.Instance;
-            statisticsProviderManager = new StatisticsProviderManager("Statistics", SiloProviderRuntime.Instance);
+            var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
+            runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
+            statisticsProviderManager = new StatisticsProviderManager("Statistics", siloProviderRuntime);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
             if (statsProviderName != null)
@@ -522,7 +531,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) {  logger.Verbose("System grains created successfully."); }
 
             // Initialize storage providers once we have a basic silo runtime environment operating
-            storageProviderManager = new StorageProviderManager(grainFactory, Services);
+            storageProviderManager = new StorageProviderManager(grainFactory, Services, siloProviderRuntime);
             scheduler.QueueTask(
                 () => storageProviderManager.LoadStorageProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)
@@ -534,7 +543,7 @@ namespace Orleans.Runtime
             // Load and init stream providers before silo becomes active
             var siloStreamProviderManager = (StreamProviderManager)grainRuntime.StreamProviderManager;
             scheduler.QueueTask(
-                () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, SiloProviderRuntime.Instance),
+                () => siloStreamProviderManager.LoadStreamProviders(GlobalConfig.ProviderConfigurations, siloProviderRuntime),
                     providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(initTimeout);
             runtimeClient.CurrentStreamProviderManager = siloStreamProviderManager;
@@ -600,7 +609,7 @@ namespace Orleans.Runtime
 
                 this.bootstrapProviderManager = new BootstrapProviderManager();
                 this.scheduler.QueueTask(
-                    () => this.bootstrapProviderManager.LoadAppBootstrapProviders(this.GlobalConfig.ProviderConfigurations),
+                    () => this.bootstrapProviderManager.LoadAppBootstrapProviders(siloProviderRuntime, this.GlobalConfig.ProviderConfigurations),
                     this.providerManagerSystemTarget.SchedulingContext)
                         .WaitWithThrow(this.initTimeout);
                 this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics

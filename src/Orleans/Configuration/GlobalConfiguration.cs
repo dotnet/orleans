@@ -170,6 +170,10 @@ namespace Orleans.Runtime.Configuration
         /// The number of seconds to attempt to join a cluster of silos before giving up.
         /// </summary>
         public TimeSpan MaxJoinAttemptTime { get; set; }
+        /// <summary>
+        /// The number of seconds to refresh the cluster grain interface map
+        /// </summary>
+        public TimeSpan TypeMapRefreshInterval { get; set; }
         internal ConfigValue<int> ExpectedClusterSizeConfigValue { get; set; }
         /// <summary>
         /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
@@ -306,6 +310,11 @@ namespace Orleans.Runtime.Configuration
         }
 
         internal TimeSpan CollectionQuantum { get; set; }
+
+        /// <summary>
+        /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
+        /// </summary>
+        public TimeSpan MaxRequestProcessingTime { get; set; }
 
         /// <summary>
         /// The CacheSize attribute specifies the maximum number of grains to cache directory information for.
@@ -470,6 +479,7 @@ namespace Orleans.Runtime.Configuration
         private static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
         private static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
+        private static readonly TimeSpan DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME = TimeSpan.FromMinutes(1);
         private const int DEFAULT_LIVENESS_NUM_MISSED_PROBES_LIMIT = 3;
         private const int DEFAULT_LIVENESS_NUM_PROBED_SILOS = 3;
         private const int DEFAULT_LIVENESS_NUM_VOTES_FOR_DEATH_DECLARATION = 2;
@@ -522,6 +532,7 @@ namespace Orleans.Runtime.Configuration
             UseLivenessGossip = DEFAULT_LIVENESS_USE_LIVENESS_GOSSIP;
             ValidateInitialConnectivity = DEFAULT_VALIDATE_INITIAL_CONNECTIVITY;
             MaxJoinAttemptTime = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
+            TypeMapRefreshInterval = DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME;
             MaxMultiClusterGateways = DEFAULT_MAX_MULTICLUSTER_GATEWAYS;
             BackgroundGossipInterval = DEFAULT_BACKGROUND_GOSSIP_INTERVAL;
             UseGlobalSingleInstanceByDefault = DEFAULT_USE_GLOBAL_SINGLE_INSTANCE;
@@ -534,7 +545,8 @@ namespace Orleans.Runtime.Configuration
 
             // Assume the ado invariant is for sql server storage if not explicitly specified
             AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
-            
+
+            MaxRequestProcessingTime = DEFAULT_COLLECTION_AGE_LIMIT;
             CollectionQuantum = DEFAULT_COLLECTION_QUANTUM;
 
             CacheSize = DEFAULT_CACHE_SIZE;

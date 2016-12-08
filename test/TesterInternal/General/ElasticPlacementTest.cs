@@ -32,6 +32,7 @@ namespace UnitTests.General
 
             options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
             options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.AzureTable;
+            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
 
             return new TestCluster(options);
         }

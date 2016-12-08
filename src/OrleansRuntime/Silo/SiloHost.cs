@@ -156,18 +156,25 @@ namespace Orleans.Runtime.Host
 
                 if (orleans != null)
                 {
-                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";
-                    logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+                    var shutdownEventName = Config.Defaults.SiloShutdownEventName ?? Name + "-Shutdown";                    
 
                     bool createdNew;
-                    shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
-                    if (!createdNew)
+                    try
                     {
-                        logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                        logger.Info(ErrorCode.SiloShutdownEventName, "Silo shutdown event name: {0}", shutdownEventName);
+                        shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, shutdownEventName, out createdNew);
+                        if (!createdNew)
+                        {
+                            logger.Info(ErrorCode.SiloShutdownEventOpened, "Opened existing shutdown event. Setting the event {0}", shutdownEventName);
+                        }
+                        else
+                        {
+                            logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                        }
                     }
-                    else
+                    catch (PlatformNotSupportedException exc)
                     {
-                        logger.Info(ErrorCode.SiloShutdownEventCreated, "Created and set shutdown event {0}", shutdownEventName);
+                        logger.Info(ErrorCode.SiloShutdownEventFailure, "Unable to create SiloShutdownEvent: {0}", exc.ToString());
                     }
 
                     // Start silo
@@ -175,27 +182,37 @@ namespace Orleans.Runtime.Host
 
                     // Wait for the shutdown event, and trigger a graceful shutdown if we receive it.
 
-                    var shutdownThread = new Thread(o =>
-                       {
-                           shutdownEvent.WaitOne();
-                           logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
-                           orleans.Shutdown();
-                       });
-                    shutdownThread.IsBackground = true;
-                    shutdownThread.Start();
-
-                    var startupEventName = Name;
-                    logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
-
-                    startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
-                    if (!createdNew)
+                    if (shutdownEvent != null)
                     {
-                        logger.Info(ErrorCode.SiloStartupEventOpened, "Opened existing startup event. Setting the event {0}", startupEventName);
-                        startupEvent.Set();
+                        var shutdownThread = new Thread(o =>
+                                       {
+                                           shutdownEvent.WaitOne();
+                                           logger.Info(ErrorCode.SiloShutdownEventReceived, "Received a shutdown event. Starting graceful shutdown.");
+                                           orleans.Shutdown();
+                                       });
+                        shutdownThread.IsBackground = true;
+                        shutdownThread.Start(); 
                     }
-                    else
+
+                    try
                     {
-                        logger.Info(ErrorCode.SiloStartupEventCreated, "Created and set startup event {0}", startupEventName);
+                        var startupEventName = Name;
+                        logger.Info(ErrorCode.SiloStartupEventName, "Silo startup event name: {0}", startupEventName);
+
+                        startupEvent = new EventWaitHandle(true, EventResetMode.ManualReset, startupEventName, out createdNew);
+                        if (!createdNew)
+                        {
+                            logger.Info(ErrorCode.SiloStartupEventOpened, "Opened existing startup event. Setting the event {0}", startupEventName);
+                            startupEvent.Set();
+                        }
+                        else
+                        {
+                            logger.Info(ErrorCode.SiloStartupEventCreated, "Created and set startup event {0}", startupEventName);
+                        }
+                    }
+                    catch (PlatformNotSupportedException exc)
+                    {
+                        logger.Info(ErrorCode.SiloStartupEventFailure, "Unable to create SiloStartupEvent: {0}", exc.ToString());
                     }
 
                     logger.Info(ErrorCode.SiloStarted, "Silo {0} started successfully", Name);
@@ -498,9 +515,7 @@ namespace Orleans.Runtime.Host
 
             if (startupEvent != null)
                 startupEvent.Reset();
-            else
-                throw new InvalidOperationException("Cannot wait for silo " + this.Name + " due to prior initialization error");
-
+            
             if (orleans != null)
             {
                 // Intercept cancellation to initiate silo stop

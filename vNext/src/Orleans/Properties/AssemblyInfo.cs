@@ -23,3 +23,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]

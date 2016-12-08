@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Providers;
 
 namespace Orleans.Runtime
 {
@@ -29,9 +28,10 @@ namespace Orleans.Runtime
 
         // Explicitly typed, for backward compat
         public async Task LoadAppBootstrapProviders(
+            IProviderRuntime providerRuntime,
             IDictionary<string, ProviderCategoryConfiguration> configs)
         {
-            await pluginManager.LoadAndInitPluginProviders(configCategoryName, configs);
+            await pluginManager.LoadAndInitPluginProviders(providerRuntime, configCategoryName, configs);
         }
 
 
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
 
             public IProvider GetProvider(string name)
             {
-                return providerLoader != null ? providerLoader.GetProvider(name) : null;
+                return providerLoader?.GetProvider(name);
             }
 
             public IList<T> GetProviders()
@@ -66,7 +66,9 @@ namespace Orleans.Runtime
             }
 
             internal async Task LoadAndInitPluginProviders(
-                string configCategoryName, IDictionary<string, ProviderCategoryConfiguration> configs)
+                IProviderRuntime providerRuntime,
+                string configCategoryName,
+                IDictionary<string, ProviderCategoryConfiguration> configs)
             {
                 ProviderCategoryConfiguration categoryConfig;
                 if (!configs.TryGetValue(configCategoryName, out categoryConfig)) return;
@@ -76,7 +78,7 @@ namespace Orleans.Runtime
                 logger.Info(ErrorCode.SiloCallingProviderInit, "Calling Init for {0} classes", typeof(T).Name);
 
                 // Await here to force any errors to show this method name in stack trace, for better diagnostics
-                await providerLoader.InitProviders(SiloProviderRuntime.Instance);
+                await providerLoader.InitProviders(providerRuntime);
             }
         }
     }

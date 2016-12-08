@@ -18,6 +18,7 @@ namespace UnitTests.MembershipTests
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = "ActivationCountBasedPlacement";
             options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
             options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
+            options.ClusterConfiguration.Globals.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100);
 
             // use only Primary as the gateway
             options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();

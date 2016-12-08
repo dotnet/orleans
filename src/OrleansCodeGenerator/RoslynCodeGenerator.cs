@@ -1,3 +1,5 @@
+using Orleans.Serialization;
+
 namespace Orleans.CodeGenerator
 {
     using System;
@@ -7,6 +9,7 @@ namespace Orleans.CodeGenerator
     using System.Diagnostics;
     using System.Linq;
     using System.Reflection;
+
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Orleans.Async;
     using Orleans.CodeGeneration;
@@ -34,27 +37,7 @@ namespace Orleans.CodeGenerator
         /// The serializer generation manager.
         /// </summary>
         private static readonly SerializerGenerationManager SerializerGenerationManager = new SerializerGenerationManager();
-
-        /// <summary>
-        /// The generic interface types whose type arguments needs serializators generation
-        /// </summary>
-        private static readonly HashSet<Type> KnownGenericIntefaceTypes = new HashSet<Type>
-            {
-                typeof(Streams.IAsyncObserver<>),
-                typeof(Streams.IAsyncStream<>),
-                typeof(Streams.IAsyncObservable<>)
-            };
-
-        /// <summary>
-        /// The generic base types whose type arguments needs serializators generation
-        /// </summary>
-        private static readonly HashSet<Type> KnownGenericBaseTypes = new HashSet<Type>
-            {
-                typeof(Grain<>),
-                typeof(Streams.StreamSubscriptionHandleImpl<>),
-                typeof(Streams.StreamSubscriptionHandle<>)
-            };
-
+        
         /// <summary>
         /// Adds a pre-generated assembly.
         /// </summary>
@@ -72,21 +55,23 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Generates code for all loaded assemblies and loads the output.
         /// </summary>
-        public void GenerateAndLoadForAllAssemblies()
+        public IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAllAssemblies()
         {
-            this.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
+            return this.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
         }
 
         /// <summary>
         /// Generates and loads code for the specified inputs.
         /// </summary>
         /// <param name="inputs">The assemblies to generate code for.</param>
-        public void GenerateAndLoadForAssemblies(params Assembly[] inputs)
+        public IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(params Assembly[] inputs)
         {
             if (inputs == null)
             {
                 throw new ArgumentNullException(nameof(inputs));
             }
+
+            var results = new List<GeneratedAssembly>();
 
             var timer = Stopwatch.StartNew();
             var emitDebugSymbols = false;
@@ -98,14 +83,18 @@ namespace Orleans.CodeGenerator
                 }
 
                 RegisterGeneratedCodeTargets(input);
-                TryLoadGeneratedAssemblyFromCache(input);
+                var cached = TryLoadGeneratedAssemblyFromCache(input);
+                if (cached != null)
+                {
+                    results.Add(cached);
+                }
             }
 
             var grainAssemblies = inputs.Where(ShouldGenerateCodeForAssembly).ToList();
             if (grainAssemblies.Count == 0)
             {
                 // Already up to date.
-                return;
+                return results;
             }
 
             try
@@ -117,6 +106,10 @@ namespace Orleans.CodeGenerator
                 if (generatedSyntax.Syntax != null)
                 {
                     generatedAssembly = CompileAndLoad(generatedSyntax, emitDebugSymbols);
+                    if (generatedAssembly != null)
+                    {
+                        results.Add(generatedAssembly);
+                    }
                 }
                 else
                 {
@@ -139,6 +132,8 @@ namespace Orleans.CodeGenerator
                         generatedSyntax.SourceAssemblies.Count,
                         timer.ElapsedMilliseconds);
                 }
+
+                return results;
             }
             catch (Exception exception)
             {
@@ -156,16 +151,14 @@ namespace Orleans.CodeGenerator
         /// <param name="input">
         /// The assembly to generate code for.
         /// </param>
-        public void GenerateAndLoadForAssembly(Assembly input)
+        public GeneratedAssembly GenerateAndLoadForAssembly(Assembly input)
         {
             try
             {
                 RegisterGeneratedCodeTargets(input);
                 if (!ShouldGenerateCodeForAssembly(input))
                 {
-                    TryLoadGeneratedAssemblyFromCache(input);
-
-                    return;
+                    return TryLoadGeneratedAssemblyFromCache(input);
                 }
 
                 var timer = Stopwatch.StartNew();
@@ -197,6 +190,8 @@ namespace Orleans.CodeGenerator
                         "Generated code for 1 assembly in {0}ms",
                         timer.ElapsedMilliseconds);
                 }
+
+                return generatedAssembly;
             }
             catch (Exception exception)
             {
@@ -248,18 +243,19 @@ namespace Orleans.CodeGenerator
         /// <param name="targetAssembly">
         /// The target assembly which the cached counterpart is generated for.
         /// </param>
-        private static void TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
+        private static CachedAssembly TryLoadGeneratedAssemblyFromCache(Assembly targetAssembly)
         {
             CachedAssembly cached;
             if (!CompiledAssemblies.TryGetValue(targetAssembly.GetName().FullName, out cached)
                 || cached.RawBytes == null || cached.Loaded)
             {
-                return;
+                return cached;
             }
 
             // Load the assembly and mark it as being loaded.
-            Assembly.Load(cached.RawBytes, cached.DebugSymbolRawBytes);
+            cached.Assembly = LoadAssembly(cached);
             cached.Loaded = true;
+            return cached;
         }
 
         /// <summary>
@@ -273,11 +269,39 @@ namespace Orleans.CodeGenerator
         private static CachedAssembly CompileAndLoad(GeneratedSyntax generatedSyntax, bool emitDebugSymbols)
         {
             var generated = CodeGeneratorCommon.CompileAssembly(generatedSyntax, "OrleansCodeGen", emitDebugSymbols: emitDebugSymbols);
-            Assembly.Load(generated.RawBytes, generated.DebugSymbolRawBytes);
+            var loadedAssembly = LoadAssembly(generated);
             return new CachedAssembly(generated)
             {
-                Loaded = true
+                Loaded = true,
+                Assembly = loadedAssembly,
             };
+        }
+
+        /// <summary>
+        /// Loads the specified assembly.
+        /// </summary>
+        /// <param name="asm">The assembly to load.</param>
+        private static Assembly LoadAssembly(GeneratedAssembly asm)
+        {
+#if ORLEANS_BOOTSTRAP
+            throw new NotImplementedException();
+#elif NETSTANDARD
+            Assembly result;
+            result = Orleans.PlatformServices.PlatformAssemblyLoader.LoadFromBytes(asm.RawBytes, asm.DebugSymbolRawBytes);
+            AppDomain.CurrentDomain.AddAssembly(result);
+            return result;
+#else
+            if (asm.DebugSymbolRawBytes != null)
+            {
+                return Assembly.Load(
+                    asm.RawBytes,
+                    asm.DebugSymbolRawBytes);
+            }
+            else
+            {
+                return Assembly.Load(asm.RawBytes);
+            }
+#endif
         }
 
         /// <summary>
@@ -347,8 +371,8 @@ namespace Orleans.CodeGenerator
                                           && knownAssemblyAttribute.TreatTypesAsSerializable;
                 foreach (var type in TypeUtils.GetDefinedTypes(assembly, Logger))
                 {
-                    var considerForSerialization = considerAllTypesForSerialization || type.GetTypeInfo().IsSerializable;
-                    ConsiderType(type, runtime, targetAssembly, includedTypes, considerForSerialization);
+                    var considerForSerialization = considerAllTypesForSerialization || type.IsSerializable;
+                    ConsiderType(type.AsType(), runtime, targetAssembly, includedTypes, considerForSerialization);
                 }
             }
 
@@ -405,7 +429,7 @@ namespace Orleans.CodeGenerator
 
                             ConsoleText.WriteStatus(
                                 "\ttype " + toGen.FullName + " in namespace " + toGen.Namespace
-                                + " defined in Assembly " + toGen.Assembly.GetName());
+                                + " defined in Assembly " + toGen.GetTypeInfo().Assembly.GetName());
                         }
 
                         if (Logger.IsVerbose2)
@@ -453,8 +477,8 @@ namespace Orleans.CodeGenerator
             bool considerForSerialization = false)
         {
             // The module containing the serializer.
-            var module = runtime || type.Assembly != targetAssembly ? null : type.Module;
             var typeInfo = type.GetTypeInfo();
+            var module = runtime || !Equals(typeInfo.Assembly, targetAssembly) ? null : typeInfo.Module;
 
             // If a type was encountered which can be accessed and is marked as [Serializable], process it for serialization.
             if (considerForSerialization)
@@ -462,15 +486,20 @@ namespace Orleans.CodeGenerator
                 RecordType(type, module, targetAssembly, includedTypes);
             }
             
+            // Consider generic arguments to base types and implemented interfaces for code generation.
             ConsiderGenericBaseTypeArguments(typeInfo, module, targetAssembly, includedTypes);
             ConsiderGenericInterfacesArguments(typeInfo, module, targetAssembly, includedTypes);
-
-            // Collect the types which require code generation.
+            
+            // Include grain interface types.
             if (GrainInterfaceUtils.IsGrainInterface(type))
             {
-                if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
-                
-                includedTypes.Add(type);
+                // If code generation is being performed at runtime, the interface must be accessible to the generated code.
+                if (!runtime || TypeUtilities.IsTypePublic(type))
+                {
+                    if (Logger.IsVerbose2) Logger.Verbose2("Will generate code for: {0}", type.GetParseableName());
+
+                    includedTypes.Add(type);
+                }
             }
         }
 
@@ -490,7 +519,6 @@ namespace Orleans.CodeGenerator
         {
             if (typeInfo.BaseType == null) return;
             if (!typeInfo.BaseType.IsConstructedGenericType) return;
-            if (!KnownGenericBaseTypes.Contains(typeInfo.BaseType.GetGenericTypeDefinition())) return;
 
             foreach (var type in typeInfo.BaseType.GetGenericArguments())
             {
@@ -504,10 +532,8 @@ namespace Orleans.CodeGenerator
             Assembly targetAssembly,
             ISet<Type> includedTypes)
         {
-            var interfaces = typeInfo.GetInterfaces().Where(x =>
-                x.IsConstructedGenericType
-                && KnownGenericIntefaceTypes.Contains(x.GetGenericTypeDefinition()));
-            foreach (var type in interfaces.SelectMany(v => v.GetGenericArguments()))
+            var interfaces = typeInfo.GetInterfaces().Where(x => x.IsConstructedGenericType);
+            foreach (var type in interfaces.SelectMany(v => v.GetTypeInfo().GetGenericArguments()))
             {
                 RecordType(type, module, targetAssembly, includedTypes);
             }
@@ -564,7 +590,7 @@ namespace Orleans.CodeGenerator
                 CompiledAssemblies.TryAdd(target.AssemblyName, new CachedAssembly { Loaded = true });
             }
         }
-
+        
         [Serializable]
         private class CachedAssembly : GeneratedAssembly
         {

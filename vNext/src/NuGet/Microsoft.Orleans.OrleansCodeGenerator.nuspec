@@ -18,15 +18,16 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <group targetFramework=".NETFramework4.6.2">
+      <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
+        <dependency id="Microsoft.Orleans.PlatformServices" version="$version$" />
         <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.3.2" />
       </group>
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansCodeGenerator.XML" target="lib\net462" />
-    <file src="OrleansCodeGenerator.dll" target="lib\net462" />
+    <file src="netstandard1.5\OrleansCodeGenerator.XML" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansCodeGenerator.dll" target="lib\netstandard1.5" />
     <file src="$SRC_DIR$OrleansCodeGenerator\**\*.cs" target="src" />
   </files>
 </package>

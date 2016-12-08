@@ -16,6 +16,7 @@ namespace Orleans.CodeGenerator
     using Orleans.Runtime;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+    using Microsoft.CodeAnalysis.Emit;
 
     /// <summary>
     /// Methods common to multiple code generators.
@@ -62,7 +63,7 @@ namespace Orleans.CodeGenerator
 
             // Reference everything which can be referenced.
             var assemblies =
-                System.AppDomain.CurrentDomain.GetAssemblies()
+                AppDomain.CurrentDomain.GetAssemblies()
                     .Where(asm => !asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
                     .Select(asm => MetadataReference.CreateFromFile(asm.Location))
                     .Cast<MetadataReference>()
@@ -71,6 +72,18 @@ namespace Orleans.CodeGenerator
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+
+#if NETSTANDARD
+            // CoreFX bug https://github.com/dotnet/corefx/issues/5540 
+            // to workaround it, we are calling internal WithTopLevelBinderFlags(BinderFlags.IgnoreCorLibraryDuplicatedTypes) 
+            // TODO: this API will be public in the future releases of Roslyn. 
+            // This work is tracked in https://github.com/dotnet/roslyn/issues/5855 
+            // Once it's public, we should replace the internal reflection API call by the public one. 
+            var method = typeof(CSharpCompilationOptions).GetMethod("WithTopLevelBinderFlags", BindingFlags.NonPublic | BindingFlags.Instance);
+            // we need to pass BinderFlags.IgnoreCorLibraryDuplicatedTypes, but it's an internal class 
+            // http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/BinderFlags.cs,00f268571bb66b73 
+            options = (CSharpCompilationOptions)method.Invoke(options, new object[] { 1u << 26 });
+#endif
 
             string source = null;
             if (logger.IsVerbose3)
@@ -96,7 +109,10 @@ namespace Orleans.CodeGenerator
             var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
             try
             {
-                var compilationResult = compilation.Emit(outputStream, symbolStream);
+                var emitOptions = new EmitOptions()
+                    .WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
+
+                var compilationResult = compilation.Emit(outputStream, symbolStream, options: emitOptions);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);

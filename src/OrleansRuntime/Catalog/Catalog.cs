@@ -119,6 +119,7 @@ namespace Orleans.Runtime
 
 
         public GrainTypeManager GrainTypeManager { get; private set; }
+
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
         internal readonly ActivationCollector ActivationCollector;
@@ -142,6 +143,7 @@ namespace Orleans.Runtime
         private readonly GrainCreator grainCreator;
         private readonly NodeConfiguration nodeConfig;
         private readonly TimeSpan maxRequestProcessingTime;
+        private readonly TimeSpan maxWarningRequestProcessingTime;
 
         public Catalog(
             SiloInitializationParameters siloInitializationParameters, 
@@ -192,13 +194,23 @@ namespace Orleans.Runtime
                 }
                 return counter;
             });
-            maxRequestProcessingTime = this.config.ResponseTimeout.Multiply(5);
+            maxWarningRequestProcessingTime = this.config.ResponseTimeout.Multiply(5);
+            maxRequestProcessingTime = this.config.MaxRequestProcessingTime;
         }
 
         /// <summary>
         /// Gets the dispatcher used by this instance.
         /// </summary>
         public Dispatcher Dispatcher { get; }
+
+        public IList<SiloAddress> GetCompatibleSiloList(GrainId grain)
+        {
+            var typeCode = grain.GetTypeCode();
+            var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode).Intersect(AllActiveSilos).ToList();
+            if (compatibleSilos.Count == 0)
+                throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+            return compatibleSilos;
+        }
 
         internal void SetStorageManager(IStorageProviderManager storageManager)
         {
@@ -478,6 +490,7 @@ namespace Orleans.Runtime
                         ActivationCollector, 
                         config.Application.GetCollectionAgeLimit(grainType),
                         this.nodeConfig,
+                        this.maxWarningRequestProcessingTime,
                         this.maxRequestProcessingTime);
                     RegisterMessageTarget(result);
                 }
@@ -812,6 +825,24 @@ namespace Orleans.Runtime
         // Cannot be awaitable, since after DestroyActivation is done the activation is in Invalid state and cannot await any Task.
         internal void DeactivateActivationOnIdle(ActivationData data)
         {
+            DeactivateActivationImpl(data, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE);
+        }
+
+        // To be called fro within Activation context.
+        // To be used only if an activation is stuck for a long time, since it can lead to a duplicate activation
+        internal void DeactivateStuckActivation(ActivationData activationData)
+        {
+            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
+            // The unregistration is normally done in the regular deactivation process, but since this activation seems
+            // stuck (it might never run the deactivation process), we remove it from the directory directly
+            scheduler.RunOrQueueTask(
+                () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
+                SchedulingContext)
+                .Ignore();
+        }
+
+        private void DeactivateActivationImpl(ActivationData data, StatisticName statisticName)
+        {
             bool promptly = false;
             bool alreadBeingDestroyed = false;
             lock (data)
@@ -850,7 +881,7 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
                 "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
-            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE).Increment();
+            CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
                 DestroyActivationVoid(data); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!

@@ -20,7 +20,7 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-	  <dependency id="Consul" version="0.6.4.1" />
+      <dependency id="Consul" version="0.7.0.3" />
     </dependencies>
   </metadata>
   <files>

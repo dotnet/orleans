@@ -48,10 +48,10 @@
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="DeploymentTests\DeployTest.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
+    <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
     <Compile Include="PSClientTests\PSClientTests.cs" />
-    <Compile Include="RelationalUtilities\PostgreSqlStorageForTesting.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="SerializationTests\RoundTripSerializerTests.cs" />
@@ -92,10 +92,7 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="ProviderTests.cs" />
-    <Compile Include="RelationalUtilities\MySqlStorageForTesting.cs" />
     <Compile Include="InvocationInterceptTests.cs" />
-    <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
-    <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests\ProtobufSerializationTests\Addressbook.cs" />
@@ -202,10 +199,6 @@
     <ProjectReference Include="..\..\src\OrleansServiceBus\OrleansServiceBus.csproj">
       <Project>{8bff0092-15d2-4425-80c0-29e381702f2b}</Project>
       <Name>OrleansServiceBus</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj">
-      <Project>{47e9ae37-4eae-48d5-a778-2c80e9a6375f}</Project>
-      <Name>OrleansSQLUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>

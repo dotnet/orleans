@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -212,6 +213,8 @@ namespace Orleans.Runtime.Configuration
 
         public Dictionary<string, SearchOption> AdditionalAssemblyDirectories { get; set; }
 
+        public List<string> ExcludedGrainTypes { get; set; }
+
         public string SiloShutdownEventName { get; set; }
 
         internal const string DEFAULT_NODE_NAME = "default";
@@ -270,6 +273,7 @@ namespace Orleans.Runtime.Configuration
             UseNagleAlgorithm = false;
 
             AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
+            ExcludedGrainTypes = new List<string>();
         }
 
         public NodeConfiguration(NodeConfiguration other)
@@ -320,6 +324,7 @@ namespace Orleans.Runtime.Configuration
 
             StartupTypeName = other.StartupTypeName;
             AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
+            ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
         }
 
         public override string ToString()
@@ -487,7 +492,6 @@ namespace Orleans.Runtime.Configuration
                     case "AdditionalAssemblyDirectories":
                         ConfigUtilities.ParseAdditionalAssemblyDirectories(AdditionalAssemblyDirectories, child);
                         break;
-
                 }
             }
         }
