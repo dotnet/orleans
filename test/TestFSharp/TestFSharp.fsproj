@@ -34,9 +34,9 @@
   </PropertyGroup>
   <!--BEGIN: Workaround allowing the use of the FSharp.Compiler.Tools package from within Visual Studio-->
   <Choose>
-    <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets')">
+    <When Condition="Exists('..\..\src\packages\FSharp.Compiler.Tools.4.0.1.20\tools\Microsoft.FSharp.Targets')">
       <PropertyGroup>
-        <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.0.0.1\tools\Microsoft.FSharp.Targets</FSharpTargets>
+        <FSharpTargets>..\..\src\packages\FSharp.Compiler.Tools.4.0.1.20\tools\Microsoft.FSharp.Targets</FSharpTargets>
         <PackagesRestored>true</PackagesRestored>
       </PropertyGroup>
     </When>
