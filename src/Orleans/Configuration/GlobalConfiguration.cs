@@ -1092,8 +1092,9 @@ namespace Orleans.Runtime.Configuration
         public void RegisterLogConsistencyProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : ILogConsistencyProvider
         {
             Type providerType = typeof(T);
-            if (providerType.IsAbstract ||
-                providerType.IsGenericType ||
+            var providerTypeInfo = providerType.GetTypeInfo();
+            if (providerTypeInfo.IsAbstract ||
+                providerTypeInfo.IsGenericType ||
                 !typeof(ILogConsistencyProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements ILogConsistencyProvider interface", "typeof(T)");
 

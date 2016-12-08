@@ -105,7 +105,7 @@ namespace UnitTests.Grains
 
             foreach (var u in updates)
             {
-                state.Apply(u);
+                this.TransitionState(state, u);
                 version++;
             }
 

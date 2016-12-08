@@ -121,9 +121,12 @@ namespace Orleans.LogConsistency
         public ProtocolTransportException(string msg, Exception exc)
             : base(msg, exc)
         { }
+
+#if !NETSTANDARD
         protected ProtocolTransportException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
 
         public override string ToString()
         {

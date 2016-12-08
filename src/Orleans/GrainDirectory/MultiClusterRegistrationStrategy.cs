@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
 using System.Collections.Generic;
@@ -51,12 +52,9 @@ namespace Orleans.GrainDirectory
             return defaultStrategy;
         }
 
-        internal static MultiClusterRegistrationStrategy FromGrainType(Type graintype)
+        internal static MultiClusterRegistrationStrategy FromAttributes(IEnumerable<object> attributes)
         {
-            var attrs = graintype.GetCustomAttributes(typeof(RegistrationAttribute), true);
-            if (attrs.Length == 0)
-                return defaultStrategy;
-            return ((RegistrationAttribute)attrs[0]).RegistrationStrategy;
+            return (attributes.FirstOrDefault() as RegistrationAttribute)?.RegistrationStrategy ?? defaultStrategy;
         }
 
         public abstract IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId);

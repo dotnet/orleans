@@ -696,7 +696,9 @@ namespace Orleans.Runtime
                 else if (grain is ILogConsistentGrain)
                 {
                     var consistencyProvider = SetupLogConsistencyProvider(grain, grainType, data);                  
-                    grainCreator.InstallLogViewAdaptor(grain, grainType, grainTypeData.StateObjectType, consistencyProvider, data.StorageProvider);
+                    grainCreator.InstallLogViewAdaptor(grain, grainType, 
+                        grainTypeData.StateObjectType, grainTypeData.MultiClusterRegistrationStrategy,
+                        consistencyProvider, data.StorageProvider);
                 }
              
                 grain.Data = data;

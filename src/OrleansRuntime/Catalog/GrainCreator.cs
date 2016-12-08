@@ -86,16 +86,19 @@ namespace Orleans.Runtime
         /// <param name="grain">The grain.</param>
         /// <param name="grainType">The grain type.</param>
         /// <param name="stateType">The type of the grain state.</param>
+        /// <param name="mcRegistrationStrategy">The multi-cluster registration strategy.</param>
         /// <param name="factory">The consistency adaptor factory</param>
         /// <param name="storageProvider">The storage provider, or null if none needed</param>
         /// <returns>The newly created grain.</returns>
-        public void InstallLogViewAdaptor(Grain grain, Type grainType, Type stateType, ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
+        public void InstallLogViewAdaptor(Grain grain, Type grainType, 
+            Type stateType, IMultiClusterRegistrationStrategy mcRegistrationStrategy,
+            ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
         {
             // try to find a suitable logger that we can use to trace consistency protocol information
             var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
            
             // encapsulate runtime services used by consistency adaptors
-            var svc = new ProtocolServices(grain, logger, MultiClusterRegistrationStrategy.FromGrainType(grain.GetType()));
+            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy);
 
             var state = Activator.CreateInstance(stateType);
 

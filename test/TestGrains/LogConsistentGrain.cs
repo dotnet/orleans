@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Providers;
 using Orleans.LogConsistency;
 using UnitTests.GrainInterfaces;
 using Orleans.EventSourcing;
@@ -27,9 +26,6 @@ namespace UnitTests.Grains
         {
             return string.Format("A={0} B={1} R={{{2}}}", A, B, string.Join(", ", Reservations.Select(kvp => string.Format("{0}:{1}", kvp.Key, kvp.Value))));
         }
-
-        // dynamic dispatch to the cases listed below
-        public void Apply(dynamic o) { Apply(o); }
 
         // all the update operations are listed here
         public void Apply(UpdateA x) { A = x.Val; }
