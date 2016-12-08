@@ -5,31 +5,37 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
     {
+        private readonly GrainId grainId;
+        private readonly SchedulingContext schedulingContext;
         private IGrainMethodInvoker lastInvoker;
         private Message running;
-        
-        protected SystemTarget(GrainId grainId, SiloAddress silo) 
+
+        public SiloAddress Silo { get; }
+        GrainId ISystemTargetBase.GrainId => grainId;
+        internal SchedulingContext SchedulingContext => schedulingContext;
+        internal ActivationId ActivationId { get; set; }
+
+        public SystemTarget()
+        {
+            
+        }
+
+        internal SystemTarget(GrainId grainId, SiloAddress silo) 
             : this(grainId, silo, false)
         {
         }
 
-        protected SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority)
+        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority)
         {
-            GrainId = grainId;
+            this.grainId = grainId;
             Silo = silo;
             ActivationId = ActivationId.GetSystemActivation(grainId, silo);
-            SchedulingContext = new SchedulingContext(this, lowPriority);
+            schedulingContext = new SchedulingContext(this, lowPriority);
         }
 
-        public SiloAddress Silo { get; }
-        public GrainId GrainId { get; }
-        public ActivationId ActivationId { get; set; }
-
-        internal SchedulingContext SchedulingContext { get; }
-
-        public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
+        IGrainMethodInvoker IInvokable.GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType)
         {
             if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId)
                 return lastInvoker;
@@ -40,13 +46,13 @@ namespace Orleans.Runtime
             return lastInvoker;
         }
 
-        public void HandleNewRequest(Message request)
+        internal void HandleNewRequest(Message request)
         {
             running = request;
             InsideRuntimeClient.Current.Invoke(this, this, request).Ignore();
         }
 
-        public void HandleResponse(Message response)
+        internal void HandleResponse(Message response)
         {
             running = response;
             InsideRuntimeClient.Current.ReceiveResponse(response);
@@ -77,7 +83,7 @@ namespace Orleans.Runtime
             return String.Format("[{0}SystemTarget: {1}{2}{3}]",
                  SchedulingContext.IsSystemPriorityContext ? String.Empty : "LowPriority",
                  Silo,
-                 GrainId,
+                 this.grainId,
                  ActivationId);
         }
 

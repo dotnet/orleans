@@ -1,5 +1,7 @@
 using System;
 using System.Globalization;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Orleans.Core;
 using Orleans.Serialization;
 
@@ -88,6 +90,11 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(0L,
                 UniqueKey.Category.KeyExtGrain,
                 typeCode, primaryKey));
+        }
+
+        internal static GrainId GetGrainServiceGrainId(short id, int typeData)
+        {
+            return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.SystemTarget, typeData));
         }
 
         public Guid PrimaryKey

@@ -14,6 +14,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Streams;
+using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -148,7 +149,7 @@ namespace Orleans.Runtime
 
                 case SchedulingContextType.SystemTarget:
                     message.SendingActivation = schedulingContext.SystemTarget.ActivationId;
-                    message.SendingGrain = schedulingContext.SystemTarget.GrainId;
+                    message.SendingGrain = ((ISystemTargetBase)schedulingContext.SystemTarget).GrainId;
                     break;
             }
 
@@ -469,6 +470,7 @@ namespace Orleans.Runtime
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy = 
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
 
+
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(
@@ -638,39 +640,34 @@ namespace Orleans.Runtime
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
-            GrainReference grainReference;
-            return GetReminderService("RegisterOrUpdateReminder", reminderName, out grainReference)
-                .RegisterOrUpdateReminder(grainReference, reminderName, dueTime, period);
+            return GetReminderService("RegisterOrUpdateReminder", reminderName)
+                .RegisterOrUpdateReminder(reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(IGrainReminder reminder)
         {
-            GrainReference ignore;
-            return GetReminderService("UnregisterReminder", reminder.ReminderName, out ignore)
+            return GetReminderService("UnregisterReminder", reminder.ReminderName)
                 .UnregisterReminder(reminder);
         }
 
         public Task<IGrainReminder> GetReminder(string reminderName)
         {
-            GrainReference grainReference;
-            return GetReminderService("GetReminder", reminderName, out grainReference)
-                .GetReminder(grainReference, reminderName);
+            return GetReminderService("GetReminder", reminderName)
+                .GetReminder(reminderName);
         }
 
         public Task<List<IGrainReminder>> GetReminders()
         {
-            GrainReference grainReference;
-            return GetReminderService("GetReminders", String.Empty, out grainReference)
-                .GetReminders(grainReference);
+            return GetReminderService("GetReminders", String.Empty)
+                .GetReminders();
         }
 
-        private IReminderService GetReminderService(
-            string operation, 
-            string reminderName, 
-            out GrainReference grainRef)
+        private IReminderRegistry GetReminderService(
+            string operation,
+            string reminderName)
         {
             CheckValidReminderServiceType(operation);
-            grainRef = CurrentActivationData.GrainReference;
+            var grainRef = CurrentActivationData.GrainReference;
             SiloAddress destination = MapGrainReferenceToSiloRing(grainRef);
             if (logger.IsVerbose)
             {
@@ -682,7 +679,12 @@ namespace Orleans.Runtime
                     destination.GetConsistentHashCode(),
                     ConsistentRingProvider.ToString());
             }
-            return InternalGrainFactory.GetSystemTarget<IReminderService>(Constants.ReminderServiceId, destination);
+
+            // Code above left in to preserve the existing logging, if not required we can remove MapGrainReferenceToSiloRing from InsideRuntimeClient.
+
+            // We use the IReminderRegistry which as a GrainServiceClient is responsible for resolving the correctly partitioned GrainService for the CallerGrainReference.
+            var reminderRegistry = (IReminderRegistry) Silo.CurrentSilo.Services.GetService(typeof(IReminderRegistry));
+            return reminderRegistry;
         }
 
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)

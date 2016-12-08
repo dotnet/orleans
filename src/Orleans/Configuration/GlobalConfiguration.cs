@@ -413,6 +413,11 @@ namespace Orleans.Runtime.Configuration
         public IDictionary<string, ProviderCategoryConfiguration> ProviderConfigurations { get; set; }
 
         /// <summary>
+        /// Configuration for grain services.
+        /// </summary>
+        public GrainServiceConfigurations GrainServiceConfigurations { get; set; }
+
+        /// <summary>
         /// The time span between when we have added an entry for an activation to the grain directory and when we are allowed
         /// to conditionally remove that entry. 
         /// Conditional deregistration is used for lazy clean-up of activations whose prompt deregistration failed for some reason (e.g., message failure).
@@ -568,6 +573,7 @@ namespace Orleans.Runtime.Configuration
             MockReminderTableTimeout = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
 
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
+            GrainServiceConfigurations = new GrainServiceConfigurations();
         }
 
         public override string ToString()
@@ -976,6 +982,11 @@ namespace Orleans.Runtime.Configuration
                         break;
 
                     default:
+                        if (child.LocalName.Equals("GrainServices", StringComparison.Ordinal))
+                        {
+                            GrainServiceConfigurations = GrainServiceConfigurations.Load(child);
+                        }
+
                         if (child.LocalName.EndsWith("Providers", StringComparison.Ordinal))
                         {
                             var providerCategory = ProviderCategoryConfiguration.Load(child);
@@ -1101,6 +1112,11 @@ namespace Orleans.Runtime.Configuration
         public IEnumerable<IProviderConfiguration> GetAllProviderConfigurations()
         {
             return ProviderConfigurationUtility.GetAllProviderConfigurations(ProviderConfigurations);
-        } 
+        }
+
+        public void RegisterGrainService(string serviceName, string clientType, string serviceType, IDictionary<string, string> properties = null)
+        {
+            GrainServiceConfigurationsUtility.RegisterGrainService(GrainServiceConfigurations, serviceName, clientType, serviceType, properties);
+        }
     }
 }

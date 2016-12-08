@@ -78,6 +78,7 @@
     <Compile Include="Async\UnobservedExceptionsHandlerClass.cs" />
     <Compile Include="Async\TaskExtensions.cs" />
     <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
+    <Compile Include="Configuration\GrainServiceConfiguration.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
@@ -144,6 +145,8 @@
     <Compile Include="Serialization\ILDelegateBuilder.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Services\IGrainServiceClient.cs" />
+    <Compile Include="Services\IGrainService.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Serialization\SerializationTestEnvironment.cs" />
@@ -259,7 +262,6 @@
     <Compile Include="Streams\Core\StreamSequenceToken.cs" />
     <Compile Include="Streams\Core\StreamSubscriptionHandle.cs" />
     <Compile Include="Timers\AsyncTaskSafeTimer.cs" />
-    <Compile Include="Timers\ReminderRegistry.cs" />
     <Compile Include="Timers\TimerRegistry.cs" />
     <Compile Include="Utils\SetExtensions.cs" />
     <Compile Include="Placement\ActivationCountBasedPlacement.cs" />

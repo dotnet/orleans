@@ -92,20 +92,22 @@ namespace Orleans.Runtime
 
         public void RecordNewSystemTarget(SystemTarget target)
         {
+            var systemTarget = (ISystemTargetBase) target;
             systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(target.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(target.GrainId)).Increment();
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).Increment();
             }
         }
 
         public void RemoveSystemTarget(SystemTarget target)
         {
+            var systemTarget = (ISystemTargetBase) target;
             SystemTarget ignore;
             systemTargets.TryRemove(target.ActivationId, out ignore);
-            if (!Constants.IsSingletonSystemTarget(target.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(target.GrainId)).DecrementBy(1);
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
             }
         }
 

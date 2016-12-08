@@ -50,6 +50,8 @@
     <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />
+    <Compile Include="GrainServiceTests\CustomGrainService.cs" />
+    <Compile Include="GrainServiceTests\GrainServiceTests.cs" />
     <Compile Include="PSClientTests\PSClientTests.cs" />
     <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
