@@ -8,7 +8,6 @@ namespace Orleans.Runtime
     internal abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
     {
         private IGrainMethodInvoker lastInvoker;
-        private readonly SchedulingContext schedulingContext;
         private Message running;
         
         protected SystemTarget(GrainId grainId, SiloAddress silo) 
@@ -21,14 +20,14 @@ namespace Orleans.Runtime
             GrainId = grainId;
             Silo = silo;
             ActivationId = ActivationId.GetSystemActivation(grainId, silo);
-            schedulingContext = new SchedulingContext(this, lowPriority);
+            SchedulingContext = new SchedulingContext(this, lowPriority);
         }
 
-        public SiloAddress Silo { get; private set; }
-        public GrainId GrainId { get; private set; }
+        public SiloAddress Silo { get; }
+        public GrainId GrainId { get; }
         public ActivationId ActivationId { get; set; }
 
-        internal SchedulingContext SchedulingContext { get { return schedulingContext; } }
+        internal SchedulingContext SchedulingContext { get; }
 
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {

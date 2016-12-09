@@ -115,11 +115,11 @@ namespace Orleans.CodeGeneration
             var dict = new Dictionary<int, Type>();
 
             if (IsGrainInterface(type))
-                dict.Add(ComputeInterfaceId(type), type);
-
+                dict.Add(GetGrainInterfaceId(type), type);
+            
             Type[] interfaces = type.GetInterfaces();
             foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
-                dict.Add(ComputeInterfaceId(interfaceType), interfaceType);
+                dict.Add(GetGrainInterfaceId(interfaceType), interfaceType);
 
             return dict;
         }
@@ -163,13 +163,6 @@ namespace Orleans.CodeGeneration
         public static bool IsGrainType(Type grainType)
         {
             return typeof (IGrain).IsAssignableFrom(grainType);
-        }
-
-        public static int ComputeInterfaceId(Type interfaceType)
-        {
-            var ifaceName = TypeUtils.GetFullName(interfaceType);
-            var ifaceId = Utils.CalculateIdHash(ifaceName);
-            return ifaceId;
         }
 
         public static int GetGrainClassTypeCode(Type grainClass)
