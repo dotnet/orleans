@@ -142,7 +142,7 @@ namespace DefaultCluster.Tests
             Assert.True(promise.Status == TaskStatus.Faulted);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
+        [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
         public void StressHandlingMultipleDelayedRequests()
         {
             IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
