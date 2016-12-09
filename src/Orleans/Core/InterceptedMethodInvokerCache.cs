@@ -37,7 +37,7 @@ namespace Orleans
             if (!this.invokers.TryGetValue(implementationType, out invokerMap))
             {
                 // Generate an the invoker mapping using the provided invoker.
-                this.invokers[implementationType] = invokerMap = GetInterfaceToImplementationMap(implementationType, invoker);
+                this.invokers[implementationType] = invokerMap = CreateInterfaceToImplementationMap(implementationType, invoker);
             }
 
             // Attempt to get the invoker for the provided interfaceId.
@@ -57,12 +57,28 @@ namespace Orleans
         /// <param name="implementationType">The implementation type.</param>
         /// <param name="invoker">The grain method invoker.</param>
         /// <returns>The mapped interface.</returns>
-        private static Dictionary<int, InterceptedMethodInvoker> GetInterfaceToImplementationMap(
+        private static Dictionary<int, InterceptedMethodInvoker> CreateInterfaceToImplementationMap(
             Type implementationType,
             IGrainMethodInvoker invoker)
         {
-            // This method creates a map from interfaceId -> intercepted invoker.
-            if (implementationType.IsConstructedGenericType) return GetGenericInterfaceInvoker(implementationType, invoker);
+            if (implementationType.IsConstructedGenericType) return CreateMapForConstructedGeneric(implementationType, invoker);
+            return CreateMapForNonGeneric(implementationType, invoker);
+        }
+
+        /// <summary>
+        /// Creates and returns a map from interface id to intercepted invoker for non-generic or open-generic types.
+        /// </summary>
+        /// <param name="implementationType">The implementation type.</param>
+        /// <param name="invoker">The underlying invoker.</param>
+        /// <returns>A map from interface id to intercepted invoker.</returns>
+        private static Dictionary<int, InterceptedMethodInvoker> CreateMapForNonGeneric(Type implementationType, IGrainMethodInvoker invoker)
+        {
+            if (implementationType.IsConstructedGenericType)
+            {
+                throw new InvalidOperationException(
+                    $"Type {implementationType} passed to {nameof(CreateMapForNonGeneric)} is a constructed generic type.");
+            }
+
             var implementationTypeInfo = implementationType.GetTypeInfo();
             var interfaces = implementationType.GetInterfaces();
 
@@ -102,23 +118,22 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Maps the interfaces of the provided <paramref name="implementationType"/>.
+        /// Creates and returns a map from interface id to intercepted invoker for constructed generic types.
         /// </summary>
-        /// <param name="implementationType">The implementation type, which must be a concrete generic type.</param>
-        /// <param name="invoker">The grain method invoker.</param>
-        /// <returns>The mapped interface.</returns>
-        private static Dictionary<int, InterceptedMethodInvoker> GetGenericInterfaceInvoker(
+        /// <param name="implementationType">The implementation type.</param>
+        /// <param name="invoker">The underlying invoker.</param>
+        /// <returns>A map from interface id to intercepted invoker.</returns>
+        private static Dictionary<int, InterceptedMethodInvoker> CreateMapForConstructedGeneric(
             Type implementationType,
             IGrainMethodInvoker invoker)
         {
-            // This method creates a a map interfaceId -> intercepted invoker.
             // It is important to note that the interfaceId and methodId are computed based upon the non-concrete
             // version of the implementation type. During code generation, the concrete type would not be available
             // and therefore the generic type definition is used.
             if (!implementationType.IsConstructedGenericType)
             {
                 throw new InvalidOperationException(
-                    $"Type {implementationType} passed to {nameof(GetGenericInterfaceInvoker)} is not a constructed generic type");
+                    $"Type {implementationType} passed to {nameof(CreateMapForConstructedGeneric)} is not a constructed generic type");
             }
 
             var genericClass = implementationType.GetGenericTypeDefinition();

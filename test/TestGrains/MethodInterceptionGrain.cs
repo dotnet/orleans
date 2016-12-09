@@ -77,10 +77,24 @@ namespace UnitTests.Grains
         public Task<string> GetInputAsString(T input) => Task.FromResult(input.ToString());
     }
 
-    public class TrickyInterceptionGrain : GenericMethodInterceptionGrain<int>, ITrickyMethodInterceptionGrain
+    public class TrickyInterceptionGrain : Grain, ITrickyMethodInterceptionGrain, IGrainInvokeInterceptor
     {
+        public Task<object> Invoke(MethodInfo methodInfo, InvokeMethodRequest request, IGrainMethodInvoker invoker)
+        {
+            if (methodInfo.Name == nameof(GetInputAsString))
+            {
+                return Task.FromResult<object>($"Hah! You wanted {request.Arguments[0]}, but you got me!");
+            }
+
+            return invoker.Invoke(this, request);
+        }
+
+        public Task<string> SayHello() => Task.FromResult("Hello");
+        
         public Task<string> GetInputAsString(string input) => Task.FromResult(input);
+
         public Task<string> GetInputAsString(bool input) => Task.FromResult(input.ToString(CultureInfo.InvariantCulture));
+
         public Task<int> GetBestNumber() => Task.FromResult(38);
 
     }

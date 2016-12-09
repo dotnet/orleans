@@ -33,9 +33,7 @@ namespace Tester
         [Fact]
         public async Task GenericGrainMethodInterceptionTest()
         {
-            var grain = GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(
-                0,
-                typeof(GenericMethodInterceptionGrain<>).Namespace + "." + nameof(GenericMethodInterceptionGrain<int>));
+            var grain = GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(0);
             var result = await grain.GetInputAsString(679);
             Assert.Contains("Hah!", result);
             Assert.Contains("679", result);
