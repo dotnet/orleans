@@ -49,6 +49,12 @@ namespace Tests.GeoClusterTests
         }
 
         [Fact, TestCategory("GeoCluster")]
+        public async Task TestBattery_MemoryStorageProvider()
+        {
+            await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainMemoryStorage", true, phases);
+        }
+
+        [Fact, TestCategory("GeoCluster")]
         public async Task TestBattery_CustomStorageProvider()
         {
             await fixture.RunChecksOnGrainClass("UnitTests.Grains.LogConsistentGrainCustomStorage", true, phases);

@@ -166,6 +166,15 @@ namespace Orleans.EventSourcing
 
 
         /// <summary>
+        /// Returns the current queue of unconfirmed events.
+        /// </summary>
+        public IEnumerable<TEventBase> UnconfirmedUpdates
+        {
+            get { return LogViewAdaptor.UnconfirmedSuffix; }
+        }
+
+
+        /// <summary>
         /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
         /// <para>Override this to monitor the health of the log-consistency protocol and/or
         /// to customize retry delays.
