@@ -190,8 +190,11 @@ namespace Orleans.CodeGeneration
             List<string> violations;
             if (!TryValidateInterfaceRules(type, out violations))
             {
-                foreach (var violation in violations)
-                    ConsoleText.WriteLine("ERROR: " + violation);
+                if (ConsoleText.IsConsoleAvailable)
+                {
+                    foreach (var violation in violations)
+                        ConsoleText.WriteLine("ERROR: " + violation);
+                }
 
                 throw new RulesViolationException(
                     string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);

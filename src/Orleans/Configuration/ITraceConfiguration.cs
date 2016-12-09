@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Configuration
         IList<Tuple<string, Severity>> TraceLevelOverrides { get; }
         /// <summary>
         /// The TraceToConsole attribute specifies whether trace output should be written to the console.
-        /// The default is not to write trace data to the console.
+        /// The default is write trace data to the console if available.
         /// </summary>
         bool TraceToConsole { get; set; }
         /// <summary>
