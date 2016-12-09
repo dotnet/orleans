@@ -168,7 +168,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// Returns the current queue of unconfirmed events.
         /// </summary>
-        public IEnumerable<TEventBase> UnconfirmedUpdates
+        public IEnumerable<TEventBase> UnconfirmedEvents
         {
             get { return LogViewAdaptor.UnconfirmedSuffix; }
         }
