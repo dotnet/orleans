@@ -155,11 +155,11 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Retrieves all events now, and confirms all previously raised events. 
+        /// Retrieves the latest state now, and confirms all previously raised events. 
         /// Effectively, this enforces synchronization with the global state.
         /// </summary>
         /// <returns></returns>
-        protected Task FetchAllEventsNow()
+        protected Task RefreshNow()
         {
             return LogViewAdaptor.SynchronizeNowAsync();
         }

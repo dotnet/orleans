@@ -103,7 +103,7 @@ namespace UnitTests.Grains
 
         public async Task<int> GetAGlobal()
         {
-            await FetchAllEventsNow();
+            await RefreshNow();
             return ConfirmedState.A;
         }
 
@@ -114,7 +114,7 @@ namespace UnitTests.Grains
 
         public async Task<AB> GetBothGlobal()
         {
-            await FetchAllEventsNow();
+            await RefreshNow();
             return new AB() { A = ConfirmedState.A, B = ConfirmedState.B };
         }
 
@@ -137,13 +137,13 @@ namespace UnitTests.Grains
         }
         public async Task<int[]> GetReservationsGlobal()
         {
-            await FetchAllEventsNow();
+            await RefreshNow();
             return ConfirmedState.Reservations.Values.ToArray();
         }
 
         public Task SynchronizeGlobalState()
         {
-            return FetchAllEventsNow();
+            return RefreshNow();
         }
 
         public Task<int> GetConfirmedVersion()
@@ -158,13 +158,13 @@ namespace UnitTests.Grains
 
         public async Task<KeyValuePair<int, object>> Read()
         {
-            await FetchAllEventsNow();
+            await RefreshNow();
             return new KeyValuePair<int, object>(ConfirmedVersion, ConfirmedState);
         }
         public async Task<bool> Update(IReadOnlyList<object> updates, int expectedversion)
         {
             if (expectedversion > ConfirmedVersion)
-                await FetchAllEventsNow();
+                await RefreshNow();
             if (expectedversion != ConfirmedVersion)
                 return false;
             return await RaiseConditionalEvents(updates);
