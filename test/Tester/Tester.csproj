@@ -54,6 +54,7 @@
     <Compile Include="SerializationTests\BondSerializationTests.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
+    <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
     <Compile Include="SiloInitializationTests.cs" />
     <Compile Include="StreamingTests\DelayedQueueRebalancingTests.cs" />
     <Compile Include="StreamingTests\EHSubscriptionMultiplicityTests.cs" />

@@ -1,4 +1,4 @@
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
@@ -13,12 +13,9 @@
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="General\**" />
-    <Compile Remove="GeoClusterTests\**" />
-    <EmbeddedResource Remove="General\**" />
-    <EmbeddedResource Remove="GeoClusterTests\**" />
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
+      <Link>SerializationTests\SerializationTestsUtils.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTestsBase.cs">
       <Link>StreamingTests\StreamFilteringTestsBase.cs</Link>
     </Compile>
@@ -124,6 +121,9 @@
   </ItemGroup>
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="SerializationTests\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -28,7 +28,7 @@ namespace Tester.AzureUtils.Streaming
         public void AzureQueueBatchContainer_VerifyStillUsingFallbackSerializer()
         {
             var container = new AzureQueueBatchContainer(Guid.NewGuid(), "namespace", new List<object> { "item" }, new Dictionary<string, object>() { { "key", "value" } }, new EventSequenceToken(long.MaxValue, int.MaxValue));
-            VerifyUsingFallbackSerializer(container);
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(container);
         }
 
 
@@ -51,30 +51,6 @@ namespace Tester.AzureUtils.Streaming
             var bc2 = (IBatchContainer)AzureQueueBatchContainer.FromCloudQueueMessage(msg2, 0);
             Assert.NotNull(bc1);
             Assert.NotNull(bc2);
-        }
-
-        private static void VerifyUsingFallbackSerializer(object ob)
-        {
-            var writer = new BinaryTokenStreamWriter();
-            SerializationManager.FallbackSerializer(ob, writer, ob.GetType());
-            var bytes = writer.ToByteArray();
-
-            byte[] defaultFormatterBytes;
-            var formatter = new BinaryFormatter();
-            using (var stream = new MemoryStream())
-            {
-                formatter.Serialize(stream, ob);
-                stream.Flush();
-                defaultFormatterBytes = stream.ToArray();
-            }
-
-            var reader = new BinaryTokenStreamReader(bytes);
-            var serToken = reader.ReadToken();
-            Assert.Equal(SerializationTokenType.Fallback, serToken);
-            var length = reader.ReadInt();
-            Assert.Equal(length, defaultFormatterBytes.Length);
-            var segment = new ArraySegment<byte>(bytes, reader.CurrentPosition, bytes.Length - reader.CurrentPosition);
-            Assert.True(segment.SequenceEqual(defaultFormatterBytes));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

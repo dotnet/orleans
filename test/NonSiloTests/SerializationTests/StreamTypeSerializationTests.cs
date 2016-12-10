@@ -27,7 +27,7 @@ namespace UnitTests.Serialization
         public void EventSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventSequenceToken(long.MaxValue, int.MaxValue);
-            VerifyUsingFallbackSerializer(token);
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token);
    
         }
 
@@ -35,31 +35,7 @@ namespace UnitTests.Serialization
         public void EventHubSequenceToken_VerifyStillUsingFallbackSerializer()
         {
             var token = new EventHubSequenceToken("some offset", long.MaxValue, int.MaxValue);
-            VerifyUsingFallbackSerializer(token);
-        }
-
-        private static void VerifyUsingFallbackSerializer(object ob)
-        {
-            var writer = new BinaryTokenStreamWriter();
-            SerializationManager.FallbackSerializer(ob, writer, ob.GetType());
-            var bytes = writer.ToByteArray();
-
-            byte[] defaultFormatterBytes;
-            var formatter = new BinaryFormatter();
-            using (var stream = new MemoryStream())
-            {
-                formatter.Serialize(stream, ob);
-                stream.Flush();
-                defaultFormatterBytes = stream.ToArray();
-            }
-
-            var reader = new BinaryTokenStreamReader(bytes);
-            var serToken = reader.ReadToken();
-            Assert.Equal(SerializationTokenType.Fallback, serToken);
-            var length = reader.ReadInt();
-            Assert.Equal(length, defaultFormatterBytes.Length);
-            var segment = new ArraySegment<byte>(bytes, reader.CurrentPosition, bytes.Length - reader.CurrentPosition);
-            Assert.True(segment.SequenceEqual(defaultFormatterBytes));
+            Tester.SerializationTests.SerializationTestsUtils.VerifyUsingFallbackSerializer(token);
         }
 
         #region EventSequenceToken2
