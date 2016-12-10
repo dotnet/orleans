@@ -975,8 +975,7 @@ namespace Orleans.Runtime
                 logger.Error(ErrorCode.Runtime_Error_100324, String.Format("Called DomainUnobservedExceptionHandler with context {0}.", context), exception);
         }
 
-        //TODO: Put this back to internal, modified for quick test.
-        public void RegisterSystemTarget(SystemTarget target)
+        internal void RegisterSystemTarget(SystemTarget target)
         {
             scheduler.RegisterWorkContext(target.SchedulingContext);
             activationDirectory.RecordNewSystemTarget(target);
