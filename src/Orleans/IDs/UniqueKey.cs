@@ -126,8 +126,7 @@ namespace Orleans.Runtime
 
         internal static UniqueKey NewKey(long longKey, Category category = Category.None, long typeData = 0, string keyExt = null)
         {
-            // We need to create a UniqueKey with a longKey and typeData for GrainService - is this acceptable?
-            //ThrowIfIsSystemTargetKey(category);
+            ThrowIfIsSystemTargetKey(category);
 
             var n1 = unchecked((ulong)longKey);
             return NewKey(0, n1, category, typeData, keyExt);
@@ -160,6 +159,12 @@ namespace Orleans.Runtime
         {
             ulong n1 = unchecked((ulong)systemId);
             return NewKey(0, n1, Category.SystemTarget, 0, null);
+        }
+
+        public static UniqueKey NewGrainServiceKey(short key, long typeData)
+        {
+            ulong n1 = unchecked((ulong)key);
+            return NewKey(0, n1, Category.SystemTarget, typeData, null);
         }
 
         internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
