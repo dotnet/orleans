@@ -24,7 +24,7 @@ Each grain call can possibly fail due to one of the following reasons.
 
 ## Detection of failures
 
-Getting a reference to a grain always succeeds and is a local operation. However, method calls can fail, and when they do, you get an exception an exception.
+Getting a reference to a grain always succeeds and is a local operation. However, method calls can fail, and when they do, you get an exception.
 You can catch the exception at any level you need and they are propagated even across silos.
 
 ## Recovering from failures
