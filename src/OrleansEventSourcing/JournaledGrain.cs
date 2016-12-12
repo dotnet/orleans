@@ -281,11 +281,19 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Notify log view adaptor of activation
+        /// Notify log view adaptor of activation (called before user-level OnActivate)
         /// </summary>
-        async Task IProtocolParticipant.ActivateProtocolParticipant()
+        async Task IProtocolParticipant.PreActivateProtocolParticipant()
         {
-            await LogViewAdaptor.Activate();
+            await LogViewAdaptor.PreActivate();
+        }
+
+        /// <summary>
+        /// Notify log view adaptor of activation (called after user-level OnActivate)
+        /// </summary>
+        async Task IProtocolParticipant.PostActivateProtocolParticipant()
+        {
+            await LogViewAdaptor.PostActivate();
         }
 
         /// <summary>

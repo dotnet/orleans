@@ -22,7 +22,10 @@ namespace Orleans.LogConsistency
         where TLogView : new()
     {
         /// <summary>Called during activation, right before the user grain activation code is run.</summary>
-        Task Activate();
+        Task PreActivate();
+
+        /// <summary>Called during activation, right after the user grain activation code is run.</summary>
+        Task PostActivate();
 
         /// <summary>Called during deactivation, right after the user grain deactivation code is run.</summary>
         Task Deactivate();

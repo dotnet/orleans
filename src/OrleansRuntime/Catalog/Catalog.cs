@@ -1183,7 +1183,7 @@ namespace Orleans.Runtime
 
             if (activation.GrainInstance is IProtocolParticipant)
             {
-                await ((IProtocolParticipant)activation.GrainInstance).ActivateProtocolParticipant();
+                await ((IProtocolParticipant)activation.GrainInstance).PreActivateProtocolParticipant();
             }
 
             // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
@@ -1221,6 +1221,11 @@ namespace Orleans.Runtime
                 activationsFailedToActivate.Increment();
 
                 throw;
+            }
+
+            if (activation.GrainInstance is IProtocolParticipant)
+            {
+                await ((IProtocolParticipant)activation.GrainInstance).PostActivateProtocolParticipant();
             }
         }
 

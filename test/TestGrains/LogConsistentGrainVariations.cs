@@ -92,6 +92,17 @@ namespace UnitTests.Grains
         MyGrainState state;
         int version;
 
+        // simulate an async call during activation. This caused deadlock in earlier version,
+        // so I add it here to catch regressions.
+        public override async Task OnActivateAsync()
+        {
+            await Task.Run(async () =>
+            {
+                await Task.Delay(10);
+            });
+        }
+
+
         public Task<bool> ApplyUpdatesToStorageAsync(IReadOnlyList<object> updates, int expectedversion)
         {
             if (state == null)

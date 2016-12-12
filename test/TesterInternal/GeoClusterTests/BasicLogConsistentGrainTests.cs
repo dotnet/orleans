@@ -52,6 +52,7 @@ namespace Tests.GeoClusterTests
         {
             await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainSharedLogStorage");
         }
+        [Fact, TestCategory("GeoCluster")]
         public async Task CustomStorage()
         {
             await DoBasicLogConsistentGrainTest("UnitTests.Grains.LogConsistentGrainCustomStorage");

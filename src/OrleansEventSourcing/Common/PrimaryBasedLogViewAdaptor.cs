@@ -184,30 +184,34 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public virtual async Task Activate()
+        public virtual async Task PreActivate()
         {
-            Services.Verbose2("Activation Started");
+            Services.Verbose2("PreActivation Started");
+
+            // this flag indicates we have not done an initial load from storage yet
+            // we do not act on this yet, but wait until after user OnActivate has run. 
+            needInitialRead = true;
 
             Services.SubscribeToMultiClusterConfigurationChanges();
-
-            // initial load happens async
-            KickOffInitialRead().Ignore();
 
             var latestconf = Services.MultiClusterConfiguration;
             if (latestconf != null)
                 await OnMultiClusterConfigurationChange(latestconf);
 
-            Services.Verbose2("Activation Complete");
+            Services.Verbose2("PreActivation Complete");
         }
 
-        private async Task KickOffInitialRead()
+        public virtual Task PostActivate()
         {
-            needInitialRead = true;
-            // kick off notification for initial read cycle with a bit of delay
-            // so that we don't do this several times if user does strong sync
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
-            Services.Verbose2("Notify ({0})", nameof(KickOffInitialRead));
-            worker.Notify();
+            Services.Verbose2("PostActivation Started");
+
+            // start worker, if it has not already happened
+            if (needInitialRead)
+                worker.Notify();
+
+            Services.Verbose2("PostActivation Complete");
+
+            return TaskDone.Done;
         }
 
         /// <inheritdoc/>
