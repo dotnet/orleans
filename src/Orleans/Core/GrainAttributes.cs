@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-using System.Reflection;
 using Orleans.GrainDirectory;
 namespace Orleans
 {
@@ -282,64 +280,6 @@ namespace Orleans
             /// The name of the storage provider to ne used for persisting state for this grain.
             /// </summary>
             public string ProviderName { get; set; }
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Interface)]
-    internal sealed class FactoryAttribute : Attribute
-    {
-        public enum FactoryTypes
-        {
-            Grain,
-            ClientObject,
-            Both
-        };
-
-        private readonly FactoryTypes factoryType;
-
-        public FactoryAttribute(FactoryTypes factoryType)
-        {
-            this.factoryType = factoryType;
-        }
-
-        internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
-        {
-            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
-
-            // if no attributes are specified, we default to FactoryTypes.Grain.
-            if (0 == attribs.Length)
-                return FactoryTypes.Grain;
-            
-            // otherwise, we'll consider all of them and aggregate the specifications
-            // like flags.
-            FactoryTypes? result = null;
-            foreach (var i in attribs)
-            {
-                var a = (FactoryAttribute)i;
-                if (result.HasValue)
-                {
-                    if (a.factoryType == FactoryTypes.Both)
-                        result = a.factoryType;
-                    else if (a.factoryType != result.Value)
-                        result = FactoryTypes.Both;
-                }
-                else
-                    result = a.factoryType;
-            }
-
-            if (result.Value == FactoryTypes.Both)
-            {
-                throw 
-                    new NotSupportedException(
-                        "Orleans doesn't currently support generating both a grain and a client object factory but we really want to!");
-            }
-            
-            return result.Value;
-        }
-
-        public static FactoryTypes CollectFactoryTypesSpecified<T>()
-        {
-            return CollectFactoryTypesSpecified(typeof(T));
         }
     }
 
