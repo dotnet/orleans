@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
-        private GrainTimer clientRefreshTimer;
+        private IGrainTimer clientRefreshTimer;
         private Gateway gateway;
 
 

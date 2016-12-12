@@ -12,7 +12,6 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -88,22 +87,7 @@ namespace Orleans
         {
             get { return CurrentActivationAddress.ToString(); }
         }
-
-        public IActivationData CurrentActivationData
-        {
-            get { return null; }
-        }
-
-        public IAddressable CurrentGrain
-        {
-            get { return null; }
-        }
-
-        public IStorageProvider CurrentStorageProvider
-        {
-            get { throw new InvalidOperationException("Storage provider only available from inside grain"); }
-        }
-
+        
         internal IList<Uri> Gateways
         {
             get
@@ -832,12 +816,7 @@ namespace Orleans
         {
             throw new InvalidOperationException("GetReminders can only be called from inside a grain");
         }
-
-        public SiloStatus GetSiloStatus(SiloAddress silo)
-        {
-            throw new InvalidOperationException("GetSiloStatus can only be called on the silo.");
-        }
-
+        
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
@@ -865,11 +844,6 @@ namespace Orleans
             LocalObjectData ignore;
             if (!localObjects.TryRemove(reference.ObserverId, out ignore))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
-        }
-
-        public void DeactivateOnIdle(ActivationId id)
-        {
-            throw new InvalidOperationException();
         }
 
         #endregion Implementation of IRuntimeClient
@@ -937,16 +911,6 @@ namespace Orleans
         public IGrainTypeResolver GrainTypeResolver
         {
             get { return grainInterfaceMap; }
-        }
-
-        public string CaptureRuntimeEnvironment()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
-        {
-            throw new NotImplementedException();
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

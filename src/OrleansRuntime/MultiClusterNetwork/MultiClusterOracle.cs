@@ -25,7 +25,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly TimeSpan backgroundGossipInterval;
         private TimeSpan resendActiveStatusAfter;
 
-        private GrainTimer timer;
+        private IGrainTimer timer;
         private ISiloStatusOracle siloStatusOracle;
         private MultiClusterConfiguration injectedConfig;
 

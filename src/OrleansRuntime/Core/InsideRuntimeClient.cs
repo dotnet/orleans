@@ -13,7 +13,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -343,7 +342,7 @@ namespace Orleans.Runtime
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, logger, this);
                     }
 
-                    var invoker = invokable.GetInvoker(request.InterfaceId, message.GenericGrainType);
+                    var invoker = invokable.GetInvoker(this.typeManager, request.InterfaceId, message.GenericGrainType);
 
                     if (invoker is IGrainExtensionMethodInvoker
                         && !(target is IGrainExtension))
@@ -619,23 +618,6 @@ namespace Orleans.Runtime
             get { return MySilo; }
         }
 
-        public IStorageProvider CurrentStorageProvider
-        {
-            get
-            {
-                if (RuntimeContext.Current != null)
-                {
-                    SchedulingContext context = RuntimeContext.Current.ActivationContext as SchedulingContext;
-                    if (context != null && context.Activation != null)
-                    {
-                        return context.Activation.StorageProvider;
-                    }
-                }
-
-                throw new InvalidOperationException("Storage provider only available from inside grain");
-            }
-        }
-
         public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             GrainReference grainReference;
@@ -770,34 +752,9 @@ namespace Orleans.Runtime
             return ConsistentRingProvider.GetPrimaryTargetSilo(hashCode);
         }
 
-        public string CaptureRuntimeEnvironment()
-        {
-            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return String.Format(
-                  "   TaskScheduler={0}" + Environment.NewLine 
-                + "   RuntimeContext={1}" + Environment.NewLine
-                + "   WorkerPoolThread={2}" + Environment.NewLine
-                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
-                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
-                + "   StackTrace=" + Environment.NewLine 
-                + "   {5}",
-                    TaskScheduler.Current,
-                    RuntimeContext.Current,
-                    WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
-                    WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture),
-                    System.Threading.Thread.CurrentThread.ManagedThreadId,
-                    callStack);
-        }
-
-
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
             return this.typeManager.GetInvoker(interfaceId, genericGrainType);
-        }
-
-        public SiloStatus GetSiloStatus(SiloAddress siloAddress)
-        {
-            return this.siloStatusOracle.Value.GetApproximateSiloStatus(siloAddress);
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

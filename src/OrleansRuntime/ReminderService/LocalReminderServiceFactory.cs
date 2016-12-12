@@ -14,7 +14,7 @@ namespace Orleans.Runtime
             logger = LogManager.GetLogger("ReminderFactory", LoggerType.Runtime);
         }
 
-        internal IReminderService CreateReminderService(Silo silo, IGrainFactory grainFactory, TimeSpan iniTimeSpan)
+        internal IReminderService CreateReminderService(Silo silo, IGrainFactory grainFactory, TimeSpan iniTimeSpan, ISiloRuntimeClient runtimeClient)
         {
             var reminderServiceType = silo.GlobalConfig.ReminderServiceType;
             logger.Info("Creating reminder system target for type={0}", Enum.GetName(typeof(GlobalConfiguration.ReminderServiceProviderType), reminderServiceType));
@@ -27,7 +27,8 @@ namespace Orleans.Runtime
                 silo.LocalScheduler, 
                 ReminderTable.Singleton, 
                 silo.GlobalConfig,
-                iniTimeSpan);
+                iniTimeSpan,
+                runtimeClient);
         }
     }
 }

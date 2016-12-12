@@ -29,12 +29,12 @@ namespace Orleans.Runtime
 
         internal SchedulingContext SchedulingContext { get; }
 
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
+        public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
         {
             if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId)
                 return lastInvoker;
 
-            var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
+            var invoker = typeManager.GetInvoker(interfaceId);
             lastInvoker = invoker;
             
             return lastInvoker;

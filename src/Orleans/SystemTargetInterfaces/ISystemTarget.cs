@@ -22,10 +22,4 @@ namespace Orleans
         SiloAddress Silo { get; }
         GrainId GrainId { get; }
     }
-
-    // Common internal interface for SystemTarget and ActivationData.
-    internal interface IInvokable
-    {
-        IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
-    }
 }

@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
         private IRingRange myRange;
         private long localTableSequence;
         private int rangeSerialNumber;
-        private GrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
+        private IGrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly CancellationTokenSource stoppedCancellationTokenSource;
         private uint initialReadCallCount = 0;
@@ -41,6 +41,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly Logger logger;
         private readonly GlobalConfiguration config;
         private readonly TimeSpan initTimeout;
+        private readonly ISiloRuntimeClient runtimeClient;
 
         internal LocalReminderService(
             SiloAddress addr,
@@ -49,7 +50,8 @@ namespace Orleans.Runtime.ReminderService
             OrleansTaskScheduler localScheduler,
             IReminderTable reminderTable,
             GlobalConfiguration config,
-            TimeSpan initTimeout)
+            TimeSpan initTimeout,
+            ISiloRuntimeClient runtimeClient)
             : base(id, addr)
         {
             logger = LogManager.GetLogger("ReminderService", LoggerType.Runtime);
@@ -60,6 +62,7 @@ namespace Orleans.Runtime.ReminderService
             this.reminderTable = reminderTable;
             this.config = config;
             this.initTimeout = initTimeout;
+            this.runtimeClient = runtimeClient;
             status = ReminderServiceStatus.Booting;
             myRange = null;
             localTableSequence = 0;
@@ -555,7 +558,7 @@ namespace Orleans.Runtime.ReminderService
 
             internal ReminderIdentity Identity { get; private set; }
             internal string ETag;
-            internal GrainTimer Timer;
+            internal IGrainTimer Timer;
             internal long LocalSequenceNumber; // locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
 
             internal LocalReminderData(ReminderEntry entry)

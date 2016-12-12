@@ -252,12 +252,6 @@ namespace Orleans
             return GetLogger(GetType().Name);
         }
 
-        [SuppressMessage("Microsoft.Performance", "CA1822:MarkMembersAsStatic")]
-        internal string CaptureRuntimeEnvironment()
-        {
-            return RuntimeClient.Current.CaptureRuntimeEnvironment();
-        }
-
         private void EnsureRuntime()
         {
             if (Runtime == null)
