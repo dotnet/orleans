@@ -9,17 +9,16 @@ namespace DefaultCluster.Tests.General
     /// <summary>
     /// Unit tests for grains implementing generic interfaces
     /// </summary>
-    [TestCategory("BVT"), TestCategory("Functional")]
     public class CodeGeneratorTests_TakeSerializedData : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataNotRefOrleans()
         {
             var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());
             await grain.TakeSerializedData(new UnitTests.Dtos.ClassNotReferencingOrleansTypeDto { MyProperty = "Test" });
         }
 
-        [Fact(Skip = "reproduces issue #1480"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact(Skip = "reproduces issue #1480"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataRefOrleans()
         {
             var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());

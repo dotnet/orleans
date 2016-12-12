@@ -9,7 +9,7 @@ using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace DefaultCluster.Tests
+namespace UnitTests
 {
     // if we parallelize tests, this should run in isolation 
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
@@ -28,7 +28,7 @@ namespace DefaultCluster.Tests
             RuntimeClient.Current.SetResponseTimeout(originalTimeout);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT"), TestCategory("Timeout")]
+        [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()
         {
             bool finished = false;

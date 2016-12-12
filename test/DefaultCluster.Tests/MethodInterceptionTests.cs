@@ -10,10 +10,10 @@ namespace DefaultCluster.Tests
     using UnitTests.GrainInterfaces;
     using Xunit;
 
-    [TestCategory("BVT"), TestCategory("MethodInterception")]
+    [TestCategory("MethodInterception")]
     public class MethodInterceptionTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task GrainMethodInterceptionTest()
         {
             var grain = GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
@@ -30,7 +30,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("Hello", result);
         }
 
-        [Fact]
+        [Fact, TestCategory("BVT")]
         public async Task GenericGrainMethodInterceptionTest()
         {
             var grain = GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(0);
@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("Hello", result);
         }
 
-        [Fact]
+        [Fact, TestCategory("BVT")]
         public async Task ConstructedInheritanceGenericGrainMethodInterceptionTest()
         {
             var grain = GrainFactory.GetGrain<ITrickyMethodInterceptionGrain>(0);

@@ -9,7 +9,6 @@ using Xunit;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT")]
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
@@ -68,7 +67,7 @@ namespace DefaultCluster.Tests
             }
         }
 
-        [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task TestClientAddressableHappyPath()
         {
             var myOb = new MyPseudoGrain();
@@ -83,7 +82,7 @@ namespace DefaultCluster.Tests
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task TestClientAddressableSadPath()
         {
             const string message = "o hai!";
@@ -101,7 +100,7 @@ namespace DefaultCluster.Tests
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task GrainShouldSuccessfullyPullFromClientObject()
         {
             var myOb = new MyProducer();
@@ -118,7 +117,7 @@ namespace DefaultCluster.Tests
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task MicroClientAddressableSerialStressTest()
         {
             const int iterationCount = 1000;
@@ -133,7 +132,7 @@ namespace DefaultCluster.Tests
             RuntimeClient.Current.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
         public async Task MicroClientAddressableParallelStressTest()
         {
             const int iterationCount = 1000;

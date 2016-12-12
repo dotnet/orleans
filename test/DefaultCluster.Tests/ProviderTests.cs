@@ -8,10 +8,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT")]
     public class ProviderTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional"), TestCategory("Providers")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
             IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());

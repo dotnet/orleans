@@ -11,10 +11,9 @@ using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT")]
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyType()
         {
             GrainReference grain = (GrainReference)GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
@@ -23,7 +22,7 @@ namespace DefaultCluster.Tests
             Assert.IsAssignableFrom<ISimpleGrain>(cast);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyTypePolymorphic()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -44,7 +43,7 @@ namespace DefaultCluster.Tests
         }
 
         // Test case currently fails intermittently
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastMultifacetRWReference()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -67,7 +66,7 @@ namespace DefaultCluster.Tests
         }
 
         // Test case currently fails
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastMultifacetRWReferenceWaitForResolve()
         {
             // MultifacetTestGrain implements IMultifacetReader
@@ -92,7 +91,7 @@ namespace DefaultCluster.Tests
             Assert.Equal(newValue, result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void ConfirmServiceInterfacesListContents()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -112,7 +111,7 @@ namespace DefaultCluster.Tests
             Assert.True(interfaces.Keys.Contains(id3), "id3 is present");
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastCheckExpectedCompatIds()
         {
             Type t = typeof(ISimpleGrain);
@@ -121,7 +120,7 @@ namespace DefaultCluster.Tests
             Assert.True(grain.IsCompatible(expectedInterfaceId));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastCheckExpectedCompatIds2()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -138,7 +137,7 @@ namespace DefaultCluster.Tests
             Assert.True(grain.IsCompatible(id3));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastFailInternalCastFromBadType()
         {
             var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(
@@ -149,7 +148,7 @@ namespace DefaultCluster.Tests
             Assert.Throws<InvalidCastException>(() => GrainClient.InternalGrainFactory.Cast(grain, typeof(bool)));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastInternalCastFromMyType()
         {
             var serviceName = typeof(SimpleGrain).FullName;
@@ -162,7 +161,7 @@ namespace DefaultCluster.Tests
             Assert.IsAssignableFrom<ISimpleGrain>(cast);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastInternalCastUpFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -175,7 +174,7 @@ namespace DefaultCluster.Tests
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -185,7 +184,7 @@ namespace DefaultCluster.Tests
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public async Task FailSideCastAfterResolve()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -199,7 +198,7 @@ namespace DefaultCluster.Tests
             await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public async Task FailOperationAfterSideCast()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
@@ -214,7 +213,7 @@ namespace DefaultCluster.Tests
         }
 
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void FailSideCastAfterContinueWith()
         {
             Assert.Throws<InvalidCastException>(() =>
@@ -242,7 +241,7 @@ namespace DefaultCluster.Tests
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromGrandchild()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference
@@ -270,7 +269,7 @@ namespace DefaultCluster.Tests
             Assert.False(cast is IGeneratorTestDerivedGrain1);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastGrainRefUpCastFromDerivedDerivedChild()
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
@@ -283,7 +282,7 @@ namespace DefaultCluster.Tests
             Assert.False(cast is IGeneratorTestDerivedGrain1);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastAsyncGrainRefCastFromSelf()
         {
             IAddressable grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix); ;
@@ -420,7 +419,7 @@ namespace DefaultCluster.Tests
             Assert.True(false, "Exception should have been raised");
         }
 #endif
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void CastCallMethodInheritedFromBaseClass()
         {
             // GeneratorTestDerivedGrain1Reference derives from GeneratorTestGrainReference

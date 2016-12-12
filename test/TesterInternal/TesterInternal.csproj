@@ -134,6 +134,7 @@
     <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
+    <Compile Include="TimeoutTests.cs" />
     <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
     <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />

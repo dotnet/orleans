@@ -23,14 +23,7 @@ foreach ($a in $assemblies)
 {
     $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileNameWithoutExtension($a) + '.xml'
     $outXml = $(Join-Path $outDir $xmlName)
-	if([System.IO.Path]::GetFileNameWithoutExtension($a) -eq 'DefaultCluster.Tests')
-	{
-		$cmdLine = $xunitRunner.FullName + ' ' + $a + ' ' + $testFilter + ' -xml ' + $outXml + ' -parallel collections -noshadow -verbose' 
-	}else
-	{
-		$cmdLine = $xunitRunner.FullName + ' ' + $a + ' ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -verbose' 
-	}
-    
+    $cmdLine = $xunitRunner.FullName + ' ' + $a + ' ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -verbose' 
     Write-Host $cmdLine
     Start-Job $ExecuteCmd -ArgumentList $cmdLine -Name $([System.IO.Path]::GetFileNameWithoutExtension($a))
 }

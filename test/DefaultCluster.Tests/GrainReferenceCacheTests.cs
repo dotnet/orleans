@@ -7,10 +7,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT")]
     public class GrainReferenceCacheTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain()
         {
             int size = 1;
@@ -30,7 +29,7 @@ namespace DefaultCluster.Tests.General
             //Assert.Equal(id, grain.A.Result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain2()
         {
             int size = 1;
@@ -61,7 +60,7 @@ namespace DefaultCluster.Tests.General
             //Assert.Equal(id1, grain1.A.Result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void Get2GrainsFromCache()
         {
             int size = 2;

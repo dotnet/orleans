@@ -8,7 +8,6 @@ using Xunit;
 namespace DefaultCluster.Tests.General
 {
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
-    [TestCategory("BVT")]
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         IMultifacetWriter writer;
@@ -30,7 +29,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(x, y);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
             Assert.Throws<InvalidCastException>(() =>
@@ -40,7 +39,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
             IMultifacetFactoryTestGrain factory = GrainClient.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
@@ -53,7 +52,7 @@ namespace DefaultCluster.Tests.General
             
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {
             IMultifacetFactoryTestGrain factory = GrainClient.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());

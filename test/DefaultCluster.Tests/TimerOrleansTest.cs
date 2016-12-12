@@ -14,7 +14,6 @@ using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.TimerTests
 {
-    [TestCategory("BVT")]
     public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
         private readonly ITestOutputHelper output;
@@ -25,7 +24,7 @@ namespace DefaultCluster.Tests.TimerTests
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Basic()
         {
             for (int i = 0; i < 10; i++)
@@ -44,7 +43,7 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
@@ -71,7 +70,7 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
         public void TimerOrleansTest_Migration()
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -111,7 +110,7 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";

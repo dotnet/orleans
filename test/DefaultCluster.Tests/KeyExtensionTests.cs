@@ -8,10 +8,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT")]
     public class KeyExtensionTests : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingTheSameBasePrimaryKey()
         {
             var baseKey = Guid.NewGuid();
@@ -31,7 +30,7 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched key extensions should differentiate an identical base primary key.
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingDifferentBaseKeys()
         {
             var baseKey1 = Guid.NewGuid();
@@ -51,7 +50,7 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched base keys should differentiate between identical extended keys.
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void EmptyKeyExtensionsAreDisallowed()
         {
             Xunit.Assert.Throws(typeof(ArgumentException), () =>
@@ -62,7 +61,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void WhiteSpaceKeyExtensionsAreDisallowed()
         {
             Xunit.Assert.Throws(typeof(ArgumentException), () =>
@@ -73,7 +72,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void NullKeyExtensionsAreDisallowed()
         {
             Xunit.Assert.Throws(typeof(ArgumentNullException), () =>
@@ -84,7 +83,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldPermitStringsLongerThan127BytesLong()
         {
             var baseKey = Guid.NewGuid();
@@ -97,7 +96,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(localGrainRef, remoteGrainRef); // Mismatched grain ID.
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void GetPrimaryKeyStringOnGrainReference()
         {
             const string key = "foo";
@@ -108,7 +107,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(key, key2); // Unexpected key was returned.
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
         public void GetPrimaryKeyStringOnWrongGrainReference()
         {
             var grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(0);

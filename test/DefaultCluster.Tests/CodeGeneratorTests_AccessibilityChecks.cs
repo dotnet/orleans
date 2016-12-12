@@ -8,7 +8,7 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT"), TestCategory("CodeGen")]
+    [TestCategory("CodeGen")]
     public class CodeGeneratorTests_AccessibilityChecks : HostedTestClusterEnsureDefaultStarted
     {
         /// <summary>
@@ -16,7 +16,7 @@ namespace DefaultCluster.Tests.General
         /// runtime code generation does not.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact]
+        [Fact, TestCategory("BVT")]
         public async Task CodeGenInterfaceAccessibilityCheckTest()
         {
             // Runtime codegen does not support internal interfaces.

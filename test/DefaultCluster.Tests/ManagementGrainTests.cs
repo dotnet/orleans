@@ -16,7 +16,6 @@ using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.Management
 {
-    [TestCategory("BVT")]
     public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly ITestOutputHelper output;
@@ -29,7 +28,7 @@ namespace DefaultCluster.Tests.Management
             mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public async Task GetHosts()
         {
             if (HostedCluster.SecondarySilos.Count == 0)
@@ -44,7 +43,7 @@ namespace DefaultCluster.Tests.Management
             Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public async Task GetDetailedHosts()
         {
             if (HostedCluster.SecondarySilos.Count == 0)
@@ -60,7 +59,7 @@ namespace DefaultCluster.Tests.Management
         }
 
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
             SimpleGrainStatistic[] stats = GetSimpleGrainStatistics("Initial");
@@ -71,13 +70,13 @@ namespace DefaultCluster.Tests.Management
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public void GetSimpleGrainStatistics_ActivationCounts()
         {
             RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
         public void GetTestGrainStatistics_ActivationCounts()
         {
             RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());

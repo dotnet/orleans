@@ -86,7 +86,6 @@
     <Compile Include="SerializationTests\SerializationTests.cs" />
     <Compile Include="SimpleGrainTests.cs" />
     <Compile Include="StatelessWorkerTests.cs" />
-    <Compile Include="TimeoutTests.cs" />
     <Compile Include="TimerOrleansTest.cs" />
   </ItemGroup>
   <ItemGroup>

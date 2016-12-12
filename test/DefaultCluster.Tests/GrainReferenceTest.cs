@@ -11,10 +11,9 @@ namespace DefaultCluster.Tests.General
     /// <summary>
     /// Summary description for GrainReferenceTest
     /// </summary>
-    [TestCategory("BVT")]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
-        [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {
             ISimpleGrain ref1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
@@ -27,7 +26,7 @@ namespace DefaultCluster.Tests.General
             Assert.False(ref2.Equals(ref1));
         }
 
-        [Fact,TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void TaskCompletionSource_Resolve()
         {
             string str = "Hello TaskCompletionSource";
@@ -40,7 +39,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(str, tcs.Task.Result);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this()
         {
             IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -49,7 +48,7 @@ namespace DefaultCluster.Tests.General
             g1.PassThis(g2).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this_Nested()
         {
             IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
@@ -58,28 +57,28 @@ namespace DefaultCluster.Tests.General
             g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
         public void GrainReference_DotNet_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("GrainReference")]
         public void GrainReference_DotNet_Serialization_Unresolved()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, false, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
             TestGrainReferenceSerialization(id, true, true);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON"), TestCategory("GrainReference")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();

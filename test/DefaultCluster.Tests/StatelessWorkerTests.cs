@@ -14,7 +14,6 @@ using Xunit.Abstractions;
 
 namespace DefaultCluster.Tests.General
 {
-    [TestCategory("BVT")]
     public class StatelessWorkerTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly int ExpectedMaxLocalActivations = StatelessWorkerGrain.MaxLocalWorkers; // System.Environment.ProcessorCount;
@@ -25,7 +24,7 @@ namespace DefaultCluster.Tests.General
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("StatelessWorker")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
             var gatewaysCount = HostedCluster.ClientConfiguration.Gateways.Count;
