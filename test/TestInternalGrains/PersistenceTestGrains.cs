@@ -777,8 +777,9 @@ namespace UnitTests.Grains
         }
     }
 
-    public class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
+    internal class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
     {
+        private readonly OrleansTaskScheduler scheduler;
         private const int Multiple = 100;
         private Logger logger;
         private bool executing;
@@ -800,7 +801,10 @@ namespace UnitTests.Grains
             new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Info)
         };
 
-        public NonReentrentStressGrainWithoutState() { }
+        public NonReentrentStressGrainWithoutState(OrleansTaskScheduler scheduler)
+        {
+            this.scheduler = scheduler;
+        }
 
         private NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
             : base(identity, runtime)
@@ -915,7 +919,7 @@ namespace UnitTests.Grains
                     + "\n {1} \n Call Stack={2}",
                     _id, CaptureRuntimeEnvironment(), callStack);
                 logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                OrleansTaskScheduler.Instance.DumpSchedulerStatus();
+                this.scheduler.DumpSchedulerStatus();
                 LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);

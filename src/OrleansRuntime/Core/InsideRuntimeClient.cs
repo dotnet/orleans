@@ -691,7 +691,7 @@ namespace Orleans.Runtime
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             // Schedule call back to grain context
-            await OrleansTaskScheduler.Instance.QueueNamedTask(asyncFunction, context, activityName);
+            await this.Scheduler.QueueNamedTask(asyncFunction, context, activityName);
         }
 
         public void Reset(bool cleanup)
@@ -888,7 +888,7 @@ namespace Orleans.Runtime
             if (interfaces.Count != 1)
                 throw new InvalidOperationException($"Extension type {handlerType.FullName} implements more than one grain interface.");
 
-            var interfaceId = GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
+            var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(interfaces.First());
             var invoker = typeManager.GetInvoker(interfaceId);
             if (invoker != null)
                 return (IGrainExtensionMethodInvoker)invoker;

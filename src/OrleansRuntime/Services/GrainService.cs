@@ -11,8 +11,9 @@ namespace Orleans.Runtime
     {
         private readonly OrleansTaskScheduler scheduler;
         private readonly IConsistentRingProvider ring;
-
+        private string typeName;
         private GrainServiceStatus status;
+
 
         protected Logger Logger { get; }
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
@@ -21,7 +22,8 @@ namespace Orleans.Runtime
         protected GrainServiceStatus Status
         {
             get { return status; }
-            set {
+            set
+            {
                 OnStatusChange(status, value);
                 status = value;
             }
@@ -34,7 +36,8 @@ namespace Orleans.Runtime
 
         protected GrainService(object id, Silo silo) : base((GrainId)id, silo.SiloAddress, lowPriority: true)
         {
-            Logger = LogManager.GetLogger("Pass the name from config.");
+            typeName = this.GetType().FullName;
+            Logger = LogManager.GetLogger(typeName);
 
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;
@@ -65,7 +68,7 @@ namespace Orleans.Runtime
 
         public virtual Task Start()
         {
-            Logger.Info(ErrorCode.RS_ServiceStarting, "Starting GetTheName grain service on: {0} x{1,8:X8}, with range {2}", Silo, Silo.GetConsistentHashCode(), RingRange);
+            Logger.Info(ErrorCode.RS_ServiceStarting, "Starting {0} grain service on: {1} x{2,8:X8}, with range {3}", this.typeName, Silo, Silo.GetConsistentHashCode(), RingRange);
             RingRange = ring.GetMyRange();
 
             StartInBackground().Ignore();
@@ -79,7 +82,7 @@ namespace Orleans.Runtime
         {
             StoppedCancellationTokenSource.Cancel();
 
-            Logger.Info(ErrorCode.RS_ServiceStopping, "Stopping GetTheName grain service");
+            Logger.Info(ErrorCode.RS_ServiceStopping, $"Stopping {this.typeName} grain service");
             Status = GrainServiceStatus.Stopped;
             
             return TaskDone.Done;

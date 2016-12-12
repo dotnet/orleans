@@ -23,10 +23,7 @@ namespace Orleans.Runtime.Scheduler
         internal LimitValue MaxPendingItemsLimit { get; private set; }
         internal TimeSpan DelayWarningThreshold { get; private set; }
         
-        public static OrleansTaskScheduler Instance { get; private set; }
-
         public int RunQueueLength { get { return RunQueue.Length; } }
-        
 
         public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads)
         {
@@ -48,7 +45,6 @@ namespace Orleans.Runtime.Scheduler
         private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
             TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, LimitValue maxPendingItemsLimit)
         {
-            Instance = this;
             DelayWarningThreshold = delayWarningThreshold;
             WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
             TurnWarningLengthThreshold = turnWarningLengthThreshold;
