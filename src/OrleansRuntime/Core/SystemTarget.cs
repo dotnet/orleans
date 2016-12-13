@@ -5,6 +5,11 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Base class for various system services, such as grain directory, reminder serive, etc.
+    /// Made public for GrainSerive to inherit from it.
+    /// Can be turned to internal after a refactoring that would remove the inheritence relaion.
+    /// </summary>
     public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
     {
         private readonly GrainId grainId;
@@ -12,14 +17,15 @@ namespace Orleans.Runtime
         private IGrainMethodInvoker lastInvoker;
         private Message running;
 
+        /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
         GrainId ISystemTargetBase.GrainId => grainId;
         internal SchedulingContext SchedulingContext => schedulingContext;
         internal ActivationId ActivationId { get; set; }
 
-        public SystemTarget()
+        /// <summary>Only needed to make Reflection happy.</summary>
+        protected SystemTarget()
         {
-            
         }
 
         internal SystemTarget(GrainId grainId, SiloAddress silo) 
@@ -35,7 +41,7 @@ namespace Orleans.Runtime
             schedulingContext = new SchedulingContext(this, lowPriority);
         }
 
-        IGrainMethodInvoker IInvokable.GetInvoker(int interfaceId, string genericGrainType = null)
+        IGrainMethodInvoker IInvokable.GetInvoker(int interfaceId, string genericGrainType)
         {
             if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId)
                 return lastInvoker;
@@ -78,6 +84,7 @@ namespace Orleans.Runtime
             return timer;
         }
 
+        /// <summary>Override of object.ToString()</summary>
         public override string ToString()
         {
             return String.Format("[{0}SystemTarget: {1}{2}{3}]",
@@ -87,7 +94,8 @@ namespace Orleans.Runtime
                  ActivationId);
         }
 
-        public string ToDetailedString()
+        /// <summary>Adds details about message currently being processed</summary>
+        internal string ToDetailedString()
         {
             return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
         }
