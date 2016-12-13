@@ -342,7 +342,7 @@ namespace Orleans.Runtime
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, logger, this);
                     }
 
-                    var invoker = invokable.GetInvoker(this.typeManager, request.InterfaceId, message.GenericGrainType);
+                    var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);
 
                     if (invoker is IGrainExtensionMethodInvoker
                         && !(target is IGrainExtension))
@@ -754,7 +754,7 @@ namespace Orleans.Runtime
 
         public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
         {
-            return this.typeManager.GetInvoker(interfaceId, genericGrainType);
+            return typeManager.GetInvoker(interfaceId, genericGrainType);
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

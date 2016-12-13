@@ -84,7 +84,7 @@ namespace Orleans.Streams
         {
             var grainRef = producer as GrainReference;
             if (grainRef !=null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return this.siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
             
             return true;
         }
@@ -93,7 +93,7 @@ namespace Orleans.Streams
         {
             var grainRef = producer as GrainReference;
             if (grainRef != null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return this.siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
             
             return false;
         }

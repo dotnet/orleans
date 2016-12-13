@@ -27,8 +27,7 @@ namespace Orleans.Runtime
                 silo.LocalScheduler, 
                 ReminderTable.Singleton, 
                 silo.GlobalConfig,
-                iniTimeSpan,
-                runtimeClient);
+                iniTimeSpan);
         }
     }
 }

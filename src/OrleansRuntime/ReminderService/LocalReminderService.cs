@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
         private IRingRange myRange;
         private long localTableSequence;
         private int rangeSerialNumber;
-        private IGrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
+        private IGrainTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly CancellationTokenSource stoppedCancellationTokenSource;
         private uint initialReadCallCount = 0;
@@ -41,7 +41,6 @@ namespace Orleans.Runtime.ReminderService
         private readonly Logger logger;
         private readonly GlobalConfiguration config;
         private readonly TimeSpan initTimeout;
-        private readonly ISiloRuntimeClient runtimeClient;
 
         internal LocalReminderService(
             SiloAddress addr,
@@ -50,8 +49,7 @@ namespace Orleans.Runtime.ReminderService
             OrleansTaskScheduler localScheduler,
             IReminderTable reminderTable,
             GlobalConfiguration config,
-            TimeSpan initTimeout,
-            ISiloRuntimeClient runtimeClient)
+            TimeSpan initTimeout)
             : base(id, addr)
         {
             logger = LogManager.GetLogger("ReminderService", LoggerType.Runtime);
@@ -62,7 +60,6 @@ namespace Orleans.Runtime.ReminderService
             this.reminderTable = reminderTable;
             this.config = config;
             this.initTimeout = initTimeout;
-            this.runtimeClient = runtimeClient;
             status = ReminderServiceStatus.Booting;
             myRange = null;
             localTableSequence = 0;
@@ -100,10 +97,10 @@ namespace Orleans.Runtime.ReminderService
 
             ring.UnSubscribeFromRangeChangeEvents(this);
 
-            if (listRefresher != null)
+            if (listRefreshTimer != null)
             {
-                listRefresher.Dispose();
-                listRefresher = null;
+                listRefreshTimer.Dispose();
+                listRefreshTimer = null;
             }
             foreach (LocalReminderData r in localReminders.Values)
                 r.StopReminder(logger);
@@ -270,13 +267,13 @@ namespace Orleans.Runtime.ReminderService
             if (status == ReminderServiceStatus.Booting)
             {
                 var random = new SafeRandom();
-                listRefresher = GrainTimer.FromTaskCallback(
+                listRefreshTimer = GrainTimer.FromTaskCallback(
                     _ => DoInitialReadAndUpdateReminders(),
                     null,
                     random.NextTimeSpan(InitialReadRetryPeriod),
                     InitialReadRetryPeriod,
                     name: "ReminderService.ReminderListInitialRead");
-                listRefresher.Start();
+                listRefreshTimer.Start();
             }
         }
 
@@ -290,14 +287,14 @@ namespace Orleans.Runtime.ReminderService
             startedTask.TrySetResult(true);
             var random = new SafeRandom();
             var dueTime = random.NextTimeSpan(Constants.RefreshReminderList);
-            if (listRefresher != null) listRefresher.Dispose();
-            listRefresher = GrainTimer.FromTaskCallback(
+            if (listRefreshTimer != null) listRefreshTimer.Dispose();
+            listRefreshTimer = GrainTimer.FromTaskCallback(
                 _ => ReadAndUpdateReminders(),
                 null,
                 dueTime,
                 Constants.RefreshReminderList,
                 name: "ReminderService.ReminderListRefresher");
-            listRefresher.Start();
+            listRefreshTimer.Start();
             ring.SubscribeToRangeChangeEvents(this);
         }
 
