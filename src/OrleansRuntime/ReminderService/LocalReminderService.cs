@@ -199,7 +199,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         #region Change in membership, e.g., failure of predecessor
-        private async Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
+        public override async Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             await base.OnRangeChange(oldRange, newRange, increased);
             if (Status == GrainServiceStatus.Started)

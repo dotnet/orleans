@@ -7,6 +7,7 @@ using Orleans.Services;
 
 namespace Orleans.Runtime
 {
+    /// <summary>Base class for implementing a grain-like partitioned service with per silo instances of it automatically instantiated and started by silo runtime</summary>
     public abstract class GrainService : SystemTarget, IRingRangeListener, IGrainService
     {
         private readonly OrleansTaskScheduler scheduler;
@@ -14,11 +15,15 @@ namespace Orleans.Runtime
         private string typeName;
         private GrainServiceStatus status;
 
-
+        /// <summary>Logger instance to be used by grain service subclasses</summary>
         protected Logger Logger { get; }
+        /// <summary>Token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
+        /// <summary>Monotonically increasing serial number of the version of the ring range owned by the grain service instance</summary>
         protected int RangeSerialNumber { get; private set; }
+        /// <summary>Range of the partitioning ring currently owned by the grain service instance</summary>
         protected IRingRange RingRange { get; private set; }
+        /// <summary>Status of the grain service instance</summary>
         protected GrainServiceStatus Status
         {
             get { return status; }
@@ -29,11 +34,13 @@ namespace Orleans.Runtime
             }
         }
 
-        public GrainService() : base(null, null)
+        /// <summary>Only to make Reflection happy</summary>
+        protected GrainService() : base(null, null)
         {
             throw new Exception("This should not be constructed by client code.");
         }
 
+        /// <summary>Costructor to use for grain services</summary>
         protected GrainService(object id, Silo silo) : base((GrainId)id, silo.SiloAddress, lowPriority: true)
         {
             typeName = this.GetType().FullName;
@@ -44,7 +51,8 @@ namespace Orleans.Runtime
             StoppedCancellationTokenSource = new CancellationTokenSource();
         }
 
-        public virtual void Init(IServiceProvider serviceProvider)
+        /// <summary>Invoked upon initialization of the service</summary>
+        protected virtual void Init(IServiceProvider serviceProvider)
         {
         }
 
@@ -60,12 +68,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public virtual Task Init()
-        {
-            // Set up here.
-            return TaskDone.Done;
-        }
-
+        /// <summary>Invoked when service is being started</summary>
         public virtual Task Start()
         {
             Logger.Info(ErrorCode.RS_ServiceStarting, "Starting {0} grain service on: {1} x{2,8:X8}, with range {3}", this.typeName, Silo, Silo.GetConsistentHashCode(), RingRange);
@@ -76,8 +79,10 @@ namespace Orleans.Runtime
             return TaskDone.Done;
         }
 
+        /// <summary>Deferred part of initialization that executes after the service is already started (to speed up startup)</summary>
         protected abstract Task StartInBackground();
 
+        /// <summary>Invoked when service is being stopped</summary>
         public virtual Task Stop()
         {
             StoppedCancellationTokenSource.Cancel();
@@ -89,11 +94,12 @@ namespace Orleans.Runtime
         }
 
 
-        public void RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
+        void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this.SchedulingContext).Ignore();
         }
 
+        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the clsuter state</summary>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             Logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);
@@ -103,10 +109,14 @@ namespace Orleans.Runtime
             return TaskDone.Done;
         }
 
+        /// <summary>Possible statuses of a grain service</summary>
         protected enum GrainServiceStatus
         {
+            /// <summary>Initialization is in progress</summary>
             Booting = 0,
+            /// <summary>Service successfully started</summary>
             Started,
+            /// <summary>Service has been stopped</summary>
             Stopped,
         }
     }
