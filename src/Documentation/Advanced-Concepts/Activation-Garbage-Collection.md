@@ -132,8 +132,10 @@ You can also instruct the runtime to deactivate the grain next time it becomes i
 ``` csharp
   protected void DeactivateOnIdle()
 ```
-An activation is considered idle if it is not processing any message at the moment
-and has an empty inbox (i.e. there are no requests waiting to be processed by it).
+An activation is considered idle if it is not processing any message at the moment.
+If you call `DeactivateOnIdle` while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.
+If there are any requests queued for the grain, they will be forwarded to the next activation.
+
 
 `DeactivateOnIdle` take priority over any Activation Garbage Collection settings specified in the config or `DelayDeactivation`.
 Please notice that this setting only applies to this particular activation from which it has been called and it does not apply to all possible instances of grains of this type.

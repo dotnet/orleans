@@ -6,25 +6,20 @@ title: Grain LifeCycle
 
 ## Grain LifeCycle
 
-We say grains virtually always exist but here we want to describe different stages of a grain's life.
-A grain is like a class definition, it is nothing unless it is on the memory and can execute code.
-An instance of a class is instantiated with the `new` keyword in C#.
-an instance of a grain is called an activation.
-The grain's instances are differentiated by their key and a grain with a specific key is either activated or not.
-You don't control this by using construction/destruction keywords and instead Orleans runtime manages this for you.
+"Grains are logical entities that always exist, virtually, and have stable logical identities (keys). Application code never creates or destroys grains. Instead, it acts as if all possible grains are always in memory and available for processing requests.
 
-All possible grains in the whole key space virtually always exist
-and it means whenever you call a method of a grain, if it is not active, it will get activated by the runtime.
-Also after the grain passes a certain amount of time in idle state, the runtime will deactivate the grain (i.e. destroys it).
-A grain is in idle state if it is not currently processing a message and its queue of messages is empty.
+Grains get physically instantiated, activated, by the Orleans runtime automatically on an as-needed to process incoming requests. After a grain has been idle for a certain amount of time, the Orleans runtime automatically removes, deactivates, it from memory.
+
+A physical instance of a grain in memory is called a grain activation. Grain activations are invisible to application code as well as the process of activating and deactivating them. Only the grain itself can be aware of that - by overriding virtual methods  OnActivateAsync  and  OnDeactivateAsync  that get invoked upon activation and deactivation of the grain respectively.
+
+Over the course of its eternal, virtual, life a grain goes through the cycles of activations and deactivations, staying always available for callers to invoke it, whether it is in memory at the time of the call or not."
 
 When you get a grain reference in a client or in another grain by using `GetGrain`,
-you only get a reference to a grain and you don't get the activation.
-When you call a method using the reference,then the grain will be activated in a silo (if it is not already active)
-and your reference sends messages to the activation by calling methods and points to the activation logically.
+you only get a proxy object with a logical address (identity) of the grain, but not its physical address.
+When you call a method using the proxy object, then the grain will get activated in a silo (if it is not already activated in the cluster).
+Your method calls on the proxy are sent to the activation by the Orleans runtime.
 
-`GetGrain` itself is not asynchronous, can not fail and only returns the logical reference which points to the activation.
-Resolving the reference->activation map is one of the many things that runtime does for you 
+`GetGrain`  itself is an inexpensive local operation of constructing a proxy object with an embedded identity of the target grain.
 
 ## callbacks 
 
@@ -47,7 +42,7 @@ For grains which store their state and derive from `Grain<T>` there is a point w
 So the life cycle of a grain is like this
 
 - another grain or a client calls a method of a grain
-- the grain gets activated and brought to memory
+- the grain gets activated (if it is not activated anywhere in the silo) and an instance of the grain class will be created
   - Constructor of the grain will be executed and DI will setup (If you have DI)
   - the grain state will be read from storage if any
   - if successful then `OnActivateAsync` is called
