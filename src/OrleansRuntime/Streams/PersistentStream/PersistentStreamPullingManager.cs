@@ -295,7 +295,7 @@ namespace Orleans.Streams
             {
                 try
                 {
-                    providerRuntime.UnRegisterSystemTarget(agent);
+                    providerRuntime.UnregisterSystemTarget(agent);
                 }
                 catch (Exception exc)
                 {

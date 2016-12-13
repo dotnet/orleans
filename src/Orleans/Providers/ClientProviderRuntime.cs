@@ -108,7 +108,7 @@ namespace Orleans.Providers
             throw new NotImplementedException();
         }
 
-        public void UnRegisterSystemTarget(ISystemTarget target)
+        public void UnregisterSystemTarget(ISystemTarget target)
         {
             throw new NotImplementedException();
         }

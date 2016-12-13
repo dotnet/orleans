@@ -37,7 +37,6 @@ namespace Orleans.Runtime
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
-        private readonly Lazy<ISiloStatusOracle> siloStatusOracle;
 
         internal readonly IConsistentRingProvider ConsistentRingProvider;
 
@@ -49,7 +48,6 @@ namespace Orleans.Runtime
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
-            Func<ISiloStatusOracle> siloStatusOracle,
             OrleansTaskScheduler scheduler)
         {
             this.dispatcher = dispatcher;
@@ -64,7 +62,6 @@ namespace Orleans.Runtime
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
             this.Scheduler = scheduler;
-            this.siloStatusOracle = new Lazy<ISiloStatusOracle>(siloStatusOracle);
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
             tryResendMessage = TryResendMessage;
             unregisterCallback = msg => UnRegisterCallback(msg.Id);

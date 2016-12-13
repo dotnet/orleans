@@ -28,7 +28,7 @@ namespace Orleans.Streams
 
         void RegisterSystemTarget(ISystemTarget target);
 
-        void UnRegisterSystemTarget(ISystemTarget target);
+        void UnregisterSystemTarget(ISystemTarget target);
 
         /// <summary>
         /// Binds an extension to an addressable object, if not already done.

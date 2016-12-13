@@ -207,7 +207,7 @@ namespace Orleans.Runtime.GrainDirectory
         private Dictionary<GrainId, IGrainInfo> partitionData;
         private readonly object lockable;
         private readonly Logger log;
-        private ISiloStatusOracle membership;
+        private ISiloStatusOracle siloStatusOracle;
 
         [ThreadStatic]
         private static ActivationId[] activationIdsHolder;
@@ -217,21 +217,17 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        internal GrainDirectoryPartition()
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle)
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
             log = LogManager.GetLogger("DirectoryPartition");
-            membership = Silo.CurrentSilo.LocalSiloStatusOracle;
+            this.siloStatusOracle = siloStatusOracle;
         }
 
         private bool IsValidSilo(SiloAddress silo)
         {
-            if (membership == null)
-            {
-                membership = Silo.CurrentSilo.LocalSiloStatusOracle;
-            }
-            return membership.IsFunctionalDirectory(silo);
+            return this.siloStatusOracle.IsFunctionalDirectory(silo);
         }
 
         internal void Clear()
@@ -515,7 +511,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
-            var newDirectory = new GrainDirectoryPartition();
+            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle);
 
             if (modifyOrigin)
             {
