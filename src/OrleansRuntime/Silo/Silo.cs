@@ -650,14 +650,14 @@ namespace Orleans.Runtime
             foreach (var serviceConfig in grainServiceConfigurations.GrainServices)
             {
                 // Construct the Grain Service
-                var serviceType = TypeInfo.GetType(serviceConfig.Value.ServiceType);
+                var serviceType = System.Type.GetType(serviceConfig.Value.ServiceType);
                 if (serviceType == null)
                 {
                     throw new Exception(String.Format("Cannot find Grain Service type {0} of Grain Service {1}", serviceConfig.Value.ServiceType, serviceConfig.Value.Name));
                 }
 
                 // internal GrainService(GrainId grainId, Silo silo) 
-                var ctor = serviceType.GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new[] {typeof(object), typeof(Silo)}, null);
+                var ctor = TypeUtils.GetConstructorThatMatches(serviceType, new[] {typeof(object), typeof(Silo)});
 
                 var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
                 if (grainServiceInterfaceType == null)
