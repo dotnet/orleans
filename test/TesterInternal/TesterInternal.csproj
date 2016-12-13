@@ -47,7 +47,6 @@
   <ItemGroup>
     <Compile Include="ActivationsLifeCycleTests\ActivationCollectorTests.cs" />
     <Compile Include="ActivationsLifeCycleTests\DeactivateOnIdleTests.cs" />
-    <Compile Include="CodeGeneratorTests_AccessibilityChecks.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConnectionStringFixture.cs" />
     <Compile Include="ErrorInjectionStorageProvider.cs" />
@@ -78,16 +77,10 @@
     <Compile Include="StorageTests\TestDataSets\TestStateGeneric1.cs" />
     <Compile Include="StreamingTests\PubSubRendezvousGrainTests.cs" />
     <Compile Include="OrleansRuntime\StuckGrainTests.cs" />
-    <Compile Include="CodeGeneratorTests_TakeSerializedData.cs" />
-    <Compile Include="CodeGeneratorTests_KnownAssemblyAttribute.cs" />
-    <Compile Include="ClientAddressableTests.cs" />
     <Compile Include="ClientInitTests.cs" />
-    <Compile Include="CodeGeneratorTests_RequiringSilo.cs" />
     <Compile Include="ConcurrencyTests.cs" />
     <Compile Include="CounterControlProgTests.cs" />
     <Compile Include="DeadlockDetectionTests.cs" />
-    <Compile Include="EchoTaskGrainTests.cs" />
-    <Compile Include="ErrorGrainTest.cs" />
     <Compile Include="General\ConsistentRingProviderTests_Silo.cs" />
     <Compile Include="General\BootstrapProviderTests.cs" />
     <Compile Include="General\ElasticPlacementTest.cs" />
@@ -107,19 +100,11 @@
     <Compile Include="OrleansRuntime\Streams\FixedSizeObjectPoolTests.cs" />
     <Compile Include="OrleansRuntime\Streams\ObjectPoolTests.cs" />
     <Compile Include="OrleansRuntime\Streams\PooledQueueCacheTests.cs" />
-    <Compile Include="GrainReferenceCacheTests.cs" />
-    <Compile Include="GrainReferenceCastTests.cs" />
-    <Compile Include="GrainReferenceTest.cs" />
-    <Compile Include="LocalErrorGrain.cs" />
     <Compile Include="MockStatsCollectors.cs" />
     <Compile Include="ReentrancyTests.cs" />
-    <Compile Include="SchedulerTests\STSchedulerLongTurnTest.cs" />
-    <Compile Include="SerializerTests\SerializationTests.cs" />
     <Compile Include="StorageTests\HierarchicalKeyStoreTests.cs" />
     <Compile Include="StorageTests\LocalStoreTests.cs" />
-    <Compile Include="MultifacetGrainTest.cs" />
     <Compile Include="OrleansHostProgTests.cs" />
-    <Compile Include="PolymorphicInterfaceTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -150,7 +135,6 @@
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
-    <Compile Include="TimerOrleansTest.cs" />
     <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
     <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />

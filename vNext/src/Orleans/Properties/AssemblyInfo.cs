@@ -23,4 +23,7 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]

@@ -119,6 +119,9 @@
     <Compile Include="..\..\..\test\TesterAzureUtils\UnitTestAzureTableDataManager.cs">
       <Link>UnitTestAzureTableDataManager.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TesterAzureUtils\StreamTypeSerializationTests.cs">
+      <Link>StreamTypeSerializationTests.cs</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
