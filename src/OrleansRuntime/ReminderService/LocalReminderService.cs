@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
         private IRingRange myRange;
         private long localTableSequence;
         private int rangeSerialNumber;
-        private GrainTimer listRefresher; // timer that refreshes our list of reminders to reflect global reminder table
+        private IGrainTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly CancellationTokenSource stoppedCancellationTokenSource;
         private uint initialReadCallCount = 0;
@@ -97,10 +97,10 @@ namespace Orleans.Runtime.ReminderService
 
             ring.UnSubscribeFromRangeChangeEvents(this);
 
-            if (listRefresher != null)
+            if (listRefreshTimer != null)
             {
-                listRefresher.Dispose();
-                listRefresher = null;
+                listRefreshTimer.Dispose();
+                listRefreshTimer = null;
             }
             foreach (LocalReminderData r in localReminders.Values)
                 r.StopReminder(logger);
@@ -267,13 +267,13 @@ namespace Orleans.Runtime.ReminderService
             if (status == ReminderServiceStatus.Booting)
             {
                 var random = new SafeRandom();
-                listRefresher = GrainTimer.FromTaskCallback(
+                listRefreshTimer = GrainTimer.FromTaskCallback(
                     _ => DoInitialReadAndUpdateReminders(),
                     null,
                     random.NextTimeSpan(InitialReadRetryPeriod),
                     InitialReadRetryPeriod,
                     name: "ReminderService.ReminderListInitialRead");
-                listRefresher.Start();
+                listRefreshTimer.Start();
             }
         }
 
@@ -287,14 +287,14 @@ namespace Orleans.Runtime.ReminderService
             startedTask.TrySetResult(true);
             var random = new SafeRandom();
             var dueTime = random.NextTimeSpan(Constants.RefreshReminderList);
-            if (listRefresher != null) listRefresher.Dispose();
-            listRefresher = GrainTimer.FromTaskCallback(
+            if (listRefreshTimer != null) listRefreshTimer.Dispose();
+            listRefreshTimer = GrainTimer.FromTaskCallback(
                 _ => ReadAndUpdateReminders(),
                 null,
                 dueTime,
                 Constants.RefreshReminderList,
                 name: "ReminderService.ReminderListRefresher");
-            listRefresher.Start();
+            listRefreshTimer.Start();
             ring.SubscribeToRangeChangeEvents(this);
         }
 
@@ -555,7 +555,7 @@ namespace Orleans.Runtime.ReminderService
 
             internal ReminderIdentity Identity { get; private set; }
             internal string ETag;
-            internal GrainTimer Timer;
+            internal IGrainTimer Timer;
             internal long LocalSequenceNumber; // locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
 
             internal LocalReminderData(ReminderEntry entry)

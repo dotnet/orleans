@@ -428,7 +428,7 @@ namespace Orleans.Runtime
             {
                 // start the reminder service system target
                 reminderService = Services.GetRequiredService<LocalReminderServiceFactory>()
-                                          .CreateReminderService(this, grainFactory, initTimeout);
+                                          .CreateReminderService(this, grainFactory, initTimeout, this.runtimeClient);
                 RegisterSystemTarget((SystemTarget) reminderService);
             }
 

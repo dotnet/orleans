@@ -25,6 +25,7 @@ namespace Orleans.Streams
         private static readonly CounterStatistic counterConsumersAdded;
         private static readonly CounterStatistic counterConsumersRemoved;
         private static readonly CounterStatistic counterConsumersTotal;
+        private readonly ISiloStatusOracle siloStatusOracle;
 
         static PubSubRendezvousGrain()
         {
@@ -34,6 +35,11 @@ namespace Orleans.Streams
             counterConsumersAdded   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_ADDED);
             counterConsumersRemoved = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_REMOVED);
             counterConsumersTotal   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_TOTAL);
+        }
+
+        public PubSubRendezvousGrain(ISiloStatusOracle siloStatusOracle)
+        {
+            this.siloStatusOracle = siloStatusOracle;
         }
 
         public override async Task OnActivateAsync()
@@ -74,20 +80,20 @@ namespace Orleans.Streams
         }
 
         /// accept and notify only Active producers.
-        private static bool IsActiveProducer(IStreamProducerExtension producer)
+        private bool IsActiveProducer(IStreamProducerExtension producer)
         {
             var grainRef = producer as GrainReference;
             if (grainRef !=null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
             
             return true;
         }
 
-        private static bool IsDeadProducer(IStreamProducerExtension producer)
+        private bool IsDeadProducer(IStreamProducerExtension producer)
         {
             var grainRef = producer as GrainReference;
             if (grainRef != null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
             
             return false;
         }

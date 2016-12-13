@@ -7,7 +7,7 @@ namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        private readonly IRuntimeClient runtimeClient;
+        private readonly ISiloRuntimeClient runtimeClient;
 
         public GrainRuntime(
             GlobalConfiguration globalConfig,
@@ -17,7 +17,7 @@ namespace Orleans.Runtime
             IReminderRegistry reminderRegistry,
             IStreamProviderManager streamProviderManager,
             IServiceProvider serviceProvider,
-            IRuntimeClient runtimeClient)
+            ISiloRuntimeClient runtimeClient)
         {
             this.runtimeClient = runtimeClient;
             ServiceId = globalConfig.ServiceId;
