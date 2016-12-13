@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -10,7 +11,7 @@ namespace Orleans.Runtime
         private static readonly Dictionary<string, IntValueStatistic> registeredStatistics;
         private static readonly object lockable;
 
-        public string Name { get; private set; }
+        public string Name { get; }
         public CounterStorage Storage { get; private set; }
 
         private Func<long> fetcher;
@@ -28,7 +29,7 @@ namespace Orleans.Runtime
             fetcher = f;
         }
 
-        static public IntValueStatistic Find(StatisticName name)
+        public static IntValueStatistic Find(StatisticName name)
         {
             lock (lockable)
             {
@@ -36,7 +37,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public IntValueStatistic FindOrCreate(StatisticName name, Func<long> f, CounterStorage storage = CounterStorage.LogOnly)
+        public static IntValueStatistic FindOrCreate(StatisticName name, Func<long> f, CounterStorage storage = CounterStorage.LogOnly)
         {
             lock (lockable)
             {
@@ -51,7 +52,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public void Delete(StatisticName name)
+        public static void Delete(StatisticName name)
         {
             lock (lockable)
             {
@@ -90,7 +91,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsValueDelta { get { return false; } }
+        public bool IsValueDelta => false;
 
         public string GetValueString()
         {
@@ -116,6 +117,11 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return Name + "=" + GetValueString();
+        }
+
+        public void TrackMetric(Logger logger)
+        {
+            logger.TrackMetric(Metric.CreateName(this), this.GetCurrentValue());
         }
     }
 }

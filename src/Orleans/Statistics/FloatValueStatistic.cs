@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -10,7 +11,7 @@ namespace Orleans.Runtime
         private static readonly Dictionary<string, FloatValueStatistic> registeredStatistics;
         private static readonly object lockable;
 
-        public string Name { get; private set; }
+        public string Name { get; }
         public CounterStorage Storage { get; private set; }
 
         private Func<float> fetcher;
@@ -44,12 +45,12 @@ namespace Orleans.Runtime
             }
         }
 
-        static public FloatValueStatistic FindOrCreate(StatisticName name, Func<float> f)
+        public static FloatValueStatistic FindOrCreate(StatisticName name, Func<float> f)
         {
             return FindOrCreate(name, f, CounterStorage.LogOnly);
         }
 
-        static public FloatValueStatistic FindOrCreate(StatisticName name, Func<float> f, CounterStorage storage)
+        public static FloatValueStatistic FindOrCreate(StatisticName name, Func<float> f, CounterStorage storage)
         {
             lock (lockable)
             {
@@ -64,7 +65,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public void Delete(StatisticName name)
+        public static void Delete(StatisticName name)
         {
             lock (lockable)
             {
@@ -79,7 +80,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public FloatValueStatistic CreateDoNotRegister(string name, Func<float> f)
+        public static FloatValueStatistic CreateDoNotRegister(string name, Func<float> f)
         {
             return new FloatValueStatistic(name, f) { Storage = CounterStorage.DontStore };
         }
@@ -125,7 +126,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsValueDelta { get { return false; } }
+        public bool IsValueDelta => false;
 
         public string GetValueString()
         {
@@ -150,7 +151,12 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("{0}={1}", Name, GetValueString());
+            return $"{Name}={GetValueString()}";
+        }
+
+        public void TrackMetric(Logger logger)
+        {
+            logger.TrackMetric(Metric.CreateName(this), GetCurrentValue());
         }
     }
 }

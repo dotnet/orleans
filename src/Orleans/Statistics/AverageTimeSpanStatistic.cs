@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -14,9 +15,9 @@ namespace Orleans.Runtime
         private readonly CounterStatistic tickAccum;
         private readonly CounterStatistic sampleCounter;
                 
-        public string Name { get; private set; }
-        public bool IsValueDelta { get; private set; }
-        public CounterStorage Storage { get; private set; }
+        public string Name { get; }
+        public bool IsValueDelta { get; }
+        public CounterStorage Storage { get; }
 
         static AverageTimeSpanStatistic()
         {
@@ -53,10 +54,8 @@ namespace Orleans.Runtime
             if (storage != expected.Storage)
             {
                 throw new ArgumentException(
-                    String.Format(
-                        "Please verity that all invocations of AverageTimeSpanStatistic.FindOrCreate() for instance \"{0}\" all specify the same storage type {1}" ,
-                        name.Name, Enum.GetName(typeof(CounterStorage), expected.Storage)),
-                    "storage"); 
+                    $"Please verity that all invocations of AverageTimeSpanStatistic.FindOrCreate() for instance \"{name.Name}\" all specify the same storage type {Enum.GetName(typeof(CounterStorage), expected.Storage)}",
+                    nameof(storage)); 
             }
         }
 
@@ -82,7 +81,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public void Delete(StatisticName name)
+        public static void Delete(StatisticName name)
         {
             lock (classLock)
             {
@@ -144,12 +143,17 @@ namespace Orleans.Runtime
 
         public string GetDisplayString()
         {
-            return String.Format("{0}={1} Secs", Name, GetValueString());
+            return $"{Name}={GetValueString()} Secs";
         }
         
         public override string ToString()
         {
             return GetValueString();
+        }
+
+        public void TrackMetric(Logger logger)
+        {
+            logger.TrackMetric(Metric.CreateName(this), GetCurrentValue());
         }
     }
 }
