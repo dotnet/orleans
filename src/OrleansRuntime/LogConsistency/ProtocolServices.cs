@@ -48,11 +48,18 @@ namespace Orleans.Runtime.LogConsistency
 
             log?.Verbose3("SendMessage {0}->{1}: {2}", mycluster, clusterId, payload);
 
+            // send the message to ourself if we are the destination cluster
             if (mycluster == clusterId)
             {
                 var g = (IProtocolParticipant)grain;
                 // we are on the same scheduler, so we can call the method directly
                 return await g.OnProtocolMessageReceived(payload);
+            }
+
+            // cannot send to remote instance if there is only one instance
+            if (RegistrationStrategy.Equals(GlobalSingleInstanceRegistration.Singleton))
+            {
+                throw new ProtocolTransportException("cannot send protocol message to remote instance because there is only one global instance");
             }
 
             if (PseudoMultiClusterConfiguration != null)
