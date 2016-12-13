@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Threading;
@@ -10,7 +11,7 @@ using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-
+using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -22,11 +23,14 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Services;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
 using Orleans.Runtime.TestHooks;
 using Orleans.Serialization;
+using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
@@ -241,7 +245,6 @@ namespace Orleans.Runtime
                     services.TryAddExisting<ISiloRuntimeClient, InsideRuntimeClient>();
                     services.TryAddSingleton<MembershipFactory>();
                     services.TryAddSingleton<MultiClusterOracleFactory>();
-                    services.TryAddSingleton<LocalReminderServiceFactory>();
                     services.TryAddSingleton<DeploymentLoadPublisher>();
                     services.TryAddSingleton<IMembershipTable>(
                         sp => sp.GetRequiredService<MembershipFactory>().GetMembershipTable(sp.GetRequiredService<GlobalConfiguration>()));
@@ -550,6 +553,9 @@ namespace Orleans.Runtime
             allSiloProviders.AddRange(siloStreamProviderManager.GetProviders());
             if (logger.IsVerbose) { logger.Verbose("Stream provider manager created successfully."); }
 
+            // Load and init grain services before silo becomes active.
+            CreateGrainServices(GlobalConfig.GrainServiceConfigurations);
+
             ISchedulingContext statusOracleContext = ((SystemTarget)LocalSiloStatusOracle).SchedulingContext;
 
             bool waitForPrimaryToStart = GlobalConfig.PrimaryNodeIsRequired && Type != SiloType.Primary;
@@ -637,6 +643,33 @@ namespace Orleans.Runtime
                 throw;
             }
             if (logger.IsVerbose) { logger.Verbose("Silo.Start complete: System status = {0}", SystemStatus.Current); }
+        }
+
+        private void CreateGrainServices(GrainServiceConfigurations grainServiceConfigurations)
+        {
+            foreach (var serviceConfig in grainServiceConfigurations.GrainServices)
+            {
+                // Construct the Grain Service
+                var serviceType = TypeInfo.GetType(serviceConfig.Value.ServiceType);
+                if (serviceType == null)
+                {
+                    throw new Exception(String.Format("Cannot find Grain Service type {0} of Grain Service {1}", serviceConfig.Value.ServiceType, serviceConfig.Value.Name));
+                }
+
+                // internal GrainService(GrainId grainId, Silo silo) 
+                var ctor = serviceType.GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new[] {typeof(object), typeof(Silo)}, null);
+
+                var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
+                if (grainServiceInterfaceType == null)
+                {
+                    throw new Exception(String.Format("Cannot find an interface on {0} which implements IGrainService", serviceConfig.Value.ServiceType));
+                }
+                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
+                var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
+
+                var grainService = (GrainService) ctor.Invoke(new object[] { grainId, this });
+                RegisterSystemTarget(grainService);
+            }
         }
 
         /// <summary>
@@ -960,8 +993,8 @@ namespace Orleans.Runtime
         public string GetDebugDump(bool all = true)
         {
             var sb = new StringBuilder();            
-            foreach (var sytemTarget in activationDirectory.AllSystemTargets())
-                sb.AppendFormat("System target {0}:", sytemTarget.GrainId.ToString()).AppendLine();               
+            foreach (var systemTarget in activationDirectory.AllSystemTargets())
+                sb.AppendFormat("System target {0}:", ((ISystemTargetBase)systemTarget).GrainId.ToString()).AppendLine();               
             
             var enumerator = activationDirectory.GetEnumerator();
             while(enumerator.MoveNext())

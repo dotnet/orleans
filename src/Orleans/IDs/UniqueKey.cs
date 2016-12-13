@@ -161,6 +161,12 @@ namespace Orleans.Runtime
             return NewKey(0, n1, Category.SystemTarget, 0, null);
         }
 
+        public static UniqueKey NewGrainServiceKey(short key, long typeData)
+        {
+            ulong n1 = unchecked((ulong)key);
+            return NewKey(0, n1, Category.SystemTarget, typeData, null);
+        }
+
         internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
         {
             ValidateKeyExt(keyExt, typeCodeData);

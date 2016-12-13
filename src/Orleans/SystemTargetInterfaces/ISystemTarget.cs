@@ -10,7 +10,7 @@ namespace Orleans
     /// Proxy class is being generated for ISystemTarget, just like for IGrain
     /// System target are scheduled by the runtime scheduler and follow turn based concurrency.
     /// </summary> 
-    internal interface ISystemTarget : IAddressable
+    public interface ISystemTarget : IAddressable
     {
     }
 

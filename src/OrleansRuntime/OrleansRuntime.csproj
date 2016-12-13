@@ -61,6 +61,9 @@
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Counters\CounterConfigData.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="ReminderService\ReminderRegistry.cs" />
+    <Compile Include="Services\GrainService.cs" />
+    <Compile Include="Services\GrainServiceClient.cs" />
     <Compile Include="Silo\SiloInitializationParameters.cs" />
     <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />
     <Compile Include="Silo\TestHooks\TestHooksSystemTarget.cs" />
