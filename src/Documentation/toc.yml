@@ -78,6 +78,8 @@
     href: Advanced-Concepts/Troubleshooting-Deployments.md
   - name: Powershell Client
     href: Advanced-Concepts/Powershell-Client.md   
+  - name: Heterogeneous Silos
+    href: Advanced-Concepts/Heterogeneous-Silos.md
 - name: Runtime Implementation Details
   items:
     - name: Messaging Delivery Guarantees
