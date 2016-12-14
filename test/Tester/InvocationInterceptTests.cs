@@ -30,7 +30,7 @@ namespace UnitTests.General
         /// Ensures that the invocation interceptor is invoked around method calls.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackTest()
         {
             var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
@@ -45,7 +45,7 @@ namespace UnitTests.General
         /// Ensures that the invocation interceptor is invoked for stream subscribers.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact, TestCategory("Functional")]
+        [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackWithStreamTest()
         {
             var streamProvider = GrainClient.GetStreamProvider("SMSProvider");
