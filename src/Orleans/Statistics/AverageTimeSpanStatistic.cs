@@ -14,7 +14,8 @@ namespace Orleans.Runtime
         private readonly object instanceLock;
         private readonly CounterStatistic tickAccum;
         private readonly CounterStatistic sampleCounter;
-                
+        private readonly string currentName;
+
         public string Name { get; }
         public bool IsValueDelta { get; }
         public CounterStorage Storage { get; }
@@ -28,6 +29,7 @@ namespace Orleans.Runtime
         private AverageTimeSpanStatistic(string name, CounterStorage storage)
         {
             Name = name;
+            currentName = Metric.CreateCurrentName(name);
             IsValueDelta = false;
             Storage = storage;
             // the following counters are used internally and shouldn't be stored. the derived value,
@@ -153,7 +155,8 @@ namespace Orleans.Runtime
 
         public void TrackMetric(Logger logger)
         {
-            logger.TrackMetric(Metric.CreateName(this), GetCurrentValue());
+            logger.TrackMetric(currentName, GetCurrentValue());
+            // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
 }

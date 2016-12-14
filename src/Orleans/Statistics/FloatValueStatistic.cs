@@ -16,6 +16,7 @@ namespace Orleans.Runtime
 
         private Func<float> fetcher;
         private Func<float, float> valueConverter;
+        private readonly string currentName;
 
         static FloatValueStatistic()
         {
@@ -27,6 +28,7 @@ namespace Orleans.Runtime
         private FloatValueStatistic(string n, Func<float> f)
         {
             Name = n;
+            currentName = Metric.CreateCurrentName(n);
             fetcher = f;
         }
 
@@ -156,7 +158,8 @@ namespace Orleans.Runtime
 
         public void TrackMetric(Logger logger)
         {
-            logger.TrackMetric(Metric.CreateName(this), GetCurrentValue());
+            logger.TrackMetric(currentName, GetCurrentValue());
+            // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
 }

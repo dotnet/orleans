@@ -10,6 +10,7 @@ namespace Orleans.Runtime
     {
         private static readonly Dictionary<string, IntValueStatistic> registeredStatistics;
         private static readonly object lockable;
+        private readonly string currentName;
 
         public string Name { get; }
         public CounterStorage Storage { get; private set; }
@@ -26,6 +27,7 @@ namespace Orleans.Runtime
         private IntValueStatistic(string n, Func<long> f)
         {
             Name = n;
+            currentName = Metric.CreateCurrentName(n);
             fetcher = f;
         }
 
@@ -121,7 +123,8 @@ namespace Orleans.Runtime
 
         public void TrackMetric(Logger logger)
         {
-            logger.TrackMetric(Metric.CreateName(this), this.GetCurrentValue());
+            logger.TrackMetric(currentName, GetCurrentValue());
+            // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
 }

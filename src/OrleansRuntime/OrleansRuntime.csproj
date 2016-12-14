@@ -61,7 +61,6 @@
     <Compile Include="Core\GrainRuntime.cs" />
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
-    <Compile Include="Counters\CounterConfigData.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Silo\SiloInitializationParameters.cs" />
     <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />

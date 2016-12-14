@@ -38,10 +38,13 @@ namespace Orleans.Runtime
 
     public static class Metric
     {
-        public static string CreateName(ICounter counter)
+        public static string CreateCurrentName(string statisticName)
         {
-            return counter.Name + "." + (counter.IsValueDelta ? "Delta" : "Current");
-
+            return statisticName + "." + "Current";
+        }
+        public static string CreateDeltaName(string statisticName)
+        {
+            return statisticName + "." + "Delta";
         }
     }
 
@@ -75,6 +78,7 @@ namespace Orleans.Runtime
         private Func<long, long> valueConverter;
         private long nonOrleansThreadsCounter; // one for all non-Orleans threads
         private readonly bool isHidden;
+        private readonly string currentName;
 
         public string Name { get; }
         public bool UseDelta { get; }
@@ -91,6 +95,7 @@ namespace Orleans.Runtime
         private CounterStatistic(string name, bool useDelta, CounterStorage storage, bool isHidden)
         {
             Name = name;
+            currentName = Metric.CreateCurrentName(name);
             UseDelta = useDelta;
             Storage = storage;
             id = Interlocked.Increment(ref nextId);
@@ -326,7 +331,8 @@ namespace Orleans.Runtime
 
         public void TrackMetric(Logger logger)
         {
-            logger.TrackMetric(Metric.CreateName(this), GetCurrentValue());
+            logger.TrackMetric(currentName, GetCurrentValue());
+            // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
 }
