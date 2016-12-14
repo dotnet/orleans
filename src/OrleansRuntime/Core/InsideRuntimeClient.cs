@@ -410,11 +410,25 @@ namespace Orleans.Runtime
                 return invoker.Invoke(target, request);
             }
 
+            // If the request is intended for an extension object, use that as the implementation type, otherwise use
+            // the target object.
+            Type implementationType;
+            var extensionMap = invoker as IGrainExtensionMap;
+            IGrainExtension extension;
+            if (extensionMap != null && extensionMap.TryGetExtension(request.InterfaceId, out extension))
+            {
+                implementationType = extension.GetType();
+            }
+            else
+            {
+                implementationType = target.GetType();
+            }
+
             // Get an invoker which delegates to the grain's IGrainInvocationInterceptor implementation.
             // If the grain does not implement IGrainInvocationInterceptor, then the invoker simply delegates
             // calls to the provided invoker.
             var interceptedMethodInvoker = interceptedMethodInvokerCache.GetOrCreate(
-                target.GetType(),
+                implementationType,
                 request.InterfaceId,
                 invoker);
             var methodInfo = interceptedMethodInvoker.GetMethodInfo(request.MethodId);
