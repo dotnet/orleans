@@ -8,7 +8,7 @@
     <title>Orleans Streams Programming APIs | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Orleans Streams Programming APIs | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.8.0.0">
+    <meta name="generator" content="docfx 2.9.2.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -104,7 +104,7 @@ public interface IAsyncObservable&lt;T&gt;
 lambda functions to process incoming events. More options for <code>SubscribeAsync</code> are available via <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/AsyncObservableExtensions.cs"><strong><code>AsyncObservableExtensions</code></strong></a> class.
 <code>SubscribeAsync</code> returns a <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Streams/Core/StreamSubscriptionHandle.cs"><strong><code>StreamSubscriptionHandle&lt;T&gt;</code></strong></a>, which is an opaque handle that can be used to unsubscribe from the stream (similar in spirit to an asynchronous version of <code>IDisposable</code>).</p>
 <pre><code class="lang-csharp">await subscriptionHandle.UnsubscribeAsync()
-</code></pre><p>It is important to note that <strong>the subscription is for a grain, not for an activation</strong>. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a <strong>virtual stream abstraction</strong>: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.</p>
+</code></pre><p>It is important to note that <strong>the subscription is for a grain, not for an activation</strong>. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a <strong>virtual stream abstraction</strong>: not only all the streams always exists, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.</p>
 <h3 id="multiplicitya-namemultiplicitya">Multiplicity<a name="Multiplicity"></a></h3>
 <p>An Orleans stream may have multiple producers and multiple consumers. A message published by a producer will be delivered to all consumers that were subscribed to the stream before the message was published.</p>
 <p>In addition, the consumer can subscribe to the same stream multiple times. Each time it subscribes it gets back a unique <code>StreamSubscriptionHandle&lt;T&gt;</code>. If a grain (or client) is subscribed X times to the same stream, it will receive the same event X times, once for each subscription. The consumer can also unsubscribe from an individual subscription or find out all its current subscriptions, by calling:</p>
@@ -127,10 +127,10 @@ lambda functions to process incoming events. More options for <code>SubscribeAsy
 IAsyncStream&lt;T&gt; stream = streamProvider.GetStream&lt;T&gt;(this.GetPrimaryKey(), &quot;MyStreamNamespace&quot;);
 StreamSubscriptionHandle&lt;T&gt; subscription = await stream.SubscribeAsync(IAsyncObserver&lt;T&gt;);
 </code></pre><h3 id="writing-subscription-logica-namewriting-subscription-logica">Writing Subscription Logic<a name="Writing-Subscription-Logic"></a></h3>
-<p>Below are the guidlines on how to write the subscription logic for varios cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subsriptions (there is no subscription multiplicity) and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subsription.
-On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subsribes again it will result in the grain being subscribed multipe times.</p>
+<p>Below are the guidelines on how to write the subscription logic for various cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subscriptions (there is no subscription multiplicity), there is no way to unsubscribe, and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subscription.
+On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subscribes again it will result in the grain being subscribed multiple times.</p>
 <p><strong>Implicit Subscriptions:</strong></p>
-<p>For implicit subscriptions case the grain needs to subscribe in order to attach the processing logic. This should be done in the grain&#39;s <code>OnActivateAsync</code> method. The grain should simply execute <code>await stream.SubscribeAsync(OnNext ...)</code> in its <code>OnActivateAsync</code> method. That will cause this particular activation to attach the <code>OnNext</code> function to process that stream. The grain can optionaly specify the <code>StreamSequenceToken</code> as an argument to <code>SubscribeAsync</code>, which will cause this implicit subscriptions to start consuming from that token. There is never a need for implicit subscriptions to call <code>ResumeAsync</code>.</p>
+<p>For implicit subscriptions the grain needs to subscribe to attach the processing logic. This should be done in the grain&#39;s <code>OnActivateAsync</code> method. The grain should simply execute <code>await stream.SubscribeAsync(OnNext ...)</code> in its <code>OnActivateAsync</code> method. That will cause this particular activation to attach the <code>OnNext</code> function to process that stream. The grain can optionally specify the <code>StreamSequenceToken</code> as an argument to <code>SubscribeAsync</code>, which will cause this implicit subscription to start consuming from that token. There is never a need for implicit subscription to call <code>ResumeAsync</code>.</p>
 <pre><code class="lang-csharp">public async override Task OnActivateAsync()
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
@@ -138,8 +138,8 @@ On the other hand, for explicit subscriptions, one needs to Resume the subscript
     await stream.SubscribeAsync(OnNextAsync)
 }
 </code></pre><p><strong>Explicit Subscriptions:</strong></p>
-<p>Grain that wants to explicitly subscribe first has to call <code>SubscribeAsync</code> in some place in its code, in order to subsribe the first time. This causes the subsription to be established, as well as attaches the processig logic.
-Now imagine a case when the grain got deactivated and reactivated. The grain is still explicitly subscribed, but no processig logic is attached. The grain needs to re-attach the processing logic. To do that, in its <code>OnActivateAsync</code>, the grain first needs to find out what subscriptions it has, by calling <code>stream.GetAllSubscriptionHandles()</code>. Then the grain has to execute <code>ResumeAsync</code> on each  handle. The grain can also optionaly specify the <code>StreamSequenceToken</code> as an argument to <code>SubscribeAsync</code>, which will cause this explicit subscription to start consuming from that token.</p>
+<p>For explicit subscriptions, a grain must call <code>SubscribeAsync</code> to subscribe to the stream.  This creates a subscription, as well as attaches the processing logic.
+The explicit subscription will exist until the grain unsubscribes, so if a grain gets deactivated and reactivated, the grain is still explicitly subscribed, but no processing logic will be attached. In this case the grain needs to re-attach the processing logic. To do that, in its <code>OnActivateAsync</code>, the grain first needs to find out what subscriptions it has, by calling <code>stream.GetAllSubscriptionHandles()</code>. The grain must execute <code>ResumeAsync</code> on each handle it wishes to continue processing or UnsubscribeAsync on any handles it is done with. The grain can also optionally specify the <code>StreamSequenceToken</code> as an argument to the <code>ResumeAsync</code> calls, which will cause this explicit subscription to start consuming from that token.</p>
 <pre><code class="lang-csharp">public async override Task OnActivateAsync()
 {
     var streamProvider = GetStreamProvider(PROVIDER_NAME);
@@ -204,9 +204,6 @@ public void RegisterStreamProvider&lt;T&gt;(string providerName, IDictionary&lt;
             <div class="sideaffix">
               <div class="contribution">
                 <ul class="nav">
-                  <li>
-                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Orleans-Streams/Streams-Programming-APIs.md/#L1" class="contribution-link">Improve this Doc</a>
-                  </li>
                 </ul>
               </div>
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">

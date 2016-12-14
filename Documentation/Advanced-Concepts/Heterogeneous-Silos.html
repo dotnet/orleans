@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-    <title>Orleans Configuration Guide | Microsoft Orleans Website </title>
+    <title>Heterogeneous silos | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
-    <meta name="title" content="Orleans Configuration Guide | Microsoft Orleans Website ">
+    <meta name="title" content="Heterogeneous silos | Microsoft Orleans Website ">
     <meta name="generator" content="docfx 2.9.2.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
@@ -71,13 +71,43 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-              <h1 id="orleans-configuration-guide">Orleans Configuration Guide</h1>
+              <h1 id="heterogeneous-silos">Heterogeneous silos</h1>
               
-<p>This Configuration Guide explains the key configuration parameters and how they should be used for most typical usage scenarios.</p>
-<p><strong>Orleans Configuration xsd file</strong> is located <a href="https://github.com/dotnet/orleans/blob/master/src/Orleans/Configuration/OrleansConfiguration.xsd">here</a>.</p>
-<p>Orleans can be used in a variety of configurations that fit different usage scenarios, such as local single node deployment for development and testing, cluster of servers, multi-instance Azure worker role, etc. All of the different target scenarios are achieved by specifying particular values in the Orleans configuration XML files. This guide provides instructions for the key configuration parameters that are necessary to make Orleans run in one of the target scenarios. There are also other configuration parameters that primarily help fine tune Orleans for better performance. They are documented in the XSD schema and in general are not required even for running the system in production.</p>
-<p> Orleans is a framework for building and running high scale services. A typical deployment of an Orleans application spans a cluster of servers. The instances of the Orleans runtime, called silos, running on each of the servers need to be configured to connect to each other. In addition to that, there is always a client component that connects to the Orleans deployment, most typically a web frontend, that needs to be configured to connect to the silos. The <a href="Server-Configuration.html">Server Configuration</a> and <a href="Client-Configuration.html">Client Configuration</a> sections of the guide cover those aspects, respectively. The section on <a href="Typical-Configurations.html">Typical Configurations</a> provides a summary of a few common configurations.</p>
-<p><strong>Important</strong>: Make sure you properly configure .NET Garbage Collection as detailed in <a href="http://dotnet.github.io/orleans/Advanced-Concepts/Configuring-.NET-Garbage-Collection">Configuring .NET Garbage Collection</a>.</p>
+<h2 id="overview">Overview</h2>
+<p>On a given cluster, silos can support a different set of grain types:
+<img src="Heterogeneous.png" alt=""></p>
+<p>In this example the cluster support grain of type <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code>, <code>E</code>:</p>
+<ul>
+<li>Grain types<code>A</code>and<code>B</code>can be placed on Silo 1 and 2. </li>
+<li>Grain type<code>C</code>can be placed on Silo 1, 2 or 3. </li>
+<li>Grain type<code>D</code>can be only placed on Silo 3</li>
+<li>Grain Type<code>E</code>can be only placed on Silo 4.</li>
+</ul>
+<p>The client does not know which silo support a given Grain Type.</p>
+<p><strong>A given Grain Type implementation must be the same on each silo that support it. The following scenario is NOT valid:</strong></p>
+<p>On Silo 1 and 2:</p>
+<pre><code class="lang-csharp">public class C: Grain, IMyGrainInterface
+{
+   public Task SomeMethod() { … }
+}
+</code></pre><p>On Silo 3</p>
+<pre><code class="lang-csharp">public class C: Grain, IMyGrainInterface, IMyOtherGrainInterface
+{
+   public Task SomeMethod() { … }
+   public Task SomeOtherMethod() { … }
+}
+</code></pre><h2 id="configuration">Configuration</h2>
+<p>No configuration is needed, you can deploy different binaries on each silo in your cluster.</p>
+<p>For testing purpose, you can use the property <code>ExcludedGrainTypes</code> in <code>NodeConfiguration</code>.</p>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>Connected clients will not be notified if the set of supported Grain Types changed. In the previous example:<ul>
+<li>If Silo 4 leave the cluster, the client will still try to make calls to grain of type <code>E</code>. It will fail at runtime with a OrleansException.</li>
+<li>If the client was connected to the cluster before Silo 4 joined it, the client will not be able to make calls to grain of type <code>E</code>. It will fail will a ArgumentException</li>
+</ul>
+</li>
+<li>Stateless grains is not supported: all silos in the cluster must support the same set of stateless grains.</li>
+</ul>
 
             </article>
           </div>
