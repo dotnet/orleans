@@ -66,12 +66,12 @@ namespace UnitTestGrains
 
         public Task<TimeSpan> GetTimerPeriod()
         {
-            return Task<TimeSpan>.FromResult(period);
+            return Task.FromResult(period);
         }
 
         public Task<int> GetCounter()
         {
-            return Task<int>.FromResult(counter);
+            return Task.FromResult(counter);
         }
         public Task SetCounter(int value)
         {

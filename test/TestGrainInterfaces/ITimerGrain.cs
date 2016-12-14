@@ -15,10 +15,6 @@ namespace UnitTests.GrainInterfaces
         Task LongWait(TimeSpan time);
     }
 
-    public interface ITimerPersistantGrain : ITimerGrain
-    {
-    }
-
     public interface ITimerCallGrain : IGrainWithIntegerKey
     {
         Task<int> GetTickCount();
