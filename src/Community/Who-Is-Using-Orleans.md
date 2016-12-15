@@ -44,6 +44,8 @@ Mobile and Social Payment platform
 * <a href="https://www.invertironline.com" target="_blank">__PagoLivre__</a>
 invertirOnline.com
 * <a href="https://www.lebara.com" target="_blank">__Lebara__</a>
+* <a href="http://www.nomnio.com" target="_blank">__Nomnio__</a>
+Nomnio IoT Platform and industry projects where reliability and performance is required
 
 ## Projects and Applications
 
