@@ -18,7 +18,7 @@ namespace Orleans.Runtime.LogConsistency
     /// This class allows access to these services to providers that cannot see runtime-internals.
     /// It also stores grain-specific information like the grain reference, and caches 
     /// </summary>
-    internal class ProtocolServices : IProtocolServices
+    internal class ProtocolServices : ILogConsistencyProtocolServices
     {
 
         public GrainReference GrainReference { get { return grain.GrainReference; } }
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.LogConsistency
         }
 
 
-        public async Task<IProtocolMessage> SendMessage(IProtocolMessage payload, string clusterId)
+        public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
             var silo = Silo.CurrentSilo;
             var mycluster = silo.ClusterId;
@@ -51,7 +51,7 @@ namespace Orleans.Runtime.LogConsistency
             // send the message to ourself if we are the destination cluster
             if (mycluster == clusterId)
             {
-                var g = (IProtocolParticipant)grain;
+                var g = (ILogConsistencyProtocolParticipant)grain;
                 // we are on the same scheduler, so we can call the method directly
                 return await g.OnProtocolMessageReceived(payload);
             }
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.LogConsistency
             if (clusterGateway == null)
                 throw new ProtocolTransportException("no active gateways found for cluster");
 
-            var repAgent = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<IProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
+            var repAgent = InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
 
             // test hook
             var filter = (oracle as MultiClusterNetwork.MultiClusterOracle).ProtocolMessageFilterForTesting;

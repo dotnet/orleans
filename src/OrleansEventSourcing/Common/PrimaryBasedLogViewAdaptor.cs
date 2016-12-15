@@ -80,7 +80,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Handle protocol messages.
         /// </summary>
-        protected virtual Task<IProtocolMessage> OnMessageReceived(IProtocolMessage payload)
+        protected virtual Task<ILogConsistencyProtocolMessage> OnMessageReceived(ILogConsistencyProtocolMessage payload)
         {
             // subclasses that define custom protocol messages must override this
             throw new NotImplementedException();
@@ -156,7 +156,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// The runtime services required for implementing notifications between grain instances in different cluster.
         /// </summary>
-        protected IProtocolServices Services { get; private set; }
+        protected ILogConsistencyProtocolServices Services { get; private set; }
 
         /// <summary>
         /// The current multi-cluster configuration for this grain instance.
@@ -174,7 +174,7 @@ namespace Orleans.EventSourcing.Common
         /// Construct an instance, for the given parameters.
         /// </summary>
         protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, 
-            TLogView initialstate, IProtocolServices services)
+            TLogView initialstate, ILogConsistencyProtocolServices services)
         {
             Debug.Assert(host != null && services != null && initialstate != null);
             this.Host = host;
@@ -184,7 +184,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public virtual async Task PreActivate()
+        public virtual async Task PreOnActivate()
         {
             Services.Verbose2("PreActivation Started");
 
@@ -201,7 +201,7 @@ namespace Orleans.EventSourcing.Common
             Services.Verbose2("PreActivation Complete");
         }
 
-        public virtual Task PostActivate()
+        public virtual Task PostOnActivate()
         {
             Services.Verbose2("PostActivation Started");
 
@@ -215,7 +215,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public virtual async Task Deactivate()
+        public virtual async Task PostOnDeactivate()
         {
             Services.Verbose2("Deactivation Started");
 
@@ -478,7 +478,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         /// <param name="payLoad"></param>
         /// <returns></returns>
-        public async Task<IProtocolMessage> OnProtocolMessageReceived(IProtocolMessage payLoad)
+        public async Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payLoad)
         {
             var notificationMessage = payLoad as INotificationMessage;
 

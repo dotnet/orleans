@@ -11,7 +11,7 @@ namespace Orleans.EventSourcing.Common
     /// Base class for notification messages that are sent by log view adaptors to other 
     /// clusters, after updating the log. All subclasses must be serializable.
     /// </summary>
-    public interface INotificationMessage : IProtocolMessage
+    public interface INotificationMessage : ILogConsistencyProtocolMessage
     {
         ///<summary>The version number.</summary>
         int Version { get; }

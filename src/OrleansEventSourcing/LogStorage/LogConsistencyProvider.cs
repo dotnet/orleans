@@ -81,7 +81,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// <param name="initialState">The initial state for this view</param>
         /// <param name="grainTypeName">The type name of the grain</param>
         /// <param name="services">Runtime services for multi-cluster coherence protocols</param>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, IProtocolServices services) 
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, ILogConsistencyProtocolServices services) 
             where TView : class, new()
             where TEntry : class
         {

@@ -13,13 +13,13 @@ namespace Orleans.EventSourcing.Common
     /// </summary>
     internal class NotificationTracker
     {
-        internal IProtocolServices services;
+        internal ILogConsistencyProtocolServices services;
         internal IConnectionIssueListener listener;
         internal int maxNotificationBatchSize;
 
         private Dictionary<string, NotificationWorker> sendWorkers;
 
-        public NotificationTracker(IProtocolServices services, IEnumerable<string> remoteInstances, int maxNotificationBatchSize, IConnectionIssueListener listener)
+        public NotificationTracker(ILogConsistencyProtocolServices services, IEnumerable<string> remoteInstances, int maxNotificationBatchSize, IConnectionIssueListener listener)
         {
             this.services = services;
             this.listener = listener;

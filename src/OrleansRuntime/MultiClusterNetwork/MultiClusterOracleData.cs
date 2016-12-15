@@ -114,7 +114,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                             logger.Verbose2("-NotificationWork: notify IProtocolParticipant {0} of configuration {1}", listener, delta.Configuration);
 
                         // enqueue conf change event as grain call
-                        var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<IProtocolParticipant>(listener);
+                        var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<ILogConsistencyProtocolParticipant>(listener);
                         g.OnMultiClusterConfigurationChange(delta.Configuration).Ignore();
                     }
                     catch (Exception exc)

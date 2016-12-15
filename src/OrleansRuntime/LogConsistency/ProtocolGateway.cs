@@ -13,16 +13,16 @@ using Orleans.Concurrency;
 namespace Orleans.Runtime.LogConsistency
 {
     [Reentrant]
-    internal class ProtocolGateway : SystemTarget, IProtocolGateway
+    internal class ProtocolGateway : SystemTarget, ILogConsistencyProtocolGateway
     {
         public ProtocolGateway(SiloAddress silo)
             : base(Constants.ProtocolGatewayId, silo)
         {
         }
 
-        public async Task<IProtocolMessage> RelayMessage(GrainId id, IProtocolMessage payload)
+        public async Task<ILogConsistencyProtocolMessage> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload)
         {
-            var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<IProtocolParticipant>(GrainReference.FromGrainId(id));
+            var g = InsideRuntimeClient.Current.InternalGrainFactory.Cast<ILogConsistencyProtocolParticipant>(GrainReference.FromGrainId(id));
             return await g.OnProtocolMessageReceived(payload);
         }
 

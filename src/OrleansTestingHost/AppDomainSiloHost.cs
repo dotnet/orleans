@@ -175,7 +175,7 @@ namespace Orleans.TestingHost
             simulatedMessageLoss.Clear();
         }
 
-        internal Func<IProtocolMessage,bool> ProtocolMessageFilterForTesting
+        internal Func<ILogConsistencyProtocolMessage,bool> ProtocolMessageFilterForTesting
         {
             get
             {

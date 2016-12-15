@@ -1181,9 +1181,9 @@ namespace Orleans.Runtime
         {
             var grainTypeName = activation.GrainInstanceType.FullName;
 
-            if (activation.GrainInstance is IProtocolParticipant)
+            if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
             {
-                await ((IProtocolParticipant)activation.GrainInstance).PreActivateProtocolParticipant();
+                await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).PreActivateProtocolParticipant();
             }
 
             // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
@@ -1223,9 +1223,9 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            if (activation.GrainInstance is IProtocolParticipant)
+            if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
             {
-                await ((IProtocolParticipant)activation.GrainInstance).PostActivateProtocolParticipant();
+                await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).PostActivateProtocolParticipant();
             }
         }
 
@@ -1269,9 +1269,9 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if (activation.GrainInstance is IProtocolParticipant)
+                if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
                 {
-                    await ((IProtocolParticipant)activation.GrainInstance).DeactivateProtocolParticipant();
+                    await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).DeactivateProtocolParticipant();
                 }
             }
             catch(Exception exc)

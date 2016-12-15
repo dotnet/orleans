@@ -38,7 +38,7 @@ namespace Orleans.LogConsistency
             TLogView initialstate,
             string graintypename,
             IStorageProvider storageProvider,
-            IProtocolServices services)
+            ILogConsistencyProtocolServices services)
 
             where TLogView : class, new()
             where TLogEntry : class;

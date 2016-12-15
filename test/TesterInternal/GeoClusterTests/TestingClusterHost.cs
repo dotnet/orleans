@@ -415,7 +415,7 @@ namespace Tests.GeoClusterTests
             }
         }
   
-        public void SetProtocolMessageFilterForTesting(string origincluster, Func<IProtocolMessage,bool> filter)
+        public void SetProtocolMessageFilterForTesting(string origincluster, Func<ILogConsistencyProtocolMessage,bool> filter)
         {
             var silos = Clusters[origincluster].Silos;
             foreach (var silo in silos)

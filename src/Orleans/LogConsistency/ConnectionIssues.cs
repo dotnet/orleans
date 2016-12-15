@@ -10,7 +10,7 @@ namespace Orleans.LogConsistency
     /// <summary>
     /// Represents information about connection issues encountered inside log consistency protocols.
     /// It is used both inside the protocol to track retry loops, and is made visible to users 
-    /// who want to monitor their log-view grains for communication issues.
+    /// who want to monitor their log-consistent grains for communication issues.
     /// </summary>
     [Serializable]
     public abstract class ConnectionIssue

@@ -25,7 +25,7 @@ namespace Orleans.EventSourcing.Common
         /// <param name="newIssue">the connection issue to be recorded</param>
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
-        public void Record(ConnectionIssue newIssue, IConnectionIssueListener listener, IProtocolServices services)
+        public void Record(ConnectionIssue newIssue, IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
             newIssue.TimeStamp = DateTime.UtcNow;
             if (Issue != null)
@@ -55,7 +55,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         /// <param name="listener">the listener for connection issues</param>
         /// <param name="services">for reporting exceptions in listener</param>
-        public void Resolve(IConnectionIssueListener listener, IProtocolServices services)
+        public void Resolve(IConnectionIssueListener listener, ILogConsistencyProtocolServices services)
         {
             if (Issue != null)
             {

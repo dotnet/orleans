@@ -135,7 +135,7 @@
     <Compile Include="Providers\IControllable.cs" />
     <Compile Include="LogConsistency\ILogConsistencyProvider.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
-    <Compile Include="LogConsistency\IProtocolServices.cs" />
+    <Compile Include="LogConsistency\ILogConsistencyProtocolServices.cs" />
     <Compile Include="Runtime\GrainRuntime.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />
@@ -166,7 +166,7 @@
     <Compile Include="Streams\Predicates\DefaultStreamFilterPredicateWrapper.cs" />
     <Compile Include="Streams\PubSub\FaultedSubscriptionException.cs" />
     <Compile Include="SystemTargetInterfaces\IClusterGrainDirectory.cs" />
-    <Compile Include="SystemTargetInterfaces\IProtocolGateway.cs" />
+    <Compile Include="SystemTargetInterfaces\ILogConsistencyProtocolGateway.cs" />
     <Compile Include="Streams\PubSub\ImplicitStreamPubSub.cs" />
     <Compile Include="Streams\PubSub\StreamPubSubImpl.cs" />
     <Compile Include="Streams\QueueAdapters\IQueueFlowController.cs" />

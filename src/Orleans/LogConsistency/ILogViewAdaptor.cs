@@ -21,17 +21,17 @@ namespace Orleans.LogConsistency
           ILogConsistencyDiagnostics
         where TLogView : new()
     {
-        /// <summary>Called during activation, right before the user grain activation code is run.</summary>
-        Task PreActivate();
+        /// <summary>Called during activation, right before the user-defined <see cref="Grain.OnActivateAsync"/>.</summary>
+        Task PreOnActivate();
 
-        /// <summary>Called during activation, right after the user grain activation code is run.</summary>
-        Task PostActivate();
+        /// <summary>Called during activation, right after the user-defined <see cref="Grain.OnActivateAsync"/>..</summary>
+        Task PostOnActivate();
 
-        /// <summary>Called during deactivation, right after the user grain deactivation code is run.</summary>
-        Task Deactivate();
+        /// <summary>Called during deactivation, right after the user-defined <see cref="Grain.OnDeactivateAsync"/>.</summary>
+        Task PostOnDeactivate();
 
         /// <summary>Called when a grain receives a message from a remote instance.</summary>
-        Task<IProtocolMessage> OnProtocolMessageReceived(IProtocolMessage payload);
+        Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload);
 
         /// <summary>Called after the silo receives a new multi-cluster configuration.</summary>
         Task OnMultiClusterConfigurationChange(MultiClusterConfiguration next);

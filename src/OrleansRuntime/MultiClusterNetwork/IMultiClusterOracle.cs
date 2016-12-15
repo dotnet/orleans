@@ -72,6 +72,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
         /// <summary>
         /// A test hook for dropping protocol messages between replicated grain instances
         /// </summary>
-        Func<IProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
+        Func<ILogConsistencyProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
     }
 }

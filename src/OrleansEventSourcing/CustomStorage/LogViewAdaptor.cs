@@ -27,7 +27,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Initialize a new instance of CustomStorageAdaptor class
         /// </summary>
         public CustomStorageAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialState,
-            IProtocolServices services, string primaryCluster)
+            ILogConsistencyProtocolServices services, string primaryCluster)
             : base(host, initialState, services)
         {
             if (!(host is ICustomStorageInterface<TLogView, TLogEntry>))
@@ -85,12 +85,12 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         [Serializable]
-        private class ReadRequest : IProtocolMessage
+        private class ReadRequest : ILogConsistencyProtocolMessage
         {
             public int KnownVersion { get; set; }
         }
         [Serializable]
-        private class ReadResponse<ViewType> : IProtocolMessage
+        private class ReadResponse<ViewType> : ILogConsistencyProtocolMessage
         {
             public int Version { get; set; }
 
@@ -98,7 +98,7 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        protected override Task<IProtocolMessage> OnMessageReceived(IProtocolMessage payload)
+        protected override Task<ILogConsistencyProtocolMessage> OnMessageReceived(ILogConsistencyProtocolMessage payload)
         {
             var request = (ReadRequest) payload;
 
@@ -111,7 +111,7 @@ namespace Orleans.EventSourcing.CustomStorage
             if (version > request.KnownVersion)
                 response.Value = cached;
 
-            return Task.FromResult<IProtocolMessage>(response);
+            return Task.FromResult<ILogConsistencyProtocolMessage>(response);
         }
 
         /// <inheritdoc/>

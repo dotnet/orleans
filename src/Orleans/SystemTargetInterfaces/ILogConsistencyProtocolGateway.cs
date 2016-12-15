@@ -14,9 +14,9 @@ namespace Orleans.SystemTargetInterfaces
     /// The  protocol gateway is a relay that forwards incoming protocol messages from other clusters
     /// to the appropriate grain in this cluster.
     /// </summary>
-    internal interface IProtocolGateway : ISystemTarget
+    internal interface ILogConsistencyProtocolGateway : ISystemTarget
     {
-        Task<IProtocolMessage> RelayMessage(GrainId id, IProtocolMessage payload);
+        Task<ILogConsistencyProtocolMessage> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload);
     }
 
 }

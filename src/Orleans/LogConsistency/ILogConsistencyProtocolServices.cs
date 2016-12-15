@@ -15,7 +15,7 @@ namespace Orleans.LogConsistency
     /// Functionality for use by log view adaptors that use custom consistency or replication protocols.
     /// Abstracts communication between replicas of the log-consistent grain in different clusters.
     /// </summary>
-    public interface IProtocolServices
+    public interface ILogConsistencyProtocolServices
     {
         /// <summary>
         /// Send a message to a remote cluster.
@@ -23,7 +23,7 @@ namespace Orleans.LogConsistency
         /// <param name="payload">the message</param>
         /// <param name="clusterId">the destination cluster id</param>
         /// <returns></returns>
-        Task<IProtocolMessage> SendMessage(IProtocolMessage payload, string clusterId);
+        Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId);
 
 
         /// <summary>

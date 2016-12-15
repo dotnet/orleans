@@ -4,9 +4,9 @@ using Orleans.Concurrency;
 namespace Orleans.MultiCluster
 {
     /// <summary>
-    /// Grain interface for grains that participate in multi-cluster-protocols.
+    /// Grain interface for grains that participate in multi-cluster log-consistency protocols.
     /// </summary>
-    public interface IProtocolParticipant  : IGrain  
+    public interface ILogConsistencyProtocolParticipant  : IGrain  
     {
         /// <summary>
         /// Called when a message is received from another cluster.
@@ -15,7 +15,7 @@ namespace Orleans.MultiCluster
         /// <param name="payload">the protocol message to be delivered</param>
         /// <returns></returns>
         [AlwaysInterleave]
-        Task<IProtocolMessage> OnProtocolMessageReceived(IProtocolMessage payload);
+        Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload);
 
         /// <summary>
         /// Called when a configuration change notification is received.
@@ -49,7 +49,7 @@ namespace Orleans.MultiCluster
     /// interface to mark classes that represent protocol messages.
     /// All such classes must be serializable.
     /// </summary>
-    public interface IProtocolMessage
+    public interface ILogConsistencyProtocolMessage
     {
     }
 }

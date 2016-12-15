@@ -20,7 +20,7 @@ namespace Orleans.EventSourcing.StateStorage
             }
         }
 
-         public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IStorageProvider storageProvider, IProtocolServices services)
+         public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IStorageProvider storageProvider, ILogConsistencyProtocolServices services)
             where T : class, new() where E : class
         {
             return new LogViewAdaptor<T, E>(hostgrain, initialstate, storageProvider, graintypename, services);
