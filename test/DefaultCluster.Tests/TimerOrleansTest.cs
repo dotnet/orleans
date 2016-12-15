@@ -113,8 +113,8 @@ namespace DefaultCluster.Tests.TimerTests
             output.WriteLine("value = " + last);
             Assert.True(last >= 10 && last <= 12, $"last >= 10 && last <= 12. Actual: last = {last}");
 
-            // Restart the silo.
-            HostedCluster.RestartSilo(HostedCluster.Primary);
+            // Restart the grain.
+            await grain.Deactivate();
             stopwatch.Restart();
             period = await grain.GetTimerPeriod();
 
@@ -132,7 +132,7 @@ namespace DefaultCluster.Tests.TimerTests
             Assert.True(
                 last <= maximalNumTicks,
                 $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
-            //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
+
             output.WriteLine(
                 "Total Elaped time = " + (stopwatch.Elapsed.TotalSeconds) + " sec. Expected Ticks = " + maximalNumTicks +
                 ". Actual ticks = " + last);

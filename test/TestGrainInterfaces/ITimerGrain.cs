@@ -13,6 +13,7 @@ namespace UnitTests.GrainInterfaces
         Task StartTimer(string timerName);
         Task StopTimer(string timerName);
         Task LongWait(TimeSpan time);
+        Task Deactivate();
     }
 
     public interface ITimerCallGrain : IGrainWithIntegerKey
