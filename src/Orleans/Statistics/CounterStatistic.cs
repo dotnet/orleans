@@ -33,6 +33,19 @@ namespace Orleans.Runtime
         void ResetCurrent();
         string GetDisplayString();
         CounterStorage Storage { get; }
+        void TrackMetric(Logger logger);
+    }
+
+    public static class Metric
+    {
+        public static string CreateCurrentName(string statisticName)
+        {
+            return statisticName + "." + "Current";
+        }
+        public static string CreateDeltaName(string statisticName)
+        {
+            return statisticName + "." + "Delta";
+        }
     }
 
     internal interface ICounter<out T> : ICounter
@@ -65,10 +78,11 @@ namespace Orleans.Runtime
         private Func<long, long> valueConverter;
         private long nonOrleansThreadsCounter; // one for all non-Orleans threads
         private readonly bool isHidden;
+        private readonly string currentName;
 
-        public string Name { get; private set; }
-        public bool UseDelta { get; private set; }
-        public CounterStorage Storage { get; private set; }
+        public string Name { get; }
+        public bool UseDelta { get; }
+        public CounterStorage Storage { get; }
 
         static CounterStatistic()
         {
@@ -81,6 +95,7 @@ namespace Orleans.Runtime
         private CounterStatistic(string name, bool useDelta, CounterStorage storage, bool isHidden)
         {
             Name = name;
+            currentName = Metric.CreateCurrentName(name);
             UseDelta = useDelta;
             Storage = storage;
             id = Interlocked.Increment(ref nextId);
@@ -141,7 +156,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public bool Delete(string name)
+        public static bool Delete(string name)
         {
             lock (lockable)
             {
@@ -223,7 +238,7 @@ namespace Orleans.Runtime
             return currentValue;
         }
 
-        public bool IsValueDelta { get { return UseDelta; } }
+        public bool IsValueDelta => UseDelta;
 
         public void ResetCurrent()
         {
@@ -292,11 +307,12 @@ namespace Orleans.Runtime
 
             if (delta == 0)
             {
-                return String.Format("{0}.Current={1}", Name, current.ToString(CultureInfo.InvariantCulture));
+                return $"{Name}.Current={current.ToString(CultureInfo.InvariantCulture)}";
             }
             else
             {
-                return String.Format("{0}.Current={1},      Delta={2}", Name, current.ToString(CultureInfo.InvariantCulture), delta.ToString(CultureInfo.InvariantCulture));
+                return
+                    $"{Name}.Current={current.ToString(CultureInfo.InvariantCulture)},      Delta={delta.ToString(CultureInfo.InvariantCulture)}";
             }
         }
 
@@ -311,6 +327,12 @@ namespace Orleans.Runtime
             {
                 list.AddRange(registeredStatistics.Values.Where( c => !c.isHidden && predicate(c)));
             }
+        }
+
+        public void TrackMetric(Logger logger)
+        {
+            logger.TrackMetric(currentName, GetCurrentValue());
+            // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
 }

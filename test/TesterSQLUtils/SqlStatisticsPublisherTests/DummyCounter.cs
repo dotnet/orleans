@@ -1,18 +1,13 @@
-﻿using Orleans.Runtime;
+﻿
+using Orleans.Runtime;
 
 namespace UnitTests.SqlStatisticsPublisherTests
 {
     internal class DummyCounter : ICounter
     {
-        public string Name
-        {
-            get { return "DummyCounter"; }
-        }
+        public string Name => "DummyCounter";
 
-        public bool IsValueDelta
-        {
-            get { return true; }
-        }
+        public bool IsValueDelta => true;
 
         public string GetValueString()
         {
@@ -33,9 +28,10 @@ namespace UnitTests.SqlStatisticsPublisherTests
             return "GetDisplayString";
         }
 
-        public CounterStorage Storage
+        public CounterStorage Storage => CounterStorage.LogAndTable;
+
+        public void TrackMetric(Logger logger)
         {
-            get { return CounterStorage.LogAndTable; }
         }
     }
 }
