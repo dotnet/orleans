@@ -43,6 +43,7 @@ Social media monitoring & analytics provider. Orleans is used as part of its per
 Mobile and Social Payment platform
 * <a href="https://www.invertironline.com" target="_blank">__PagoLivre__</a>
 invertirOnline.com
+* <a href="https://www.lebara.com" target="_blank">__Lebara__</a>
 
 ## Projects and Applications
 
