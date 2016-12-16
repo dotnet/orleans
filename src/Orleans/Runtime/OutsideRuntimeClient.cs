@@ -41,6 +41,8 @@ namespace Orleans
         private readonly GrainId handshakeClientId;
         private IGrainTypeResolver grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
+        private readonly Func<Message, bool> tryResendMessage;
+        private readonly Action<Message> unregisterCallback;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
@@ -129,6 +131,9 @@ namespace Orleans
 
             BufferPool.InitGlobalBufferPool(config);
             this.handshakeClientId = GrainId.NewClientId();
+
+            tryResendMessage = TryResendMessage;
+            unregisterCallback = msg => UnRegisterCallback(msg.Id);
 
             try
             {
@@ -634,7 +639,13 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(callback, TryResendMessage, context, message, () => UnRegisterCallback(message.Id), config);
+                var callbackData = new CallbackData(
+                    callback,
+                    tryResendMessage,
+                    context,
+                    message,
+                    unregisterCallback,
+                    config);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }
