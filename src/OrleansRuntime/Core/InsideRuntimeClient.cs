@@ -30,7 +30,9 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory directory;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        
+        private readonly Func<Message, bool> tryResendMessage;
+        private readonly Action<Message> unregisterCallback;
+
         private readonly InterceptedMethodInvokerCache interceptedMethodInvokerCache = new InterceptedMethodInvokerCache();
         public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
@@ -63,6 +65,8 @@ namespace Orleans.Runtime
             this.Scheduler = scheduler;
             this.siloStatusOracle = new Lazy<ISiloStatusOracle>(siloStatusOracle);
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
+            tryResendMessage = TryResendMessage;
+            unregisterCallback = msg => UnRegisterCallback(msg.Id);
             RuntimeClient.Current = this;
         }
 
@@ -177,11 +181,11 @@ namespace Orleans.Runtime
             if (!oneWay)
             {
                 var callbackData = new CallbackData(
-                    callback, 
-                    TryResendMessage, 
+                    callback,
+                    tryResendMessage, 
                     context,
                     message,
-                    () => UnRegisterCallback(message.Id),
+                    unregisterCallback,
                     Config.Globals);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(ResponseTimeout);
@@ -410,11 +414,25 @@ namespace Orleans.Runtime
                 return invoker.Invoke(target, request);
             }
 
+            // If the request is intended for an extension object, use that as the implementation type, otherwise use
+            // the target object.
+            Type implementationType;
+            var extensionMap = invoker as IGrainExtensionMap;
+            IGrainExtension extension;
+            if (extensionMap != null && extensionMap.TryGetExtension(request.InterfaceId, out extension))
+            {
+                implementationType = extension.GetType();
+            }
+            else
+            {
+                implementationType = target.GetType();
+            }
+
             // Get an invoker which delegates to the grain's IGrainInvocationInterceptor implementation.
             // If the grain does not implement IGrainInvocationInterceptor, then the invoker simply delegates
             // calls to the provided invoker.
             var interceptedMethodInvoker = interceptedMethodInvokerCache.GetOrCreate(
-                target.GetType(),
+                implementationType,
                 request.InterfaceId,
                 invoker);
             var methodInfo = interceptedMethodInvoker.GetMethodInfo(request.MethodId);

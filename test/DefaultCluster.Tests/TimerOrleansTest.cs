@@ -25,89 +25,117 @@ namespace DefaultCluster.Tests.TimerTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
-        public void TimerOrleansTest_Basic()
+        public async Task TimerOrleansTest_Basic()
         {
             for (int i = 0; i < 10; i++)
             {
-                ITimerGrain grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
-                TimeSpan period = grain.GetTimerPeriod().Result;
-                Thread.Sleep(period.Multiply(10));
-                int last = grain.GetCounter().Result;
-                output.WriteLine("value = " + last);
-                //Assert.True(10 == last || 9 == last, last.ToString());
+                var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
+                var period = await grain.GetTimerPeriod();
+                var timeout = period.Multiply(50);
+                var stopwatch = Stopwatch.StartNew();
+                var last = 0;
+                while (stopwatch.Elapsed < timeout && last < 10)
+                {
+                    await Task.Delay(period.Divide(2));
+                    last = await grain.GetCounter();
+                }
 
-                grain.StopDefaultTimer().Wait();
-                Thread.Sleep(period.Multiply(10));
-                int curr = grain.GetCounter().Result;
-                //Assert.True(curr == last || curr == last + 1, curr.ToString() + " " + last.ToString());
+                output.WriteLine("value = " + last);
+                Assert.True(last >= 10 & last <= 12, last.ToString());
+
+                await grain.StopDefaultTimer();
+                await Task.Delay(period.Multiply(2));
+                var curr = await grain.GetCounter();
+                Assert.True(curr == last || curr == last + 1, "curr == last || curr == last + 1");
             }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
-        public void TimerOrleansTest_Parallel()
+        public async Task TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
             List<ITimerGrain> grains = new List<ITimerGrain>();
             for (int i = 0; i < 10; i++)
             {
-                ITimerGrain grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
+                ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 grains.Add(grain);
-                period = grain.GetTimerPeriod().Result; // activate grains
+                period = await grain.GetTimerPeriod(); // activate grains
             }
 
-            Thread.Sleep(period.Multiply(10));
+            var tasks = new List<Task>(grains.Count);
             for (int i = 0; i < grains.Count; i++)
             {
                 ITimerGrain grain = grains[i];
-                int last = grain.GetCounter().Result;
-                output.WriteLine("value = " + last);
-                //Assert.Equal(10, last);
+                tasks.Add(
+                    Task.Run(
+                        async () =>
+                        {
+                            int last = await grain.GetCounter();
+                            var stopwatch = Stopwatch.StartNew();
+                            var timeout = period.Multiply(50);
+                            while (stopwatch.Elapsed < timeout && last < 10)
+                            {
+                                await Task.Delay(period.Divide(2));
+                                last = await grain.GetCounter();
+                            }
+
+                            output.WriteLine("value = " + last);
+                            Assert.True(last >= 10 && last <= 12, "last >= 10 && last <= 12");
+                        }));
             }
+
+            await Task.WhenAll(tasks);
             for (int i = 0; i < grains.Count; i++)
             {
                 ITimerGrain grain = grains[i];
-                grain.StopDefaultTimer().Wait();
+                await grain.StopDefaultTimer();
             }
         }
 
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
-        public void TimerOrleansTest_Migration()
+        public async Task TimerOrleansTest_Migration()
         {
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
+            ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
+            TimeSpan period = await grain.GetTimerPeriod();
 
-            ITimerGrain grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
-            TimeSpan period = grain.GetTimerPeriod().Result;
-            Thread.Sleep(period.Multiply(10));
-            int last = grain.GetCounter().Result;
+            // Ensure that the grain works as it should.
+            var last = await grain.GetCounter();
+            var stopwatch = Stopwatch.StartNew();
+            var timeout = period.Multiply(50);
+            while (stopwatch.Elapsed < timeout && last < 10)
+            {
+                await Task.Delay(period.Divide(2));
+                last = await grain.GetCounter();
+            }
+
+            last = await grain.GetCounter();
             output.WriteLine("value = " + last);
-            Assert.True(last >= 10 && last <= 11, "last = " + last.ToString(CultureInfo.InvariantCulture));
+            Assert.True(last >= 10 && last <= 12, $"last >= 10 && last <= 12. Actual: last = {last}");
 
-            var additionalSilo = this.HostedCluster.StartAdditionalSilo();
-            try
+            // Restart the grain.
+            await grain.Deactivate();
+            stopwatch.Restart();
+            period = await grain.GetTimerPeriod();
+
+            // Poke the grain and ensure it still works as it should.
+            last = await grain.GetCounter();
+            while (stopwatch.Elapsed < timeout && last < 10)
             {
-                //IManagementGrain mgmtGrain = Orleans.Silo.SystemManagement;
-                //mgmtGrain.SuspendHost(Orleans.SiloAddress).Wait();
-
-                Thread.Sleep(period.Multiply(10));
-                grain.StopDefaultTimer().Wait();
-                stopwatch.Stop();
-
-                last = grain.GetCounter().Result;
-                Assert.True(last >= 20);
-                double maximalNumTicks = stopwatch.Elapsed.Divide(grain.GetTimerPeriod().Result);
-                Assert.True(last <= maximalNumTicks);
-                //mgmtGrain.ResumeHost(Orleans.SiloAddress).Wait();
-                output.WriteLine("Total Elaped time = " + (stopwatch.ElapsedMilliseconds / 1000.0) + " sec. Expected Ticks = " + maximalNumTicks + ". Actual ticks = " + last);
+                await Task.Delay(period.Divide(2));
+                last = await grain.GetCounter();
             }
-            finally
-            {
-                if (this.HostedCluster.SecondarySilos.Count > 1)
-                {
-                    // do not leave unnecessarily too many silos running
-                    this.HostedCluster.StopSilo(additionalSilo);
-                }
-            }
+
+            last = await grain.GetCounter();
+            Assert.True(last >= 10 && last <= 12, $"last >= 10 && last <= 12. Actual: last = {last}");
+            double maximalNumTicks = stopwatch.Elapsed.Divide(period);
+            Assert.True(
+                last <= maximalNumTicks,
+                $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
+
+            output.WriteLine(
+                "Total Elaped time = " + (stopwatch.Elapsed.TotalSeconds) + " sec. Expected Ticks = " + maximalNumTicks +
+                ". Actual ticks = " + last);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
@@ -122,7 +150,7 @@ namespace DefaultCluster.Tests.TimerTests
             Exception error = null;
             try
             {
-                grain = GrainClient.GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
+                grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
                 await grain.StartTimer(testName, delay);
 
@@ -154,57 +182,6 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 Assert.True(false, $"Test {testName} failed with error {error}");
             }
-        }
-    }
-
-    public class TimerGrainReferenceProxy // : UnitTestGrains.ITimerGrain
-    {
-        private readonly ITimerGrain grain;
-        private readonly ITimerPersistantGrain persistantGrain;
-        private readonly bool persistant;
-
-        public TimerGrainReferenceProxy(bool persist)
-        {
-            persistant = persist;
-            if (persistant)
-            {
-                persistantGrain = GrainClient.GrainFactory.GetGrain<ITimerPersistantGrain>(TestUtils.GetRandomGrainId());
-            }
-            else
-            {
-                grain = GrainClient.GrainFactory.GetGrain<ITimerGrain>(TestUtils.GetRandomGrainId());
-            }
-        }
-
-        public Task StopDefaultTimer()
-        {
-            if (persistant) return persistantGrain.StopDefaultTimer();
-            else return grain.StopDefaultTimer();
-        }
-        public Task<TimeSpan> GetTimerPeriod()
-        {
-            if (persistant) return persistantGrain.GetTimerPeriod();
-            else return grain.GetTimerPeriod();
-        }
-        public Task<int> GetCounter()
-        {
-            if (persistant) return persistantGrain.GetCounter();
-            else return grain.GetCounter();
-        }
-        public Task SetCounter(int value)
-        {
-            if (persistant) return persistantGrain.SetCounter(value);
-            else return grain.SetCounter(value);
-        }
-        public Task StartTimer(string timerName)
-        {
-            if (persistant) return persistantGrain.StartTimer(timerName);
-            else return grain.StartTimer(timerName);
-        }
-        public Task StopTimer(string timerName)
-        {
-            if (persistant) return persistantGrain.StopTimer(timerName);
-            else return grain.StopTimer(timerName);
         }
     }
 }
