@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using Orleans.Runtime.Scheduler;
 
@@ -14,14 +13,19 @@ namespace Orleans.Runtime.GrainDirectory
 
         private readonly AdaptiveGrainDirectoryCache<TValue> cache;
         private readonly LocalGrainDirectory router;
+        private readonly Func<List<ActivationAddress>, TValue> updateFunc;
 
         private long lastNumAccesses;       // for stats
         private long lastNumHits;           // for stats
 
-        internal AdaptiveDirectoryCacheMaintainer(ILocalGrainDirectory router, IGrainDirectoryCache<TValue> cache) 
+        internal AdaptiveDirectoryCacheMaintainer(
+            LocalGrainDirectory router,
+            AdaptiveGrainDirectoryCache<TValue> cache,
+            Func<List<ActivationAddress>, TValue> updateFunc)
         {
-            this.router = (LocalGrainDirectory)router;
-            this.cache = (AdaptiveGrainDirectoryCache<TValue>) cache;
+            this.updateFunc = updateFunc;
+            this.router = router;
+            this.cache = cache;
             
             lastNumAccesses = 0;
             lastNumHits = 0;
@@ -88,7 +92,7 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                         else if (entry.NumAccesses == 0)
                         {
-                            // 2. If the entry is expired and was not acccessed in the last time interval -- throw it away
+                            // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
                             cache.Remove(grain);            // for debug
                             cnt3++;
                         }
@@ -149,17 +153,14 @@ namespace Orleans.Runtime.GrainDirectory
 
             int cnt1 = 0, cnt2 = 0, cnt3 = 0;
 
-            //TODO: this is unsafe in case TValue changes in the future as it assumes List<Tuple<SiloAddress, ActivationId>>
-            var cacheRef = cache as AdaptiveGrainDirectoryCache<List<Tuple<SiloAddress, ActivationId>>>; 
-
             // pass through returned results and update the cache if needed
             foreach (Tuple<GrainId, int, List<ActivationAddress>> tuple in refreshResponse)
             {
                 if (tuple.Item3 != null)
                 {
                     // the server returned an updated entry
-                    var list = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList();
-                    cacheRef.AddOrUpdate(tuple.Item1, list, tuple.Item2);
+                    var updated = updateFunc(tuple.Item3);
+                    cache.AddOrUpdate(tuple.Item1, updated, tuple.Item2);
                     cnt1++;
                 }
                 else if (tuple.Item2 == -1)

@@ -110,7 +110,11 @@ namespace Orleans.Runtime.GrainDirectory
                     DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(globalConfig);
                 }
             });
-            maintainer = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(this, this.DirectoryCache);
+            maintainer =
+                GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(
+                    this,
+                    this.DirectoryCache,
+                    activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly());
             GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, globalConfig);
 
             if (globalConfig.SeedNodes.Count > 0)
