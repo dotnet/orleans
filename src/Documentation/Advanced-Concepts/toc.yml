@@ -38,3 +38,5 @@
   href: Powershell-Client.md
 - name: Code generation
   href: Codegen.md
+- name: Heterogeneous silos
+  href: Heterogeneous-Silos.md

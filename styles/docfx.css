@@ -85,6 +85,15 @@ h6 mark {
     margin-left: 5em;
 }
 
+span.parametername,
+span.paramref,
+span.typeparamref {
+    font-style: italic;
+}
+span.languagekeyword{
+    font-weight: bold;
+}
+
 svg:hover path {
     fill: #ffffff;
 }
@@ -805,6 +814,37 @@ footer {
 /* For code snippet line highlight */
 pre > code .line-highlight {
   background-color: #ffffcc;
+}
+
+/* Alerts */
+.alert h5 {
+    text-transform: uppercase;
+    font-weight: bold;
+    margin-top: 0;
+}
+
+.alert h5:before {
+    position:relative;
+    top:1px;
+    display:inline-block;
+    font-family:'Glyphicons Halflings';
+    line-height:1;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    margin-right: 5px;
+    font-weight: normal;
+}
+
+.alert-info h5:before {
+    content:"\e086"
+}
+
+.alert-warning h5:before {
+    content:"\e127"
+}
+
+.alert-danger h5:before {
+    content:"\e107"
 }
 
 /* For Embedded Video */

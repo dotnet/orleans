@@ -7,6 +7,19 @@ $(function () {
   var show = 'show';
   var hide = 'hide';
 
+  // Styling for tables in conceptual documents using Bootstrap.
+  // See http://getbootstrap.com/css/#tables
+  (function () {
+    $('table').addClass('table table-bordered table-striped table-condensed');
+  })();
+
+  // Styling for alerts.
+  (function () {
+    $('.NOTE, .TIP').addClass('alert alert-info');
+    $('.WARNING').addClass('alert alert-warning');
+    $('.IMPORTANT, .CAUTION').addClass('alert alert-danger');
+  })();  
+
   // Enable highlight.js
   (function () {
     $('pre code').each(function(i, block) {
@@ -76,13 +89,11 @@ $(function () {
   // Support full-text-search
   (function () {
     var query;
-    var relHref = $("meta[property='docfx\\:rel']").attr("content");
-    if (relHref) {
-      var search = searchFactory();
-      search();
-      highlightKeywords();
-      addSearchEvent();
-    }
+    var relHref = $("meta[property='docfx\\:rel']").attr("content") || "";
+    var search = searchFactory();
+    search();
+    highlightKeywords();
+    addSearchEvent();
 
     // Search factory
     function searchFactory() {
@@ -249,7 +260,7 @@ $(function () {
             );
             query.split(/\s+/).forEach(function (word) {
               if (word !== '') {
-                highlight($('#search-results>.sr-items *'), word, "<strong>");
+                $('#search-results>.sr-items *').mark(word);
               }
             });
           }
@@ -342,10 +353,10 @@ $(function () {
             $(e).parent().addClass(active);
             var parent = $(e).parent().parents('li').children('a');
             if (!breadcrumb.isTocPartLoaded) {
-              if (parent.length > 0) {
+              for (var i = parent.length - 1; i >= 0; i--) {
                 breadcrumb.push({
-                  href: parent[0].href,
-                  name: parent[0].innerHTML
+                  href: parent[i].href,
+                  name: parent[i].innerHTML
                 });
               }
               breadcrumb.push({

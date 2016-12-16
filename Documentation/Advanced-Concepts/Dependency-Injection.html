@@ -8,7 +8,7 @@
     <title>Dependency Injection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Dependency Injection | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.8.0.0">
+    <meta name="generator" content="docfx 2.9.2.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -148,6 +148,43 @@ public class InjectedService : IInjectedService
         return Task.FromResult(DateTime.UtcNow.Ticks);
     }
 }
+</code></pre><h1 id="test-framework-integration">Test Framework Integration</h1>
+<p>DI truly shines when coupled with a testing framework to verify the correctness of the code that build. You can read about the components for making testing in Orleans by following our <a href="../../Tutorials/Unit-Testing-Grains.html">tutorials</a>.</p>
+<p>You will need to do two things setup DI with tests. First you will need to implement mocks of your services. This is done in our example using <a href="https://github.com/moq/">Moq</a>, a popular mocking framework for .NET. Here is an example of doing mocking of a service.</p>
+<pre><code class="lang-csharp">public class MockServices
+{
+    public IServiceProvider ConfigureServices(IServiceCollection services)
+    {
+        var mockInjectedService = new Mock&lt;IInjectedService&gt;();
+
+        mockInjectedService.Setup(t =&gt; t.GetTicks()).Returns(knownDateTime);
+        services.AddSingleton&lt;IInjectedService&gt;(mockInjectedService.Object);
+        return services.BuildServiceProvider();
+    }
+}
+</code></pre><p>To include these services in your test silo, you will need to specify MockServices as the silo startup class. Here is an example of doing this.</p>
+<pre><code class="lang-csharp">[TestClass]
+public class IInjectedServiceTests: TestingSiloHost
+{
+    private static TestingSiloHost host;
+
+    [TestInitialize]
+    public void Setup()
+    {
+        if (host == null)
+        {
+            host = new TestingSiloHost(
+                new TestingSiloOptions
+                {
+                    StartSecondary = false,
+                    AdjustConfig = clusterConfig =&gt;
+                    {
+                        clusterConfig.UseStartupType&lt;MockServices&gt;();
+                    }
+                });
+        }
+    }
+}
 </code></pre>
             </article>
           </div>
@@ -156,9 +193,6 @@ public class InjectedService : IInjectedService
             <div class="sideaffix">
               <div class="contribution">
                 <ul class="nav">
-                  <li>
-                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/src/Documentation/Advanced-Concepts/Dependency-Injection.md/#L1" class="contribution-link">Improve this Doc</a>
-                  </li>
                 </ul>
               </div>
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
