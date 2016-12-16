@@ -217,6 +217,14 @@ namespace Orleans.Runtime.Configuration
 
         public string SiloShutdownEventName { get; set; }
 
+        public bool HttpApiEnabled { get; set; }
+
+        public int HttpApiPort { get; set; }
+
+        public string HttpApiUsername { get; set; }
+
+        public string HttpApiPassword { get; set; }
+
         internal const string DEFAULT_NODE_NAME = "default";
         private static readonly TimeSpan DEFAULT_STATS_METRICS_TABLE_WRITE_PERIOD = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DEFAULT_STATS_PERF_COUNTERS_WRITE_PERIOD = TimeSpan.FromSeconds(30);
@@ -274,6 +282,11 @@ namespace Orleans.Runtime.Configuration
 
             AdditionalAssemblyDirectories = new Dictionary<string, SearchOption>();
             ExcludedGrainTypes = new List<string>();
+
+            HttpApiEnabled = false;
+            HttpApiPort = 8080;
+            HttpApiUsername = null;
+            HttpApiPassword = null;
         }
 
         public NodeConfiguration(NodeConfiguration other)
@@ -325,6 +338,12 @@ namespace Orleans.Runtime.Configuration
             StartupTypeName = other.StartupTypeName;
             AdditionalAssemblyDirectories = other.AdditionalAssemblyDirectories;
             ExcludedGrainTypes = other.ExcludedGrainTypes.ToList();
+
+            HttpApiEnabled = other.HttpApiEnabled;
+            HttpApiPort = other.HttpApiPort;
+            HttpApiUsername = other.HttpApiUsername;
+            HttpApiPassword = other.HttpApiPassword;
+
         }
 
         public override string ToString()
@@ -346,6 +365,19 @@ namespace Orleans.Runtime.Configuration
             {
                 sb.Append("   IsGatewayNode: ").Append(IsGatewayNode).AppendLine();
             }
+            if (HttpApiEnabled)
+            {
+                sb.Append("   Http Api Enabled on Port: ").Append(HttpApiPort).AppendLine();
+                if (null != HttpApiUsername && null != HttpApiPassword)
+                {
+                    sb.Append("      ").Append("   Username: ").Append(HttpApiUsername);
+                }
+            }
+            else
+            {
+                sb.Append("   Http Api Disabled").AppendLine();
+            }
+            sb.Append("   Http Api ").Append(HttpApiEnabled ? "Enabled" : "Disabled").AppendLine();
             sb.Append("   IsPrimaryNode: ").Append(IsPrimaryNode).AppendLine();
             sb.Append("   Scheduler: ").AppendLine();
             sb.Append("      ").Append("   Max Active Threads: ").Append(MaxActiveThreads).AppendLine();

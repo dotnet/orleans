@@ -62,6 +62,12 @@
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Counters\CounterConfigData.cs" />
+    <Compile Include="Http\HttpApiConfiguration.cs" />
+    <Compile Include="Http\HttpApi.cs" />
+    <Compile Include="Http\ExtensionMethods.cs" />
+    <Compile Include="Http\GrainController.cs" />
+    <Compile Include="Http\Router.cs" />
+    <Compile Include="Http\WebServer.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="Silo\SiloInitializationParameters.cs" />
     <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />

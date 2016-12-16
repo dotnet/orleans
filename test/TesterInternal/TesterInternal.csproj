@@ -42,6 +42,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Web.Extensions" />
   </ItemGroup>
   <ItemGroup>
@@ -54,6 +55,8 @@
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
     <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
+    <Compile Include="OrleansRuntime\HttpApiWithAuthTests.cs" />
+    <Compile Include="OrleansRuntime\HttpApiTests.cs" />
     <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
     <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
     <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />

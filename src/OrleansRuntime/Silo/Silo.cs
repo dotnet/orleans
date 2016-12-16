@@ -85,7 +85,8 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders = new List<IProvider>();
-        
+        private IDisposable httpEndpointListener;
+
         /// <summary>
         /// Gets the type of this 
         /// </summary>
@@ -132,7 +133,7 @@ namespace Orleans.Runtime
         /// Test hook connection for white-box testing of silo.
         /// </summary>
         internal TestHooksSystemTarget testHook;
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
         /// </summary>
@@ -628,6 +629,18 @@ namespace Orleans.Runtime
                 mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
                 if (this.logger.IsVerbose) { this.logger.Verbose("Message gateway service started successfully."); }
 
+                // start the HTTP listener
+                var config = new HttpApiConfiguration
+                {
+                    Enable = this.LocalConfig.HttpApiEnabled,
+                    Port = this.LocalConfig.HttpApiPort,
+                    Password = this.LocalConfig.HttpApiPassword,
+                    Username = this.LocalConfig.HttpApiUsername
+                };
+                this.httpEndpointListener = 
+                    new HttpApi(this.runtimeClient.InternalGrainFactory,this.scheduler,this.catalog.SchedulingContext,config, this.logger)
+                    .Start();
+
                 SystemStatus.Current = SystemStatus.Running;
             }
             catch (Exception exc)
@@ -795,6 +808,8 @@ namespace Orleans.Runtime
                 // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
+                SafeExecute(httpEndpointListener.Dispose);
+
                 // 4: Start rejecting all silo to silo application messages
                 SafeExecute(messageCenter.BlockApplicationMessages);
 
@@ -874,6 +889,7 @@ namespace Orleans.Runtime
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
             SafeExecute(GrainTypeManager.Stop);
+            SafeExecute(httpEndpointListener.Dispose);
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
@@ -883,7 +899,7 @@ namespace Orleans.Runtime
             SafeExecute(() => this.assemblyProcessor?.Dispose());
 
             // Setting the event should be the last thing we do.
-            // Do nothijng after that!
+            // Do nothing after that!
             siloTerminatedEvent.Set();  
         }
 

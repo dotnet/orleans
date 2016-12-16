@@ -58,6 +58,7 @@
     <Compile Include="General\RingTests_Standalone.cs" />
     <Compile Include="ManagementAgentTests.cs" />
     <Compile Include="OrleansRuntime\AsyncSerialExecutorTests.cs" />
+    <Compile Include="OrleansRuntime\HttpApiTests.cs" />
     <Compile Include="OrleansRuntime\ExceptionsTests.cs" />
     <Compile Include="OrleansRuntime\Streams\BestFitBalancerTests.cs" />
     <Compile Include="OrleansRuntime\Streams\SubscriptionMarkerTests.cs" />
