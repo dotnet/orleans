@@ -18,6 +18,6 @@ For example, an ASP.NET application running on a web server can be a client part
 The client part executes on top of the .NET thread pool, and is not subject to scheduling restrictions and guarantees of the Orleans Runtime.
 
 ## Next
-Next we look how to receive asynchronous messages, or push data, from a grain.
+Next we look into grain life cycle
 
-[Client Observers](Observers.md)
+[Grains life cycle](Grain-LifeCycle.md)
