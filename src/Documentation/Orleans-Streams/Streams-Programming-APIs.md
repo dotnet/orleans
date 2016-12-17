@@ -62,7 +62,7 @@ lambda functions to process incoming events. More options for `SubscribeAsync` a
 await subscriptionHandle.UnsubscribeAsync()
 ```
 
-It is important to note that **the subscription is for a grain, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a **virtual stream abstraction**: not only all the streams always exits, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
+It is important to note that **the subscription is for a grain, not for an activation**. Once the grain code subscribed to the stream, this subscription surpasses the life of this activation and stays durable forever, until the grain code (potentially in a different activation) explicitly unsubscribes. This is the heart of a **virtual stream abstraction**: not only all the streams always exists, logically, but also that a stream subscription is durable and lives beyond a particular physical activation that issued this subscription.
 
 ### Multiplicity<a name="Multiplicity"></a>
 
@@ -114,13 +114,13 @@ StreamSubscriptionHandle<T> subscription = await stream.SubscribeAsync(IAsyncObs
 
 ### Writing Subscription Logic<a name="Writing-Subscription-Logic"></a>
 
-Below are the guidlines on how to write the subscription logic for varios cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subsriptions (there is no subscription multiplicity) and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subsription.
-On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subsribes again it will result in the grain being subscribed multipe times.
+Below are the guidelines on how to write the subscription logic for various cases: explicit and implicit subscriptions, rewindable and non-rewindable streams. The main difference between explicit and implicit subscriptions is that for implicit the grain always has exactly one implicit subscription for every stream namespace, there is no way to create multiple subscriptions (there is no subscription multiplicity), there is no way to unsubscribe, and the grain logic always only needs to attach the processing logic. That also means that for implicit subscriptions there is never a need to Resume a subscription.
+On the other hand, for explicit subscriptions, one needs to Resume the subscription, otherwise if the grain subscribes again it will result in the grain being subscribed multiple times.
 
 
 **Implicit Subscriptions:**
 
-For implicit subscriptions case the grain needs to subscribe in order to attach the processing logic. This should be done in the grain's `OnActivateAsync` method. The grain should simply execute `await stream.SubscribeAsync(OnNext ...)` in its `OnActivateAsync` method. That will cause this particular activation to attach the `OnNext` function to process that stream. The grain can optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscriptions to start consuming from that token. There is never a need for implicit subscriptions to call `ResumeAsync`.
+For implicit subscriptions the grain needs to subscribe to attach the processing logic. This should be done in the grain's `OnActivateAsync` method. The grain should simply execute `await stream.SubscribeAsync(OnNext ...)` in its `OnActivateAsync` method. That will cause this particular activation to attach the `OnNext` function to process that stream. The grain can optionally specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this implicit subscription to start consuming from that token. There is never a need for implicit subscription to call `ResumeAsync`.
 
 ``` csharp
 public async override Task OnActivateAsync()
@@ -133,8 +133,8 @@ public async override Task OnActivateAsync()
 
 **Explicit Subscriptions:**
 
-Grain that wants to explicitly subscribe first has to call `SubscribeAsync` in some place in its code, in order to subsribe the first time. This causes the subsription to be established, as well as attaches the processig logic.
-Now imagine a case when the grain got deactivated and reactivated. The grain is still explicitly subscribed, but no processig logic is attached. The grain needs to re-attach the processing logic. To do that, in its `OnActivateAsync`, the grain first needs to find out what subscriptions it has, by calling `stream.GetAllSubscriptionHandles()`. Then the grain has to execute `ResumeAsync` on each  handle. The grain can also optionaly specify the `StreamSequenceToken` as an argument to `SubscribeAsync`, which will cause this explicit subscription to start consuming from that token.
+For explicit subscriptions, a grain must call `SubscribeAsync` to subscribe to the stream.  This creates a subscription, as well as attaches the processing logic.
+The explicit subscription will exist until the grain unsubscribes, so if a grain gets deactivated and reactivated, the grain is still explicitly subscribed, but no processing logic will be attached. In this case the grain needs to re-attach the processing logic. To do that, in its `OnActivateAsync`, the grain first needs to find out what subscriptions it has, by calling `stream.GetAllSubscriptionHandles()`. The grain must execute `ResumeAsync` on each handle it wishes to continue processing or UnsubscribeAsync on any handles it is done with. The grain can also optionally specify the `StreamSequenceToken` as an argument to the `ResumeAsync` calls, which will cause this explicit subscription to start consuming from that token.
 
 ``` csharp
 public async override Task OnActivateAsync()
