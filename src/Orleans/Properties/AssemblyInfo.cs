@@ -42,3 +42,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
