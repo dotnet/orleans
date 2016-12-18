@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26009.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{013DFD29-E1DB-4968-A67B-C2342E6F5B6E}"
 	ProjectSection(SolutionItems) = preProject
@@ -213,6 +213,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DefaultCluster.Tests", "..\test\DefaultCluster.Tests\DefaultCluster.Tests.csproj", "{EEEB9AC6-F50B-4275-AE72-1D56AC01A19B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterSQLUtils", "..\test\TesterSQLUtils\TesterSQLUtils.csproj", "{5A620DF5-1461-4B31-96E0-925BBD10773C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TesterZooKeeperUtils", "..\test\TesterZooKeeperUtils\TesterZooKeeperUtils.csproj", "{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -548,6 +550,14 @@ Global
 		{5A620DF5-1461-4B31-96E0-925BBD10773C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5A620DF5-1461-4B31-96E0-925BBD10773C}.Release|x64.ActiveCfg = Release|Any CPU
 		{5A620DF5-1461-4B31-96E0-925BBD10773C}.Release|x64.Build.0 = Release|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Debug|x64.Build.0 = Debug|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Release|x64.ActiveCfg = Release|Any CPU
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -596,7 +606,8 @@ Global
 		{B93B3853-FD54-4615-891A-9AFA3D9D32A2} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{003DFE72-F1CA-4E79-8A84-EDF5D277EB16} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{DEE80624-685B-4C84-99EC-C0A637B6FB34} = {01F3CC7E-F996-411E-AFD6-72673A826549}
-{EEEB9AC6-F50B-4275-AE72-1D56AC01A19B} = {01F3CC7E-F996-411E-AFD6-72673A826549}
+		{EEEB9AC6-F50B-4275-AE72-1D56AC01A19B} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 		{5A620DF5-1461-4B31-96E0-925BBD10773C} = {01F3CC7E-F996-411E-AFD6-72673A826549}
+		{AFEC183D-C12A-4DFC-8DA9-A4895CF5D020} = {01F3CC7E-F996-411E-AFD6-72673A826549}
 	EndGlobalSection
 EndGlobal
