@@ -808,7 +808,7 @@ namespace Orleans.Runtime
                 // 3: Stop the gateway
                 SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-                SafeExecute(httpEndpointListener.Dispose);
+                SafeExecute(() => httpEndpointListener?.Dispose());
 
                 // 4: Start rejecting all silo to silo application messages
                 SafeExecute(messageCenter.BlockApplicationMessages);
@@ -889,7 +889,7 @@ namespace Orleans.Runtime
             SafeExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
             SafeExecute(GrainTypeManager.Stop);
-            SafeExecute(httpEndpointListener.Dispose);
+            SafeExecute(() => httpEndpointListener?.Dispose());
 
             UnobservedExceptionsHandlerClass.ResetUnobservedExceptionHandler();
 
