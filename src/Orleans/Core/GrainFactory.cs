@@ -67,7 +67,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = TypeCodeMapper.ComposeGrainId(implementation, primaryKey, interfaceType);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -82,7 +82,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = TypeCodeMapper.ComposeGrainId(implementation, primaryKey, interfaceType);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -98,7 +98,7 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = TypeCodeMapper.ComposeGrainId(implementation, primaryKey, interfaceType);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -117,7 +117,7 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = TypeCodeMapper.ComposeGrainId(implementation, primaryKey, interfaceType, keyExtension);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -136,7 +136,7 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = TypeCodeMapper.ComposeGrainId(implementation, primaryKey, interfaceType, keyExtension);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
             return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
         }
 
@@ -215,7 +215,22 @@ namespace Orleans
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + interfaceType.FullName);
             }
 
-            var implementation = TypeCodeMapper.GetImplementation(this.runtimeClient.GrainTypeResolver, interfaceType, grainClassNamePrefix);
+            var grainTypeResolver = this.runtimeClient.GrainTypeResolver;
+            GrainClassData implementation;
+            if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
+            {
+                var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
+                var assembliesString = string.IsNullOrEmpty(loadedAssemblies)
+                    ? string.Empty
+                    : " Loaded grain assemblies: " + loadedAssemblies;
+                var grainClassPrefixString = string.IsNullOrEmpty(grainClassNamePrefix)
+                    ? string.Empty
+                    : ", grainClassNamePrefix: " + grainClassNamePrefix;
+                throw new ArgumentException(
+                    $"Cannot find an implementation class for grain interface: {interfaceType}{grainClassPrefixString}. " +
+                    "Make sure the grain assembly was correctly deployed and loaded in the silo." + assembliesString);
+            }
+
             return implementation;
         }
 
