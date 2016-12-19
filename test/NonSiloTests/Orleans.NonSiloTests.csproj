@@ -76,6 +76,7 @@
     <Compile Include="SerializationTests\SerializationTests.ImmutableCollections.cs" />
     <Compile Include="SerializationTests\StreamTypeSerializationTests.cs" />
     <Compile Include="Serialization\BuiltInSerializerTests.cs" />
+    <Compile Include="Serialization\ILBasedExceptionSerializerTests.cs" />
     <Compile Include="Serialization\ILBasedSerializerTests.cs" />
     <Compile Include="Serialization\SerializerGenerationTests.cs" />
     <Compile Include="SerializerTests\CustomSerializerTests.cs" />

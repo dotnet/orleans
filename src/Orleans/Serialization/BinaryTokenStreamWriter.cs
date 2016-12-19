@@ -106,7 +106,7 @@ namespace Orleans.Serialization
 
         /// <summary> Return the output stream as a set of <c>ArraySegment</c>. </summary>
         /// <returns>Data from this stream, converted to output type.</returns>
-        public IList<ArraySegment<byte>> ToBytes()
+        public List<ArraySegment<byte>> ToBytes()
         {
             return ab.ToBytes();
         }
@@ -310,6 +310,12 @@ namespace Orleans.Serialization
         {
             Trace("--Wrote byte array of length {0}", b.Length);
             ab.Append(b);
+        }
+
+        /// <summary> Write a list of byte array segments to the stream. </summary>
+        public void Write(List<ArraySegment<byte>> bytes)
+        {
+            ab.Append(bytes);
         }
 
         /// <summary> Write the specified number of bytes to the stream, starting at the specified offset in the input <c>byte[]</c>. </summary>
