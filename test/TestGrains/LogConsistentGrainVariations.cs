@@ -57,7 +57,7 @@ namespace UnitTests.Grains
     {
 
         // we use another impl of this grain as the primary.
-        ILogConsistentGrain storagegrain;
+        private ILogConsistentGrain storagegrain;
 
         private ILogConsistentGrain GetStorageGrain()
         {
@@ -89,8 +89,8 @@ namespace UnitTests.Grains
     {
 
         // we use fake in-memory state as the storage
-        MyGrainState state;
-        int version;
+        private MyGrainState state;
+        private int version;
 
         // simulate an async call during activation. This caused deadlock in earlier version,
         // so I add it here to catch regressions.

@@ -769,7 +769,7 @@ namespace Orleans.EventSourcing.Common
      
 
         /// <inheritdoc />
-        public async Task SynchronizeNowAsync()
+        public async Task Synchronize()
         {
             if (stats != null)
                 stats.EventCounters["SynchronizeNowCalled"]++;
@@ -792,7 +792,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc />
-        public async Task ConfirmSubmittedEntriesAsync()
+        public async Task ConfirmSubmittedEntries()
         {
             if (stats != null)
                 stats.EventCounters["ConfirmSubmittedEntriesCalled"]++;

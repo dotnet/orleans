@@ -104,13 +104,14 @@ namespace Orleans.LogConsistency
         /// Confirm all submitted entries.
         ///<para>Waits until all previously submitted entries appear in the confirmed prefix of the log.</para>
         /// </summary>
-        Task ConfirmSubmittedEntriesAsync();
+        /// <returns>A task that completes after all entries are confirmed.</returns>
+        Task ConfirmSubmittedEntries();
 
         /// <summary>
-        /// Confirm all submitted entries and get the latest log view.
+        /// Get the latest log view and confirm all submitted entries.
         ///<para>Waits until all previously submitted entries appear in the confirmed prefix of the log, and forces a refresh of the confirmed prefix.</para>
         /// </summary>
-        /// <returns></returns>
-        Task SynchronizeNowAsync();
+        /// <returns>A task that completes after getting the latest version and confirming all entries.</returns>
+        Task Synchronize();
     }
 }

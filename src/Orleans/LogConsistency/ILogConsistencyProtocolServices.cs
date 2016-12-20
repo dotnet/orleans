@@ -44,6 +44,10 @@ namespace Orleans.LogConsistency
         /// <returns></returns>
         bool MultiClusterEnabled { get; }
 
+        // If there is no multi-cluster network,
+        // we use a default multi-cluster configuration containing just one cluster (this one), named "I"
+        // this is more convenient and consistent than returning null or invalid,
+        // since it means the log-consistency providers do the right thing (run like a single-cluster configuration)
 
         /// <summary>
         /// The id of this cluster. Returns "I" if no multi-cluster network is present.

@@ -100,19 +100,15 @@ namespace Orleans.EventSourcing.Common
             /// <summary>
             /// Queue messages
             /// </summary>
-            public INotificationMessage QueuedMessage = null;
+            private INotificationMessage QueuedMessage = null;
             /// <summary>
             /// Queue state
             /// </summary>
-            public NotificationQueueState QueueState = NotificationQueueState.Empty;
+            private NotificationQueueState QueueState = NotificationQueueState.Empty;
             /// <summary>
             /// Last exception
             /// </summary>
             public RecordedConnectionIssue LastConnectionIssue;
-            /// <summary>
-            /// Number of consecutive failures
-            /// </summary>
-            public int NumConsecutiveFailures;
             /// <summary>
             /// Is current task done or not
             /// </summary>

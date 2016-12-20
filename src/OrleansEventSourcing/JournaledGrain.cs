@@ -146,22 +146,24 @@ namespace Orleans.EventSourcing
 
         /// <summary>
         /// Waits until all previously raised events have been confirmed. 
+        /// <para>await this after raising one or more events, to ensure events are persisted before proceeding, or to guarantee strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
-        /// <returns></returns>
+        /// <returns>a task that completes once the events have been confirmed.</returns>
         protected Task ConfirmEvents()
         {
-            return LogViewAdaptor.ConfirmSubmittedEntriesAsync();
+            return LogViewAdaptor.ConfirmSubmittedEntries();
 
         }
 
         /// <summary>
         /// Retrieves the latest state now, and confirms all previously raised events. 
         /// Effectively, this enforces synchronization with the global state.
+        /// <para>Await this before reading the state to ensure strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
-        /// <returns></returns>
+        /// <returns>a task that completes once the log has been refreshed and the events have been confirmed.</returns>
         protected Task RefreshNow()
         {
-            return LogViewAdaptor.SynchronizeNowAsync();
+            return LogViewAdaptor.Synchronize();
         }
 
 
