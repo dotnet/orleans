@@ -807,26 +807,6 @@ namespace Orleans
         {
             return responseTimeout;
         }
-
-        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-        {
-            throw new InvalidOperationException("RegisterReminder can only be called from inside a grain");
-        }
-
-        public Task UnregisterReminder(IGrainReminder reminder)
-        {
-            throw new InvalidOperationException("UnregisterReminder can only be called from inside a grain");
-        }
-
-        public Task<IGrainReminder> GetReminder(string reminderName)
-        {
-            throw new InvalidOperationException("GetReminder can only be called from inside a grain");
-        }
-
-        public Task<List<IGrainReminder>> GetReminders()
-        {
-            throw new InvalidOperationException("GetReminders can only be called from inside a grain");
-        }
         
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
