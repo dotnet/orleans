@@ -349,7 +349,7 @@ namespace Orleans.Streams
                         i => ReadFromQueue((QueueId)state, receiver, maxCacheAddCount),
                         AsyncExecutorWithRetries.INFINITE_RETRIES,
                         (e, i) => !IsShutdown,
-                        TimeSpan.MaxValue,
+                        Constants.INFINITE_TIMESPAN,
                         ReadLoopBackoff);
                     if (!moreData)
                         return;
