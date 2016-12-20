@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Runtime.Services;
+using Orleans.Timers;
 
-namespace Orleans.Timers
+namespace Orleans.Runtime.ReminderService
 {
-    internal class ReminderRegistry : IReminderRegistry
+    internal class ReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
     {
         private const UInt32 MAX_SUPPORTED_TIMEOUT = (uint)0xfffffffe;
+
+        public ReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
+        }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
@@ -35,12 +40,12 @@ namespace Orleans.Timers
                 throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
             }
 
-            return RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, dueTime, period);
+            return GrainService.RegisterOrUpdateReminder(CallingGrainReference, reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(IGrainReminder reminder)
         {
-            return RuntimeClient.Current.UnregisterReminder(reminder);
+            return GrainService.UnregisterReminder(reminder);
         }
 
         public Task<IGrainReminder> GetReminder(string reminderName)
@@ -49,12 +54,13 @@ namespace Orleans.Timers
             {
                 throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
             }
-            return RuntimeClient.Current.GetReminder(reminderName);
+
+            return GrainService.GetReminder(CallingGrainReference, reminderName);
         }
 
         public Task<List<IGrainReminder>> GetReminders()
         {
-            return RuntimeClient.Current.GetReminders();
+            return GrainService.GetReminders(CallingGrainReference);
         }
     }
 }

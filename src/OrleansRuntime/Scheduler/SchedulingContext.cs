@@ -152,7 +152,7 @@ namespace Orleans.Runtime.Scheduler
                         return Activation.Name;
 
                     case SchedulingContextType.SystemTarget:
-                        return SystemTarget.GrainId.ToString();
+                        return ((ISystemTargetBase)SystemTarget).GrainId.ToString();
 
                     case SchedulingContextType.SystemThread:
                         return String.Format("DispatcherTarget{0}", DispatcherTarget);
