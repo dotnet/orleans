@@ -16,7 +16,7 @@ namespace Tester
         {
             var options = new TestClusterOptions(1);
             options.ClusterConfiguration.UseStartupType<GrainServiceStartup>();
-            options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainServiceClient, Tester", "Tester.CustomGrainService, Tester", 
+            options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainService, Tester", 
                 new Dictionary<string,string> {{"test-property", "xyz"}});
 
             return new TestCluster(options);

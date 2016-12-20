@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Configuration
 
     internal static class GrainServiceConfigurationsUtility
     {
-        internal static void RegisterGrainService(GrainServiceConfigurations grainServicesConfig, string serviceName, string clientType, string serviceType, IDictionary<string, string> properties = null)
+        internal static void RegisterGrainService(GrainServiceConfigurations grainServicesConfig, string serviceName, string serviceType, IDictionary<string, string> properties = null)
         {
             if (grainServicesConfig.GrainServices.ContainsKey(serviceName))
                 throw new InvalidOperationException(
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Configuration
 
             var config = new GrainServiceConfiguration(
                 properties ?? new Dictionary<string, string>(),
-                serviceName, clientType, serviceType);
+                serviceName, serviceType);
 
             grainServicesConfig.GrainServices.Add(config.Name, config);
         }
@@ -48,7 +48,6 @@ namespace Orleans.Runtime.Configuration
     public interface IGrainServiceConfiguration
     {
         string Name { get; set; }
-        string ClientType { get; set; }
         string ServiceType { get; set; }
         IDictionary<string, string> Properties { get; set; }
     }
@@ -58,17 +57,15 @@ namespace Orleans.Runtime.Configuration
     {
 
         public string Name { get; set; }
-        public string ClientType { get; set; }
         public string ServiceType { get; set; }
         public IDictionary<string, string> Properties { get; set; }
 
         public GrainServiceConfiguration() {}
 
-        public GrainServiceConfiguration(IDictionary<string, string> properties, string serviceName, string clientType, string serviceType)
+        public GrainServiceConfiguration(IDictionary<string, string> properties, string serviceName, string serviceType)
         {
             Properties = properties;
             Name = serviceName;
-            ClientType = clientType;
             ServiceType = serviceType;
         }
 
@@ -88,15 +85,6 @@ namespace Orleans.Runtime.Configuration
             if (alreadyLoaded != null && alreadyLoaded.ContainsKey(Name))
             {
                 return;
-            }
-
-            if (child.HasAttribute("ClientType"))
-            {
-                ClientType = child.GetAttribute("ClientType");
-            }
-            else
-            {
-                throw new FormatException("Missing 'ClientType' attribute on 'GrainService' element");
             }
 
             if (child.HasAttribute("ServiceType"))
