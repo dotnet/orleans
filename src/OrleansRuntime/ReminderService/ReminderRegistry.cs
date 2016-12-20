@@ -8,7 +8,7 @@ namespace Orleans.Runtime.ReminderService
 {
     internal class ReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
     {
-        private const UInt32 MAX_SUPPORTED_TIMEOUT = (uint)0xfffffffe;
+        private const uint MaxSupportedTimeout = 0xfffffffe;
 
         public ReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
         {
@@ -18,26 +18,35 @@ namespace Orleans.Runtime.ReminderService
         {
             // Perform input volatility checks that are consistent with System.Threading.Timer
             // http://referencesource.microsoft.com/#mscorlib/system/threading/timer.cs,c454f2afe745d4d3,references
-            var dueTm = (long)dueTime.TotalMilliseconds;
+            var dueTm = (long) dueTime.TotalMilliseconds;
             if (dueTm < -1)
-                throw new ArgumentOutOfRangeException("dueTime", "Cannot use negative dueTime to create a reminder");
-            if (dueTm > MAX_SUPPORTED_TIMEOUT)
-                throw new ArgumentOutOfRangeException("dueTime", String.Format("Cannot use value larger than {0} for dueTime when creating a reminder", MAX_SUPPORTED_TIMEOUT));
+                throw new ArgumentOutOfRangeException(nameof(dueTime), "Cannot use negative dueTime to create a reminder");
+            if (dueTm > MaxSupportedTimeout)
+                throw new ArgumentOutOfRangeException(
+                    nameof(dueTime),
+                    $"Cannot use value larger than {MaxSupportedTimeout}ms for dueTime when creating a reminder");
 
-            var periodTm = (long)period.TotalMilliseconds;
+            var periodTm = (long) period.TotalMilliseconds;
             if (periodTm < -1)
-                throw new ArgumentOutOfRangeException("period", "Cannot use negative period to create a reminder");
-            if (periodTm > MAX_SUPPORTED_TIMEOUT)
-                throw new ArgumentOutOfRangeException("period", String.Format("Cannot use value larger than {0} for period when creating a reminder", MAX_SUPPORTED_TIMEOUT));
+                throw new ArgumentOutOfRangeException(nameof(period), "Cannot use negative period to create a reminder");
+            if (periodTm > MaxSupportedTimeout)
+                throw new ArgumentOutOfRangeException(
+                    nameof(period),
+                    $"Cannot use value larger than {MaxSupportedTimeout}ms for period when creating a reminder");
 
             if (period < Constants.MinReminderPeriod)
             {
-                string msg = string.Format("Cannot register reminder {0} as requested period ({1}) is less than minimum allowed reminder period ({2})", reminderName, period, Constants.MinReminderPeriod);
+                var msg =
+                    string.Format(
+                        "Cannot register reminder {0} as requested period ({1}) is less than minimum allowed reminder period ({2})",
+                        reminderName,
+                        period,
+                        Constants.MinReminderPeriod);
                 throw new ArgumentException(msg);
             }
-            if (String.IsNullOrEmpty(reminderName))
+            if (string.IsNullOrEmpty(reminderName))
             {
-                throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
+                throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
             }
 
             return GrainService.RegisterOrUpdateReminder(CallingGrainReference, reminderName, dueTime, period);
@@ -50,9 +59,9 @@ namespace Orleans.Runtime.ReminderService
 
         public Task<IGrainReminder> GetReminder(string reminderName)
         {
-            if (String.IsNullOrEmpty(reminderName))
+            if (string.IsNullOrEmpty(reminderName))
             {
-                throw new ArgumentException("Cannot use null or empty name for the reminder", "reminderName");
+                throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
             }
 
             return GrainService.GetReminder(CallingGrainReference, reminderName);

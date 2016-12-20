@@ -42,14 +42,6 @@ namespace Orleans.Runtime
 
         void ReceiveResponse(Message message);
 
-        Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
-
-        Task UnregisterReminder(IGrainReminder reminder);
-
-        Task<IGrainReminder> GetReminder(string reminderName);
-
-        Task<List<IGrainReminder>> GetReminders();
-
         Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
         void Reset(bool cleanup);

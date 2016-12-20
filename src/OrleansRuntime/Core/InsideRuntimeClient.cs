@@ -604,13 +604,6 @@ namespace Orleans.Runtime
         {
             get { return MySilo.ToLongString(); }
         }
-        public IAddressable CurrentGrain
-        {
-            get
-            {
-                return CurrentActivationData == null ? null : CurrentActivationData.GrainInstance;
-            }
-        }
 
         public IActivationData CurrentActivationData
         {
@@ -626,67 +619,12 @@ namespace Orleans.Runtime
                 return null;
             }
         }
-        public ActivationAddress CurrentActivationAddress
-        {
-            get
-            {
-                return CurrentActivationData == null ? null : CurrentActivationData.Address;
-            }
-        }
+
         public SiloAddress CurrentSilo
         {
             get { return MySilo; }
         }
-
-        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-        {
-            return GetReminderService("RegisterOrUpdateReminder", reminderName)
-                .RegisterOrUpdateReminder(reminderName, dueTime, period);
-        }
-
-        public Task UnregisterReminder(IGrainReminder reminder)
-        {
-            return GetReminderService("UnregisterReminder", reminder.ReminderName)
-                .UnregisterReminder(reminder);
-        }
-
-        public Task<IGrainReminder> GetReminder(string reminderName)
-        {
-            return GetReminderService("GetReminder", reminderName)
-                .GetReminder(reminderName);
-        }
-
-        public Task<List<IGrainReminder>> GetReminders()
-        {
-            return GetReminderService("GetReminders", String.Empty)
-                .GetReminders();
-        }
-
-        private IReminderRegistry GetReminderService(
-            string operation,
-            string reminderName)
-        {
-            CheckValidReminderServiceType(operation);
-            var grainRef = CurrentActivationData.GrainReference;
-            SiloAddress destination = MapGrainReferenceToSiloRing(grainRef);
-            if (logger.IsVerbose)
-            {
-                logger.Verbose("{0} for reminder {1}, grainRef: {2} responsible silo: {3}/x{4, 8:X8} based on {5}",
-                    operation,
-                    reminderName,
-                    grainRef.ToDetailedString(),
-                    destination,
-                    destination.GetConsistentHashCode(),
-                    ConsistentRingProvider.ToString());
-            }
-
-            // Code above left in to preserve the existing logging, if not required we can remove MapGrainReferenceToSiloRing from InsideRuntimeClient.
-
-            // We use the IReminderRegistry which as a GrainServiceClient is responsible for resolving the correctly partitioned GrainService for the CallerGrainReference.
-            var reminderRegistry = (IReminderRegistry) Silo.CurrentSilo.Services.GetService(typeof(IReminderRegistry));
-            return reminderRegistry;
-        }
-
+        
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             // Schedule call back to grain context

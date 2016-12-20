@@ -10,7 +10,7 @@ namespace Orleans
     public interface IRemindable : IGrain
     {
         /// <summary>
-        /// Receieve a new Reminder.
+        /// Receive a new Reminder.
         /// </summary>
         /// <param name="reminderName">Name of this Reminder</param>
         /// <param name="status">Status of this Reminder tick</param>
@@ -31,7 +31,7 @@ namespace Orleans
 
         /// <summary>
         /// The status of a tick when the tick is delivered to the registrar grain.
-        /// In case of failures, it may happen that a tick is not delievered on time. The app can notice such missed missed ticks as follows.
+        /// In case of failures, it may happen that a tick is not delivered on time. The app can notice such missed missed ticks as follows.
         /// Upon receiving a tick, the app can calculate the theoretical number of ticks since start of the reminder as: 
         /// curCount = (Now - FirstTickTime) / Period
         /// The app can keep track of it as 'count'. Upon receiving a tick, the number of missed ticks = curCount - count - 1

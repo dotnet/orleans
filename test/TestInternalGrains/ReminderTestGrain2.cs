@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
+using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 
 
@@ -16,6 +17,7 @@ namespace UnitTests.Grains
     // NOTE: if you make any changes here, copy them to ReminderTestCopyGrain
     public class ReminderTestGrain2 : Grain, IReminderTestGrain2, IRemindable
     {
+        private readonly IReminderRegistry reminderRegistry;
         Dictionary<string, IGrainReminder> allReminders;
         Dictionary<string, long> sequence;
         private TimeSpan period;
@@ -26,6 +28,11 @@ namespace UnitTests.Grains
         private string myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
+
+        public ReminderTestGrain2(IReminderRegistry reminderRegistry)
+        {
+            this.reminderRegistry = reminderRegistry;
+        }
 
         public override Task OnActivateAsync()
         {
@@ -53,7 +60,7 @@ namespace UnitTests.Grains
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
-                r = await RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
+                r = await this.reminderRegistry.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
 
             allReminders[reminderName] = r;
             sequence[reminderName] = 0;
@@ -216,6 +223,7 @@ namespace UnitTests.Grains
     //      2. filePrefix should start with "gc", instead of "g"
     public class ReminderTestCopyGrain : Grain, IReminderTestCopyGrain, IRemindable
     {
+        private readonly IReminderRegistry reminderRegistry;
         Dictionary<string, IGrainReminder> allReminders;
         Dictionary<string, long> sequence;
         private TimeSpan period;
@@ -226,6 +234,11 @@ namespace UnitTests.Grains
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
+
+        public ReminderTestCopyGrain(IReminderRegistry reminderRegistry)
+        {
+            this.reminderRegistry = reminderRegistry;
+        }
 
         public override async Task OnActivateAsync()
         {
@@ -253,7 +266,10 @@ namespace UnitTests.Grains
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
-                r = await RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
+                r = await this.reminderRegistry.RegisterOrUpdateReminder(
+                    reminderName,
+                    usePeriod - TimeSpan.FromSeconds(2),
+                    usePeriod);
             if (allReminders.ContainsKey(reminderName))
             {
                 allReminders[reminderName] = r;
