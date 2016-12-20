@@ -7,10 +7,16 @@ namespace UnitTests.Grains
 {
     public class GrainServiceTestGrain : Grain, IGrainServiceTestGrain
     {
+        private readonly ICustomGrainServiceClient customGrainServiceClient;
+
         public Task<string> GetHelloWorldUsingCustomService()
         {
-            var service = (ICustomGrainServiceClient)this.ServiceProvider.GetService(typeof(ICustomGrainServiceClient));
-            return service.GetHelloWorldUsingCustomService();
+            return this.customGrainServiceClient.GetHelloWorldUsingCustomService();
+        }
+
+        public GrainServiceTestGrain(ICustomGrainServiceClient customGrainServiceClient)
+        {
+            this.customGrainServiceClient = customGrainServiceClient;
         }
     }
 

@@ -1,14 +1,15 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Base class for various system services, such as grain directory, reminder serive, etc.
+    /// Base class for various system services, such as grain directory, reminder service, etc.
     /// Made public for GrainSerive to inherit from it.
-    /// Can be turned to internal after a refactoring that would remove the inheritence relaion.
+    /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
     public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
     {

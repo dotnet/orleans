@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Services;
@@ -11,7 +12,7 @@ namespace Orleans.Runtime.Services
     /// <typeparam name="TGrainService"></typeparam>
     public abstract class GrainServiceClient<TGrainService> : IGrainServiceClient<TGrainService> where TGrainService : IGrainService
     {
-        private readonly InsideRuntimeClient runtimeClient;
+        private readonly ISiloRuntimeClient runtimeClient;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IConsistentRingProvider ringProvider;
         private readonly int grainTypeCode;
@@ -21,9 +22,9 @@ namespace Orleans.Runtime.Services
         /// </summary>
         protected GrainServiceClient(IServiceProvider serviceProvider)
         {
-            runtimeClient = (InsideRuntimeClient) serviceProvider.GetService(typeof(IRuntimeClient));
-            grainFactory = (IInternalGrainFactory) serviceProvider.GetService(typeof(IInternalGrainFactory));
-            ringProvider = (IConsistentRingProvider) serviceProvider.GetService(typeof(IConsistentRingProvider));
+            runtimeClient =  serviceProvider.GetRequiredService<ISiloRuntimeClient>();
+            grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
+            ringProvider = serviceProvider.GetRequiredService<IConsistentRingProvider>();
 
             // GrainInterfaceMap only holds IGrain types, not ISystemTarget types, so resolved via Orleans.CodeGeneration.
             // Resolve this before merge.

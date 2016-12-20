@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -655,19 +656,16 @@ namespace Orleans.Runtime
                 {
                     throw new Exception(String.Format("Cannot find Grain Service type {0} of Grain Service {1}", serviceConfig.Value.ServiceType, serviceConfig.Value.Name));
                 }
-
-                // internal GrainService(GrainId grainId, Silo silo) 
-                var ctor = TypeUtils.GetConstructorThatMatches(serviceType, new[] {typeof(object), typeof(Silo)});
-
+                
                 var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
                 if (grainServiceInterfaceType == null)
                 {
                     throw new Exception(String.Format("Cannot find an interface on {0} which implements IGrainService", serviceConfig.Value.ServiceType));
                 }
-                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-                var grainId = GrainId.GetGrainServiceGrainId(0, typeCode);
 
-                var grainService = (GrainService) ctor.Invoke(new object[] { grainId, this });
+                var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
+                var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(0, typeCode);
+                var grainService = (SystemTarget) ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId);
                 RegisterSystemTarget(grainService);
             }
         }

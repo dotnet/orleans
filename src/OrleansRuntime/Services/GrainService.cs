@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
@@ -12,7 +13,7 @@ namespace Orleans.Runtime
     {
         private readonly OrleansTaskScheduler scheduler;
         private readonly IConsistentRingProvider ring;
-        private string typeName;
+        private readonly string typeName;
         private GrainServiceStatus status;
 
         /// <summary>Logger instance to be used by grain service subclasses</summary>
@@ -40,8 +41,8 @@ namespace Orleans.Runtime
             throw new Exception("This should not be constructed by client code.");
         }
 
-        /// <summary>Costructor to use for grain services</summary>
-        protected GrainService(object id, Silo silo) : base((GrainId)id, silo.SiloAddress, lowPriority: true)
+        /// <summary>Constructor to use for grain services</summary>
+        protected GrainService(IGrainIdentity grainId, Silo silo) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true)
         {
             typeName = this.GetType().FullName;
             Logger = LogManager.GetLogger(typeName);

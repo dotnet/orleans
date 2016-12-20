@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Services;
 
@@ -20,7 +21,7 @@ namespace Tester
 
     public class CustomGrainService : GrainService, ICustomGrainService
     {
-        public CustomGrainService(object id, Silo silo) : base(id, silo)
+        public CustomGrainService(IGrainIdentity id, Silo silo) : base(id, silo)
         {
             
         }
