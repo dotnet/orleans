@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
@@ -15,7 +16,8 @@ namespace Tester
         {
             var options = new TestClusterOptions(1);
             options.ClusterConfiguration.UseStartupType<GrainServiceStartup>();
-            options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainServiceClient, Tester", "Tester.CustomGrainService, Tester");
+            options.ClusterConfiguration.Globals.RegisterGrainService("CustomGrainService", "Tester.CustomGrainServiceClient, Tester", "Tester.CustomGrainService, Tester", 
+                new Dictionary<string,string> {{"test-property", "xyz"}});
 
             return new TestCluster(options);
         }
@@ -26,8 +28,10 @@ namespace Tester
             // We need to get the Silo to create the GrainService instances and register them as SystemTargets.
 
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
-            string grainId = await grain.GetHelloWorldUsingCustomService();
-            Assert.Equal("Hello World from Grain Service", grainId.ToString());
+            var grainId = await grain.GetHelloWorldUsingCustomService();
+            Assert.Equal("Hello World from Grain Service", grainId);
+            var prop = await grain.GetServiceConfigProperty("test-property");
+            Assert.Equal("xyz", prop);
         }
     }
 

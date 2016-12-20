@@ -14,6 +14,11 @@ namespace UnitTests.Grains
             return this.customGrainServiceClient.GetHelloWorldUsingCustomService();
         }
 
+        public Task<string> GetServiceConfigProperty(string propertyName)
+        {
+            return this.customGrainServiceClient.GetServiceConfigProperty(propertyName);
+        }
+
         public GrainServiceTestGrain(ICustomGrainServiceClient customGrainServiceClient)
         {
             this.customGrainServiceClient = customGrainServiceClient;

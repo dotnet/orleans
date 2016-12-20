@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
             IReminderTable reminderTable,
             GlobalConfiguration config,
             TimeSpan initTimeout)
-            : base(id, silo)
+            : base(id, silo, null)
         {
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
