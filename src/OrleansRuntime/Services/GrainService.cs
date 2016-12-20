@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Core;
+using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
@@ -35,6 +36,9 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>Configuration of service </summary>
+        protected IGrainServiceConfiguration Config { get; private set; }
+
         /// <summary>Only to make Reflection happy</summary>
         protected GrainService() : base(null, null)
         {
@@ -42,7 +46,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(IGrainIdentity grainId, Silo silo) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true)
+        protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true)
         {
             typeName = this.GetType().FullName;
             Logger = LogManager.GetLogger(typeName);
@@ -50,6 +54,7 @@ namespace Orleans.Runtime
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
+            Config = config;
         }
 
         /// <summary>Invoked upon initialization of the service</summary>

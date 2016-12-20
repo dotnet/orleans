@@ -50,22 +50,23 @@ namespace Orleans.Runtime.Configuration
         string Name { get; set; }
         string ClientType { get; set; }
         string ServiceType { get; set; }
+        IDictionary<string, string> Properties { get; set; }
     }
 
     [Serializable]
     public class GrainServiceConfiguration : IGrainServiceConfiguration
     {
-        private IDictionary<string, string> properties;
 
         public string Name { get; set; }
         public string ClientType { get; set; }
         public string ServiceType { get; set; }
+        public IDictionary<string, string> Properties { get; set; }
 
         public GrainServiceConfiguration() {}
 
         public GrainServiceConfiguration(IDictionary<string, string> properties, string serviceName, string clientType, string serviceType)
         {
-            this.properties = properties;
+            Properties = properties;
             Name = serviceName;
             ClientType = clientType;
             ServiceType = serviceType;
@@ -112,14 +113,14 @@ namespace Orleans.Runtime.Configuration
                 Name = ServiceType;
             }
 
-            properties = new Dictionary<string, string>();
+            Properties = new Dictionary<string, string>();
             for (int i = 0; i < child.Attributes.Count; i++)
             {
                 var key = child.Attributes[i].LocalName;
                 var val = child.Attributes[i].Value;
                 if ((key != "Type") && (key != "Name"))
                 {
-                    properties[key] = val;
+                    Properties[key] = val;
                 }
             }
         }
