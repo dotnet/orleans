@@ -1,19 +1,21 @@
 using System;
-using System.Reflection;
 using System.Threading.Tasks;
 
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 
 namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     {
-        private readonly Silo silo;
+        private readonly SiloInitializationParameters siloDetails;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly OrleansTaskScheduler scheduler;
+        private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly ISiloRuntimeClient runtimeClient;
         private readonly IStreamPubSub grainBasedPubSub;
@@ -29,19 +31,25 @@ namespace Orleans.Runtime.Providers
         public string SiloIdentity { get; }
 
         public SiloProviderRuntime(
-            Silo silo,
+            SiloInitializationParameters siloDetails,
             GlobalConfiguration config,
             IGrainFactory grainFactory,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             IServiceProvider serviceProvider,
-            ImplicitStreamSubscriberTable implicitStreamSubscriberTable)
+            ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
+            ISiloStatusOracle siloStatusOracle,
+            OrleansTaskScheduler scheduler,
+            ActivationDirectory activationDirectory)
         {
-            this.silo = silo;
+            this.siloDetails = siloDetails;
+            this.siloStatusOracle = siloStatusOracle;
+            this.scheduler = scheduler;
+            this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
             this.ServiceId = config.ServiceId;
-            this.SiloIdentity = silo.SiloAddress.ToLongString();
+            this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
             this.GrainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
 
@@ -66,16 +74,22 @@ namespace Orleans.Runtime.Providers
             return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
-        public SiloAddress ExecutingSiloAddress => this.silo.SiloAddress;
+        public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
 
         public void RegisterSystemTarget(ISystemTarget target)
         {
-            this.silo.RegisterSystemTarget((SystemTarget)target);
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
+            activationDirectory.RecordNewSystemTarget(systemTarget);
         }
 
-        public void UnRegisterSystemTarget(ISystemTarget target)
+        public void UnregisterSystemTarget(ISystemTarget target)
         {
-            this.silo.UnregisterSystemTarget((SystemTarget)target);
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            activationDirectory.RemoveSystemTarget(systemTarget);
+            scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -104,8 +118,7 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config)
         {
-            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                config.BalancerType, streamProviderName, this.silo.LocalSiloStatusOracle, this.silo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
+            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(config.BalancerType, streamProviderName, this.siloStatusOracle, this.siloDetails.ClusterConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);

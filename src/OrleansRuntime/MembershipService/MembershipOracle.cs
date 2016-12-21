@@ -10,7 +10,8 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
-        private readonly IMembershipTable membershipTableProvider;
+        private readonly MembershipTableFactory membershipTableFactory;
+        private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
         private Dictionary<SiloAddress, int> probedSilos;  // map from currently probed silos to the number of failed probes
         private readonly LoggerImpl logger;
@@ -36,11 +37,11 @@ namespace Orleans.Runtime.MembershipService
         public SiloAddress SiloAddress { get { return membershipOracleData.MyAddress; } }
         private TimeSpan AllowedIAmAliveMissPeriod { get { return orleansConfig.Globals.IAmAliveTablePublishTimeout.Multiply(orleansConfig.Globals.NumMissedTableIAmAliveLimit); } }
 
-        internal MembershipOracle(Silo silo, IMembershipTable membershipTable)
+        public MembershipOracle(Silo silo, MembershipTableFactory membershipTableFactory)
             : base(Constants.MembershipOracleId, silo.SiloAddress)
         {
+            this.membershipTableFactory = membershipTableFactory;
             logger = LogManager.GetLogger("MembershipOracle");
-            membershipTableProvider = membershipTable;
             membershipOracleData = new MembershipOracleData(silo, logger);
             probedSilos = new Dictionary<SiloAddress, int>();
             orleansConfig = silo.OrleansConfig;
@@ -58,6 +59,9 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 logger.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
+
+                // Create the membership table.
+                this.membershipTableProvider = await this.membershipTableFactory.GetMembershipTable();
 
                 // randomly delay the startup, so not all silos write to the table at once.
                 // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;

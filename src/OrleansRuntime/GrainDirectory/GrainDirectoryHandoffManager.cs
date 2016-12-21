@@ -15,15 +15,17 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private const int HANDOFF_CHUNK_SIZE = 500;
         private readonly LocalGrainDirectory localDirectory;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly Logger logger;
 
-        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, GlobalConfiguration config)
+        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, ISiloStatusOracle siloStatusOracle)
         {
             logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;
+            this.siloStatusOracle = siloStatusOracle;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
             lastPromise = new Dictionary<SiloAddress, Task>();
@@ -271,11 +273,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     logger.Warn(ErrorCode.DirectoryUnexpectedDelta, 
                         String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
-                            source, localDirectory.Membership.GetApproximateSiloStatus(source),
-                            localDirectory.Membership.GetApproximateSiloStatuses(true).Count));
+                            source, this.siloStatusOracle.GetApproximateSiloStatus(source),
+                            this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
                 }
 
-                directoryPartitionsMap[source] = new GrainDirectoryPartition();
+                directoryPartitionsMap[source] = new GrainDirectoryPartition(this.siloStatusOracle);
             }
 
             if (isFullCopy)
