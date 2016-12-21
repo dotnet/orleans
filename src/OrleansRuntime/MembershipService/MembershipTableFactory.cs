@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Configuration;
 
+using LivenessProviderType = Orleans.Runtime.Configuration.GlobalConfiguration.LivenessProviderType;
+
 namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipTableFactory
@@ -27,58 +29,66 @@ namespace Orleans.Runtime.MembershipService
                 if (membershipTable != null) return membershipTable;
 
                 var globalConfig = this.serviceProvider.GetRequiredService<GlobalConfiguration>();
-                var livenessType = globalConfig.LivenessType;
                 IMembershipTable result;
-                if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.MembershipTableGrain))
+                switch (globalConfig.LivenessType)
                 {
-                    var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();
-                    if (siloDetails.Type == Silo.SiloType.Primary)
-                    {
-                        logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
-                        var catalog = this.serviceProvider.GetRequiredService<Catalog>();
-                        await catalog.CreateSystemGrain(
-                            Constants.SystemMembershipTableId,
-                            typeof(GrainBasedMembershipTable).FullName);
-                    }
-
-                    var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-                    result =
-                        grainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+                    case LivenessProviderType.MembershipTableGrain:
+                        result = await this.GetMembershipTableGrain();
+                        break;
+                    case LivenessProviderType.SqlServer:
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger);
+                        break;
+                    case LivenessProviderType.AzureTable:
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger);
+                        break;
+                    case LivenessProviderType.ZooKeeper:
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                            Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
+                            this.logger);
+                        break;
+                    case LivenessProviderType.Custom:
+                        result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
+                            globalConfig.MembershipTableAssembly,
+                            this.logger);
+                        break;
+                    default:
+                        throw new NotImplementedException(
+                            $"No membership table provider found for {nameof(globalConfig.LivenessType)}={globalConfig.LivenessType}");
                 }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.SqlServer))
-                {
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_SQL_UTILS_DLL, this.logger);
-                }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.AzureTable))
-                {
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(Constants.ORLEANS_AZURE_UTILS_DLL, this.logger);
-                }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.ZooKeeper))
-                {
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
-                        Constants.ORLEANS_ZOOKEEPER_UTILS_DLL,
-                        this.logger);
-                }
-                else if (livenessType.Equals(GlobalConfiguration.LivenessProviderType.Custom))
-                {
-                    result = AssemblyLoader.LoadAndCreateInstance<IMembershipTable>(
-                        globalConfig.MembershipTableAssembly,
-                        this.logger);
-                }
-                else
-                {
-                    throw new NotImplementedException("No membership table provider found for LivenessType=" + livenessType);
-                }
-
-                await WaitForTableToInit(result);
+                
+                await result.InitializeMembershipTable(globalConfig, true, this.logger.GetLogger(result.GetType().Name));
                 membershipTable = result;
             }
 
             return membershipTable;
         }
 
+        private async Task<IMembershipTable> GetMembershipTableGrain()
+        {
+            var siloDetails = this.serviceProvider.GetRequiredService<SiloInitializationParameters>();
+            var isPrimarySilo = siloDetails.Type == Silo.SiloType.Primary;
+            if (isPrimarySilo)
+            {
+                this.logger.Info(ErrorCode.MembershipFactory1, "Creating membership table grain");
+                var catalog = this.serviceProvider.GetRequiredService<Catalog>();
+                await catalog.CreateSystemGrain(
+                    Constants.SystemMembershipTableId,
+                    typeof(GrainBasedMembershipTable).FullName);
+            }
+
+            var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
+            var result = grainFactory.Cast<IMembershipTableGrain>(GrainReference.FromGrainId(Constants.SystemMembershipTableId));
+
+            if (isPrimarySilo)
+            {
+                await this.WaitForTableGrainToInit(result);
+            }
+
+            return result;
+        }
+
         // Only used with MembershipTableGrain to wait for primary to start.
-        private async Task WaitForTableToInit(IMembershipTable table)
+        private async Task WaitForTableGrainToInit(IMembershipTableGrain membershipTableGrain)
         {
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
             // This is a quick temporary solution to enable primary node to start fully before secondaries.
@@ -87,7 +97,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await table.ReadAll().WithTimeout(timespan);
+                    await membershipTableGrain.ReadAll().WithTimeout(timespan);
                     logger.Info(ErrorCode.MembershipTableGrainInit2, "-Connected to membership table provider.");
                     return;
                 }
