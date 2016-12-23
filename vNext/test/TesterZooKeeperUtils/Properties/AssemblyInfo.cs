@@ -5,7 +5,7 @@ using Orleans.CodeGeneration;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TesterSQLUtils")]
+[assembly: AssemblyTitle("TesterZooKeeperUtils")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 
@@ -15,6 +15,6 @@ using Orleans.CodeGeneration;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("08fac040-da5b-41bf-adae-c23714ec0bb1")]
+[assembly: Guid("afec183d-c12a-4dfc-8da9-a4895cf5d020")]
 
 [assembly: SkipCodeGeneration]

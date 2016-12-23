@@ -20,12 +20,6 @@ Copyright (C) Microsoft Corporation. All rights reserved.
         <CodeGenToolExeDir>$(OrleansReferencesBase)</CodeGenToolExeDir>
       </PropertyGroup>
     </When>
-    <!-- Legacy support for OrleansSDK -->
-    <When Condition="'$(OrleansSDK)' != ''">
-      <PropertyGroup>
-        <CodeGenToolExeDir>$(OrleansSDK)\Binaries\OrleansClient</CodeGenToolExeDir>
-      </PropertyGroup>
-    </When>
   </Choose>
 
   <Choose>
@@ -43,30 +37,30 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
   <!-- This target is run just before Compile for an Orleans Grain Interface Project -->
   <Target Name="OrleansCodeGeneration"
-          AfterTargets="BeforeCompile;ResolveReferences"
+          AfterTargets="BeforeCompile"
           BeforeTargets="CoreCompile"
           Condition="'$(OrleansCodeGenPrecompile)'!='true'"
-          Inputs="@(Compile);@(ReferencePath)"
-          Outputs="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName).codegen.cs">
+          Inputs="@(ReferencePath)"
+          Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs">
     <Message Text="[OrleansCodeGeneration] - Project=$(ProjectName)" Importance="high"/>
-    <Message Text="[OrleansCodeGeneration] 
+    <Error Text="$(CodeGenToolExe) could not be found!" Condition="!Exists('$(CodeGenToolExe)')" />
+    <Message Text="[OrleansCodeGeneration]
 - CodeGenToolExeDir=$(CodeGenToolExeDir)
 - OrleansReferencesBase=$(OrleansReferencesBase)
 - OrleansSDK=$(OrleansSDK)
 - Using CodeGenToolExe location=$(CodeGenToolExe)
-" />      
-    <MakeDir Directories="$(IntermediateOutputPath)Generated"/>
+" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
-      <CodeGenFilename>$(IntermediateOutputPath)Generated\$(TargetName).codegen.cs</CodeGenFilename>
+      <CodeGenFilename>$(ProjectDir)$(IntermediateOutputPath)$(TargetName).codegen.cs</CodeGenFilename>
       <ExcludeCodeGen>$(DefineConstants);EXCLUDE_CODEGEN</ExcludeCodeGen>
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/in:$(IntermediateOutputPath)$(TargetName)$(TargetExt)"/>
+      <CodeGenArgs Include="/out:$(CodeGenFilename)"/>
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')"/>
-      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')"/>
     </ItemGroup>
-    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen)" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Build" Properties="OrleansCodeGenPrecompile=true;DefineConstants=$(ExcludeCodeGen);DesignTimeBuild=true" UnloadProjectsOnCompletion="true" UseResultsCache="false" />
     <Message Text="[OrleansCodeGeneration] - Code-gen args file=$(ArgsFile)"/>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>

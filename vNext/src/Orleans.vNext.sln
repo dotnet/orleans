@@ -65,7 +65,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAzureUtils", "Orlean
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.PlatformServices", "Orleans.PlatformServices\Orleans.PlatformServices.csproj", "{5327F1B7-5ABD-4BEB-882B-84DF2B0C435F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesterAzureUtils", "..\test\TesterAzureUtils\TesterAzureUtils.csproj", "{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AzureUtils", "..\test\TesterAzureUtils\Tester.AzureUtils.csproj", "{AA3DFE72-F1CA-4E79-8A84-EDF5D277AB1A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extensions", "Extensions", "{7B982A96-66A1-4E08-AA68-8A56905A53CA}"
 EndProject
@@ -77,13 +77,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DefaultCluster.Tests", "..\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansSQLUtils", "OrleansSQLUtils\OrleansSQLUtils.csproj", "{D3592787-F666-4AE5-AB69-F895B4CF4876}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesterSQLUtils", "..\test\TesterSQLUtils\TesterSQLUtils.csproj", "{A6637DAD-D4EA-4FEA-BD29-42686BE65048}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.SQLUtils", "..\test\TesterSQLUtils\Tester.SQLUtils.csproj", "{A6637DAD-D4EA-4FEA-BD29-42686BE65048}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalDtosRefOrleans", "..\test\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj", "{AB11D629-BF9E-4AF5-9BD6-F056FB08EA8A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansZooKeeperUtils", "OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj", "{58E62584-5B28-4DBD-A1A0-4E7B95E5A3E8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TesterZooKeeperUtils", "..\test\TesterZooKeeperUtils\TesterZooKeeperUtils.csproj", "{DF733504-A366-4860-813E-D20AABE243B2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "..\test\TesterZooKeeperUtils\Tester.ZooKeeperUtils.csproj", "{DF733504-A366-4860-813E-D20AABE243B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

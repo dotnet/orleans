@@ -28,20 +28,31 @@ if EXIST "%VERSION_FILE%" (
 
 if "%builduri%" == "" set builduri=Build.cmd
 
-set PROJ=%CMDHOME%\Orleans.vNext.sln
+SET BINARIES_PATH=%CMDHOME%\..\Binaries
+SET TOOLS_PACKAGES_PATH=%CMDHOME%\packages
 
-@echo ===== Building %PROJ% =====
-call %_dotnet% restore "%PROJ%"
-call %_dotnet% restore "%CMDHOME%\.nuget\Tools.csproj"
+set SOLUTION=%CMDHOME%\Orleans.vNext.sln
+
+@echo ===== Building %SOLUTION% =====
+call %_dotnet% restore "%CMDHOME%\Build\Tools.csproj" --packages %TOOLS_PACKAGES_PATH%
+
+:: Restore the code generator related packages individually
+call %_dotnet% restore "%CMDHOME%\Orleans.PlatformServices\Orleans.PlatformServices.csproj"
+call %_dotnet% restore "%CMDHOME%\Orleans\Orleans.csproj"
+call %_dotnet% restore "%CMDHOME%\OrleansCodeGenerator\OrleansCodeGenerator.csproj"
+call %_dotnet% restore "%CMDHOME%\ClientGenerator\ClientGenerator.csproj"
+
+:: Restore packages for the solution
+call %_dotnet% restore "%SOLUTION%"
 
 @echo Build Debug ==============================
 
-SET CONFIGURATION=Debug
-SET OutputPath=%~dp0..\Binaries\%CONFIGURATION%
+SET Configuration=Debug
+SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-call %_dotnet% build %BUILD_FLAGS% /p:ArtefactDirectory=%OutputPath%\ /p:Configuration=%CONFIGURATION% "%PROJ%"
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
 @if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %PROJ%
+@echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
 call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
 @if ERRORLEVEL 1 GOTO :ErrorStop
@@ -49,11 +60,11 @@ call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION
 @echo Build Release ============================
 
 SET CONFIGURATION=Release
-SET OutputPath=%CMDHOME%\..\Binaries\%CONFIGURATION%
+SET OutputPath=%BINARIES_PATH%\%CONFIGURATION%
 
-call %_dotnet% build %BUILD_FLAGS% /p:ArtefactDirectory=%OutputPath%\ /p:Configuration=%CONFIGURATION% "%PROJ%"
-@if ERRORLEVEL 1 GOTO :ErrorStop
-@echo BUILD ok for %CONFIGURATION% %PROJ%
+call %_dotnet% build %BUILD_FLAGS% /p:ArtifactDirectory=%OutputPath%\;Configuration=%CONFIGURATION% "%SOLUTION%"
+@if ERRORLEVEL 1 GOTO :ErrorStop                                    
+@echo BUILD ok for %CONFIGURATION% %SOLUTION%
 
 call "%CMDHOME%\NuGet\CreateOrleansPackages.bat" %_dotnet% %OutputPath% %VERSION_FILE% %CMDHOME%\ true
 @if ERRORLEVEL 1 GOTO :ErrorStop
@@ -69,17 +80,17 @@ REM @echo Build VSIX ============================
 
 REM set PROJ=%CMDHOME%\OrleansVSTools\OrleansVSTools.sln
 REM SET OutputPath=%OutputPath%\VSIX
-REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%PROJ%"
+REM "%MSBUILDEXE%" /nr:False /m /p:Configuration=%CONFIGURATION% "%SOLUTION%"
 REM @if ERRORLEVEL 1 GOTO :ErrorStop
-REM @echo BUILD ok for VSIX package for %PROJ%
+REM @echo BUILD ok for VSIX package for %SOLUTION%
 
 :BuildFinished
-@echo ===== Build succeeded for %PROJ% =====
+@echo ===== Build succeeded for %SOLUTION% =====
 @GOTO :EOF
 
 :ErrorStop
 set RC=%ERRORLEVEL%
 if "%STEP%" == "" set STEP=%CONFIGURATION%
-@echo ===== Build FAILED for %PROJ% -- %STEP% with error %RC% - CANNOT CONTINUE =====
+@echo ===== Build FAILED for %SOLUTION% -- %STEP% with error %RC% - CANNOT CONTINUE =====
 exit /B %RC%
 :EOF
