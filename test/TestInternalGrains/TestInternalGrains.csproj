@@ -61,7 +61,6 @@
     <Compile Include="PersistenceTestGrains.cs" />
     <Compile Include="PlacementTestGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="ReentrantTestSupportGrain.cs" />
     <Compile Include="ReminderTestGrain2.cs" />
     <Compile Include="SerializerPresenceTestGrain.cs" />

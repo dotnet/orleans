@@ -384,7 +384,6 @@
     <Compile Include="Runtime\RuntimeClient.cs" />
     <Compile Include="Runtime\GrainReference.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" Condition="'$(Bootstrap)' != 'true'" />
     <Compile Include="Utils\Utils.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
@@ -417,12 +416,8 @@
     <!-- Show values of some useful properties -->
     <Message Importance="high" Text="Orleans.csproj -- Build Properties =  &#xD;&#xA;TeamProject=$(TeamProject)&#xD;&#xA;SolutionRoot=$(SolutionRoot)&#xD;&#xA;SourcesDirectory=$(SourcesDirectory)&#xD;&#xA;BinariesDirectory=$(BinariesDirectory)&#xD;&#xA;BinariesRoot=$(BinariesRoot)&#xD;&#xA;BuildDirectory=$(BuildDirectory)&#xD;&#xA;BuildProjectFolderPath=$(BuildProjectFolderPath)&#xD;&#xA;MSBuildProjectDirectory=$(MSBuildProjectDirectory)&#xD;&#xA;OutputPath=$(OutputPath)&#xD;&#xA;OutDir=$(OutDir)&#xD;&#xA;DropLocation=$(DropLocation)&#xD;&#xA;PackagesDirectory=$(PackagesDirectory)&#xD;&#xA;BuildNumber=$(BuildNumber)&#xD;&#xA;builduri=$(builduri)&#xD;&#xA;BuildUri=$(BuildUri)&#xD;&#xA;MSBuildForwardPropertiesFromChild=$(MSBuildForwardPropertiesFromChild)&#xD;&#xA;BuildingInsideVisualStudio=$(BuildingInsideVisualStudio)&#xD;&#xA;IsDesktopBuild=$(IsDesktopBuild)" />
   </Target>
-  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(Compile);@(ReferencePath)" Outputs="$(ProjectDir)$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" Condition="'$(Bootstrap)' != 'true'">
+  <Target Name="OrleansDllBootstrapUsingCodeGen" AfterTargets="BeforeCompile" BeforeTargets="CoreCompile" Inputs="@(ReferencePath)" Outputs="$(IntermediateOutputPath)$(TargetName).codegen.cs" Condition="'$(Bootstrap)' != 'true'">
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Bootstrapping the Orleans.dll" Importance="high" />
-    <!-- Clean Generated directory -->
-    <Message Text="[OrleansDllBootstrapUsingCodeGen] - Deleting/cleaning generated files for Project=$(ProjectName)" />
-    <MakeDir Directories="$(IntermediateOutputPath)Generated" />
-    <Touch Files="$(ProjectDir)Properties\orleans.codegen.cs" ForceTouch="true" AlwaysCreate="true" ContinueOnError="true" Condition="!Exists('$(ProjectDir)Properties\orleans.codegen.cs')" />
     <PropertyGroup>
       <BootstrapOutputPath>$(OutDir)Bootstrap\</BootstrapOutputPath>
       <BootstrapOutputPath Condition="'$(BuildingInsideVisualStudio)' == 'true'">$(ProjectDir)$(OutDir)Bootstrap\</BootstrapOutputPath>
@@ -439,15 +434,18 @@
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).codegen.args.txt</ArgsFile>
+      <CodeGenFilename>$(IntermediateOutputPath)$(TargetName).codegen.cs</CodeGenFilename>
     </PropertyGroup>
     <ItemGroup>
-      <CodeGenArgs Include="/bootstrap" />
       <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
+      <CodeGenArgs Include="/out:$(CodeGenFilename)"/>
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
-      <CodeGenArgs Include="@(Compile->'/src:%(Identity)')" />
     </ItemGroup>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
-    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" />
+    <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
+       <Output TaskParameter="Outputs" ItemName="Compile" />
+       <Output TaskParameter="Outputs" ItemName="FileWrites" />
+    </Exec>
   </Target>
 </Project>

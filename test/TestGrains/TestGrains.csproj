@@ -113,7 +113,6 @@
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />
     <Compile Include="SimpleGrain.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimplePersistentGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
