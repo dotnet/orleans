@@ -100,19 +100,19 @@ namespace Orleans
         #region Serialization
 
         [SerializerMethod]
-        internal static void SerializeGrainCancellationTokenSource(object obj, BinaryTokenStreamWriter stream, Type expected)
+        internal static void SerializeGrainCancellationTokenSource(object obj, ISerializationContext context, Type expected)
         {
             throw new NotSupportedException("GrainCancellationTokenSource can not be serialized");
         }
 
         [DeserializerMethod]
-        internal static object DeserializeGrainCancellationTokenSource(Type expected, BinaryTokenStreamReader stream)
+        internal static object DeserializeGrainCancellationTokenSource(Type expected, IDeserializationContext context)
         {
             throw new NotSupportedException("GrainCancellationTokenSource can not be deserialized");
         }
 
         [CopierMethod]
-        internal static object CopyGrainCancellationTokenSource(object obj)
+        internal static object CopyGrainCancellationTokenSource(object obj, ICopyContext context)
         {
             throw new NotSupportedException("GrainCancellationTokenSource can not be deep copied");
         }

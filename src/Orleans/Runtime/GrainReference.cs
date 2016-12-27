@@ -481,8 +481,9 @@ namespace Orleans.Runtime
         /// <summary> Serializer function for grain reference.</summary>
         /// <seealso cref="SerializationManager"/>
         [SerializerMethod]
-        protected internal static void SerializeGrainReference(object obj, BinaryTokenStreamWriter stream, Type expected)
+        protected internal static void SerializeGrainReference(object obj, ISerializationContext context, Type expected)
         {
+            var stream = context.Stream;
             var input = (GrainReference)obj;
             stream.Write(input.GrainId);
             if (input.IsSystemTarget)
@@ -510,8 +511,9 @@ namespace Orleans.Runtime
         /// <summary> Deserializer function for grain reference.</summary>
         /// <seealso cref="SerializationManager"/>
         [DeserializerMethod]
-        protected internal static object DeserializeGrainReference(Type t, BinaryTokenStreamReader stream)
+        protected internal static object DeserializeGrainReference(Type t, IDeserializationContext context)
         {
+            var stream = context.Stream;
             GrainId id = stream.ReadGrainId();
             SiloAddress silo = null;
             GuidId observerId = null;
@@ -540,7 +542,7 @@ namespace Orleans.Runtime
         /// <summary> Copier function for grain reference. </summary>
         /// <seealso cref="SerializationManager"/>
         [CopierMethod]
-        protected internal static object CopyGrainReference(object original)
+        protected internal static object CopyGrainReference(object original, ICopyContext context)
         {
             return (GrainReference)original;
         }

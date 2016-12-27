@@ -302,9 +302,7 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
-
- 
-
+        
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
             var list = new List<ActivationAddress>();
@@ -458,8 +456,12 @@ namespace Orleans.Runtime
         // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header)
         {
-            var input = new BinaryTokenStreamReader(header);
-            Headers = SerializationManager.DeserializeMessageHeaders(input);
+            var context = new DeserializationContext
+            {
+                Stream = new BinaryTokenStreamReader(header)
+            };
+
+            Headers = SerializationManager.DeserializeMessageHeaders(context);
         }
 
         /// <summary>
@@ -583,8 +585,11 @@ namespace Orleans.Runtime
 
         private List<ArraySegment<byte>> Serialize_Impl(out int headerLengthOut, out int bodyLengthOut)
         {
-            var headerStream = new BinaryTokenStreamWriter();
-            SerializationManager.SerializeMessageHeaders(Headers, headerStream);
+            var context = new SerializationContext
+            {
+                Stream = new BinaryTokenStreamWriter()
+            };
+            SerializationManager.SerializeMessageHeaders(Headers, context);
 
             if (bodyBytes == null)
             {
@@ -601,7 +606,7 @@ namespace Orleans.Runtime
             {
                 BufferPool.GlobalPool.Release(headerBytes);
             }
-            headerBytes = headerStream.ToBytes() as List<ArraySegment<byte>>;
+            headerBytes = context.Stream.ToBytes() as List<ArraySegment<byte>>;
             int headerLength = headerBytes.Sum(ab => ab.Count);
             int bodyLength = bodyBytes.Sum(ab => ab.Count);
 
@@ -1161,17 +1166,18 @@ namespace Orleans.Runtime
             }
 
 
-            [Orleans.CodeGeneration.CopierMethodAttribute]
-            public static System.Object DeepCopier(System.Object original)
+            [CopierMethod]
+            public static object DeepCopier(object original, ICopyContext context)
             {
                 return original;
             }
 
-            [Orleans.CodeGeneration.SerializerMethodAttribute]
-            public static void Serializer(System.Object untypedInput,  BinaryTokenStreamWriter stream, System.Type expected)
+            [SerializerMethod]
+            public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
                 var headers = input.GetHeadersMask();
+                var stream = context.Stream;
                 stream.Write((int)headers);
                 if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
                 {
@@ -1179,7 +1185,7 @@ namespace Orleans.Runtime
                     stream.Write(input.CacheInvalidationHeader.Count);
                     for (int i = 0; i < count; i++)
                     {
-                        WriteObj(stream, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
+                        WriteObj(context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
                     }
                 }
 
@@ -1235,7 +1241,7 @@ namespace Orleans.Runtime
                     foreach (var d in requestData)
                     {
                         stream.Write(d.Key);
-                        SerializationManager.SerializeInner(d.Value, stream, typeof(object));
+                        SerializationManager.SerializeInner(d.Value, context, typeof(object));
                     }
                 }
 
@@ -1272,7 +1278,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                 {
-                    WriteObj(stream, typeof(GuidId), input.TargetObserverId);
+                    WriteObj(context, typeof(GuidId), input.TargetObserverId);
                 }
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
@@ -1281,11 +1287,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            [Orleans.CodeGeneration.DeserializerMethodAttribute]
-            public static System.Object Deserializer(System.Type expected,  BinaryTokenStreamReader stream)
+            [DeserializerMethod]
+            public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 var result = new HeadersContainer();
-                Orleans.Serialization.DeserializationContext.Current.RecordObject(result);
+                var stream = context.Stream;
+                context.RecordObject(result);
                 var headers = (Headers)stream.ReadInt();
 
                 if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
@@ -1296,7 +1303,7 @@ namespace Orleans.Runtime
                        var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
                         for (int i = 0; i < n; i++)
                         {
-                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), stream));
+                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), context));
                         }
                     }
                 }
@@ -1320,7 +1327,7 @@ namespace Orleans.Runtime
                     result.GenericGrainType = stream.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), stream);
+                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), context);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
                     result.IsAlwaysInterleave = ReadBool(stream);
@@ -1349,7 +1356,7 @@ namespace Orleans.Runtime
                     var requestData = new Dictionary<string, object>(c);
                     for (int i = 0; i < c; i++)
                     {
-                        requestData[stream.ReadString()] = SerializationManager.DeserializeInner(null, stream);
+                        requestData[stream.ReadString()] = SerializationManager.DeserializeInner(null, context);
                     }
                     result.RequestContextData = requestData;
                 }
@@ -1376,7 +1383,7 @@ namespace Orleans.Runtime
                     result.TargetGrain = stream.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), stream);
+                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                     result.TargetSilo = stream.ReadSiloAddress();
@@ -1389,16 +1396,16 @@ namespace Orleans.Runtime
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
-            private static void WriteObj(BinaryTokenStreamWriter stream, Type type, object input)
+            private static void WriteObj(ISerializationContext context, Type type, object input)
             {
                 var ser = SerializationManager.GetSerializer(type);
-                ser.Invoke(input, stream, type);
+                ser.Invoke(input, context, type);
             }
 
-            private static object ReadObj(Type t, BinaryTokenStreamReader stream)
+            private static object ReadObj(Type t, IDeserializationContext context)
             {
                 var des = SerializationManager.GetDeserializer(t);
-                return des.Invoke(t, stream);
+                return des.Invoke(t, context);
             }
 
             public static void Register()

@@ -235,7 +235,7 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Used to mark a method as providinga serializer function for that type.
+    /// Used to mark a method as providing a serializer function for that type.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class SerializerMethodAttribute : Attribute
