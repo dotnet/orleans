@@ -37,7 +37,7 @@ using Orleans.TestingHost;
 
 namespace Tests
 {
- [TestClass]
+    [TestClass]
     public class HelloWorldSiloTests : TestingSiloHost
     {
         [ClassCleanup]
