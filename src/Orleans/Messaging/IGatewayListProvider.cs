@@ -24,12 +24,12 @@ namespace Orleans.Messaging
         Task<IList<Uri>> GetGateways();
 
         /// <summary>
-        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
+        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
         TimeSpan MaxStaleness { get; }
 
         /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
         /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
         /// </summary>
         bool IsUpdatable { get; }
@@ -49,7 +49,7 @@ namespace Orleans.Messaging
     /// Optionally, some GatewayListProviders may be able to notify a listener if an updated gw information is available.
     /// This is optional and not required.
     /// </summary>
-    internal interface IGatewayListObservable
+    public interface IGatewayListObservable
     {
         bool SubscribeToGatewayNotificationEvents(IGatewayListListener listener);
 
