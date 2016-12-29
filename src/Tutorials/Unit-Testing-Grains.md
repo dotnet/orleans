@@ -13,7 +13,7 @@ Orleans makes it possible to mock many of its parts ([example](https://github.co
 The steps are
 
 - You should create a test project in your favorite unit testing framework.
-- Add references to Microsoft.Orleans.TestingHost and Microsoft.Orleans.OrleansProviders packages from NuGet to the project.
+- Add references to `Microsoft.Orleans.TestingHost`, `Microsoft.Orleans.OrleansProviders` and `Microsoft.Orleans.OrleansTelemetryConsumers.Counters` packages from NuGet to the project.
 - Reference your interfaces and collection projects in the test project.
 - Inherit your test classes from `Orleans.TestingHost.TestingSiloHost`.
 - Shutdown the silo properly in each test class.
