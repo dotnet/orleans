@@ -12,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Tester;
 using System.Collections;
+using Orleans.Providers.SqlServer;
 
 namespace UnitTests.Stats
 {
