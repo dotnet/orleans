@@ -17,6 +17,7 @@ using UnitTests;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Providers;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -38,6 +39,13 @@ namespace Tester.AzureUtils.Persistence
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
+
+        public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
+        {
+            var providerConfig = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
+
+            return providerConfig.First();
+        }
 
         public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
@@ -271,7 +279,6 @@ namespace Tester.AzureUtils.Persistence
         protected async Task Grain_AzureStore_SiloRestart()
         {
             var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
-            var initialDeploymentId = this.HostedCluster.DeploymentId;
 
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
 
@@ -285,7 +292,6 @@ namespace Tester.AzureUtils.Persistence
             await grain.DoWrite(1);
 
             output.WriteLine("About to reset Silos");
-            //this.HostedCluster.RestartDefaultSilos(true);
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
                 this.HostedCluster.RestartSilo(silo);
@@ -296,8 +302,7 @@ namespace Tester.AzureUtils.Persistence
 
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
             Assert.Equal(initialServiceId,  this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
-            Assert.NotEqual(initialDeploymentId,  this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
-
+            
             val = await grain.GetValue();
             Assert.Equal(1,  val);  // "Value after Write-1"
 

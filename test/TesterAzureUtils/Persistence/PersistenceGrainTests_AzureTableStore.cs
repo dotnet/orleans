@@ -38,11 +38,10 @@ namespace Tester.AzureUtils.Persistence
                 TestUtils.CheckForAzureStorage();
 
                 Guid serviceId = Guid.NewGuid();
-                var options = new TestClusterOptions(initialSilosCount: 1);
+                var options = new TestClusterOptions(initialSilosCount: 4);
 
                 options.ClusterConfiguration.Globals.ServiceId = serviceId;
 
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
                 options.ClusterConfiguration.Globals.MaxResendCount = 0;
 
                 //options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -52,15 +51,13 @@ namespace Tester.AzureUtils.Persistence
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
                 options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" } });
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore1");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore2");
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore3");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore1", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore2", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.AzureTableStorage>("AzureStore3", new Dictionary<string, string> { { "DataConnectionString", options.ClusterConfiguration.Globals.DataConnectionString } });
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedAzureStore");
 
-                //< Provider Name = "AzureStore1" />
-                // < Provider Name = "AzureStore2" />
-                //  < Provider Name = "AzureStore3" />
+
                 IProviderConfiguration providerConfig;
                 if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedAzureStore", out providerConfig))
                 {
@@ -68,27 +65,16 @@ namespace Tester.AzureUtils.Persistence
 
                     var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
 
-                    IProvider provider1 = GetNamedProviderForShardedProvider(providers, "AzureStore1");
-                    IProvider provider2 = GetNamedProviderForShardedProvider(providers, "AzureStore2");
-                    IProvider provider3 = GetNamedProviderForShardedProvider(providers, "AzureStore3");
-                    providerConfig.Children.Add(provider1);
-                    providerConfig.Children.Add(provider2);
-                    providerConfig.Children.Add(provider3);
+                    IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore1");
+                    IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore2");
+                    IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "AzureStore3");
+                    providerConfig.AddChildConfiguration(provider1);
+                    providerConfig.AddChildConfiguration(provider2);
+                    providerConfig.AddChildConfiguration(provider3);
                 }
 
                 return new TestCluster(options);
             }
-            private static IProvider GetNamedProviderForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
-            {
-                var ddbStore1 = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
-
-                var pm = ddbStore1.First();
-
-                var provider = ((ProviderConfiguration) pm).ProviderManager.GetProvider(providerName);
-                return provider;
-            }
-
-
         }
 
         public PersistenceGrainTests_AzureTableStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)

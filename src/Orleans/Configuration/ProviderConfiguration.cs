@@ -25,6 +25,10 @@ namespace Orleans.Runtime.Configuration
         public string Name { get; private set; }
         public IProviderManager ProviderManager {get { return providerManager; } }
 
+        public void AddChildConfiguration(IProviderConfiguration config)
+        {
+            childConfigurations.Add(config as ProviderConfiguration);
+        }
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
