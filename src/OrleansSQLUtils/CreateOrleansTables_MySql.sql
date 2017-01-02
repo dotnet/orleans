@@ -42,7 +42,8 @@ CREATE TABLE OrleansMembershipVersionTable
 	Timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	Version INT NOT NULL DEFAULT 0,
 
-	CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId)
+	CONSTRAINT PK_OrleansMembershipVersionTable_DeploymentId PRIMARY KEY(DeploymentId),
+	KEY IX_Deployment_Version(DeploymentId, Version)
 );
 
 -- Every silo instance has a row in the membership table.
@@ -61,6 +62,7 @@ CREATE TABLE OrleansMembershipTable
 	IAmAliveTime DATETIME NOT NULL,
 
 	CONSTRAINT PK_MembershipTable_DeploymentId PRIMARY KEY(DeploymentId, Address, Port, Generation),
+	KEY IX_Deplyment_Status_ProxyPort(DeploymentId, Status, ProxyPort),
 	CONSTRAINT FK_MembershipTable_MembershipVersionTable_DeploymentId FOREIGN KEY (DeploymentId) REFERENCES OrleansMembershipVersionTable (DeploymentId)
 );
 
@@ -75,7 +77,8 @@ CREATE TABLE OrleansRemindersTable
 	GrainHash INT NOT NULL,
 	Version INT NOT NULL,
 
-	CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
+	CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName),
+	KEY IX_ServiceId_GrainIdConsistentHash (ServiceId, GrainHash)
 );
 
 CREATE TABLE OrleansStatisticsTable
