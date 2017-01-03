@@ -8,7 +8,7 @@
     <title>Activation Garbage Collection | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Activation Garbage Collection | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.9.2.0">
+    <meta name="generator" content="docfx 2.10.1.0">
     
     <link rel="shortcut icon" href="../../favicon.ico">
     <link rel="stylesheet" href="../../styles/docfx.vendor.css">
@@ -176,7 +176,10 @@ Therefore, this call provides an additional hook to <strong>delay the deactivati
 <p>4) Activation Garbage Collection settings specify age limit of 10 minutes and the grain is making a call to DelayDeactivation(20 min), and after 7 minutes there is another call on this grain, the activation will be collected after 20 min from time zero, if no extra calls were made.</p>
 <p>You can also instruct the runtime to deactivate the grain next time it becomes idle, by using:</p>
 <pre><code class="lang-csharp">  protected void DeactivateOnIdle()
-</code></pre><p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
+</code></pre><p>An activation is considered idle if it is not processing any message at the moment.
+If you call <code>DeactivateOnIdle</code> while a grain is processing a message, it will get deactivated as soon as processing of the current message is finished.
+If there are any requests queued for the grain, they will be forwarded to the next activation.</p>
+<p><code>DeactivateOnIdle</code> take priority over any Activation Garbage Collection settings specified in the config or <code>DelayDeactivation</code>.
 Please notice that this setting only applies to this particular activation from which it has been called and it does not apply to all possible instances of grains of this type.</p>
 
             </article>
@@ -186,6 +189,9 @@ Please notice that this setting only applies to this particular activation from 
             <div class="sideaffix">
               <div class="contribution">
                 <ul class="nav">
+                  <li>
+                    <a href="https://github.com/dotnet/orleans/blob/gh-pages/SRC/Documentation/Advanced-Concepts/Activation-Garbage-Collection.md/#L1" class="contribution-link">Improve this Doc</a>
+                  </li>
                 </ul>
               </div>
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
