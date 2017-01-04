@@ -10,3 +10,5 @@
   href: Consul-Deployment.md
 - name: Load Balancing
   href: Load-Balancing.md
+- name: Scheduler
+  href: Scheduler.md
