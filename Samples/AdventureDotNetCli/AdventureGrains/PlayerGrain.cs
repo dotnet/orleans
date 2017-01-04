@@ -13,7 +13,8 @@ namespace AdventureGrains
     {
         IRoomGrain roomGrain; // Current room
         List<Thing> things = new List<Thing>(); // Things that the player is carrying
-        private IAsyncStream<string> playerStream; // Stream of messages going from PlayerGrain to Client
+        private ObserverSubscriptionManager<IMessage> _subsManager;
+
 
         bool killed = false;
 
@@ -24,11 +25,29 @@ namespace AdventureGrains
         {
             this.myInfo = new PlayerInfo { Key = this.GetPrimaryKey(), Name = "nobody" };
 
+
             // Hook up stream where we push messages to Client
-            IStreamProvider sp = GetStreamProvider("SMS");
-            playerStream = sp.GetStream<string>(this.GetPrimaryKey(), "playerstream");
+            _subsManager = new ObserverSubscriptionManager<IMessage>();
 
             return base.OnActivateAsync();
+        }
+
+        // Clients call this to subscribe.
+        public async Task Subscribe(IMessage observer)
+        {
+             _subsManager.Subscribe(observer);
+        }
+
+        //Also clients use this to unsubscribe themselves to no longer receive the messages.
+        public async Task UnSubscribe(IMessage observer)
+        {
+            _subsManager.Unsubscribe(observer);
+        }
+
+        public Task SendUpdateMessage(string message)
+        {
+            _subsManager.Notify(s => s.ReceiveMessage(message));
+            return TaskDone.Done;
         }
 
         Task<string> IPlayerGrain.Name()
@@ -59,12 +78,12 @@ namespace AdventureGrains
                 {
                     // He was killed by a player
                     await this.roomGrain.ExitDead(myInfo, killer, weapon);
-                    await playerStream.OnNextAsync("You where killed by " + killer.Name + "!");
+                    await SendUpdateMessage("You where killed by " + killer.Name + "!");
                 }
                 else
                 {
                     await this.roomGrain.Exit(myInfo);
-                    await playerStream.OnNextAsync("You died!");
+                    await SendUpdateMessage("You died!");
                 }
                 this.roomGrain = null;
                 killed = true;
@@ -228,7 +247,7 @@ namespace AdventureGrains
 
         async Task IPlayerGrain.SendMessage(string message)
         {
-            await playerStream.OnNextAsync(message);
+            await SendUpdateMessage(message);
         }
 
         async Task<string> Whisper(string words)

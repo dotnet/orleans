@@ -17,13 +17,14 @@ namespace AdventureGrainInterfaces
         Task<IRoomGrain> RoomGrain();
 
         // Until Death comes knocking                
-        Task Die(PlayerInfo killer, Thing weapon );
+        Task Die(PlayerInfo killer, Thing weapon);
 
         // Send Text Messages to Player
         Task SendMessage(string message);
 
         // A Player takes his turn by calling Play with a command
         Task<string> Play(string command);
-        
+        Task Subscribe(IMessage obj);
+        Task UnSubscribe(IMessage obj);
     }
 }

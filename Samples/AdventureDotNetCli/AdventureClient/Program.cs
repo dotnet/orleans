@@ -11,10 +11,7 @@ namespace AdventureClient
     class Program
     {
 
-        static IAsyncStream<string> _playerStream;
-        static gameStreamObserver _gsObserver;
-        static StreamSubscriptionHandle<string> _subscriptionHandle;
-
+        
         static void Main(string[] args)
         {
             var config = ClientConfiguration.LocalhostSilo();
@@ -47,7 +44,10 @@ namespace AdventureClient
             var player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerGuid);
             player.SetName(name).Wait();
 
-            await RegisterPlayerStream(playerGuid);
+            Message m = new Message();
+            //Create a reference for Message usable for subscribing to the observable grain.
+            var obj = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(m);
+            await player.Subscribe(obj);
 
             var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
             player.SetRoomGrain(room1).Wait();
@@ -76,18 +76,14 @@ namespace AdventureClient
             }
         }
 
-        private static async Task RegisterPlayerStream(Guid playerGuid)
+     
+        public class Message : IMessage
         {
-            // Neded to make variables global to avoid garbage-collection and disconnect.
-            var sp = GrainClient.GetStreamProvider("SMS");
-            _playerStream = sp.GetStream<string>(playerGuid, "playerstream");
-            
-            //await playerStream.SubscribeAsync<string>((data, token) => Console.WriteLine(data));
-            
-            _gsObserver = new gameStreamObserver();
-            _subscriptionHandle = await _playerStream.SubscribeAsync(_gsObserver);
+            public void ReceiveMessage(string message)
+            {
+                Console.WriteLine(message);
+            }
         }
-
         public class gameStreamObserver : Orleans.Streams.IAsyncObserver<string>
         {
             public Task OnCompletedAsync()
