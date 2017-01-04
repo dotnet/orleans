@@ -96,6 +96,8 @@
       href: Runtime-Implementation-Details/Consul-Deployment.md
     - name: Load Balancing
       href: Runtime-Implementation-Details/Load-Balancing.md
+	- name: Scheduler
+      href: Runtime-Implementation-Details/Scheduler.md
 
 - name: Streams
   href: Orleans-Streams/index.md
