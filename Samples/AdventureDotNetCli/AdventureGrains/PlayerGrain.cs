@@ -42,7 +42,7 @@ namespace AdventureGrains
         }
 
 
-        async Task IPlayerGrain.Die(PlayerInfo killer, Thing weapon) // PlayerInfo tells who killed the person
+        async Task IPlayerGrain.Die(PlayerInfo killer, Thing weapon)
         {
             // Drop everything
             var tasks = new List<Task<string>>();
@@ -177,8 +177,7 @@ namespace AdventureGrains
                 if (weapon != null)
                 {
                     await GrainFactory.GetGrain<IPlayerGrain>(player.Key).Die(myInfo, weapon);
-                    return target + " is now dead.";
-                    //return ""; // RoomGrain will broadcast death
+                    return target + " is now dead.";                    
                 }
                 return "With what? Your bare hands?";
             }
@@ -193,7 +192,6 @@ namespace AdventureGrains
 
                     await GrainFactory.GetGrain<IMonsterGrain>(monster.Id).Kill(this.roomGrain, player, weapon);
                     return target + " is now dead.";
-                    //return ""; // RoomGrain will broadcast death
                 }
                 return "With what? Your bare hands?";
             }

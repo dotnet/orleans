@@ -78,10 +78,12 @@ namespace AdventureClient
 
         private static async Task RegisterPlayerStream(Guid playerGuid)
         {
+            // Neded to make variables global to avoid garbage-collection and disconnect.
             var sp = GrainClient.GetStreamProvider("SMS");
             _playerStream = sp.GetStream<string>(playerGuid, "playerstream");
+            
             //await playerStream.SubscribeAsync<string>((data, token) => Console.WriteLine(data));
-            //await playerStream.SubscribeAsync<string>((data, token) => Console.WriteLine(data));
+            
             _gsObserver = new gameStreamObserver();
             _subscriptionHandle = await _playerStream.SubscribeAsync(_gsObserver);
         }
