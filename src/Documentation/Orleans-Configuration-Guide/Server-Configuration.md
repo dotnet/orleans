@@ -10,9 +10,11 @@ There are two key aspects of silo configuration:
 * Connectivity: silo’s endpoints for other silos and clients
 * Cluster membership and reliability: how silos discover each other in a deployment and detect node failures.
 
-Depending on the environment you want to run Orleans in some of these parameters may or may not be important. For example, for a single silo development environment one usually doesn’t need reliability, and all the endpoints can be localhost. Or if you only use self-managed grains in your application, you don’t need to configure grain index.
+Depending on the environment you want to run Orleans in some of these parameters may or may not be important.
+For example, for a single silo development environment one usually doesn’t need reliability, and all the endpoints can be localhost.
 
- The following sections detail the configuration setting for the four mentioned key aspects. Then in the scenarios section you can find the recommended combinations of the settings for the most typical deployment scenarios.
+The following sections detail the configuration setting for the four mentioned key aspects.
+Then in the scenarios section you can find the recommended combinations of the settings for the most typical deployment scenarios.
 
 ## Connectivity
 The connectivity settings define two TCP/IP endpoints: one for inter-silo communication and one for client connections, also referred to as client gateway or simply gateway.

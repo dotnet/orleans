@@ -107,8 +107,6 @@ Now whenever our grain on the server calls the `SendUpdateMessage` method, all s
 
 **Note:** Objects passed to `CreateObjectReference` are held via a [`WeakReference<T>`](https://msdn.microsoft.com/en-us/library/system.weakreference) and will therefore be garbage collected if no other references exist. Users should maintain a reference for each observer which they do not want to be collected.
 
-**Note:** Support for observers might be removed in a future version and replaced with a Simple Message Stream [SMS](http://dotnet.github.io/orleans/Orleans-Streams/), which can support the same concept with more power, flexibility, and reliability.
-
 ## Next
 
 Next we look at [Developing a Grain](Developing-a-Grain.md)
