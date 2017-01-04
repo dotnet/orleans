@@ -5,9 +5,11 @@ title: Scheduler
 
 # Scheduler
 
-Orleans Scheduler is a component within the Orleans runtime responsible for executing application code and parts of the runtime code to ensure the single threaded execution semantics. It implements a custom TPL Task scheduler.
+Orleans Scheduler is a component within the Orleans runtime responsible for executing application code and parts of the runtime code to ensure the **single threaded execution semantics**. It implements a custom TPL Task scheduler.
 
-Orleans Task scheduler is a hierarchical 2 level scheduler. At the first level there is the global OrleansTaskScheduler that is responsible for execution of system activities. At the second level every grain activation has its own ActivationTaskScheduler, which provides the single threaded execution semantics.
+Orleans Task scheduler is a hierarchical 2 level scheduler. 
+At the first level there is the global **OrleansTaskScheduler** that is responsible for execution of system activities. 
+At the second level every grain activation has its own **ActivationTaskScheduler**, which provides the single threaded execution semantics.
 
 ### At a high level, the execution path is the following:
 1.	A request arrives to the correct silo and the destination activation is found.
@@ -28,7 +30,7 @@ There are currently the following work item types:
 5.	ClosureWorkItem – a wrapper around a closure (arbitrary lambda) that is queued to the system context.
 
 ### Scheduling Context:
-Scheduling Context is a tag, just an opaque object that represents scheduling unit – activation data, system target or system null context.
+Scheduling Context is a tag, just an opaque object that represents scheduling target – activation data, system target or system null context.
 
 
 ### High level Principles:
@@ -37,10 +39,9 @@ Scheduling Context is a tag, just an opaque object that represents scheduling un
     1.2	We never create tasks on behalf of other tasks to execute them.
     1.3	WorkItems are wrapped within Task (that is, in order to execute a work item, we create a Task whose lambda function will just run the work item lambda). By always going via tasks we ensure that any activity is executed via an appropriate Task scheduler.
 2.	Tasks are executed on the scheduler where they were queued by using base.TryExecute (and not by RunSynchronously)
-3.	There is a one to one mapping between:
-    3.1	Activation Task Scheduler (ATS) maps 1:1 to its TPL scheduler. We keep it thin and store all the data in WorkItemGroup. Activation Task Scheduler points to its WorkItemGroup.
-    3.2	WorkItem Group is the actual holder (data object) of the activation Tasks. The Tasks are stored in a List<Task> - the queue of all tasks for its Activation Task Scheduler. WorkItemGroup also points to the Activation Task Scheduler.
-    3.3	Scheduling Context is a tag, an opaque object that represents the scheduling target - activation data or system target or system null context.
+3.	There is a one to one mapping between ATS, WorkItem Group and Scheduling Context:
+    3.1	Activation Task Scheduler (ATS) is a custom TPL scheduler. We keep ATS thin and store all the data in WorkItemGroup. ATS points to its WorkItemGroup.
+    3.2	WorkItem Group is the actual holder (data object) of the activation Tasks. The Tasks are stored in a List<Task> - the queue of all tasks for its ATS. WorkItemGroup points back to its ATS.
 
 
 ### Data Flow and Execution of Tasks and Work items:
