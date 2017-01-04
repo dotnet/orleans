@@ -2,6 +2,8 @@ using System;
 using System.Net;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
+using Orleans.Storage;
+using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace AdventureSetup
 {
@@ -133,7 +135,14 @@ namespace AdventureSetup
             }
 
             var config = ClusterConfiguration.LocalhostPrimarySilo();
+
+            // Adding stream support
+            config.AddMemoryStorageProvider();
+            config.Globals.RegisterStorageProvider<MemoryStorage>("PubSubStore");
+            config.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>("SMS");
+
             siloHost = new SiloHost(siloName, config);
+
 
             if (deploymentId != null)
                 siloHost.DeploymentId = deploymentId;

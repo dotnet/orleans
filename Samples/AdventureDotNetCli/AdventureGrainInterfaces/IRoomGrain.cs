@@ -20,10 +20,12 @@ namespace AdventureGrainInterfaces
         // Players can enter or exit a room
         Task Enter(PlayerInfo player);
         Task Exit(PlayerInfo player);
-
+        Task ExitDead(PlayerInfo player, PlayerInfo killer, Thing weapon);
         // Players can enter or exit a room
         Task Enter(MonsterInfo monster);
         Task Exit(MonsterInfo monster);
+        Task ExitDead(MonsterInfo monster, PlayerInfo killer, Thing weapon);
+         
 
         // Things can be dropped or taken from a room
         Task Drop(Thing thing);
@@ -33,5 +35,9 @@ namespace AdventureGrainInterfaces
         // Players and monsters can be killed, if you have the right weapon.
         Task<PlayerInfo> FindPlayer(string name);
         Task<MonsterInfo> FindMonster(string name);
+        Task Whisper(string words, PlayerInfo sender);
+
+        Task Shout(string words, PlayerInfo sender);
+        
     }
 }

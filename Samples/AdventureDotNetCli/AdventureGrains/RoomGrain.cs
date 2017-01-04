@@ -23,29 +23,134 @@ namespace AdventureGrains
 
         Dictionary<string, IRoomGrain> exits = new Dictionary<string, IRoomGrain>();
 
+        // Send a text message to all players in the room               
+        async void SendMessageToAllPlayersInRoomExceptPlayer(string message, PlayerInfo exPlayer)
+        {
+            System.Guid exID = System.Guid.Empty;
+            if (exPlayer != null)
+            {
+                exID = exPlayer.Key;
+            }
+
+            foreach(PlayerInfo p in players)
+            {
+                if (exID != p.Key)
+                {
+                    var player = GrainFactory.GetGrain<IPlayerGrain>(p.Key);
+                    await player.SendMessage(message);
+                }
+            }            
+        }
+
+        Task IRoomGrain.Whisper(string words, PlayerInfo sender)
+        {
+            string message = sender.Name + " whispers '" + words + "'";
+            SendMessageToAllPlayersInRoomExceptPlayer(message, sender);
+
+            return TaskDone.Done;
+        }
+
+        Task IRoomGrain.Shout(string words, PlayerInfo sender)
+        {
+            string message = sender.Name + " SHOUTS '" +  words.ToUpper() + "'";
+            SendMessageToAllPlayersInRoomExceptPlayer(message, sender);
+
+            return TaskDone.Done;
+        }
         Task IRoomGrain.Enter(PlayerInfo player)
         {
             players.RemoveAll(x => x.Key == player.Key);
             players.Add(player);
+
+            SendMessageToAllPlayersInRoomExceptPlayer(player.Name + " entered the room.", player);
+
+            
+            
             return TaskDone.Done;
         }
 
         Task IRoomGrain.Exit(PlayerInfo player)
         {
             players.RemoveAll(x => x.Key == player.Key);
+
+            SendMessageToAllPlayersInRoomExceptPlayer(player.Name + " left the room.", player);
+
             return TaskDone.Done;
         }
+
+        Task IRoomGrain.ExitDead(PlayerInfo player, PlayerInfo killer, Thing weapon)
+        {
+            players.RemoveAll(x => x.Key == player.Key);
+
+            string message = player.Name;
+            if (killer != null)
+            {
+                message += " was killed by " + killer.Name;
+                if (weapon != null)
+                {
+                    message += " using a " + weapon.Name;
+                }
+            }
+            else
+            {
+                if (weapon != null)
+                {
+                    message += " was killed with a " + weapon.Name;
+                }
+            }
+
+            SendMessageToAllPlayersInRoomExceptPlayer(message, player);
+
+            return TaskDone.Done;
+
+        }
+
 
         Task IRoomGrain.Enter(MonsterInfo monster)
         {
             monsters.RemoveAll(x => x.Id == monster.Id);
             monsters.Add(monster);
+
+            SendMessageToAllPlayersInRoomExceptPlayer(monster.Name + " entered the room.", null);
+
+            
             return TaskDone.Done;
         }
 
+        // Monster was killed by someone
+        Task IRoomGrain.ExitDead(MonsterInfo monster, PlayerInfo killer, Thing weapon)
+        {
+            monsters.RemoveAll(x => x.Id == monster.Id);
+
+            string message = monster.Name;
+            if (killer != null)
+            {
+                message += " was killed by " + killer.Name;
+                if (weapon != null)
+                {
+                    message += " using a " + weapon.Name;
+                }
+            }
+            else
+            {
+                if (weapon != null)
+                {
+                    message += " was killed with a " + weapon.Name;
+                }
+            }
+
+            SendMessageToAllPlayersInRoomExceptPlayer(message, null);
+
+            return TaskDone.Done;
+
+        }
         Task IRoomGrain.Exit(MonsterInfo monster)
         {
             monsters.RemoveAll(x => x.Id == monster.Id);
+
+            SendMessageToAllPlayersInRoomExceptPlayer(monster.Name + " left the room.", null);
+
+            
             return TaskDone.Done;
         }
 

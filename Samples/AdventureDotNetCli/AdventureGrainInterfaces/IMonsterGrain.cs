@@ -13,6 +13,6 @@ namespace AdventureGrainInterfaces
         Task SetRoomGrain(IRoomGrain room);
         Task<IRoomGrain> RoomGrain();
 
-        Task<string> Kill(IRoomGrain room);
+        Task<string> Kill(IRoomGrain room, PlayerInfo killer, Thing weapon);
     }
 }

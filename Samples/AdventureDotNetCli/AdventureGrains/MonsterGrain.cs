@@ -62,7 +62,7 @@ namespace AdventureGrains
         }
 
 
-        Task<string> IMonsterGrain.Kill(IRoomGrain room)
+        Task<string> IMonsterGrain.Kill(IRoomGrain room, PlayerInfo killer, Thing weapon)
         {
             if (this.roomGrain != null)
             {
@@ -70,7 +70,7 @@ namespace AdventureGrains
                 {
                     return Task.FromResult(monsterInfo.Name + " snuck away. You were too slow!");
                 }
-                return this.roomGrain.Exit(this.monsterInfo).ContinueWith(t => monsterInfo.Name + " is dead.");
+                return this.roomGrain.ExitDead(this.monsterInfo, killer, weapon).ContinueWith(t => monsterInfo.Name + " is dead.");
             }
             return Task.FromResult(monsterInfo.Name + " is already dead. You were too slow and someone else got to him!");
         }
