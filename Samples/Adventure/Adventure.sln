@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.26014.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdventureClient", "AdventureClient\AdventureClient.csproj", "{E0BE4D41-CA6F-412E-890A-62A0EBF07228}"
 EndProject
@@ -18,6 +18,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		1.Demo Start Silo.cmd = 1.Demo Start Silo.cmd
 		2.Demo Client.cmd = 2.Demo Client.cmd
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdventureSocketClient", "AdventureSocketClient\AdventureSocketClient.csproj", "{1B9EEF9D-3B2F-4E12-8012-E23F5B6EF16F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,10 @@ Global
 		{9BAF0036-B2DA-4403-8648-8E6F49D1152F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9BAF0036-B2DA-4403-8648-8E6F49D1152F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9BAF0036-B2DA-4403-8648-8E6F49D1152F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1B9EEF9D-3B2F-4E12-8012-E23F5B6EF16F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B9EEF9D-3B2F-4E12-8012-E23F5B6EF16F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B9EEF9D-3B2F-4E12-8012-E23F5B6EF16F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B9EEF9D-3B2F-4E12-8012-E23F5B6EF16F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -15,8 +15,6 @@ namespace AdventureClient
         static void Main(string[] args)
         {
             var config = ClientConfiguration.LocalhostSilo();
-            // Adding stream support
-            config.AddSimpleMessageStreamProvider("SMS");
 
             GrainClient.Initialize(config);
 
