@@ -12,7 +12,10 @@ namespace AdventureSocketClient
     {
 
         bool waitingForName = true;
-        IPlayerGrain player = null;
+        IPlayerGrain _player = null;
+        Message _message = null;
+        IMessage _messageInterface = null;
+
 
         public override void ChannelActive(IChannelHandlerContext contex)
         {
@@ -33,57 +36,64 @@ namespace AdventureSocketClient
 
         protected override void ChannelRead0(IChannelHandlerContext contex, string msg)
         {
-            // Generate and write a response.
+            try
+            {
+                // Generate and write a response.
+                this.ProcessMessage(contex, msg);
+            }
+            catch (Exception ex)
+            {
 
-            ProcessRequest(contex, msg).Wait();
+                Console.WriteLine("Exception in ChannelRead0: " + ex);
+            }
         }
+        
+        private async void ProcessMessage(IChannelHandlerContext contex, string msg)
+        {            
 
-        private async Task ProcessRequest(IChannelHandlerContext contex, string msg)
-        {
             string response = "";
             bool close = false;
             if (string.IsNullOrEmpty(msg))
             {
                 response = "Please type something.\r\n";
             }
-
-            if (waitingForName)
+            else if (waitingForName)
             {
                 waitingForName = false;
 
                 Guid playerGuid = Guid.NewGuid();
 
-                player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerGuid);
-                await player.SetName(msg);
+                _player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerGuid);
+                await _player.SetName(msg);
 
-                Message m = new Message(contex);
+                _message = new Message(contex);
 
                 //Create a reference for Message usable for subscribing to the observable grain.
-                var obj = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(m);
-                await player.Subscribe(obj);
+                _messageInterface = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(_message);
+                await _player.Subscribe(_messageInterface);
 
                 var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
-                await player.SetRoomGrain(room1);
+                await _player.SetRoomGrain(room1);
 
-                response = player.Play("look").Result;
+                response = await _player.Play("look");
 
             }
             else if (string.Equals("bye", msg, StringComparison.OrdinalIgnoreCase))
             {
                 response = "Have a good day!\r\n";
-                await player.Play("End"); // disconnect
+                await _player.Play("End"); // disconnect
 
-                //player.UnSubscribe()
-                player = null;
+                await _player.UnSubscribe(_messageInterface);
+                _player = null;
 
                 close = true;
             }
             else
             {
-                response = player.Play(msg).Result;
+                response = await _player.Play(msg);
             }
 
-            Task wait_close = contex.WriteAndFlushAsync(response);
+            Task wait_close = contex.WriteAndFlushAsync(response + "\r\n");
             if (close)
             {
                 Task.WaitAll(wait_close);
