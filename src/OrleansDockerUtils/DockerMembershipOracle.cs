@@ -373,8 +373,8 @@ namespace Microsoft.Orleans.Docker
             catch (Exception exception)
             {
                 log?.Warn(
-                    (int)ErrorCode.Docker_MembershipOracle_ExceptionRefreshingPartitions,
-                    "Exception refreshing partitions.",
+                    (int)ErrorCode.Docker_MembershipOracle_ExceptionRefreshingSilos,
+                    "Exception refreshing silos.",
                     exception);
                 throw;
             }
