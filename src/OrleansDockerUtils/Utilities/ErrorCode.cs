@@ -6,7 +6,6 @@
         DockerBase = Runtime + 4400,
         Docker_GatewayProvider_ExceptionNotifyingSubscribers = DockerBase + 1,
         Docker_GatewayProvider_ExceptionRefreshingGateways = DockerBase + 2,
-        Docker_MembershipOracle_ExceptionNotifyingSubscribers = DockerBase + 3,
-        Docker_MembershipOracle_ExceptionRefreshingPartitions = DockerBase + 4
+        Docker_MembershipOracle_ExceptionNotifyingSubscribers = DockerBase + 3
     }
 }

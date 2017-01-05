@@ -3,10 +3,10 @@ using Docker.DotNet.BasicAuth;
 using Docker.DotNet.X509;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -55,37 +55,41 @@ namespace Microsoft.Orleans.Docker
             var parameters = cs.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(_ => _.Split(new char[] { '=' }, StringSplitOptions.RemoveEmptyEntries))
                 .Where(_ => _.Length == 2)
-                .ToDictionary(_ => _.First().ToUpper(), _ => _.Last());
+                .ToDictionary(_ => _.First(), _ => _.Last(), StringComparer.OrdinalIgnoreCase);
 
             string dockerDaemonEndpoint = string.Empty;
-            string username = string.Empty;
-            string password = string.Empty;
-            string certificate = string.Empty;
 
-            Credentials credentials = null;
+            var  credentials = GetDockerCredentials(parameters);
 
-            if (parameters.TryGetValue("DaemonEndpoint".ToUpper(), out username))
-            {
-                parameters.TryGetValue("Password".ToUpper(), out password);
-
-                credentials = new BasicAuthCredentials(username, password);
-            }
-
-            if (parameters.TryGetValue("Certificate".ToUpper(), out certificate))
-            {
-                if (!File.Exists(certificate)) throw new FileNotFoundException("Unable to find certificate file");
-
-                parameters.TryGetValue("Password".ToUpper(), out password);
-
-                credentials = new CertificateCredentials(new X509Certificate2(certificate, password));
-            }
-
-            if (credentials == null) credentials = new AnonymousCredentials();
-
-            if (parameters.TryGetValue("DaemonEndpoint".ToUpper(), out dockerDaemonEndpoint))
+            if (parameters.TryGetValue("DaemonEndpoint", out dockerDaemonEndpoint))
                 return new DockerClientConfiguration(new Uri(dockerDaemonEndpoint), credentials).CreateClient();
 
             throw new InvalidOperationException("Unable to create Docker Client. Please check the DataConnectionString parameter on ClientConfiguration.");
+        }
+
+        private static Credentials GetDockerCredentials(Dictionary<string, string> parameters)
+        {
+            string username;
+            string password;
+            string certificate;
+            
+            if (parameters.TryGetValue("Certificate", out certificate))
+            {
+                if (!File.Exists(certificate)) throw new FileNotFoundException("Unable to find certificate file");
+
+                parameters.TryGetValue("Password", out password);
+
+                return new CertificateCredentials(new X509Certificate2(certificate, password ?? string.Empty));
+            }
+
+            if (parameters.TryGetValue("Username", out username))
+            {
+                parameters.TryGetValue("Password", out password);
+
+                return new BasicAuthCredentials(username, password ?? string.Empty);
+            }
+
+            return new AnonymousCredentials();
         }
     }
 }

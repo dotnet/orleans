@@ -35,7 +35,7 @@ namespace Microsoft.Orleans.Docker
 
         public async Task Refresh()
         {
-            var result = await Task.WhenAll((await dockerClient.Containers.ListContainersAsync(
+            var containerList = await dockerClient.Containers.ListContainersAsync(
                 new ContainersListParameters
                 {
                     Filters = new Dictionary<string, IDictionary<string, bool>>
@@ -48,22 +48,32 @@ namespace Microsoft.Orleans.Docker
                                         }
                                 },
                             }
-                })).Select(c => dockerClient.Containers.InspectContainerAsync(c.ID)));
+                });
+            var inspectionResult = await Task.WhenAll(containerList.Select(c => dockerClient.Containers.InspectContainerAsync(c.ID)));
 
             lock (updateLock)
             {
-                silos = result.Select(_ => 
-                {
-                    return new DockerSiloInfo(_.Config.Hostname,
-                        new IPEndPoint(IPAddress.Parse(_.NetworkSettings.Networks.First().Value.IPAddress), 
-                            int.Parse(_.Config.Labels[DockerLabels.SILO_PORT])),
-                        new IPEndPoint(IPAddress.Parse(_.NetworkSettings.Networks.First().Value.IPAddress), 
-                            int.Parse(_.Config.Labels[DockerLabels.GATEWAY_PORT])),
-                        int.Parse(_.Config.Labels[DockerLabels.GENERATION]));
-                }).ToList(); 
+                silos = inspectionResult.Select(GetSiloFromContainer).ToList(); 
             }
 
             NotifySubscribers();
+        }
+
+        private static DockerSiloInfo GetSiloFromContainer(ContainerInspectResponse container)
+        {
+            var network = container.NetworkSettings.Networks.First().Value;
+            var hostname = container.Config.Hostname;
+            var siloIPAddress = IPAddress.Parse(network.IPAddress);
+            var siloPort = container.Config.Labels[DockerLabels.SILO_PORT];
+            var siloEndpoint = new IPEndPoint(siloIPAddress, int.Parse(siloPort));
+
+            var gatewayIPAddress = IPAddress.Parse(network.IPAddress);
+            var gatewayPort = container.Config.Labels[DockerLabels.GATEWAY_PORT];
+            var gatewayEndpoint = new IPEndPoint(siloIPAddress, int.Parse(gatewayPort));
+
+            var generation = int.Parse(container.Config.Labels[DockerLabels.GENERATION]);
+
+            return new DockerSiloInfo(hostname, siloEndpoint, gatewayEndpoint, generation);
         }
 
         public void Subscribe(IDockerStatusListener handler)
