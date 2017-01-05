@@ -48,6 +48,7 @@ namespace AdventureClient
             await player.Subscribe(obj);
 
             var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
+            
             player.SetRoomGrain(room1).Wait();
 
            

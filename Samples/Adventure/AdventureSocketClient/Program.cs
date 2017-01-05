@@ -41,7 +41,7 @@ namespace AdventureSocketClient
 
             var STRING_ENCODER = new StringEncoder();
             var STRING_DECODER = new StringDecoder();
-            var SERVER_HANDLER = new MudServerHandler();
+            
 
             try
             {
@@ -56,7 +56,7 @@ namespace AdventureSocketClient
                         IChannelPipeline pipeline = channel.Pipeline;
   
                         pipeline.AddLast(new DelimiterBasedFrameDecoder(8192, Delimiters.LineDelimiter()));
-                        pipeline.AddLast(STRING_ENCODER, STRING_DECODER, SERVER_HANDLER);
+                        pipeline.AddLast(STRING_ENCODER, STRING_DECODER, new MudServerHandler());
                     }));
 
                 IChannel bootstrapChannel = await bootstrap.BindAsync(ServerPort);

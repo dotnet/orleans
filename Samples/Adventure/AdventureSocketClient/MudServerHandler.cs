@@ -8,7 +8,7 @@ using AdventureGrainInterfaces;
 namespace AdventureSocketClient
 {
 
-    public class MudServerHandler : SimpleChannelInboundHandler<string>
+    public class MudServerHandler : ChannelHandlerAdapter
     {
 
         bool waitingForName = true;
@@ -34,12 +34,13 @@ namespace AdventureSocketClient
 
         }
 
-        protected override void ChannelRead0(IChannelHandlerContext contex, string msg)
+        public override void ChannelRead(IChannelHandlerContext context, object message)
         {
             try
             {
+                string msg = (string)message;
                 // Generate and write a response.
-                this.ProcessMessage(contex, msg);
+                this.ProcessMessage(context, msg);
             }
             catch (Exception ex)
             {
@@ -47,7 +48,30 @@ namespace AdventureSocketClient
                 Console.WriteLine("Exception in ChannelRead0: " + ex);
             }
         }
-        
+
+        public override void ChannelInactive(IChannelHandlerContext context)
+        {
+            killPlayer();
+        }
+ 
+        private async void killPlayer()
+        {
+            if (_player != null)
+            {
+                await _player.Play("End"); // disconnect
+                await _player.UnSubscribe(_messageInterface);
+            }
+
+            await GrainClient.GrainFactory.DeleteObjectReference<IMessage>(_messageInterface);            
+            
+            _message = null;
+            _messageInterface = null;
+            _player = null;
+
+        }
+
+
+
         private async void ProcessMessage(IChannelHandlerContext contex, string msg)
         {            
 
@@ -78,13 +102,10 @@ namespace AdventureSocketClient
                 response = await _player.Play("look");
 
             }
-            else if (string.Equals("bye", msg, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals("End", msg, StringComparison.OrdinalIgnoreCase))
             {
-                response = "Have a good day!\r\n";
-                await _player.Play("End"); // disconnect
-
-                await _player.UnSubscribe(_messageInterface);
-                _player = null;
+                response = "Have a good day!\r\n";                
+                killPlayer();
 
                 close = true;
             }
@@ -125,7 +146,7 @@ namespace AdventureSocketClient
         }
         public void ReceiveMessage(string message)
         {
-            _context.WriteAndFlushAsync(message);
+            _context.WriteAndFlushAsync(message + "\r\n");
         }
     }
 

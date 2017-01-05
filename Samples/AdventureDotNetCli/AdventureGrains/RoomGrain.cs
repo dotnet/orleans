@@ -69,6 +69,15 @@ namespace AdventureGrains
             return TaskDone.Done;
         }
 
+        Task IRoomGrain.Leave(PlayerInfo player)
+        {
+            players.RemoveAll(x => x.Key == player.Key);
+
+            SendMessageToAllPlayersInRoomExceptPlayer(player.Name + " left the game.", player);
+
+            return TaskDone.Done;
+        }
+
         Task IRoomGrain.Exit(PlayerInfo player)
         {
             players.RemoveAll(x => x.Key == player.Key);

@@ -63,13 +63,7 @@ namespace AdventureGrains
 
         async Task IPlayerGrain.Die(PlayerInfo killer, Thing weapon)
         {
-            // Drop everything
-            var tasks = new List<Task<string>>();
-            foreach (var thing in new List<Thing>(things))
-            {
-                tasks.Add(this.Drop(thing));
-            }
-            await Task.WhenAll(tasks);
+            await DropAllItems();
 
             // Exit the game
             if (this.roomGrain != null)
@@ -90,6 +84,17 @@ namespace AdventureGrains
 
 
             }
+        }
+
+        private async Task DropAllItems()
+        {
+            // Drop everything
+            var tasks = new List<Task<string>>();
+            foreach (var thing in new List<Thing>(things))
+            {
+                tasks.Add(this.Drop(thing));
+            }
+            await Task.WhenAll(tasks);
         }
 
         async Task<string> Drop(Thing thing)
@@ -266,9 +271,22 @@ namespace AdventureGrains
             {
                 await roomGrain.Shout(words, myInfo);
             }
+            
             return "You shouted '" + words + "'";
         }
 
+        async Task<string> Leave()
+        {
+            await DropAllItems();
+
+            if (this.roomGrain != null)
+            {
+                await roomGrain.Leave(myInfo);
+            }
+            return "You left the game";
+
+            this.DeactivateOnIdle(); // Force a deactivation of the grain
+        }
 
         async Task<string> IPlayerGrain.Play(string command)
         {
@@ -282,6 +300,10 @@ namespace AdventureGrains
             if (killed && verb != "end")
                 return await CheckAlive();
 
+
+            verb = map_shortcuts(verb);
+
+           
             switch (verb)
             {
                 case "look":
@@ -323,11 +345,35 @@ namespace AdventureGrains
                 case "whisper":
                     return await Whisper(Rest(words));
 
+                case "help":
+                    return "Available commands: Look, North, South, East, West, Kill, Drop, Take, Inventory, Shout, Whisper, End";
                 case "end":
+                    await Leave();
                     return "";
             }
             return "I don't understand.";
         }
 
+        private string map_shortcuts(string verb)
+        {
+            // Map shortcuts
+            switch (verb)
+            {
+                case "n":
+                    verb = "north";
+                    break;
+                case "s":
+                    verb = "south";
+                    break;
+                case "e":
+                    verb = "north";
+                    break;
+                case "w":
+                    verb = "south";
+                    break;
+            }
+
+            return verb;
+        }
     }
 }
