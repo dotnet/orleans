@@ -1,6 +1,8 @@
 ﻿{
   "dependencies": {
     "Docker.DotNet": "2.124.3",
+    "Docker.DotNet.BasicAuth": "2.124.3",
+    "Docker.DotNet.X509": "2.124.3",
     "Microsoft.Extensions.DependencyInjection.Abstractions": "1.0.0"
   },
   "frameworks": {

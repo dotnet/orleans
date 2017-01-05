@@ -21,6 +21,8 @@
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Docker.DotNet" version="2.124.3" />
+      <dependency id="Docker.DotNet.BasicAuth" version="2.124.3" />
+      <dependency id="Docker.DotNet.X509" version="2.124.3" />
     </dependencies>
   </metadata>
   <files>

@@ -1,7 +1,16 @@
-﻿using System;
+﻿using Docker.DotNet;
+using Docker.DotNet.BasicAuth;
+using Docker.DotNet.X509;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Messaging;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using System;
+using System.IO;
+using System.Linq;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
-using Docker.DotNet;
 
 namespace Microsoft.Orleans.Docker
 {
@@ -11,63 +20,7 @@ namespace Microsoft.Orleans.Docker
     public static class OrleansDockerExtensions
     {
         /// <summary>
-        /// Add Docker support to the provided service collection.
-        /// Use this overload for unsecured endpoints of Docker Daemon or Swarm (mostly dev/test)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <returns>The provided service collection</returns>
-        public static IServiceCollection AddDockerSupport(
-            this IServiceCollection serviceCollection, 
-            Uri deamonEndpointUri, string deploymentId)
-        {
-
-            return serviceCollection;
-        }
-
-        /// <summary>
         /// Add Docker support to the provided service collection. 
-        /// Use this overload for secured endpoints of Docker Daemon or Swarm using Basic Auth (username+password)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <param name="userName">The username.</param>
-        /// <param name="password">The password.</param>
-        /// <returns>The provided service collection</returns>
-        public static IServiceCollection AddDockerSupport(
-            this IServiceCollection serviceCollection, 
-            Uri deamonEndpointUri, string deploymentId,
-            string userName, string password)
-        {
-
-
-            return serviceCollection;
-        }
-
-        /// <summary>
-        /// Add Docker support to the provided service collection. 
-        /// Use this overload for secured endpoints of Docker Daemon or Swarm using TLS (certificate)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <param name="certificate">The certificate.</param>
-        /// <returns>The provided service collection.</returns>
-        public static IServiceCollection AddDockerSupport(
-            this IServiceCollection serviceCollection,
-            Uri deamonEndpointUri, string deploymentId,
-            X509Certificate2 certificate)
-        {
-
-
-            return serviceCollection;
-        }
-
-        /// <summary>
-        /// Add Docker support to the provided service collection. 
-        /// Use this overload to provide a pre-configured <see cref="DockerClientConfiguration"/>
         /// </summary>
         /// <param name="serviceCollection">The service collection.</param>
         /// <param name="deploymentId">Orleans Deployment Id.</param>
@@ -78,82 +31,61 @@ namespace Microsoft.Orleans.Docker
             string deploymentId,
             DockerClientConfiguration dockerConfig)
         {
+            if (string.IsNullOrWhiteSpace(deploymentId)) deploymentId = Dns.GetHostName();
 
+            serviceCollection.TryAddSingleton(dockerConfig.CreateClient());
 
-            return serviceCollection;
-        }
+            serviceCollection.TryAddSingleton(sp =>
+                new DockerSiloResolver(deploymentId, 
+                sp.GetService<DockerClient>(), 
+                sp.GetService<Func<string, Logger>>()));
 
-        /// <summary>
-        /// Add support for connecting to a cluster hosted in Docker containers to the provided service collection. 
-        /// Use this overload for unsecured endpoints of Docker Daemon or Swarm (mostly dev/test)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <returns>The provided service collection</returns>
-        public static IServiceCollection AddDockerClientSupport(
-            this IServiceCollection serviceCollection,
-            Uri deamonEndpointUri, string deploymentId)
-        {
+            serviceCollection.AddSingleton<IMembershipOracle, DockerMembershipOracle>();
 
             return serviceCollection;
         }
-
-        /// <summary>
-        /// Add support for connecting to a cluster hosted in Docker containers to the provided service collection. 
-        /// Use this overload for secured endpoints of Docker Daemon or Swarm using Basic Auth (username+password)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <param name="userName">The username.</param>
-        /// <param name="password">The password.</param>
-        /// <returns>The provided service collection</returns>
-        public static IServiceCollection AddDockerClientSupport(
-            this IServiceCollection serviceCollection,
-            Uri deamonEndpointUri, string deploymentId,
-            string userName, string password)
+        
+        internal static DockerClient CreateDockerClient(this ClientConfiguration clientConfig)
         {
+            if (string.IsNullOrWhiteSpace(clientConfig.DataConnectionString))
+                throw new InvalidOperationException("DataConnectionString must be set in order to connect to Docker Daemon");
 
+            var cs = clientConfig.DataConnectionString;
 
-            return serviceCollection;
-        }
+            var parameters = cs.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(_ => _.Split(new char[] { '=' }, StringSplitOptions.RemoveEmptyEntries))
+                .Where(_ => _.Length == 2)
+                .ToDictionary(_ => _.First().ToUpper(), _ => _.Last());
 
-        /// <summary>
-        /// Add support for connecting to a cluster hosted in Docker containers to the provided service collection. 
-        /// Use this overload for secured endpoints of Docker Daemon or Swarm using TLS (certificate)
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deamonEndpointUri">The Docker Daemon or Swarm endpoint.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <param name="certificate">The certificate.</param>
-        /// <returns>The provided service collection.</returns>
-        public static IServiceCollection AddDockerClientSupport(
-            this IServiceCollection serviceCollection,
-            Uri deamonEndpointUri, string deploymentId,
-            X509Certificate2 certificate)
-        {
+            string dockerDaemonEndpoint = string.Empty;
+            string username = string.Empty;
+            string password = string.Empty;
+            string certificate = string.Empty;
 
+            Credentials credentials = null;
 
-            return serviceCollection;
-        }
+            if (parameters.TryGetValue("DaemonEndpoint".ToUpper(), out username))
+            {
+                parameters.TryGetValue("Password".ToUpper(), out password);
 
-        /// <summary>
-        /// Add support for connecting to a cluster hosted in Docker containers to the provided service collection. 
-        /// Use this overload to provide a pre-configured <see cref="DockerClientConfiguration"/>
-        /// </summary>
-        /// <param name="serviceCollection">The service collection.</param>
-        /// <param name="deploymentId">Orleans Deployment Id.</param>
-        /// <param name="dockerConfig">The certificate.</param>
-        /// <returns>The provided service collection.</returns>
-        public static IServiceCollection AddDockerClientSupport(
-            this IServiceCollection serviceCollection,
-            string deploymentId,
-            DockerClientConfiguration dockerConfig)
-        {
+                credentials = new BasicAuthCredentials(username, password);
+            }
 
+            if (parameters.TryGetValue("Certificate".ToUpper(), out certificate))
+            {
+                if (!File.Exists(certificate)) throw new FileNotFoundException("Unable to find certificate file");
 
-            return serviceCollection;
+                parameters.TryGetValue("Password".ToUpper(), out password);
+
+                credentials = new CertificateCredentials(new X509Certificate2(certificate, password));
+            }
+
+            if (credentials == null) credentials = new AnonymousCredentials();
+
+            if (parameters.TryGetValue("DaemonEndpoint".ToUpper(), out dockerDaemonEndpoint))
+                return new DockerClientConfiguration(new Uri(dockerDaemonEndpoint), credentials).CreateClient();
+
+            throw new InvalidOperationException("Unable to create Docker Client. Please check the DataConnectionString parameter on ClientConfiguration.");
         }
     }
 }
