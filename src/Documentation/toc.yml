@@ -96,7 +96,7 @@
       href: Runtime-Implementation-Details/Consul-Deployment.md
     - name: Load Balancing
       href: Runtime-Implementation-Details/Load-Balancing.md
-	- name: Scheduler
+    - name: Scheduler
       href: Runtime-Implementation-Details/Scheduler.md
 
 - name: Streams
