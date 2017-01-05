@@ -16,6 +16,7 @@ namespace Orleans.CodeGenerator
     using Orleans.Runtime;
     using Orleans.Serialization;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+    using static Microsoft.CodeAnalysis.SyntaxNodeExtensions;
 
     /// <summary>
     /// Code generator which generates serializers.
@@ -267,7 +268,9 @@ namespace Orleans.CodeGenerator
             if (type.GetTypeInfo().GetCustomAttribute<ImmutableAttribute>() != null)
             {
                 // Immutable types do not require copying.
-                body.Add(SF.ReturnStatement(originalVariable));
+                var typeName = type.GetParseableName(new TypeFormattingOptions(includeGlobal: false));
+                var comment = SF.Comment($"// No deep copy required since {typeName} is marked with the [Immutable] attribute.");
+                body.Add(SF.ReturnStatement(originalVariable).WithLeadingTrivia(comment));
             }
             else
             {
