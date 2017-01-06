@@ -74,7 +74,7 @@ namespace Orleans.Serialization
                 // Special handling for null value. 
                 // Since in this ProtobufSerializer we are usually writing the data lengh as 4 bytes
                 // we also have to write the Null object as 4 bytes lengh of zero.
-                context.Stream.Write(0);
+                context.StreamWriter.Write(0);
                 return;
             }
 
@@ -94,8 +94,8 @@ namespace Orleans.Serialization
             // Alternatively, we could force to always append to BinaryTokenStreamWriter, but that could create a lot of small ArraySegments.
             // The plan is to ask the ProtoBuff team to add support for some "InputStream" interface, like Bond does.
             byte[] outBytes = iMessage.ToByteArray();
-            context.Stream.Write(outBytes.Length);
-            context.Stream.Write(outBytes);
+            context.StreamWriter.Write(outBytes.Length);
+            context.StreamWriter.Write(outBytes);
         }
         
         /// <inheritdoc />
@@ -118,7 +118,7 @@ namespace Orleans.Serialization
                 throw new ArgumentException("No parser found for the expected type " + expectedType, nameof(expectedType));
             }
 
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             int length = reader.ReadInt();
             byte[] data = reader.ReadBytes(length);
 

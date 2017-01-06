@@ -50,7 +50,7 @@ namespace Orleans.Serialization
         internal static void SerializeReadOnlyCollection<T>(object obj, ISerializationContext context, Type expected)
         {
             var collection = (ReadOnlyCollection<T>)obj;
-            context.Stream.Write(collection.Count);
+            context.StreamWriter.Write(collection.Count);
             foreach (var element in collection)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -59,7 +59,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeReadOnlyCollection<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var list = new List<T>(count);
 
             context.RecordObject(list);
@@ -121,7 +121,7 @@ namespace Orleans.Serialization
         internal static void SerializeList<T>(object obj, ISerializationContext context, Type expected)
         {
             var list = (List<T>)obj;
-            context.Stream.Write(list.Count);
+            context.StreamWriter.Write(list.Count);
             foreach (var element in list)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -130,7 +130,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeList<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var list = new List<T>(count);
             context.RecordObject(list);
 
@@ -190,7 +190,7 @@ namespace Orleans.Serialization
         internal static void SerializeLinkedList<T>(object obj, ISerializationContext context, Type expected)
         {
             var list = (LinkedList<T>)obj;
-            context.Stream.Write(list.Count);
+            context.StreamWriter.Write(list.Count);
             foreach (var element in list)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -199,7 +199,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeLinkedList<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var list = new LinkedList<T>();
             context.RecordObject(list);
             for (var i = 0; i < count; i++)
@@ -262,7 +262,7 @@ namespace Orleans.Serialization
             var set = (HashSet<T>)obj;
             SerializationManager.SerializeInner(set.Comparer.Equals(EqualityComparer<T>.Default) ? null : set.Comparer,
                 context, typeof(IEqualityComparer<T>));
-            context.Stream.Write(set.Count);
+            context.StreamWriter.Write(set.Count);
             foreach (var element in set)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -273,7 +273,7 @@ namespace Orleans.Serialization
         {
             var comparer =
                 (IEqualityComparer<T>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<T>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var set = new HashSet<T>(comparer);
             context.RecordObject(set);
             for (var i = 0; i < count; i++)
@@ -332,7 +332,7 @@ namespace Orleans.Serialization
             var set = (SortedSet<T>)obj;
             SerializationManager.SerializeInner(set.Comparer.Equals(Comparer<T>.Default) ? null : set.Comparer,
                 context, typeof(IComparer<T>));
-            context.Stream.Write(set.Count);
+            context.StreamWriter.Write(set.Count);
             foreach (var element in set)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -343,7 +343,7 @@ namespace Orleans.Serialization
         {
             var comparer =
                 (IComparer<T>)SerializationManager.DeserializeInner(typeof(IComparer<T>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var set = new SortedSet<T>(comparer);
             context.RecordObject(set);
             for (var i = 0; i < count; i++)
@@ -403,7 +403,7 @@ namespace Orleans.Serialization
         internal static void SerializeQueue<T>(object obj, ISerializationContext context, Type expected)
         {
             var queue = (Queue<T>)obj;
-            context.Stream.Write(queue.Count);
+            context.StreamWriter.Write(queue.Count);
             foreach (var element in queue)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -412,7 +412,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeQueue<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var queue = new Queue<T>();
             context.RecordObject(queue);
             for (var i = 0; i < count; i++)
@@ -473,7 +473,7 @@ namespace Orleans.Serialization
         internal static void SerializeStack<T>(object obj, ISerializationContext context, Type expected)
         {
             var stack = (Stack<T>)obj;
-            context.Stream.Write(stack.Count);
+            context.StreamWriter.Write(stack.Count);
             foreach (var element in stack)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -482,7 +482,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeStack<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var list = new List<T>(count);
             var stack = new Stack<T>(count);
             context.RecordObject(stack);
@@ -547,7 +547,7 @@ namespace Orleans.Serialization
             var dict = (Dictionary<K, V>)original;
             SerializationManager.SerializeInner(dict.Comparer.Equals(EqualityComparer<K>.Default) ? null : dict.Comparer,
                                            context, typeof(IEqualityComparer<K>));
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -558,7 +558,7 @@ namespace Orleans.Serialization
         internal static object DeserializeDictionary<K, V>(Type expected, IDeserializationContext context)
         {
             var comparer = (IEqualityComparer<K>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<K>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dict = new Dictionary<K, V>(count, comparer);
             context.RecordObject(dict);
             for (var i = 0; i < count; i++)
@@ -611,7 +611,7 @@ namespace Orleans.Serialization
         internal static void SerializeReadOnlyDictionary<K, V>(object original, ISerializationContext context, Type expected)
         {
             var dict = (ReadOnlyDictionary<K, V>)original;
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -621,7 +621,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeReadOnlyDictionary<K, V>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dict = new Dictionary<K, V>(count);
             for (var i = 0; i < count; i++)
             {
@@ -659,11 +659,11 @@ namespace Orleans.Serialization
             var dict = (Dictionary<string, object>)original;
             SerializationManager.SerializeInner(dict.Comparer.Equals(EqualityComparer<string>.Default) ? null : dict.Comparer,
                                            context, typeof(IEqualityComparer<string>));
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 //context.Stream.WriteTypeHeader(stringType, stringType);
-                context.Stream.Write(pair.Key);
+                context.StreamWriter.Write(pair.Key);
                 SerializationManager.SerializeInner(pair.Value, context, objectType);
             }
         }
@@ -671,13 +671,13 @@ namespace Orleans.Serialization
         internal static object DeserializeStringObjectDictionary(Type expected, IDeserializationContext context)
         {
             var comparer = (IEqualityComparer<string>)SerializationManager.DeserializeInner(typeof(IEqualityComparer<string>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dict = new Dictionary<string, object>(count, comparer);
             context.RecordObject(dict);
             for (var i = 0; i < count; i++)
             {
                 //context.Stream.ReadFullTypeHeader(stringType); // Skip the type header, which will be string
-                var key = context.Stream.ReadString();
+                var key = context.StreamReader.ReadString();
                 var value = SerializationManager.DeserializeInner(null, context);
                 dict[key] = value;
             }
@@ -725,7 +725,7 @@ namespace Orleans.Serialization
         {
             var dict = (SortedDictionary<K, V>)original;
             SerializationManager.SerializeInner(dict.Comparer.Equals(Comparer<K>.Default) ? null : dict.Comparer, context, typeof(IComparer<K>));
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -736,7 +736,7 @@ namespace Orleans.Serialization
         internal static object DeserializeSortedDictionary<K, V>(Type expected, IDeserializationContext context)
         {
             var comparer = (IComparer<K>)SerializationManager.DeserializeInner(typeof(IComparer<K>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dict = new SortedDictionary<K, V>(comparer);
             context.RecordObject(dict);
             for (var i = 0; i < count; i++)
@@ -794,7 +794,7 @@ namespace Orleans.Serialization
         {
             var list = (SortedList<K, V>)original;
             SerializationManager.SerializeInner(list.Comparer.Equals(Comparer<K>.Default) ? null : list.Comparer, context, typeof(IComparer<K>));
-            context.Stream.Write(list.Count);
+            context.StreamWriter.Write(list.Count);
             foreach (var pair in list)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -805,7 +805,7 @@ namespace Orleans.Serialization
         internal static object DeserializeSortedList<K, V>(Type expected, IDeserializationContext context)
         {
             var comparer = (IComparer<K>)SerializationManager.DeserializeInner(typeof(IComparer<K>), context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var list = new SortedList<K, V>(count, comparer);
             context.RecordObject(list);
             for (var i = 0; i < count; i++)
@@ -872,7 +872,7 @@ namespace Orleans.Serialization
             SerializationManager.SerializeInner(dict.KeyComparer.Equals(EqualityComparer<K>.Default) ? null : dict.KeyComparer, context, typeof(IEqualityComparer<K>));
             SerializationManager.SerializeInner(dict.ValueComparer.Equals(EqualityComparer<V>.Default) ? null : dict.ValueComparer, context, typeof(IEqualityComparer<V>));
 
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -884,7 +884,7 @@ namespace Orleans.Serialization
         {
             var keyComparer = SerializationManager.DeserializeInner<IEqualityComparer<K>>(context);
             var valueComparer = SerializationManager.DeserializeInner<IEqualityComparer<V>>(context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dictBuilder = ImmutableDictionary.CreateBuilder(keyComparer, valueComparer);
             for (var i = 0; i < count; i++)
             {
@@ -921,7 +921,7 @@ namespace Orleans.Serialization
         internal static void SerializeImmutableList<T>(object untypedInput, ISerializationContext context, Type typeExpected)
         {
             var list = (ImmutableList<T>)untypedInput;
-            context.Stream.Write(list.Count);
+            context.StreamWriter.Write(list.Count);
             foreach (var element in list)
             {
                 SerializationManager.SerializeInner(element, context, typeof(T));
@@ -930,7 +930,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeImmutableList<T>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var listBuilder = ImmutableList.CreateBuilder<T>();
 
             for (var i = 0; i < count; i++)
@@ -977,7 +977,7 @@ namespace Orleans.Serialization
             var dict = (ImmutableHashSet<K>)untypedInput;
             SerializationManager.SerializeInner(dict.KeyComparer.Equals(EqualityComparer<K>.Default) ? null : dict.KeyComparer, context, typeof(IEqualityComparer<K>));
 
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair, context, typeof(K));
@@ -987,7 +987,7 @@ namespace Orleans.Serialization
         internal static object DeserializeImmutableHashSet<K>(Type expected, IDeserializationContext context)
         {
             var keyComparer = SerializationManager.DeserializeInner<IEqualityComparer<K>>(context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dictBuilder = ImmutableHashSet.CreateBuilder(keyComparer);
             for (var i = 0; i < count; i++)
             {
@@ -1030,7 +1030,7 @@ namespace Orleans.Serialization
             var dict = (ImmutableSortedSet<K>)untypedInput;
             SerializationManager.SerializeInner(dict.KeyComparer.Equals(Comparer<K>.Default) ? null : dict.KeyComparer, context, typeof(IComparer<K>));
 
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair, context, typeof(K));
@@ -1040,7 +1040,7 @@ namespace Orleans.Serialization
         internal static object DeserializeImmutableSortedSet<K>(Type expected, IDeserializationContext context)
         {
             var keyComparer = SerializationManager.DeserializeInner<IComparer<K>>(context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dictBuilder = ImmutableSortedSet.CreateBuilder(keyComparer);
             for (var i = 0; i < count; i++)
             {
@@ -1084,7 +1084,7 @@ namespace Orleans.Serialization
             SerializationManager.SerializeInner(dict.KeyComparer.Equals(Comparer<K>.Default) ? null : dict.KeyComparer, context, typeof(IComparer<K>));
             SerializationManager.SerializeInner(dict.ValueComparer.Equals(EqualityComparer<V>.Default) ? null : dict.ValueComparer, context, typeof(IEqualityComparer<V>));
 
-            context.Stream.Write(dict.Count);
+            context.StreamWriter.Write(dict.Count);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair.Key, context, typeof(K));
@@ -1096,7 +1096,7 @@ namespace Orleans.Serialization
         {
             var keyComparer = SerializationManager.DeserializeInner<IComparer<K>>(context);
             var valueComparer = SerializationManager.DeserializeInner<IEqualityComparer<V>>(context);
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dictBuilder = ImmutableSortedDictionary.CreateBuilder(keyComparer, valueComparer);
             for (var i = 0; i < count; i++)
             {
@@ -1139,7 +1139,7 @@ namespace Orleans.Serialization
         {
             var dict = (ImmutableArray<K>)untypedInput;
 
-            context.Stream.Write(dict.Length);
+            context.StreamWriter.Write(dict.Length);
             foreach (var pair in dict)
             {
                 SerializationManager.SerializeInner(pair, context, typeof(K));
@@ -1148,7 +1148,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeImmutableArray<K>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var dictBuilder = ImmutableArray.CreateBuilder<K>();
             for (var i = 0; i < count; i++)
             {
@@ -1189,7 +1189,7 @@ namespace Orleans.Serialization
         {
             var queue = (ImmutableQueue<K>)untypedInput;
 
-            context.Stream.Write(queue.Count());
+            context.StreamWriter.Write(queue.Count());
             foreach (var item in queue)
             {
                 SerializationManager.SerializeInner(item, context, typeof(K));
@@ -1198,7 +1198,7 @@ namespace Orleans.Serialization
 
         internal static object DeserializeImmutableQueue<K>(Type expected, IDeserializationContext context)
         {
-            var count = context.Stream.ReadInt();
+            var count = context.StreamReader.ReadInt();
             var items = new K[count];
             for (var i = 0; i < count; i++)
             {
@@ -1524,15 +1524,15 @@ namespace Orleans.Serialization
             }
             else
             {
-                context.Stream.WriteNull();
+                context.StreamWriter.WriteNull();
             }
         }
 
         internal static object DeserializeNullable<T>(Type expected, IDeserializationContext context) where T : struct
         {
-            if (context.Stream.PeekToken() == SerializationTokenType.Null)
+            if (context.StreamReader.PeekToken() == SerializationTokenType.Null)
             {
-                context.Stream.ReadToken();
+                context.StreamReader.ReadToken();
                 return new T?();
             }
 
@@ -1597,12 +1597,12 @@ namespace Orleans.Serialization
         internal static void SerializeTimeSpan(object obj, ISerializationContext context, Type expected)
         {
             var ts = (TimeSpan)obj;
-            context.Stream.Write(ts.Ticks);
+            context.StreamWriter.Write(ts.Ticks);
         }
 
         internal static object DeserializeTimeSpan(Type expected, IDeserializationContext context)
         {
-            return new TimeSpan(context.Stream.ReadLong());
+            return new TimeSpan(context.StreamReader.ReadLong());
         }
 
         internal static object CopyTimeSpan(object obj, ICopyContext context)
@@ -1617,13 +1617,13 @@ namespace Orleans.Serialization
         internal static void SerializeDateTimeOffset(object obj, ISerializationContext context, Type expected)
         {
             var dts = (DateTimeOffset)obj;
-            context.Stream.Write(dts.DateTime.Ticks);
-            context.Stream.Write(dts.Offset.Ticks);
+            context.StreamWriter.Write(dts.DateTime.Ticks);
+            context.StreamWriter.Write(dts.Offset.Ticks);
         }
 
         internal static object DeserializeDateTimeOffset(Type expected, IDeserializationContext context)
         {
-            return new DateTimeOffset(context.Stream.ReadLong(), new TimeSpan(context.Stream.ReadLong()));
+            return new DateTimeOffset(context.StreamReader.ReadLong(), new TimeSpan(context.StreamReader.ReadLong()));
         }
 
         internal static object CopyDateTimeOffset(object obj, ICopyContext context)
@@ -1637,12 +1637,12 @@ namespace Orleans.Serialization
 
         internal static void SerializeType(object obj, ISerializationContext context, Type expected)
         {
-            context.Stream.Write(((Type)obj).OrleansTypeKeyString());
+            context.StreamWriter.Write(((Type)obj).OrleansTypeKeyString());
         }
 
         internal static object DeserializeType(Type expected, IDeserializationContext context)
         {
-            return SerializationManager.ResolveTypeName(context.Stream.ReadString());
+            return SerializationManager.ResolveTypeName(context.StreamReader.ReadString());
         }
 
         internal static object CopyType(object obj, ICopyContext context)
@@ -1657,12 +1657,12 @@ namespace Orleans.Serialization
         internal static void SerializeGuid(object obj, ISerializationContext context, Type expected)
         {
             var guid = (Guid)obj;
-            context.Stream.Write(guid.ToByteArray());
+            context.StreamWriter.Write(guid.ToByteArray());
         }
 
         internal static object DeserializeGuid(Type expected, IDeserializationContext context)
         {
-            var bytes = context.Stream.ReadBytes(16);
+            var bytes = context.StreamReader.ReadBytes(16);
             return new Guid(bytes);
         }
 
@@ -1681,13 +1681,13 @@ namespace Orleans.Serialization
         internal static void SerializeUri(object obj, ISerializationContext context, Type expected)
         {
             if (uriConverter == null) uriConverter = TypeDescriptor.GetConverter(typeof(Uri));
-            context.Stream.Write(uriConverter.ConvertToInvariantString(obj));
+            context.StreamWriter.Write(uriConverter.ConvertToInvariantString(obj));
         }
 
         internal static object DeserializeUri(Type expected, IDeserializationContext context)
         {
             if (uriConverter == null) uriConverter = TypeDescriptor.GetConverter(typeof(Uri));
-            return uriConverter.ConvertFromInvariantString(context.Stream.ReadString());
+            return uriConverter.ConvertFromInvariantString(context.StreamReader.ReadString());
         }
 
         internal static object CopyUri(object obj, ICopyContext context)
@@ -1706,12 +1706,12 @@ namespace Orleans.Serialization
         internal static void SerializeGrainId(object obj, ISerializationContext context, Type expected)
         {
             var id = (GrainId)obj;
-            context.Stream.Write(id);
+            context.StreamWriter.Write(id);
         }
 
         internal static object DeserializeGrainId(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadGrainId();
+            return context.StreamReader.ReadGrainId();
         }
 
         internal static object CopyGrainId(object original, ICopyContext context)
@@ -1722,12 +1722,12 @@ namespace Orleans.Serialization
         internal static void SerializeActivationId(object obj, ISerializationContext context, Type expected)
         {
             var id = (ActivationId)obj;
-            context.Stream.Write(id);
+            context.StreamWriter.Write(id);
         }
 
         internal static object DeserializeActivationId(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadActivationId();
+            return context.StreamReader.ReadActivationId();
         }
 
         internal static object CopyActivationId(object original, ICopyContext context)
@@ -1738,12 +1738,12 @@ namespace Orleans.Serialization
         internal static void SerializeActivationAddress(object obj, ISerializationContext context, Type expected)
         {
             var addr = (ActivationAddress)obj;
-            context.Stream.Write(addr);
+            context.StreamWriter.Write(addr);
         }
 
         internal static object DeserializeActivationAddress(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadActivationAddress();
+            return context.StreamReader.ReadActivationAddress();
         }
 
         internal static object CopyActivationAddress(object original, ICopyContext context)
@@ -1754,12 +1754,12 @@ namespace Orleans.Serialization
         internal static void SerializeIPAddress(object obj, ISerializationContext context, Type expected)
         {
             var ip = (IPAddress)obj;
-            context.Stream.Write(ip);
+            context.StreamWriter.Write(ip);
         }
 
         internal static object DeserializeIPAddress(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadIPAddress();
+            return context.StreamReader.ReadIPAddress();
         }
 
         internal static object CopyIPAddress(object original, ICopyContext context)
@@ -1770,12 +1770,12 @@ namespace Orleans.Serialization
         internal static void SerializeIPEndPoint(object obj, ISerializationContext context, Type expected)
         {
             var ep = (IPEndPoint)obj;
-            context.Stream.Write(ep);
+            context.StreamWriter.Write(ep);
         }
 
         internal static object DeserializeIPEndPoint(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadIPEndPoint();
+            return context.StreamReader.ReadIPEndPoint();
         }
 
         internal static object CopyIPEndPoint(object original, ICopyContext context)
@@ -1786,12 +1786,12 @@ namespace Orleans.Serialization
         internal static void SerializeCorrelationId(object obj, ISerializationContext context, Type expected)
         {
             var id = (CorrelationId)obj;
-            context.Stream.Write(id);
+            context.StreamWriter.Write(id);
         }
 
         internal static object DeserializeCorrelationId(Type expected, IDeserializationContext context)
         {
-            var bytes = context.Stream.ReadBytes(CorrelationId.SIZE_BYTES);
+            var bytes = context.StreamReader.ReadBytes(CorrelationId.SIZE_BYTES);
             return new CorrelationId(bytes);
         }
 
@@ -1803,12 +1803,12 @@ namespace Orleans.Serialization
         internal static void SerializeSiloAddress(object obj, ISerializationContext context, Type expected)
         {
             var addr = (SiloAddress)obj;
-            context.Stream.Write(addr);
+            context.StreamWriter.Write(addr);
         }
 
         internal static object DeserializeSiloAddress(Type expected, IDeserializationContext context)
         {
-            return context.Stream.ReadSiloAddress();
+            return context.StreamReader.ReadSiloAddress();
         }
 
         internal static object CopySiloAddress(object original, ICopyContext context)
@@ -1829,9 +1829,9 @@ namespace Orleans.Serialization
         {
             var request = (InvokeMethodRequest)obj;
 
-            context.Stream.Write(request.InterfaceId);
-            context.Stream.Write(request.MethodId);
-            context.Stream.Write(request.Arguments != null ? request.Arguments.Length : 0);
+            context.StreamWriter.Write(request.InterfaceId);
+            context.StreamWriter.Write(request.MethodId);
+            context.StreamWriter.Write(request.Arguments != null ? request.Arguments.Length : 0);
             if (request.Arguments != null)
             {
                 foreach (var arg in request.Arguments)
@@ -1843,10 +1843,10 @@ namespace Orleans.Serialization
 
         internal static object DeserializeInvokeMethodRequest(Type expected, IDeserializationContext context)
         {
-            int iid = context.Stream.ReadInt();
-            int mid = context.Stream.ReadInt();
+            int iid = context.StreamReader.ReadInt();
+            int mid = context.StreamReader.ReadInt();
 
-            int argCount = context.Stream.ReadInt();
+            int argCount = context.StreamReader.ReadInt();
             object[] args = null;
 
             if (argCount > 0)

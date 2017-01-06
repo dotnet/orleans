@@ -69,12 +69,12 @@ namespace Tester.AzureUtils.Streaming
             var container = CreateAzureQueueBatchContainer();
             var writer = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             AzureQueueBatchContainerV2.Serialize(container, writer, null);
             var reader = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(writer.Stream.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
 
             var deserialized = AzureQueueBatchContainerV2.Deserialize(typeof(AzureQueueBatchContainer), reader) as AzureQueueBatchContainerV2;

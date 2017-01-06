@@ -96,7 +96,7 @@ namespace Orleans
         {
             var ctw = (GrainCancellationToken)obj;
             var canceled = ctw.CancellationToken.IsCancellationRequested;
-            var stream = context.Stream;
+            var stream = context.StreamWriter;
             stream.Write(canceled);
             stream.Write(ctw.Id);
         }
@@ -104,7 +104,7 @@ namespace Orleans
         [DeserializerMethod]
         internal static object DeserializeGrainCancellationToken(Type expected, IDeserializationContext context)
         {
-            var stream = context.Stream;
+            var stream = context.StreamReader;
             var cancellationRequested = stream.ReadToken() == SerializationTokenType.True;
             var tokenId = stream.ReadGuid();
             return new GrainCancellationToken(tokenId, cancellationRequested);

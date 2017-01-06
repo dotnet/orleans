@@ -77,7 +77,7 @@
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             var typed = (SimpleType)item;
-            context.Stream.Write(typed.Number);
+            context.StreamWriter.Write(typed.Number);
         }
 
         public object Deserialize(Type expectedType, IDeserializationContext context)

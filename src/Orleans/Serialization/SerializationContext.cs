@@ -19,7 +19,7 @@ namespace Orleans.Serialization
 
     public interface ISerializationContext
     {
-        BinaryTokenStreamWriter Stream { get; }
+        BinaryTokenStreamWriter StreamWriter { get; }
         void RecordObject(object original);
         int CheckObjectWhileSerializing(object raw);
     }
@@ -52,7 +52,7 @@ namespace Orleans.Serialization
             }
         }
 
-        public BinaryTokenStreamWriter Stream { get; set; }
+        public BinaryTokenStreamWriter StreamWriter { get; set; }
 
         private readonly Dictionary<object, Record> processedObjects;
 
@@ -83,7 +83,7 @@ namespace Orleans.Serialization
 
         public void RecordObject(object original)
         {
-            processedObjects[original] = new Record(this.Stream.CurrentOffset);
+            processedObjects[original] = new Record(this.StreamWriter.CurrentOffset);
         }
         
         // Returns an object suitable for insertion if this is a back-reference, or null if it's new

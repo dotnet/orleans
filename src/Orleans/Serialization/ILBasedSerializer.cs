@@ -93,7 +93,7 @@
         {
             if (item == null)
             {
-                context.Stream.WriteNull();
+                context.StreamWriter.WriteNull();
                 return;
             }
 
@@ -105,7 +105,7 @@
         /// <inheritdoc />
         public object Deserialize(Type expectedType, IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var token = reader.ReadToken();
             if (token == SerializationTokenType.Null) return null;
             var actualType = this.ReadType(token, context, expectedType);
@@ -117,11 +117,11 @@
         {
             if (actualType == expectedType)
             {
-                context.Stream.Write((byte)SerializationTokenType.ExpectedType);
+                context.StreamWriter.Write((byte)SerializationTokenType.ExpectedType);
             }
             else
             {
-                context.Stream.Write((byte)SerializationTokenType.NamedType);
+                context.StreamWriter.Write((byte)SerializationTokenType.NamedType);
                 this.WriteNamedType(actualType, context);
             }
         }
@@ -141,7 +141,7 @@
 
         private Type ReadNamedType(IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var hashCode = reader.ReadInt();
             var count = reader.ReadUShort();
             var typeName = reader.ReadBytes(count);
@@ -152,7 +152,7 @@
 
         private void WriteNamedType(Type type, ISerializationContext context)
         {
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             var key = this.typeCache.GetOrAdd(type, t => new TypeKey(Encoding.UTF8.GetBytes(t.AssemblyQualifiedName)));
             writer.Write(key.HashCode);
             writer.Write((ushort)key.TypeName.Length);

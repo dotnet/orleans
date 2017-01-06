@@ -67,13 +67,13 @@ namespace UnitTests.Serialization
         {
             var writer = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             var token = new EventSequenceTokenV2(long.MaxValue, int.MaxValue);
             EventSequenceTokenV2.Serialize(token, writer, null);
             var reader = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(writer.Stream.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
 
             var deserialized = EventSequenceTokenV2.Deserialize(typeof(EventSequenceTokenV2), reader) as EventSequenceTokenV2;
@@ -114,14 +114,14 @@ namespace UnitTests.Serialization
         {
             var writer = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
 
             var token = new EventHubSequenceTokenV2("name", long.MaxValue, int.MaxValue);
             EventHubSequenceTokenV2.Serialize(token, writer, null);
             var reader = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(writer.Stream.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
             var deserialized = EventHubSequenceTokenV2.Deserialize(typeof (EventHubSequenceTokenV2), reader) as EventHubSequenceTokenV2;
             Assert.NotNull(deserialized);

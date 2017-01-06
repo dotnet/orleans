@@ -32,7 +32,7 @@ namespace UnitTests.Serialization
             var serializers = generator.GenerateSerializer(input.GetType(), f => f.Name != "One", f => f.Name != "Three");
             var writer = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             var copy = (FieldTest)serializers.DeepCopy(input, writer);
             Assert.Equal(1, copy.One);
@@ -42,7 +42,7 @@ namespace UnitTests.Serialization
             serializers.Serialize(input, writer, input.GetType());
             var reader = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(writer.Stream.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
             };
             var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
 

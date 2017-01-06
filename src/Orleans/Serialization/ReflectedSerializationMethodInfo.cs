@@ -12,7 +12,7 @@ namespace Orleans.Serialization
     internal class ReflectedSerializationMethodInfo
     {
         /// <summary>
-        /// A reference to the <see cref="SerializationContext.Stream"/> getter.
+        /// A reference to the <see cref="SerializationContext.StreamWriter"/> getter.
         /// </summary>
         public readonly MethodInfo GetStreamFromSerializationContext;
 
@@ -85,8 +85,8 @@ namespace Orleans.Serialization
             
             this.RecordObjectWhileCopying = TypeUtils.Method((ICopyContext ctx) => ctx.RecordCopy(default(object), default(object)));
 
-            this.GetStreamFromDeserializationContext = TypeUtils.Property((IDeserializationContext ctx) => ctx.Stream).GetMethod;
-            this.GetStreamFromSerializationContext = TypeUtils.Property((ISerializationContext ctx) => ctx.Stream).GetMethod;
+            this.GetStreamFromDeserializationContext = TypeUtils.Property((IDeserializationContext ctx) => ctx.StreamReader).GetMethod;
+            this.GetStreamFromSerializationContext = TypeUtils.Property((ISerializationContext ctx) => ctx.StreamWriter).GetMethod;
 
             this.RecordObjectWhileDeserializing = TypeUtils.Method((IDeserializationContext ctx) => ctx.RecordObject(default(object)));
             this.SerializerDelegate =

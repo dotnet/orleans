@@ -82,8 +82,8 @@ namespace Orleans.Providers.Streams.AzureQueue
                 throw new SerializationException();
             }
 
-            context.Stream.Write(typed.StreamGuid);
-            context.Stream.Write(typed.StreamNamespace);
+            context.StreamWriter.Write(typed.StreamGuid);
+            context.StreamWriter.Write(typed.StreamNamespace);
             WriteOrSerializeInner(typed.sequenceToken, context);
             WriteOrSerializeInner(typed.events, context);
             WriteOrSerializeInner(typed.requestContext, context);
@@ -97,7 +97,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <returns>The deserialized value</returns>
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var deserialized = new AzureQueueBatchContainerV2();
             context.RecordObject(deserialized);
             var guid = reader.ReadGuid();
@@ -121,7 +121,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             if (val == null)
             {
-                context.Stream.WriteNull();
+                context.StreamWriter.WriteNull();
             }
             else
             {

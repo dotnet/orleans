@@ -458,7 +458,7 @@ namespace Orleans.Runtime
         {
             var context = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(header)
+                StreamReader = new BinaryTokenStreamReader(header)
             };
 
             Headers = SerializationManager.DeserializeMessageHeaders(context);
@@ -587,7 +587,7 @@ namespace Orleans.Runtime
         {
             var context = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             SerializationManager.SerializeMessageHeaders(Headers, context);
 
@@ -606,9 +606,9 @@ namespace Orleans.Runtime
             {
                 BufferPool.GlobalPool.Release(headerBytes);
             }
-            headerBytes = context.Stream.ToBytes() as List<ArraySegment<byte>>;
-            int headerLength = headerBytes.Sum(ab => ab.Count);
-            int bodyLength = bodyBytes.Sum(ab => ab.Count);
+            headerBytes = context.StreamWriter.ToBytes() as List<ArraySegment<byte>>;
+            int headerLength = context.StreamWriter.CurrentOffset;
+            int bodyLength = BufferLength(bodyBytes);
 
             var bytes = new List<ArraySegment<byte>>();
             bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
@@ -811,6 +811,17 @@ namespace Orleans.Runtime
             MessagingStatisticsGroup.OnMessageExpired(phase);
             if (logger.IsVerbose2) logger.Verbose2("Dropping an expired message: {0}", this);
             ReleaseBodyAndHeaderBuffers();
+        }
+
+        private static int BufferLength(List<ArraySegment<byte>> buffer)
+        {
+            var result = 0;
+            for (var i = 0; i < buffer.Count; i++)
+            {
+                result += buffer[i].Count;
+            }
+
+            return result;
         }
 
         [Serializable]
@@ -1177,7 +1188,7 @@ namespace Orleans.Runtime
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
                 var headers = input.GetHeadersMask();
-                var stream = context.Stream;
+                var stream = context.StreamWriter;
                 stream.Write((int)headers);
                 if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
                 {
@@ -1291,7 +1302,7 @@ namespace Orleans.Runtime
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 var result = new HeadersContainer();
-                var stream = context.Stream;
+                var stream = context.StreamReader;
                 context.RecordObject(result);
                 var headers = (Headers)stream.ReadInt();
 

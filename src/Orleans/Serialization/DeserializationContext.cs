@@ -5,7 +5,7 @@ namespace Orleans.Serialization
 {
     public interface IDeserializationContext
     {
-        BinaryTokenStreamReader Stream { get; }
+        BinaryTokenStreamReader StreamReader { get; }
         int CurrentObjectOffset { get; set; }
         void RecordObject(object obj);
         object FetchReferencedObject(int offset);
@@ -20,7 +20,7 @@ namespace Orleans.Serialization
             taggedObjects = new Dictionary<int, object>();
         }
 
-        public BinaryTokenStreamReader Stream { get; set; }
+        public BinaryTokenStreamReader StreamReader { get; set; }
 
         internal void Reset()
         {

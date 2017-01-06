@@ -1129,7 +1129,7 @@ namespace Orleans.Serialization
 
             var context = CurrentSerializationContext;
             context.Reset();
-            context.Stream = stream;
+            context.StreamWriter = stream;
             SerializeInner(raw, context, null);
             context.Reset();
             
@@ -1149,7 +1149,7 @@ namespace Orleans.Serialization
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, ISerializationContext context, Type expected)
         {
-            var stream = context.Stream;
+            var stream = context.StreamWriter;
 
             // Nulls get special handling
             if (obj == null)
@@ -1269,7 +1269,7 @@ namespace Orleans.Serialization
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
         private static void SerializeArray(Array array, ISerializationContext context, Type expected, Type et)
         {
-            var stream = context.Stream;
+            var stream = context.StreamWriter;
 
             // First check for one of the optimized cases
             if (array.Rank == 1)
@@ -1429,7 +1429,7 @@ namespace Orleans.Serialization
             {
                 var context = CurrentSerializationContext;
                 context.Reset();
-                context.Stream = stream;
+                context.StreamWriter = stream;
                 SerializeInner(raw, context, null);
                 context.Reset();
                 result = stream.ToByteArray();
@@ -1485,7 +1485,7 @@ namespace Orleans.Serialization
 
             var context = CurrentDeserializationContext;
             context.Reset();
-            context.Stream = stream;
+            context.StreamReader = stream;
             result = DeserializeInner(t, context);
             context.Reset();
             
@@ -1517,8 +1517,8 @@ namespace Orleans.Serialization
         public static object DeserializeInner(Type expected, IDeserializationContext context)
         {
             var previousOffset = context.CurrentObjectOffset;
-            var stream = context.Stream;
-            context.CurrentObjectOffset = context.Stream.CurrentPosition;
+            var stream = context.StreamReader;
+            context.CurrentObjectOffset = context.StreamReader.CurrentPosition;
 
             try
             {
@@ -1613,7 +1613,7 @@ namespace Orleans.Serialization
 
         private static object DeserializeArray(Type resultType, IDeserializationContext context)
         {
-            var stream = context.Stream;
+            var stream = context.StreamReader;
             var lengths = ReadArrayLengths(resultType.GetArrayRank(), stream);
             var rank = lengths.Length;
             var et = resultType.GetElementType();
@@ -1781,7 +1781,7 @@ namespace Orleans.Serialization
         {
             var context = CurrentDeserializationContext;
             context.Reset();
-            context.Stream = new BinaryTokenStreamReader(data);
+            context.StreamReader = new BinaryTokenStreamReader(data);
             var result = DeserializeInner<T>(context);
             context.Reset();
             return result;
@@ -1875,7 +1875,7 @@ namespace Orleans.Serialization
                 FallbackSerializations.Increment();
             }
 
-            context.Stream.Write(SerializationTokenType.Fallback);
+            context.StreamWriter.Write(SerializationTokenType.Fallback);
             fallbackSerializer.Serialize(raw, context, t);
 
             if (StatisticsCollector.CollectSerializationStats)

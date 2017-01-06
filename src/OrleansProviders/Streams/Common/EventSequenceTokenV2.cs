@@ -62,7 +62,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="expected">The expected type.</param>
         public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             var typed = untypedInput as EventSequenceTokenV2;
             if (typed == null)
             {
@@ -82,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var result = new EventSequenceTokenV2(reader.ReadLong(), reader.ReadInt());
             context.RecordObject(result);
             return result;

@@ -41,13 +41,13 @@ namespace Tester.Serialization
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             SerializeCalled = true;
-            context.Stream.WriteNull();
+            context.StreamWriter.WriteNull();
         }
 
         public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             DeserializeCalled = true;
-            context.Stream.ReadToken();
+            context.StreamReader.ReadToken();
             return (FakeSerialized)Activator.CreateInstance(expectedType);
         }
     }

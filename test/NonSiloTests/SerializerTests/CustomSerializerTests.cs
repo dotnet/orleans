@@ -51,7 +51,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         {
             SerializeCounter++;
             var obj = input as ClassWithCustomSerializer;
-            var stream = context.Stream;
+            var stream = context.StreamWriter;
             stream.Write(obj.IntProperty);
             stream.Write(obj.StringProperty);
         }
@@ -61,7 +61,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         {
             DeserializeCounter++;
             var result = new ClassWithCustomSerializer();
-            var stream = context.Stream;
+            var stream = context.StreamReader;
             result.IntProperty = stream.ReadInt();
             result.StringProperty = stream.ReadString();
             return result;

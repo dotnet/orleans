@@ -63,12 +63,12 @@ namespace DefaultCluster.Tests.General
             {
                 var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, context.Stream);
+                SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.Stream);
+                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
 

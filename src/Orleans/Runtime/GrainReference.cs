@@ -483,7 +483,7 @@ namespace Orleans.Runtime
         [SerializerMethod]
         protected internal static void SerializeGrainReference(object obj, ISerializationContext context, Type expected)
         {
-            var stream = context.Stream;
+            var stream = context.StreamWriter;
             var input = (GrainReference)obj;
             stream.Write(input.GrainId);
             if (input.IsSystemTarget)
@@ -513,7 +513,7 @@ namespace Orleans.Runtime
         [DeserializerMethod]
         protected internal static object DeserializeGrainReference(Type t, IDeserializationContext context)
         {
-            var stream = context.Stream;
+            var stream = context.StreamReader;
             GrainId id = stream.ReadGrainId();
             SiloAddress silo = null;
             GuidId observerId = null;

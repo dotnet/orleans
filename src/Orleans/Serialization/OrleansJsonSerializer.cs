@@ -104,17 +104,17 @@ namespace Orleans.Serialization
 
             var serializationContext = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             
             Serialize(source, serializationContext, source.GetType());
             var deserializationContext = new DeserializationContext
             {
-                Stream = new BinaryTokenStreamReader(serializationContext.Stream.ToBytes())
+                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
             };
 
             var retVal = Deserialize(source.GetType(), deserializationContext);
-            serializationContext.Stream.ReleaseBuffers();
+            serializationContext.StreamWriter.ReleaseBuffers();
             return retVal;
         }
 
@@ -126,7 +126,7 @@ namespace Orleans.Serialization
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var str = reader.ReadString();
             return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
@@ -144,7 +144,7 @@ namespace Orleans.Serialization
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             if (item == null)
             {
                 writer.WriteNull();

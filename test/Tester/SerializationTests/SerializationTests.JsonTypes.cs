@@ -53,12 +53,12 @@ namespace UnitTests.Serialization
             {
                 var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, context.Stream);
+                SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.Stream);
+                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
 
@@ -156,12 +156,12 @@ namespace UnitTests.Serialization
             public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
-                SerializationManager.Serialize(str, context.Stream);
+                SerializationManager.Serialize(str, context.StreamWriter);
             }
 
             public static object Deserialize(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), context.Stream);
+                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
             }
 

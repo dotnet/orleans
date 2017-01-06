@@ -46,7 +46,7 @@ namespace Orleans.Serialization
 
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             if (writer == null)
             {
                 throw new ArgumentNullException("writer");
@@ -73,7 +73,7 @@ namespace Orleans.Serialization
 
         public object Deserialize(Type expectedType, IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             if (reader == null)
             {
                 throw new ArgumentNullException(nameof(reader));

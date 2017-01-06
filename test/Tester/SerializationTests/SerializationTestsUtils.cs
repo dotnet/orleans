@@ -9,10 +9,10 @@ namespace Tester.SerializationTests
         {
             var writer = new SerializationContext
             {
-                Stream = new BinaryTokenStreamWriter()
+                StreamWriter = new BinaryTokenStreamWriter()
             };
             SerializationManager.FallbackSerializer(ob, writer, ob.GetType());
-            var bytes = writer.Stream.ToByteArray();
+            var bytes = writer.StreamWriter.ToByteArray();
 
             var reader = new BinaryTokenStreamReader(bytes);
             var serToken = reader.ReadToken();

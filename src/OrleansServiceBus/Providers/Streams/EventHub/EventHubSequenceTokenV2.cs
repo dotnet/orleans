@@ -63,7 +63,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
         public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
             var typed = untypedInput as EventHubSequenceTokenV2;
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             if (typed == null)
             {
                 writer.WriteNull();
@@ -83,7 +83,7 @@ namespace OrleansServiceBus.Providers.Streams.EventHub
         /// <returns></returns>
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
-            var reader = context.Stream;
+            var reader = context.StreamReader;
             var deserialized = new EventHubSequenceTokenV2(reader.ReadString(), reader.ReadLong(), reader.ReadInt());
             context.RecordObject(deserialized);
             return deserialized;

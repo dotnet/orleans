@@ -88,7 +88,7 @@ namespace Orleans.Serialization
                 throw new ArgumentOutOfRangeException("no deserializer provided for the selected type", "expectedType");
             }
 
-            var inputStream = InputStream.Create(context.Stream);
+            var inputStream = InputStream.Create(context.StreamReader);
             var bondReader = new BondBinaryReader(inputStream);
             return deserializer.Deserialize(bondReader);
         }
@@ -110,7 +110,7 @@ namespace Orleans.Serialization
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var writer = context.Stream;
+            var writer = context.StreamWriter;
             if (item == null)
             {
                 writer.WriteNull();
