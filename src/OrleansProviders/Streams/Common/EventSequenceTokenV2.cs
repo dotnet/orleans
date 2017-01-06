@@ -39,8 +39,9 @@ namespace Orleans.Providers.Streams.Common
         /// Create a deep copy of the token.
         /// </summary>
         /// <param name="original">The token to copy</param>
+        /// <param name="context">The serialization context.</param>
         /// <returns>A copy</returns>
-        public static object DeepCopy(object original)
+        public static object DeepCopy(object original, ICopyContext context)
         {
             var source = original as EventSequenceTokenV2;
             if (source == null)
@@ -49,7 +50,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             var copy = new EventSequenceTokenV2(source.SequenceNumber, source.EventIndex);
-            SerializationContext.Current.RecordObject(original, copy);
+            context.RecordCopy(original, copy);
             return copy;
         }
 
@@ -57,10 +58,11 @@ namespace Orleans.Providers.Streams.Common
         /// Serialize the event sequence token.
         /// </summary>
         /// <param name="untypedInput">The object to serialize.</param>
-        /// <param name="writer">The writer to write the binary stream to.</param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expected">The expected type.</param>
-        public static void Serialize(object untypedInput, BinaryTokenStreamWriter writer, Type expected)
+        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
+            var writer = context.StreamWriter;
             var typed = untypedInput as EventSequenceTokenV2;
             if (typed == null)
             {
@@ -76,12 +78,13 @@ namespace Orleans.Providers.Streams.Common
         /// Deserializes an event sequence token
         /// </summary>
         /// <param name="expected">The expected type.</param>
-        /// <param name="reader">The binary stream to read from.</param>
+        /// <param name="context">The deserialization context.</param>
         /// <returns></returns>
-        public static object Deserialize(Type expected, BinaryTokenStreamReader reader)
+        public static object Deserialize(Type expected, IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             var result = new EventSequenceTokenV2(reader.ReadLong(), reader.ReadInt());
-            DeserializationContext.Current.RecordObject(result);
+            context.RecordObject(result);
             return result;
         }
     }

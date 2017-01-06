@@ -69,18 +69,18 @@
 
         public bool IsSupportedType(Type itemType) => itemType == typeof(SimpleType);
 
-        public object DeepCopy(object source)
+        public object DeepCopy(object source, ICopyContext context)
         {
             return source;
         }
 
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             var typed = (SimpleType)item;
-            writer.Write(typed.Number);
+            context.StreamWriter.Write(typed.Number);
         }
 
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             throw new NotSupportedException(FailureMessage);
         }

@@ -82,57 +82,51 @@ namespace Orleans.Serialization
             return settings;
         }
 
-        /// <summary>
-        /// Initializes the serializer
-        /// </summary>
-        /// <param name="logger">The logger to use to capture any serialization events</param>
+        /// <inheritdoc />
         public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
 
-        /// <summary>
-        /// Informs the serialization manager whether this serializer supports the type for serialization.
-        /// </summary>
-        /// <param name="itemType">The type of the item to be serialized</param>
-        /// <returns>A value indicating whether the item can be serialized.</returns>
+        /// <inheritdoc />
         public bool IsSupportedType(Type itemType)
         {
             return true;
         }
 
-        /// <summary>
-        /// Creates a deep copy of an object
-        /// </summary>
-        /// <param name="source">The source object to be copy</param>
-        /// <returns>The copy that was created</returns>
-        public object DeepCopy(object source)
+        /// <inheritdoc />
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null)
             {
                 return null;
             }
 
-            var writer = new BinaryTokenStreamWriter();
-            Serialize(source, writer, source.GetType());
-            var retVal = Deserialize(source.GetType(), new BinaryTokenStreamReader(writer.ToByteArray()));
-            writer.ReleaseBuffers();
+            var serializationContext = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            
+            Serialize(source, serializationContext, source.GetType());
+            var deserializationContext = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
+            };
+
+            var retVal = Deserialize(source.GetType(), deserializationContext);
+            serializationContext.StreamWriter.ReleaseBuffers();
             return retVal;
         }
 
-        /// <summary>
-        /// Deserializes an object from a binary stream
-        /// </summary>
-        /// <param name="expectedType">The type that is expected to be deserialized</param>
-        /// <param name="reader">The <see cref="BinaryTokenStreamReader"/></param>
-        /// <returns>The deserialized object</returns>
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        /// <inheritdoc />
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
-            if (reader == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(context));
             }
 
+            var reader = context.StreamReader;
             var str = reader.ReadString();
             return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
@@ -141,15 +135,16 @@ namespace Orleans.Serialization
         /// Serializes an object to a binary stream
         /// </summary>
         /// <param name="item">The object to serialize</param>
-        /// <param name="writer">The <see cref="BinaryTokenStreamWriter"/></param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expectedType">The type the deserializer should expect</param>
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
-            if (writer == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("writer");
+                throw new ArgumentNullException(nameof(context));
             }
 
+            var writer = context.StreamWriter;
             if (item == null)
             {
                 writer.WriteNull();

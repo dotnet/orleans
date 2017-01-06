@@ -29,23 +29,24 @@ namespace Orleans.Serialization
         /// Tries to create a copy of source.
         /// </summary>
         /// <param name="source">The item to create a copy of</param>
+        /// <param name="context">The context in which the object is being copied.</param>
         /// <returns>The copy</returns>
-        object DeepCopy(object source);
+        object DeepCopy(object source, ICopyContext context);
 
         /// <summary>
         /// Tries to serialize an item.
         /// </summary>
         /// <param name="item">The instance of the object being serialized</param>
-        /// <param name="writer">The writer used for serialization</param>
+        /// <param name="context">The context in which the object is being serialized.</param>
         /// <param name="expectedType">The type that the deserializer will expect</param>
-        void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType);
+        void Serialize(object item, ISerializationContext context, Type expectedType);
 
         /// <summary>
         /// Tries to deserialize an item.
         /// </summary>
-        /// <param name="reader">The reader used for binary deserialization</param>
-        /// <param name="expectedType">The type that should be deserialzied</param>
+        /// <param name="context">The context in which the object is being deserialized.</param>
+        /// <param name="expectedType">The type that should be deserialized</param>
         /// <returns>The deserialized object</returns>
-        object Deserialize(Type expectedType, BinaryTokenStreamReader reader);
+        object Deserialize(Type expectedType, IDeserializationContext context);
     }
 }

@@ -44,7 +44,7 @@ namespace UnitTests.Serialization
         public void EventSequenceTokenV2_DeepCopy_IfNotNull()
         {
             var token = new EventSequenceTokenV2(long.MaxValue, int.MaxValue);
-            var copy = EventSequenceTokenV2.DeepCopy(token) as EventSequenceToken;
+            var copy = EventSequenceTokenV2.DeepCopy(token, new SerializationContext()) as EventSequenceToken;
             Assert.NotNull(copy);
             Assert.NotSame(token, copy);
             Assert.Equal(token.EventIndex, copy.EventIndex);
@@ -65,10 +65,17 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventSequenceTokenV2_Serialize_IfNotNull()
         {
-            var writer = new BinaryTokenStreamWriter();
+            var writer = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
             var token = new EventSequenceTokenV2(long.MaxValue, int.MaxValue);
             EventSequenceTokenV2.Serialize(token, writer, null);
-            var reader = new BinaryTokenStreamReader(writer.ToByteArray());
+            var reader = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
+
             var deserialized = EventSequenceTokenV2.Deserialize(typeof(EventSequenceTokenV2), reader) as EventSequenceTokenV2;
             Assert.NotNull(deserialized);
             Assert.NotSame(token, deserialized);
@@ -84,7 +91,7 @@ namespace UnitTests.Serialization
         public void EventHubSequenceTokenV2_DeepCopy_IfNotNull()
         {
             var token = new EventHubSequenceTokenV2("name", long.MaxValue, int.MaxValue);
-            var copy = EventHubSequenceTokenV2.DeepCopy(token) as EventSequenceToken;
+            var copy = EventHubSequenceTokenV2.DeepCopy(token, new SerializationContext()) as EventSequenceToken;
             Assert.NotNull(copy);
             Assert.NotSame(token, copy);
             Assert.Equal(token.EventIndex, copy.EventIndex);
@@ -105,10 +112,17 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
         public void EventHubSequenceTokenV2_Serialize_IfNotNull()
         {
-            var writer = new BinaryTokenStreamWriter();
+            var writer = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+
             var token = new EventHubSequenceTokenV2("name", long.MaxValue, int.MaxValue);
             EventHubSequenceTokenV2.Serialize(token, writer, null);
-            var reader = new BinaryTokenStreamReader(writer.ToByteArray());
+            var reader = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
             var deserialized = EventHubSequenceTokenV2.Deserialize(typeof (EventHubSequenceTokenV2), reader) as EventHubSequenceTokenV2;
             Assert.NotNull(deserialized);
             Assert.NotSame(token, deserialized);

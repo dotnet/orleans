@@ -92,24 +92,26 @@ namespace Orleans
         #region Serialization
 
         [SerializerMethod]
-        internal static void SerializeGrainCancellationToken(object obj, BinaryTokenStreamWriter stream, Type expected)
+        internal static void SerializeGrainCancellationToken(object obj, ISerializationContext context, Type expected)
         {
             var ctw = (GrainCancellationToken)obj;
             var canceled = ctw.CancellationToken.IsCancellationRequested;
-            stream.Write(canceled);
-            stream.Write(ctw.Id);
+            var writer = context.StreamWriter;
+            writer.Write(canceled);
+            writer.Write(ctw.Id);
         }
 
         [DeserializerMethod]
-        internal static object DeserializeGrainCancellationToken(Type expected, BinaryTokenStreamReader stream)
+        internal static object DeserializeGrainCancellationToken(Type expected, IDeserializationContext context)
         {
-            var cancellationRequested = stream.ReadToken() == SerializationTokenType.True;
-            var tokenId = stream.ReadGuid();
+            var reader = context.StreamReader;
+            var cancellationRequested = reader.ReadToken() == SerializationTokenType.True;
+            var tokenId = reader.ReadGuid();
             return new GrainCancellationToken(tokenId, cancellationRequested);
         }
 
         [CopierMethod]
-        internal static object CopyGrainCancellationToken(object obj)
+        internal static object CopyGrainCancellationToken(object obj, ICopyContext context)
         {
             var gct = (GrainCancellationToken) obj;
             return new GrainCancellationToken(gct.Id, gct.IsCancellationRequested);

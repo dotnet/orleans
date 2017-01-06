@@ -1,25 +1,26 @@
-using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    public class DeserializationContext
+    public interface IDeserializationContext
     {
-        [ThreadStatic]
-        private static DeserializationContext ctx;
+        BinaryTokenStreamReader StreamReader { get; }
+        int CurrentObjectOffset { get; set; }
+        void RecordObject(object obj);
+        object FetchReferencedObject(int offset);
+    }
 
-        public static DeserializationContext Current
-        {
-            get { return ctx ?? (ctx = new DeserializationContext()); }
-        }
-
+    public class DeserializationContext : IDeserializationContext
+    {
         private readonly Dictionary<int, object> taggedObjects;
 
-        private DeserializationContext()
+        public DeserializationContext()
         {
             taggedObjects = new Dictionary<int, object>();
         }
+
+        public BinaryTokenStreamReader StreamReader { get; set; }
 
         internal void Reset()
         {
@@ -27,19 +28,14 @@ namespace Orleans.Serialization
             CurrentObjectOffset = 0;
         }
 
-        internal int CurrentObjectOffset { get; set; }
-
-        internal void RecordObject(int offset, object obj)
-        {
-            taggedObjects[offset] = obj;
-        }
+        public int CurrentObjectOffset { get; set; }
 
         public void RecordObject(object obj)
         {
             taggedObjects[CurrentObjectOffset] = obj;
         }
 
-        internal object FetchReferencedObject(int offset)
+        public object FetchReferencedObject(int offset)
         {
             object result;
             if (!taggedObjects.TryGetValue(offset, out result))
