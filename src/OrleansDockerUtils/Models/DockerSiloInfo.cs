@@ -51,7 +51,7 @@ namespace Microsoft.Orleans.Docker.Models
         {
             Name = siloName;
             Silo = SiloAddress.New(siloEndPoint, generation).ToParsableString(); 
-            Gateway = SiloAddress.New(gatewayEndPoint, generation).ToParsableString();
+            Gateway = gatewayEndPoint != null ? SiloAddress.New(gatewayEndPoint, generation).ToParsableString() : null;
         }
 
         /// <inheritdoc />

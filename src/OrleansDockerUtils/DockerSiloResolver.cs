@@ -53,7 +53,7 @@ namespace Microsoft.Orleans.Docker
 
             lock (updateLock)
             {
-                silos = inspectionResult.Select(GetSiloFromContainer).ToList(); 
+                silos = inspectionResult.Select(GetSiloFromContainer).ToList();
             }
 
             NotifySubscribers();
@@ -67,9 +67,10 @@ namespace Microsoft.Orleans.Docker
             var siloPort = container.Config.Labels[DockerLabels.SILO_PORT];
             var siloEndpoint = new IPEndPoint(siloIPAddress, int.Parse(siloPort));
 
-            var gatewayIPAddress = IPAddress.Parse(network.IPAddress);
-            var gatewayPort = container.Config.Labels[DockerLabels.GATEWAY_PORT];
-            var gatewayEndpoint = new IPEndPoint(siloIPAddress, int.Parse(gatewayPort));
+            IPEndPoint gatewayEndpoint = null;
+            string gatewayPort;
+            if (container.Config.Labels.TryGetValue(DockerLabels.GATEWAY_PORT, out gatewayPort))
+                gatewayEndpoint = new IPEndPoint(siloIPAddress, int.Parse(gatewayPort));
 
             var generation = int.Parse(container.Config.Labels[DockerLabels.GENERATION]);
 

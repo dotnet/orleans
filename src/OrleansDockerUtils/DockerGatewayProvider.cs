@@ -38,9 +38,9 @@ namespace Microsoft.Orleans.Docker
         public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
         {
             resolver = new DockerSiloResolver(
-                clientConfiguration.DeploymentId, 
-                clientConfiguration.CreateDockerClient(), 
-                logger.GetLogger); 
+                clientConfiguration.DeploymentId,
+                clientConfiguration.CreateDockerClient(),
+                logger.GetLogger);
 
             resolver.Subscribe(this);
             log = logger.GetLogger(nameof(DockerGatewayProvider));
@@ -109,7 +109,8 @@ namespace Microsoft.Orleans.Docker
 
         public void OnUpdate(DockerSiloInfo[] silos)
         {
-            gateways = silos.Select(silo => silo.GatewayAddress.ToGatewayUri()).ToList();
+            gateways = silos.Where(s => string.IsNullOrWhiteSpace(s.Gateway))
+                .Select(silo => silo.GatewayAddress.ToGatewayUri()).ToList();
 
             if (log.IsVerbose)
             {
