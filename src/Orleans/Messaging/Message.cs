@@ -1188,12 +1188,12 @@ namespace Orleans.Runtime
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
                 var headers = input.GetHeadersMask();
-                var stream = context.StreamWriter;
-                stream.Write((int)headers);
+                var writer = context.StreamWriter;
+                writer.Write((int)headers);
                 if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
                 {
                     var count = input.CacheInvalidationHeader.Count;
-                    stream.Write(input.CacheInvalidationHeader.Count);
+                    writer.Write(input.CacheInvalidationHeader.Count);
                     for (int i = 0; i < count; i++)
                     {
                         WriteObj(context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
@@ -1202,89 +1202,89 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.CATEGORY) != Headers.NONE)
                 {
-                    stream.Write((byte)input.Category);
+                    writer.Write((byte)input.Category);
                 }
 
                 if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    stream.Write(input.DebugContext);
+                    writer.Write(input.DebugContext);
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
-                    stream.Write((byte)input.Direction.Value);
+                    writer.Write((byte)input.Direction.Value);
 
                 if ((headers & Headers.EXPIRATION) != Headers.NONE)
-                    stream.Write(input.Expiration.Value);
+                    writer.Write(input.Expiration.Value);
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
-                    stream.Write(input.ForwardCount);
+                    writer.Write(input.ForwardCount);
 
                 if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
-                    stream.Write(input.GenericGrainType);
+                    writer.Write(input.GenericGrainType);
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    stream.Write(input.Id);
+                    writer.Write(input.Id);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
-                    stream.Write(input.IsAlwaysInterleave);
+                    writer.Write(input.IsAlwaysInterleave);
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
-                    stream.Write(input.IsNewPlacement);
+                    writer.Write(input.IsNewPlacement);
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
-                    stream.Write(input.IsReadOnly);
+                    writer.Write(input.IsReadOnly);
 
                 if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
-                    stream.Write(input.IsUnordered);
+                    writer.Write(input.IsUnordered);
 
                 if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    stream.Write(input.NewGrainType);
+                    writer.Write(input.NewGrainType);
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
-                    stream.Write(input.RejectionInfo);
+                    writer.Write(input.RejectionInfo);
 
                 if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
-                    stream.Write((byte)input.RejectionType);
+                    writer.Write((byte)input.RejectionType);
 
                 if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
                 {
                     var requestData = input.RequestContextData;
                     var count = requestData.Count;
-                    stream.Write(count);
+                    writer.Write(count);
                     foreach (var d in requestData)
                     {
-                        stream.Write(d.Key);
+                        writer.Write(d.Key);
                         SerializationManager.SerializeInner(d.Value, context, typeof(object));
                     }
                 }
 
                 if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    stream.Write(input.ResendCount);
+                    writer.Write(input.ResendCount);
 
                 if ((headers & Headers.RESULT) != Headers.NONE)
-                    stream.Write((byte)input.Result);
+                    writer.Write((byte)input.Result);
 
                 if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
                 {
-                    stream.Write(input.SendingActivation);
+                    writer.Write(input.SendingActivation);
                 }
 
                 if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
                 {
-                    stream.Write(input.SendingGrain);
+                    writer.Write(input.SendingGrain);
                 }
 
                 if ((headers & Headers.SENDING_SILO) != Headers.NONE)
                 {
-                    stream.Write(input.SendingSilo);
+                    writer.Write(input.SendingSilo);
                 }
 
                 if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE)
                 {
-                    stream.Write(input.TargetActivation);
+                    writer.Write(input.TargetActivation);
                 }
 
                 if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
                 {
-                    stream.Write(input.TargetGrain);
+                    writer.Write(input.TargetGrain);
                 }
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
@@ -1294,7 +1294,7 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                 {
-                    stream.Write(input.TargetSilo);
+                    writer.Write(input.TargetSilo);
                 }
             }
 
@@ -1302,13 +1302,13 @@ namespace Orleans.Runtime
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 var result = new HeadersContainer();
-                var stream = context.StreamReader;
+                var reader = context.StreamReader;
                 context.RecordObject(result);
-                var headers = (Headers)stream.ReadInt();
+                var headers = (Headers)reader.ReadInt();
 
                 if ((headers & Headers.CACHE_INVALIDATION_HEADER) != Headers.NONE)
                 {
-                    var n = stream.ReadInt();
+                    var n = reader.ReadInt();
                     if (n > 0)
                     {
                        var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
@@ -1320,84 +1320,84 @@ namespace Orleans.Runtime
                 }
 
                 if ((headers & Headers.CATEGORY) != Headers.NONE)
-                    result.Category = (Categories)stream.ReadByte();
+                    result.Category = (Categories)reader.ReadByte();
 
                 if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    result.DebugContext = stream.ReadString();
+                    result.DebugContext = reader.ReadString();
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
-                    result.Direction = (Message.Directions)stream.ReadByte();
+                    result.Direction = (Message.Directions)reader.ReadByte();
 
                 if ((headers & Headers.EXPIRATION) != Headers.NONE)
-                    result.Expiration = stream.ReadDateTime();
+                    result.Expiration = reader.ReadDateTime();
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
-                    result.ForwardCount = stream.ReadInt();
+                    result.ForwardCount = reader.ReadInt();
 
                 if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
-                    result.GenericGrainType = stream.ReadString();
+                    result.GenericGrainType = reader.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
                     result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), context);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
-                    result.IsAlwaysInterleave = ReadBool(stream);
+                    result.IsAlwaysInterleave = ReadBool(reader);
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
-                    result.IsNewPlacement = ReadBool(stream);
+                    result.IsNewPlacement = ReadBool(reader);
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
-                    result.IsReadOnly = ReadBool(stream);
+                    result.IsReadOnly = ReadBool(reader);
 
                 if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
-                    result.IsUnordered = ReadBool(stream);
+                    result.IsUnordered = ReadBool(reader);
 
                 if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    result.NewGrainType = stream.ReadString();
+                    result.NewGrainType = reader.ReadString();
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
-                    result.RejectionInfo = stream.ReadString();
+                    result.RejectionInfo = reader.ReadString();
 
                 if ((headers & Headers.REJECTION_TYPE) != Headers.NONE)
-                    result.RejectionType = (RejectionTypes)stream.ReadByte();
+                    result.RejectionType = (RejectionTypes)reader.ReadByte();
 
                 if ((headers & Headers.REQUEST_CONTEXT) != Headers.NONE)
                 {
-                    var c = stream.ReadInt();
+                    var c = reader.ReadInt();
                     var requestData = new Dictionary<string, object>(c);
                     for (int i = 0; i < c; i++)
                     {
-                        requestData[stream.ReadString()] = SerializationManager.DeserializeInner(null, context);
+                        requestData[reader.ReadString()] = SerializationManager.DeserializeInner(null, context);
                     }
                     result.RequestContextData = requestData;
                 }
 
                 if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    result.ResendCount = stream.ReadInt();
+                    result.ResendCount = reader.ReadInt();
 
                 if ((headers & Headers.RESULT) != Headers.NONE)
-                    result.Result = (Orleans.Runtime.Message.ResponseTypes)stream.ReadByte();
+                    result.Result = (Orleans.Runtime.Message.ResponseTypes)reader.ReadByte();
 
                 if ((headers & Headers.SENDING_ACTIVATION) != Headers.NONE)
-                    result.SendingActivation = stream.ReadActivationId();
+                    result.SendingActivation = reader.ReadActivationId();
 
                 if ((headers & Headers.SENDING_GRAIN) != Headers.NONE)
-                    result.SendingGrain = stream.ReadGrainId();
+                    result.SendingGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.SENDING_SILO) != Headers.NONE)
-                    result.SendingSilo = stream.ReadSiloAddress();
+                    result.SendingSilo = reader.ReadSiloAddress();
 
                 if ((headers & Headers.TARGET_ACTIVATION) != Headers.NONE) 
-                    result.TargetActivation = stream.ReadActivationId();
+                    result.TargetActivation = reader.ReadActivationId();
 
                 if ((headers & Headers.TARGET_GRAIN) != Headers.NONE)
-                    result.TargetGrain = stream.ReadGrainId();
+                    result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                     result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
-                    result.TargetSilo = stream.ReadSiloAddress();
+                    result.TargetSilo = reader.ReadSiloAddress();
 
                 return (HeadersContainer)result;
             }

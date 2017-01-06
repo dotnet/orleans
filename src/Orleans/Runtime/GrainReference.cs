@@ -483,29 +483,29 @@ namespace Orleans.Runtime
         [SerializerMethod]
         protected internal static void SerializeGrainReference(object obj, ISerializationContext context, Type expected)
         {
-            var stream = context.StreamWriter;
+            var writer = context.StreamWriter;
             var input = (GrainReference)obj;
-            stream.Write(input.GrainId);
+            writer.Write(input.GrainId);
             if (input.IsSystemTarget)
             {
-                stream.Write((byte)1);
-                stream.Write(input.SystemTargetSilo);
+                writer.Write((byte)1);
+                writer.Write(input.SystemTargetSilo);
             }
             else
             {
-                stream.Write((byte)0);
+                writer.Write((byte)0);
             }
 
             if (input.IsObserverReference)
             {
-                input.observerId.SerializeToStream(stream);
+                input.observerId.SerializeToStream(writer);
             }
 
             // store as null, serialize as empty.
             var genericArg = String.Empty;
             if (input.HasGenericArgument)
                 genericArg = input.genericArguments;
-            stream.Write(genericArg);
+            writer.Write(genericArg);
         }
 
         /// <summary> Deserializer function for grain reference.</summary>
@@ -513,22 +513,22 @@ namespace Orleans.Runtime
         [DeserializerMethod]
         protected internal static object DeserializeGrainReference(Type t, IDeserializationContext context)
         {
-            var stream = context.StreamReader;
-            GrainId id = stream.ReadGrainId();
+            var reader = context.StreamReader;
+            GrainId id = reader.ReadGrainId();
             SiloAddress silo = null;
             GuidId observerId = null;
-            byte siloAddressPresent = stream.ReadByte();
+            byte siloAddressPresent = reader.ReadByte();
             if (siloAddressPresent != 0)
             {
-                silo = stream.ReadSiloAddress();
+                silo = reader.ReadSiloAddress();
             }
             bool expectObserverId = id.IsClient;
             if (expectObserverId)
             {
-                observerId = GuidId.DeserializeFromStream(stream);
+                observerId = GuidId.DeserializeFromStream(reader);
             }
             // store as null, serialize as empty.
-            var genericArg = stream.ReadString();
+            var genericArg = reader.ReadString();
             if (String.IsNullOrEmpty(genericArg))
                 genericArg = null;
 

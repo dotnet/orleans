@@ -96,17 +96,17 @@ namespace Orleans
         {
             var ctw = (GrainCancellationToken)obj;
             var canceled = ctw.CancellationToken.IsCancellationRequested;
-            var stream = context.StreamWriter;
-            stream.Write(canceled);
-            stream.Write(ctw.Id);
+            var writer = context.StreamWriter;
+            writer.Write(canceled);
+            writer.Write(ctw.Id);
         }
 
         [DeserializerMethod]
         internal static object DeserializeGrainCancellationToken(Type expected, IDeserializationContext context)
         {
-            var stream = context.StreamReader;
-            var cancellationRequested = stream.ReadToken() == SerializationTokenType.True;
-            var tokenId = stream.ReadGuid();
+            var reader = context.StreamReader;
+            var cancellationRequested = reader.ReadToken() == SerializationTokenType.True;
+            var tokenId = reader.ReadGuid();
             return new GrainCancellationToken(tokenId, cancellationRequested);
         }
 

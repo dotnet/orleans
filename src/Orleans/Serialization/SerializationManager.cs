@@ -1149,12 +1149,12 @@ namespace Orleans.Serialization
         [SuppressMessage("Microsoft.Usage", "CA2201:DoNotRaiseReservedExceptionTypes")]
         public static void SerializeInner(object obj, ISerializationContext context, Type expected)
         {
-            var stream = context.StreamWriter;
+            var writer = context.StreamWriter;
 
             // Nulls get special handling
             if (obj == null)
             {
-                stream.WriteNull();
+                writer.WriteNull();
                 return;
             }
 
@@ -1164,14 +1164,14 @@ namespace Orleans.Serialization
             // Enums are extra-special
             if (typeInfo.IsEnum)
             {
-                stream.WriteTypeHeader(t, expected);
-                WriteEnum(obj, stream, t);
+                writer.WriteTypeHeader(t, expected);
+                WriteEnum(obj, writer, t);
 
                 return;
             }
 
             // Check for simple types
-            if (stream.TryWriteSimpleObject(obj)) return;
+            if (writer.TryWriteSimpleObject(obj)) return;
 
             // Check for primitives
             // At this point, we're either an object or a non-trivial value type
@@ -1182,7 +1182,7 @@ namespace Orleans.Serialization
                 int reference = context.CheckObjectWhileSerializing(obj);
                 if (reference >= 0)
                 {
-                    stream.WriteReference(reference);
+                    writer.WriteReference(reference);
                     return;
                 }
 
@@ -1192,8 +1192,8 @@ namespace Orleans.Serialization
             // If we're simply a plain old unadorned, undifferentiated object, life is easy
             if (t.TypeHandle.Equals(objectTypeHandle))
             {
-                stream.Write(SerializationTokenType.SpecifiedType);
-                stream.Write(SerializationTokenType.Object);
+                writer.Write(SerializationTokenType.SpecifiedType);
+                writer.Write(SerializationTokenType.Object);
                 return;
             }
 
@@ -1208,7 +1208,7 @@ namespace Orleans.Serialization
             IExternalSerializer serializer;
             if (TryLookupExternalSerializer(t, out serializer))
             {
-                stream.WriteTypeHeader(t, expected);
+                writer.WriteTypeHeader(t, expected);
                 serializer.Serialize(obj, context, expected);
                 return;
             }
@@ -1216,7 +1216,7 @@ namespace Orleans.Serialization
             Serializer ser = GetSerializer(t);
             if (ser != null)
             {
-                stream.WriteTypeHeader(t, expected);
+                writer.WriteTypeHeader(t, expected);
                 ser(obj, context, expected);
                 return;
             }
@@ -1269,111 +1269,111 @@ namespace Orleans.Serialization
         // We assume that all lower bounds are 0, since creating an array with lower bound !=0 is hard in .NET 4.0+
         private static void SerializeArray(Array array, ISerializationContext context, Type expected, Type et)
         {
-            var stream = context.StreamWriter;
+            var writer = context.StreamWriter;
 
             // First check for one of the optimized cases
             if (array.Rank == 1)
             {
                 if (et.TypeHandle.Equals(byteTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.ByteArray);
-                    stream.Write(array.Length);
-                    stream.Write((byte[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.ByteArray);
+                    writer.Write(array.Length);
+                    writer.Write((byte[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(sbyteTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.SByteArray);
-                    stream.Write(array.Length);
-                    stream.Write((sbyte[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.SByteArray);
+                    writer.Write(array.Length);
+                    writer.Write((sbyte[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(boolTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.BoolArray);
-                    stream.Write(array.Length);
-                    stream.Write((bool[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.BoolArray);
+                    writer.Write(array.Length);
+                    writer.Write((bool[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(charTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.CharArray);
-                    stream.Write(array.Length);
-                    stream.Write((char[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.CharArray);
+                    writer.Write(array.Length);
+                    writer.Write((char[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(shortTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.ShortArray);
-                    stream.Write(array.Length);
-                    stream.Write((short[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.ShortArray);
+                    writer.Write(array.Length);
+                    writer.Write((short[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(intTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.IntArray);
-                    stream.Write(array.Length);
-                    stream.Write((int[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.IntArray);
+                    writer.Write(array.Length);
+                    writer.Write((int[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(longTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.LongArray);
-                    stream.Write(array.Length);
-                    stream.Write((long[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.LongArray);
+                    writer.Write(array.Length);
+                    writer.Write((long[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(ushortTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.UShortArray);
-                    stream.Write(array.Length);
-                    stream.Write((ushort[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.UShortArray);
+                    writer.Write(array.Length);
+                    writer.Write((ushort[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(uintTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.UIntArray);
-                    stream.Write(array.Length);
-                    stream.Write((uint[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.UIntArray);
+                    writer.Write(array.Length);
+                    writer.Write((uint[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(ulongTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.ULongArray);
-                    stream.Write(array.Length);
-                    stream.Write((ulong[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.ULongArray);
+                    writer.Write(array.Length);
+                    writer.Write((ulong[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(floatTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.FloatArray);
-                    stream.Write(array.Length);
-                    stream.Write((float[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.FloatArray);
+                    writer.Write(array.Length);
+                    writer.Write((float[])array);
                     return;
                 }
                 if (et.TypeHandle.Equals(doubleTypeHandle))
                 {
-                    stream.Write(SerializationTokenType.SpecifiedType);
-                    stream.Write(SerializationTokenType.DoubleArray);
-                    stream.Write(array.Length);
-                    stream.Write((double[])array);
+                    writer.Write(SerializationTokenType.SpecifiedType);
+                    writer.Write(SerializationTokenType.DoubleArray);
+                    writer.Write(array.Length);
+                    writer.Write((double[])array);
                     return;
                 }
             }
 
             // Write the array header
-            stream.WriteArrayHeader(array, expected);
+            writer.WriteArrayHeader(array, expected);
 
             // Figure out the array size
             var rank = array.Rank;
@@ -1517,7 +1517,7 @@ namespace Orleans.Serialization
         public static object DeserializeInner(Type expected, IDeserializationContext context)
         {
             var previousOffset = context.CurrentObjectOffset;
-            var stream = context.StreamReader;
+            var reader = context.StreamReader;
             context.CurrentObjectOffset = context.StreamReader.CurrentPosition;
 
             try
@@ -1526,7 +1526,7 @@ namespace Orleans.Serialization
                 // We'll allow a cast exception higher up to catch this.
                 SerializationTokenType token;
                 object result;
-                if (stream.TryReadSimpleType(out result, out token))
+                if (reader.TryReadSimpleType(out result, out token))
                 {
                     return result;
                 }
@@ -1534,7 +1534,7 @@ namespace Orleans.Serialization
                 // Special serializations (reference, fallback)
                 if (token == SerializationTokenType.Reference)
                 {
-                    var offset = stream.ReadInt();
+                    var offset = reader.ReadInt();
                     result = context.FetchReferencedObject(offset);
                     return result;
                 }
@@ -1557,7 +1557,7 @@ namespace Orleans.Serialization
                 }
                 else if (token == SerializationTokenType.SpecifiedType)
                 {
-                    resultType = stream.ReadSpecifiedTypeHeader();
+                    resultType = reader.ReadSpecifiedTypeHeader();
                 }
                 else
                 {
@@ -1574,7 +1574,7 @@ namespace Orleans.Serialization
                 // Handle enums
                 if (resultTypeInfo.IsEnum)
                 {
-                    result = ReadEnum(stream, resultType);
+                    result = ReadEnum(reader, resultType);
                     return result;
                 }
 
@@ -1613,8 +1613,8 @@ namespace Orleans.Serialization
 
         private static object DeserializeArray(Type resultType, IDeserializationContext context)
         {
-            var stream = context.StreamReader;
-            var lengths = ReadArrayLengths(resultType.GetArrayRank(), stream);
+            var reader = context.StreamReader;
+            var lengths = ReadArrayLengths(resultType.GetArrayRank(), reader);
             var rank = lengths.Length;
             var et = resultType.GetElementType();
 
@@ -1622,83 +1622,83 @@ namespace Orleans.Serialization
             if (rank == 1)
             {
                 if (et.TypeHandle.Equals(byteTypeHandle))
-                    return stream.ReadBytes(lengths[0]);
+                    return reader.ReadBytes(lengths[0]);
 
                 if (et.TypeHandle.Equals(sbyteTypeHandle))
                 {
                     var result = new sbyte[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(shortTypeHandle))
                 {
                     var result = new short[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(intTypeHandle))
                 {
                     var result = new int[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(longTypeHandle))
                 {
                     var result = new long[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(ushortTypeHandle))
                 {
                     var result = new ushort[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(uintTypeHandle))
                 {
                     var result = new uint[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(ulongTypeHandle))
                 {
                     var result = new ulong[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(doubleTypeHandle))
                 {
                     var result = new double[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(floatTypeHandle))
                 {
                     var result = new float[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(charTypeHandle))
                 {
                     var result = new char[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(boolTypeHandle))
                 {
                     var result = new bool[lengths[0]];
                     var n = Buffer.ByteLength(result);
-                    stream.ReadBlockInto(result, n);
+                    reader.ReadBlockInto(result, n);
                     return result;
                 }
             }
