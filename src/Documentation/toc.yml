@@ -88,7 +88,7 @@
       href: Runtime-Implementation-Details/Messaging-Delivery-Guarantees.md
     - name: Relational Storage
       href: Runtime-Implementation-Details/Relational-Storage.md
-    - name: Runtime Tables
+    - name: Azure Runtime Tables
       href: Runtime-Implementation-Details/Runtime-Tables.md
     - name: Cluster Management
       href: Runtime-Implementation-Details/Cluster-Management.md

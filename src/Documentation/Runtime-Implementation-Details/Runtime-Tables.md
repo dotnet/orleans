@@ -1,11 +1,12 @@
 ---
 layout: page
-title: Runtime Tables
+title: Azure Runtime Tables
 ---
 
-# Runtime Tables
+# Azure Runtime Tables
 
-Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables and provide more details on their internal structure.
+Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables as they are organized if Azure is used as the system store, and provide more details on their internal structure.
+When SQL, ZooKeepr, Consul and other technologies are used for system store, organization and exact structure of the data may vary, but the general idea stays the same. 
 
 Runtime tables:
 
@@ -44,7 +45,7 @@ All rows in this table consist of the following columns ([`SiloInstanceTableEntr
 There is also a special row in this table, called membership version row, with the following columns:
 
 1. *PartitionKey* - deployment id.
-2. *RowKey* - "VersionRow" costant string
+2. *RowKey* - "VersionRow" constant string
 3. *DeploymentId*
 4. *MembershipVersion* - the latest version of the current membership configuration.
 
