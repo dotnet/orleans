@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.GrainDirectory;
@@ -26,7 +24,6 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Services;
 using Orleans.Runtime.Startup;
 using Orleans.Runtime.Storage;
 using Orleans.Runtime.TestHooks;
@@ -199,89 +196,85 @@ namespace Orleans.Runtime
                 this.initializationParams.Type, LocalConfig.DNSHostName, Environment.MachineName, localEndpoint, this.initializationParams.SiloAddress.Generation);
             logger.Info(ErrorCode.SiloInitConfig, "Starting silo {0} with the following configuration= " + Environment.NewLine + "{1}",
                 name, config.ToString(name));
-            
+
+            // Register system services.
+            var services = new ServiceCollection();
+            services.AddSingleton(sp => sp);
+            services.AddSingleton(this);
+            services.AddSingleton(initializationParams);
+            services.AddSingleton<ILocalSiloDetails>(initializationParams);
+            services.AddSingleton(initializationParams.ClusterConfig);
+            services.AddSingleton(initializationParams.GlobalConfig);
+            services.AddTransient(sp => initializationParams.NodeConfig);
+            services.AddSingleton<ITimerRegistry, TimerRegistry>();
+            services.AddSingleton<IReminderRegistry, ReminderRegistry>();
+            services.AddSingleton<IStreamProviderManager, StreamProviderManager>();
+            services.AddSingleton<GrainRuntime>();
+            services.AddSingleton<IGrainRuntime, GrainRuntime>();
+            services.AddSingleton<OrleansTaskScheduler>();
+            services.AddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
+            services.AddFromExisting<IGrainFactory, GrainFactory>();
+            services.AddFromExisting<IInternalGrainFactory, GrainFactory>();
+            services.AddSingleton<TypeMetadataCache>();
+            services.AddSingleton<AssemblyProcessor>();
+            services.AddSingleton<ActivationDirectory>();
+            services.AddSingleton<LocalGrainDirectory>();
+            services.AddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
+            services.AddSingleton<SiloStatisticsManager>();
+            services.AddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
+            services.AddSingleton<SiloAssemblyLoader>();
+            services.AddSingleton<GrainTypeManager>();
+            services.AddFromExisting<IMessagingConfiguration, GlobalConfiguration>();
+            services.AddSingleton<MessageCenter>();
+            services.AddFromExisting<IMessageCenter, MessageCenter>();
+            services.AddFromExisting<ISiloMessageCenter, MessageCenter>();
+            services.AddSingleton<Catalog>();
+            services.AddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
+            services.AddSingleton<InsideRuntimeClient>();
+            services.AddFromExisting<IRuntimeClient, InsideRuntimeClient>();
+            services.AddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
+            services.AddSingleton<MultiClusterGossipChannelFactory>();
+            services.AddSingleton<MultiClusterOracle>();
+            services.AddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
+            services.AddSingleton<DeploymentLoadPublisher>();
+            services.AddSingleton<MembershipOracle>();
+            services.AddFromExisting<IMembershipOracle, MembershipOracle>();
+            services.AddFromExisting<ISiloStatusOracle, MembershipOracle>();
+            services.AddSingleton<MembershipTableFactory>();
+            services.AddSingleton<LocalReminderServiceFactory>();
+            services.AddSingleton<ClientObserverRegistrar>();
+            services.AddSingleton<SiloProviderRuntime>();
+            services.AddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
+            services.AddSingleton<ImplicitStreamSubscriberTable>();
+
+            // Placement
+            services.AddSingleton<PlacementDirectorsManager>();
+            services.AddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
+            services.AddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
+            services.AddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
+            services.AddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
+            services.AddSingleton<DefaultPlacementStrategy>();
+            services.AddSingleton<ClientObserversPlacementDirector>();
+
+            services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
+            services.AddSingleton<GrainCreator>();
+
+            if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
+            {
+                services.AddSingleton<IConsistentRingProvider>(
+                    sp =>
+                    new VirtualBucketsRingProvider(
+                        this.initializationParams.SiloAddress,
+                        this.initializationParams.GlobalConfig.NumVirtualBucketsConsistentRing));
+            }
+            else
+            {
+                services.AddSingleton<IConsistentRingProvider>(
+                    sp => new ConsistentRingProvider(this.initializationParams.SiloAddress));
+            }
+
             // Configure DI using Startup type
-            this.Services = StartupBuilder.ConfigureStartup(
-                this.LocalConfig.StartupTypeName,
-                (services, usingCustomServiceProvider) =>
-                {
-                    // add system types
-                    // Note: you can replace IGrainFactory with your own implementation, but 
-                    // we don't recommend it, in the aspect of performance and usability
-                    services.TryAddSingleton(sp => sp);
-                    services.TryAddSingleton(this);
-                    services.TryAddSingleton(initializationParams);
-                    services.TryAddSingleton<ILocalSiloDetails>(initializationParams);
-                    services.TryAddSingleton(initializationParams.ClusterConfig);
-                    services.TryAddSingleton(initializationParams.GlobalConfig);
-                    services.TryAddTransient(sp => initializationParams.NodeConfig);
-                    services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-                    services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-                    services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
-                    services.TryAddSingleton<GrainRuntime>();
-                    services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
-                    services.TryAddSingleton<OrleansTaskScheduler>();
-                    services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
-                    services.TryAddExisting<IGrainFactory, GrainFactory>();
-                    services.TryAddExisting<IInternalGrainFactory, GrainFactory>();
-                    services.TryAddSingleton<TypeMetadataCache>();
-                    services.TryAddSingleton<AssemblyProcessor>();
-                    services.TryAddSingleton<ActivationDirectory>();
-                    services.TryAddSingleton<LocalGrainDirectory>();
-                    services.TryAddExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-                    services.TryAddSingleton<SiloStatisticsManager>();
-                    services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
-                    services.TryAddSingleton<SiloAssemblyLoader>();
-                    services.TryAddSingleton<GrainTypeManager>();
-                    services.TryAddExisting<IMessagingConfiguration, GlobalConfiguration>();
-                    services.TryAddSingleton<MessageCenter>();
-                    services.TryAddExisting<IMessageCenter, MessageCenter>();
-                    services.TryAddExisting<ISiloMessageCenter, MessageCenter>();
-                    services.TryAddSingleton<Catalog>();
-                    services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
-                    services.TryAddSingleton<InsideRuntimeClient>();
-                    services.TryAddExisting<IRuntimeClient, InsideRuntimeClient>();
-                    services.TryAddExisting<ISiloRuntimeClient, InsideRuntimeClient>();
-                    services.TryAddSingleton<MultiClusterGossipChannelFactory>();
-                    services.TryAddSingleton<MultiClusterOracle>();
-                    services.TryAddExisting<IMultiClusterOracle, MultiClusterOracle>();
-                    services.TryAddSingleton<DeploymentLoadPublisher>();
-                    services.TryAddSingleton<MembershipOracle>();
-                    services.TryAddExisting<IMembershipOracle, MembershipOracle>();
-                    services.TryAddExisting<ISiloStatusOracle, MembershipOracle>();
-                    services.TryAddSingleton<MembershipTableFactory>();
-                    services.TryAddSingleton<LocalReminderServiceFactory>();
-                    services.TryAddSingleton<ClientObserverRegistrar>();
-                    services.TryAddSingleton<SiloProviderRuntime>();
-                    services.TryAddExisting<IStreamProviderRuntime, SiloProviderRuntime>();
-                    services.TryAddSingleton<ImplicitStreamSubscriberTable>();
-
-                    // Placement
-                    services.TryAddSingleton<PlacementDirectorsManager>();
-                    services.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
-                    services.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
-                    services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-                    services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
-                    services.TryAddSingleton<DefaultPlacementStrategy>();
-                    services.TryAddSingleton<ClientObserversPlacementDirector>();
-                    
-                    services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
-                    services.TryAddSingleton<GrainCreator>();
-
-                    if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
-                    {
-                        services.TryAddSingleton<IConsistentRingProvider>(
-                            sp =>
-                            new VirtualBucketsRingProvider(
-                                this.initializationParams.SiloAddress,
-                                this.initializationParams.GlobalConfig.NumVirtualBucketsConsistentRing));
-                    }
-                    else
-                    {
-                        services.TryAddSingleton<IConsistentRingProvider>(
-                            sp => new ConsistentRingProvider(this.initializationParams.SiloAddress));
-                    }
-                });
+            this.Services = StartupBuilder.ConfigureStartup(this.LocalConfig.StartupTypeName, services);
 
             this.assemblyProcessor = this.Services.GetRequiredService<AssemblyProcessor>();
             this.assemblyProcessor.Initialize();
