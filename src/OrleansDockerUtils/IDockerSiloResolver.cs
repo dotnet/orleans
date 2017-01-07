@@ -1,9 +1,13 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace Microsoft.Orleans.Docker
 {
     internal interface IDockerSiloResolver
     {
+        DateTime LastRefreshTime { get; }
+        TimeSpan RefreshPeriod { get; }
+
         /// <summary>
         /// Subscribes the provided handler for update notifications.
         /// </summary>

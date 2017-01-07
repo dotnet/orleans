@@ -7,7 +7,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microsoft.Orleans.Docker
@@ -32,8 +31,7 @@ namespace Microsoft.Orleans.Docker
         private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> subscribers =
             new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>();
         private readonly object updateLock = new object();
-        private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();
-        private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(30);
+        private readonly Dictionary<SiloAddress, SiloEntry> silos = new Dictionary<SiloAddress, SiloEntry>();        
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly Logger log;
         private readonly GlobalConfiguration globalConfig;
@@ -47,10 +45,7 @@ namespace Microsoft.Orleans.Docker
 
         // Cached collection of multicluster gateways.
         private volatile List<SiloAddress> multiClusterSilosCache;
-
-        private Timer timer;
-        private DateTime lastRefreshTime;
-
+        
         /// <summary>
         /// Initialize a new instance of the <see cref="DockerMembershipOracle"/> class
         /// </summary>
@@ -78,7 +73,7 @@ namespace Microsoft.Orleans.Docker
         /// <returns><see langword="true"/> if the participant is healthy, <see langword="false"/> otherwise.</returns>
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            return lastRefreshTime.Add(refreshPeriod + refreshPeriod) > DateTime.UtcNow;
+            return resolver.LastRefreshTime > DateTime.UtcNow;
         }
 
         public IReadOnlyList<SiloAddress> GetApproximateMultiClusterGateways()
@@ -187,14 +182,7 @@ namespace Microsoft.Orleans.Docker
         /// </summary>
         public Task Start()
         {
-            timer = new Timer(
-                self => ((DockerMembershipOracle)self).RefreshAsync().Ignore(),
-                this,
-                refreshPeriod,
-                refreshPeriod);
-
             resolver.Subscribe(this);
-            RefreshAsync().Ignore();
             UpdateStatus(SiloStatus.Joining);
 
             return TaskDone.Done;
@@ -362,24 +350,6 @@ namespace Microsoft.Orleans.Docker
             }
         }
 
-        private async Task RefreshAsync()
-        {
-            try
-            {
-                await resolver.Refresh();
-
-                lastRefreshTime = DateTime.UtcNow;
-            }
-            catch (Exception exception)
-            {
-                log?.Warn(
-                    (int)ErrorCode.Docker_MembershipOracle_ExceptionRefreshingSilos,
-                    "Exception refreshing silos.",
-                    exception);
-                throw;
-            }
-        }
-
         /// <summary>
         /// Clears the cached data.
         /// </summary>
@@ -442,9 +412,7 @@ namespace Microsoft.Orleans.Docker
         }
 
         private void StopInternal()
-        {
-            timer?.Dispose();
-            timer = null;
+        {            
             resolver.Unsubscribe(this);
         }
 

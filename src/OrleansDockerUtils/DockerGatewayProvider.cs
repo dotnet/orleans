@@ -18,10 +18,8 @@ namespace Microsoft.Orleans.Docker
     {
         private readonly ConcurrentDictionary<IGatewayListListener, IGatewayListListener> subscribers =
             new ConcurrentDictionary<IGatewayListListener, IGatewayListListener>();
-        private readonly TimeSpan refreshPeriod = TimeSpan.FromSeconds(30);
         private IDockerSiloResolver resolver;
         private List<Uri> gateways = new List<Uri>();
-        private Timer timer;
         private Logger log;
 
         /// <summary>
@@ -33,19 +31,19 @@ namespace Microsoft.Orleans.Docker
         /// <summary>
         /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
-        public TimeSpan MaxStaleness => TimeSpan.FromSeconds(refreshPeriod.TotalSeconds * 2);
+        public TimeSpan MaxStaleness => resolver != null ?  TimeSpan.FromSeconds(resolver.RefreshPeriod.TotalSeconds * 2) : TimeSpan.FromSeconds(30);
 
-        public async Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
+        public Task InitializeGatewayListProvider(ClientConfiguration clientConfiguration, Logger logger)
         {
             resolver = new DockerSiloResolver(
                 clientConfiguration.DeploymentId,
                 clientConfiguration.CreateDockerClient(),
                 logger.GetLogger);
 
-            resolver.Subscribe(this);
             log = logger.GetLogger(nameof(DockerGatewayProvider));
-            await RefreshAsync();
-            timer = new Timer(Refresh, null, refreshPeriod, refreshPeriod);
+            resolver.Subscribe(this);
+            
+            return TaskDone.Done;
         }
 
         /// <summary>
@@ -77,34 +75,7 @@ namespace Microsoft.Orleans.Docker
 
         public void Dispose()
         {
-            timer?.Dispose();
-            timer = null;
             resolver.Unsubscribe(this);
-        }
-
-        /// <summary>
-        /// Refreshes the gateway list.
-        /// </summary>
-        /// <param name="state">The state object.</param>
-        private void Refresh(object state)
-        {
-            RefreshAsync().Ignore();
-        }
-
-        private async Task RefreshAsync()
-        {
-            try
-            {
-                await resolver.Refresh();
-            }
-            catch (Exception exception)
-            {
-                log.Warn(
-                    (int)ErrorCode.Docker_GatewayProvider_ExceptionRefreshingGateways,
-                    "Exception while refreshing gateways on scheduled interval",
-                    exception);
-                throw;
-            }
         }
 
         public void OnUpdate(DockerSiloInfo[] silos)
