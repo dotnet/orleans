@@ -6,7 +6,7 @@ title: Azure Runtime Tables
 # Azure Runtime Tables
 
 Orleans maintains a number of internal tables for different runtime mechanisms. Here we list all the tables as they are organized if Azure is used as the system store, and provide more details on their internal structure.
-When SQL, ZooKeepr, Consul and other technologies are used for system store, organization and exact structure of the data may vary, but the general idea stays the same. 
+When SQL, ZooKeeper, Consul and other technologies are used for system store, organization and exact structure of the data may vary, but the general idea stays the same. 
 
 Runtime tables:
 
