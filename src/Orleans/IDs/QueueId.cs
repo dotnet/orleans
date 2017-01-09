@@ -35,7 +35,7 @@ namespace Orleans.Streams
         private static QueueId FindOrCreateQueueId(string queuePrefix, uint id, uint hash)
         {
             var key = new QueueId(queuePrefix, id, hash);
-            return queueIdInternCache.Value.FindOrCreate(key, () => key);
+            return queueIdInternCache.Value.FindOrCreate(key, k => k);
         }
 
         public string GetStringNamePrefix()

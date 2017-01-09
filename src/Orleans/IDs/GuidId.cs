@@ -36,7 +36,7 @@ namespace Orleans.Runtime
 
         private static GuidId FindOrCreateGuidId(Guid guid)
         {
-            return guidIdInternCache.Value.FindOrCreate(guid, () => new GuidId(guid));
+            return guidIdInternCache.Value.FindOrCreate(guid, g => new GuidId(g));
         }
 
         #region IComparable<GuidId> Members
