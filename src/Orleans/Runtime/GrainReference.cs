@@ -15,6 +15,8 @@ namespace Orleans.Runtime
     [Serializable]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
+        private static readonly Action<Message, TaskCompletionSource<object>> ResponseCallbackDelegate = ResponseCallback;
+
         private readonly string genericArguments;
         private readonly GuidId observerId;
         
@@ -347,7 +349,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, genericArguments);
+            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallbackDelegate, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
