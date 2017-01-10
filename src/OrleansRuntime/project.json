@@ -1,6 +1,8 @@
-{
+﻿{
   "dependencies": {
-    "Microsoft.Extensions.DependencyInjection": "1.0.0"
+    "Microsoft.Extensions.DependencyInjection": "1.0.0",
+    "Microsoft.Owin.Hosting": "3.0.1",
+    "Nowin": "0.25.0"
   },
   "frameworks": {
     "net451": {}

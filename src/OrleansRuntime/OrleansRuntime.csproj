@@ -61,6 +61,12 @@
     <Compile Include="Core\GrainRuntime.cs" />
     <Compile Include="Core\IInvokable.cs" />
     <Compile Include="Core\ISiloRuntimeClient.cs" />
+    <Compile Include="Http\HttpApiConfiguration.cs" />
+    <Compile Include="Http\HttpApi.cs" />
+    <Compile Include="Http\ExtensionMethods.cs" />
+    <Compile Include="Http\GrainController.cs" />
+    <Compile Include="Http\Router.cs" />
+    <Compile Include="Http\WebServer.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
     <Compile Include="ReminderService\ReminderRegistry.cs" />
     <Compile Include="Services\GrainService.cs" />
