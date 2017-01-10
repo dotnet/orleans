@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
-using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using UnitTests.MembershipTests;
@@ -52,9 +51,6 @@ namespace UnitTests.RemindersTest
 
         public virtual void Dispose()
         {
-            // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 remindersTable.TestOnlyClearTable().Wait();

@@ -53,16 +53,6 @@
     <Compile Include="GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\MultiClusterRegistrationTests.cs" />
     <Compile Include="HostedTestClusterBase.cs" />
-    <Compile Include="MembershipTests\DynamoDBMembershipTableTest.cs" />
-    <Compile Include="RemindersTest\DynamoDBRemindersTableTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\AWSTestConstants.cs" />
-    <Compile Include="StorageTests\AWSUtils\Base_PersistenceGrainTests_AWSStore.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageProviderTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTestFixture.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageStressTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\DynamoDBStorageTests.cs" />
-    <Compile Include="StorageTests\AWSUtils\PersistenceGrainTests_AWSDynamoDBStore.cs" />
-    <Compile Include="StorageTests\AWSUtils\UnitTestDynamoDBStorage.cs" />
     <Compile Include="StorageTests\CommonStorageTests.cs" />
     <Compile Include="StorageTests\CommonStorageUtilities.cs" />
     <Compile Include="StorageTests\SymbolSet.cs" />
@@ -117,16 +107,10 @@
     <Compile Include="StorageTests\StorageProviders\FileStorageProvider.cs" />
     <Compile Include="StorageTests\StorageProviders\IJSONStateDataManager.cs" />
     <Compile Include="StreamingTests\DynamicStreamProviderConfigurationTests.cs" />
-    <Compile Include="StreamingTests\HaloStreamSubscribeTests.cs" />
     <Compile Include="StreamingTests\MultipleStreamsTestRunner.cs" />
     <Compile Include="StreamingTests\SingleStreamTestRunner.cs" />
     <Compile Include="StreamingTests\SMSStreamingTests.cs" />
-    <Compile Include="StreamingTests\SQSAdapterTests.cs" />
-    <Compile Include="StreamingTests\SQSStreamTests.cs" />
-    <Compile Include="StreamingTests\StreamLifecycleTests.cs" />
-    <Compile Include="StreamingTests\StreamLimitTests.cs" />
     <Compile Include="StreamingTests\StreamPubSubReliabilityTests.cs" />
-    <Compile Include="StreamingTests\StreamReliabilityTests.cs" />
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
@@ -134,8 +118,6 @@
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />
-    <Compile Include="TimerTests\ReminderTests_Azure_Standalone.cs" />
-    <Compile Include="TimerTests\ReminderTests_AzureTable.cs" />
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />
     <Compile Include="TimerTests\ReminderTests_Base.cs" />
   </ItemGroup>
@@ -143,10 +125,6 @@
     <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.csproj">
       <Project>{e782dd19-51f7-4f66-8217-bacac33767e4}</Project>
       <Name>ClientGenerator</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj">
-      <Project>{67738E6C-F292-46A2-994D-5B52E745205B}</Project>
-      <Name>OrleansAWSUtils</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj">
       <Project>{792818ef-b3f8-4ce2-9886-4808713b15c4}</Project>
@@ -219,15 +197,6 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="ReadMe.md" />
-    <None Include="ClientConfig_SQSStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <Content Include="Config_AWS_DynamoDB_Storage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="Config_SQSStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -247,22 +216,10 @@
       <Link>OrleansConfigurationForTesting.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="ClientConfig_AzureWebRole.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_AzureStreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="ClientConfig_StreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Config_DevStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_StorageErrors.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_AzureStreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config_StreamProviders.xml">
