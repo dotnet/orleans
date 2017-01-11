@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.AzureUtils;
 using Orleans.Streams;
@@ -11,6 +13,8 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         protected readonly string DeploymentId;
         protected readonly string DataConnectionString;
+        protected readonly bool HasLargeMessageSupport;
+
         protected readonly TimeSpan? MessageVisibilityTimeout;
         private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
@@ -20,11 +24,12 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public AzureQueueAdapter(HashRingBasedStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName, TimeSpan? messageVisibilityTimeout = null)
+        public AzureQueueAdapter(HashRingBasedStreamQueueMapper streamQueueMapper, string dataConnectionString, string deploymentId, string providerName, bool supportLargeMessages, TimeSpan? messageVisibilityTimeout = null)
         {
             if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
             if (String.IsNullOrEmpty(deploymentId)) throw new ArgumentNullException("deploymentId");
-            
+
+            this.HasLargeMessageSupport = supportLargeMessages;           
             DataConnectionString = dataConnectionString;
             DeploymentId = deploymentId;
             Name = providerName;
@@ -34,7 +39,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, MessageVisibilityTimeout);
+            return AzureQueueAdapterReceiver.Create(queueId, DataConnectionString, DeploymentId, HasLargeMessageSupport, MessageVisibilityTimeout);
         }
 
         public async Task QueueMessageBatchAsync<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -45,14 +50,25 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             AzureQueueDataManager queue;
+
+            
             if (!Queues.TryGetValue(queueId, out queue))
             {
                 var tmpQueue = new AzureQueueDataManager(queueId.ToString(), DeploymentId, DataConnectionString, MessageVisibilityTimeout);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var cloudMsg = AzureQueueBatchContainer.ToCloudQueueMessage(streamGuid, streamNamespace, events, requestContext);
-            await queue.AddQueueMessage(cloudMsg);
+
+            if (this.HasLargeMessageSupport)
+            {
+                var cloudMessages = AzureQueueBatchContainer.ToCloudQueueMessageRange(streamGuid, streamNamespace, events, requestContext);
+                await Task.WhenAll(cloudMessages.Select(m => queue.AddQueueMessage(m)));
+            }
+            else
+            {
+                var cloudMsg = AzureQueueBatchContainer.ToCloudQueueMessage(streamGuid, streamNamespace, events, requestContext);
+                await queue.AddQueueMessage(cloudMsg);
+            }
         }
     }
 }

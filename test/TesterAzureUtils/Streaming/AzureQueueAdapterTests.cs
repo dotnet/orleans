@@ -51,7 +51,7 @@ namespace Tester.AzureUtils.Streaming
                 {
                     {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
                     {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId},
-                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" }
+                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" },
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
@@ -60,7 +60,27 @@ namespace Tester.AzureUtils.Streaming
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config)
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Streaming")]
+        public async Task SendAndReceiveFromAzureQueueWithLargeMessages()
+        {
+            AzureQueueBatchContainerV2.Register();
+            EventSequenceTokenV2.Register();
+            var properties = new Dictionary<string, string>
+                {
+                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
+                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId},
+                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" },
+                    {AzureQueueAdapterFactory.SupportLargeMessagesPropertyName, "true" }
+                };
+            var config = new ProviderConfiguration(properties, "type", "name");
+
+            var adapterFactory = new AzureQueueAdapterFactory();
+            adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
+            await SendAndReceiveFromQueueAdapter(adapterFactory, config, true);
+        }
+
+
+        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config, bool useLargeMessages = false)
         {
             IQueueAdapter adapter = await adapterFactory.CreateAdapter();
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
@@ -106,8 +126,15 @@ namespace Tester.AzureUtils.Streaming
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamGuid);
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                            if (useLargeMessages)
+                            {
+                                Assert.Equal(NumMessagesPerBatch, message.GetEvents<byte[]>().Count());  // "
+                            }
+                            else
+                            {
+                                Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                                Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                            }
                         }
                         Interlocked.Add(ref receivedBatches, messages.Length);
                         qCache.AddToCache(messages);
@@ -117,13 +144,15 @@ namespace Tester.AzureUtils.Streaming
             }
 
             // send events
-            List<object> events = CreateEvents(NumMessagesPerBatch);
+            List<object> events = CreateEvents(NumMessagesPerBatch, useLargeMessages);
+
             work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
-                .Select(i => i % 2 == 0 ? streamId1 : streamId2)
+                .Select(i => i % 2 == 0 || useLargeMessages ? streamId1 : streamId2)
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
                         events.Take(NumMessagesPerBatch).ToArray(), null, RequestContext.Export()).Wait())));
+
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
@@ -157,25 +186,41 @@ namespace Tester.AzureUtils.Streaming
                         }
                     }
                     output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    Assert.Equal(NumBatches / 2, messageCount);
-                    Assert.NotNull(tenthInCache);
-
-                    // read all messages from the 10th
-                    cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
-                    messageCount = 0;
-                    while (cursor.MoveNext())
+                    if (useLargeMessages)
                     {
-                        messageCount++;
+                        Assert.Equal(NumBatches, messageCount);
                     }
-                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
-                    const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
-                    Assert.Equal(expected, messageCount);
+                    else
+                    {
+                        Assert.Equal(NumBatches / 2, messageCount);
+                        Assert.NotNull(tenthInCache);
+                        // read all messages from the 10th
+                        cursor = qCache.GetCacheCursor(streamGuid, tenthInCache);
+                        messageCount = 0;
+                        while (cursor.MoveNext())
+                        {
+                            messageCount++;
+                        }
+                        output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                        const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
+                        Assert.Equal(expected, messageCount);
+                    }
                 }
             }
         }
 
-        private List<object> CreateEvents(int count)
+        private List<object> CreateEvents(int count, bool createLargeMessages = false)
         {
+            if (createLargeMessages)
+            {
+                return Enumerable.Range(0, count).Select(i =>
+                {
+                    var bytes = new byte[CloudQueueMessage.MaxMessageSize*3];
+                    Random.NextBytes(bytes);
+                    return (object)bytes;
+                }).ToList();
+            }
+
             return Enumerable.Range(0, count).Select(i =>
             {
                 if (i % 2 == 0)

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime.Host.Providers.Streams.AzureQueue;
 using Orleans.Serialization;
 using Orleans.Streams;
 using RuntimeRequestContext = Orleans.Runtime.RequestContext;
@@ -22,10 +24,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         [JsonProperty]
         protected Dictionary<string, object> requestContext;
 
-        [NonSerialized]
         // Need to store reference to the original AQ CloudQueueMessage to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
-        internal CloudQueueMessage CloudQueueMessage;
+        [NonSerialized] internal List<CloudQueueMessage> CloudQueueMessages;
 
         public Guid StreamGuid { get; protected set; }
 
@@ -95,11 +96,79 @@ namespace Orleans.Providers.Streams.AzureQueue
             return cloudQueueMessage;
         }
 
+        internal static IEnumerable<CloudQueueMessage> ToCloudQueueMessageRange<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        {
+            var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
+            var writer = new BinaryTokenStreamWriter();
+            SerializationManager.Serialize(azureQueueBatchMessage, writer);
+            var segments = MessageSegment.CreateRange(writer);
+            return segments.Select(s =>
+            {
+                var message = new CloudQueueMessage(null as string);
+                var array = s.ToByteArray();
+                if (array.Length > CloudQueueMessage.MaxMessageSize)
+                {
+                    throw new InvalidDataException("The size of the message was larger than the max cloud message size. ");
+                }
+
+                message.SetMessageContent(array);
+                return message;
+            });
+        }
+
         internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
         {
             var azureQueueBatch = SerializationManager.DeserializeFromByteArray<AzureQueueBatchContainer>(cloudMsg.AsBytes);
-            azureQueueBatch.CloudQueueMessage = cloudMsg;
+            azureQueueBatch.CloudQueueMessages = new List<CloudQueueMessage> { cloudMsg };
             azureQueueBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
+            return azureQueueBatch;
+        }
+
+        internal static AzureQueueBatchContainer FromMessageSegments(IEnumerable<MessageSegment> segments, long sequenceId, bool verify = false)
+        {
+            if (segments == null)
+            {
+                throw new ArgumentNullException(nameof(segments));
+            }
+
+            var list = segments.OrderBy(m => m.Index).ToList();
+            if (list.Count == 0)
+            {
+                throw new ArgumentException("There were not segments in the list", nameof(segments));
+            }
+
+            if (verify)
+            {
+                var guid = list[0].Guid;
+                if (list.Any(i => i.Guid != guid))
+                {
+                    throw new InvalidDataException("One or more of the guids in the message list was from a different batch");
+                }
+
+                if (list.Any(i => i.Segment.Length != i.Size))
+                {
+                    throw new InvalidDataException("At least one message segment size was incorrect");
+                }
+            }
+
+            var writer = new BinaryTokenStreamWriter();
+            var previousIndex = -1;
+            foreach (var t in list)
+            {
+                if (t.Index == previousIndex)
+                {
+                    // skip duplicate messages
+                    continue;
+                }
+
+                writer.Write(t.Segment);
+                previousIndex = t.Index;
+            }
+
+            var reader = new BinaryTokenStreamReader(writer.ToBytes());
+            var azureQueueBatch = SerializationManager.Deserialize<AzureQueueBatchContainer>(reader);
+            azureQueueBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
+            azureQueueBatch.CloudQueueMessages = new List<CloudQueueMessage>(segments.Select(s => s.CloudQueueMessage));
             return azureQueueBatch;
         }
 

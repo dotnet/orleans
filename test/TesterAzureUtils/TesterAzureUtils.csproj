@@ -71,6 +71,7 @@
     <Compile Include="Streaming\AQStreamingTests.cs" />
     <Compile Include="Streaming\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="Streaming\AzureQueueAdapterTests.cs" />
+    <Compile Include="Streaming\MessageSegmentTests.cs" />
     <Compile Include="Streaming\DelayedQueueRebalancingTests.cs" />
     <Compile Include="Streaming\HaloStreamSubscribeTests.cs" />
     <Compile Include="Streaming\SampleAzureQueueStreamingTests.cs" />
