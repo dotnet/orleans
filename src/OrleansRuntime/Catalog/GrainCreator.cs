@@ -33,14 +33,7 @@ namespace Orleans.Runtime
         {
             this.services = services;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
-            if (services != null)
-            {
-                this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
-            }
-            else
-            {
-                this.createFactory = type => (sp, args) => Activator.CreateInstance(type);
-            }
+            this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
         }
 
         /// <summary>

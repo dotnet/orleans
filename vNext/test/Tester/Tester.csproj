@@ -1,26 +1,24 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="**\*.cs" />
     <EmbeddedResource Include="**\*.resx" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Remove="..\..\..\test\Tester\StreamingTests\StreamFilteringTests.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTestsBase.cs">
-      <Link>StreamingTests\StreamFilteringTestsBase.cs</Link>
-    </Compile>
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -31,33 +29,17 @@
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
+
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Sdk">
-      <Version>1.0.0-alpha-20161104-2</Version>
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables">
-      <Version>1.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json">
-      <Version>1.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="xunit">
-      <Version>2.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="xunit.runner.visualstudio">
-      <Version>2.1.0</Version>
-    </PackageReference>
-    <PackageReference Include="Xunit.SkippableFact">
-      <Version>1.2.14</Version>
-    </PackageReference>
-    <PackageReference Include="FluentAssertions">
-      <Version>4.17.0</Version>
-    </PackageReference>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>9.0.1</Version>
-    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="1.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.1.0" />
+    <PackageReference Include="xunit" Version="2.1.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="FluentAssertions" Version="4.17.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
@@ -71,57 +53,22 @@
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="..\..\..\test\Tester\BasicActivationTests.cs">
-      <Link>BasicActivationTests.cs</Link>
+    <Compile Include="..\..\..\test\Tester\FakeSerializer.cs">
+      <Link>FakeSerializer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTestsBase.cs">
+      <Link>StreamingTests\StreamFilteringTestsBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\Tester\MembershipTests\LivenessTests.cs">
+      <Link>MembershipTests\LivenessTests.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\Tester\CollectionFixtures.cs">
       <Link>CollectionFixtures.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\ConcreteStateClassTests.cs">
-      <Link>ConcreteStateClassTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\DeactivationTests.cs">
-      <Link>DeactivationTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\Tester\ExceptionPropagationTests.cs">
       <Link>ExceptionPropagationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\ExternalTypesTests.cs">
-      <Link>ExternalTypesTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\General\JsonGrainTests.cs">
-      <Link>General\JsonGrainTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\GenericGrainTests.cs">
-      <Link>GenericGrainTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs">
-      <Link>GeoClusterTests\SimpleGlobalSingleInstanceGrainTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\GrainActivateDeactivateTests.cs">
-      <Link>GrainActivateDeactivateTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\GrainFactoryTests.cs">
-      <Link>GrainFactoryTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\GrainInterfaceHierarchyTests.cs">
-      <Link>GrainInterfaceHierarchyTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\KeyExtensionTests.cs">
-      <Link>KeyExtensionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\ManagementGrainTests.cs">
-      <Link>ManagementGrainTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\MemoryStorageProviderTests.cs">
-      <Link>MemoryStorageProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\MethodInterceptionTests.cs">
-      <Link>MethodInterceptionTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\ObserverTests.cs">
-      <Link>ObserverTests.cs</Link>
     </Compile>
     <Compile Include="..\..\..\test\Tester\StreamingTests\ClientStreamTestRunner.cs">
       <Link>StreamingTests\ClientStreamTestRunner.cs</Link>
@@ -141,21 +88,6 @@
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\ProviderTests.cs">
-      <Link>ProviderTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\ReminderTest.cs">
-      <Link>ReminderTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\RequestContextTest.cs">
-      <Link>RequestContextTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\SimpleGrainTests.cs">
-      <Link>SimpleGrainTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StatelessWorkerTests.cs">
-      <Link>StatelessWorkerTests.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\Tester\CodeGenTests\RuntimeCodeGenerationTests.cs">
       <Link>CodeGenTests\RuntimeCodeGenerationTests.cs</Link>
     </Compile>
@@ -165,7 +97,11 @@
     <Compile Include="..\..\..\test\Tester\CodeGenTests\IRuntimeCodeGenGrain.cs">
       <Link>CodeGenTests\IRuntimeCodeGenGrain.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
+      <Link>SerializationTests\SerializationTestsUtils.cs</Link>
+    </Compile>
   </ItemGroup>
+
   <ItemGroup>
     <None Include="App.config" />
     <None Include="..\..\..\test\Tester\Tester.xunit.runner.json">
@@ -173,8 +109,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

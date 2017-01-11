@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
@@ -13,30 +14,33 @@ namespace Orleans.Runtime
 {
     internal class Dispatcher
     {
-        internal OrleansTaskScheduler Scheduler { get; private set; }
-        internal ISiloMessageCenter Transport { get; private set; }
+        internal ISiloMessageCenter Transport { get; }
 
+        private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
         private readonly Logger logger;
         private readonly ClusterConfiguration config;
         private readonly PlacementDirectorsManager placementDirectorsManager;
+        private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly double rejectionInjectionRate;
         private readonly bool errorInjection;
         private readonly double errorInjectionRate;
         private readonly SafeRandom random;
 
-        public Dispatcher(
+        internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
             Catalog catalog, 
             ClusterConfiguration config,
-            PlacementDirectorsManager placementDirectorsManager)
+            PlacementDirectorsManager placementDirectorsManager,
+            ILocalGrainDirectory localGrainDirectory)
         {
-            Scheduler = scheduler;
+            this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
             this.config = config;
             this.placementDirectorsManager = placementDirectorsManager;
+            this.localGrainDirectory = localGrainDirectory;
             logger = LogManager.GetLogger("Dispatcher", LoggerType.Runtime);
             rejectionInjectionRate = config.Globals.RejectionInjectionRate;
             double messageLossInjectionRate = config.Globals.MessageLossInjectionRate;
@@ -149,13 +153,13 @@ namespace Orleans.Runtime
                         // We would add a counter here, except that there's already a counter for this in the Catalog.
                         // Note that this has to run in a non-null scheduler context, so we always queue it to the catalog's context
                         var origin = message.SendingSilo;
-                        Scheduler.QueueWorkItem(new ClosureWorkItem(
+                        scheduler.QueueWorkItem(new ClosureWorkItem(
                             // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
                             async () =>
                             {
                                 try
                                 {
-                                    await Silo.CurrentSilo.LocalGrainDirectory.UnregisterAfterNonexistingActivation(
+                                    await this.localGrainDirectory.UnregisterAfterNonexistingActivation(
                                         nonExistentActivation, origin);
                                 }
                                 catch (Exception exc)
@@ -180,7 +184,7 @@ namespace Orleans.Runtime
                             nonExistentActivation,
                             message);
 
-                        Silo.CurrentSilo.LocalGrainDirectory.InvalidateCacheEntry(nonExistentActivation);
+                        this.localGrainDirectory.InvalidateCacheEntry(nonExistentActivation);
                     }
                 }
                 catch (Exception exc)
@@ -374,7 +378,7 @@ namespace Orleans.Runtime
                 var context = new SchedulingContext(targetActivation);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                Scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context, this), context);
+                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, context, this), context);
             }
         }
 
@@ -392,11 +396,22 @@ namespace Orleans.Runtime
                 RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 return;
             }
-            
-            bool enqueuedOk = targetActivation.EnqueueMessage(message);
-            if (!enqueuedOk)
+
+            switch (targetActivation.EnqueueMessage(message))
             {
-                ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
+                case ActivationData.EnqueueMessageResult.Success:
+                    // Great, nothing to do
+                    break;
+                case ActivationData.EnqueueMessageResult.ErrorInvalidActivation:
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
+                    break;
+                case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
+                    // Avoid any new call to this activation
+                    catalog.DeactivateStuckActivation(targetActivation);
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
             // Dont count this as end of processing. The message will come back after queueing via HandleIncomingRequest.
@@ -419,10 +434,10 @@ namespace Orleans.Runtime
             // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
             {
-                Silo.CurrentSilo.LocalGrainDirectory.InvalidateCacheEntry(oldAddress);
+                this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
-            Scheduler.QueueWorkItem(new ClosureWorkItem(
+            scheduler.QueueWorkItem(new ClosureWorkItem(
                 () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc)),
                 catalog.SchedulingContext);
         }
@@ -437,13 +452,13 @@ namespace Orleans.Runtime
             // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
             {
-                Silo.CurrentSilo.LocalGrainDirectory.InvalidateCacheEntry(oldAddress);
+                this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
             logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests, 
                 String.Format("Forwarding {0} requests to old address {1} after {2}.", messages.Count, oldAddress, failedOperation));
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
-            Scheduler.QueueWorkItem(new ClosureWorkItem(
+            scheduler.QueueWorkItem(new ClosureWorkItem(
                 () =>
                 {
                     foreach (var message in messages)
@@ -470,7 +485,7 @@ namespace Orleans.Runtime
                 // This ensures that the GSI protocol creates a new instance there instead of here.
                 if (forwardingAddress == null
                     && message.TargetSilo != message.SendingSilo
-                    && !Silo.CurrentSilo.LocalGrainDirectory.IsSiloInCluster(message.SendingSilo))
+                    && !this.localGrainDirectory.IsSiloInCluster(message.SendingSilo))
                 {
                     message.IsReturnedFromRemoteCluster = true; // marks message to force invalidation of stale directory entry
                     forwardingAddress = ActivationAddress.NewActivationAddress(message.SendingSilo, message.TargetGrain);
@@ -568,7 +583,7 @@ namespace Orleans.Runtime
             // message.
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
             var placementResult = await this.placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, message.TargetGrain, InsideRuntimeClient.Current.Catalog, strategy);
+                message.SendingAddress, message.TargetGrain, this.catalog, strategy);
 
             if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
             {

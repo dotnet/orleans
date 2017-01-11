@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
@@ -145,8 +146,17 @@ namespace UnitTests.Grains
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    public class StreamLifecycleConsumerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleConsumerGrain
+    internal class StreamLifecycleConsumerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleConsumerGrain
     {
+        protected readonly ISiloRuntimeClient runtimeClient;
+        protected readonly IStreamProviderRuntime streamProviderRuntime;
+
+        public StreamLifecycleConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+        {
+            this.runtimeClient = runtimeClient;
+            this.streamProviderRuntime = streamProviderRuntime;
+        }
+
         protected IDictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
 
         public override async Task OnActivateAsync()
@@ -227,8 +237,8 @@ namespace UnitTests.Grains
 #if USE_CAST
             myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
 #else
-            var tup = await SiloProviderRuntime.Instance.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(SiloProviderRuntime.Instance, _streamProvider.IsRewindable));
+            var tup = await runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                        () => new StreamConsumerExtension(streamProviderRuntime, _streamProvider.IsRewindable));
             StreamConsumerExtension myExtension = tup.Item1;
             myExtensionReference = tup.Item2;
 #endif
@@ -267,17 +277,23 @@ namespace UnitTests.Grains
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    public class FilteredStreamConsumerGrain : StreamLifecycleConsumerGrain, IFilteredStreamConsumerGrain
+    internal class FilteredStreamConsumerGrain : StreamLifecycleConsumerGrain, IFilteredStreamConsumerGrain
     {
         private static Logger _logger;
 
         private const int FilterDataOdd = 1;
         private const int FilterDataEven = 2;
 
+        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+            : base(runtimeClient, streamProviderRuntime)
+        {
+        }
+
         public override Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName)
         {
             throw new InvalidOperationException("Should not be calling unfiltered BecomeConsumer method on " + GetType());
         }
+
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName, bool sendEvensOnly)
         {
             _logger = logger;

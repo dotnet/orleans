@@ -68,7 +68,6 @@ namespace Orleans.TestingHost
                 new object[] { });
 
             appDomain.UnhandledException += ReportUnobservedException;
-            appDomain.DoCallBack(RegisterPerfCountersTelemetryConsumer);
 
             siloHost.Start();
 
@@ -214,13 +213,6 @@ namespace Orleans.TestingHost
         {
             // TODO: replace
             Console.WriteLine(value.ToString());
-        }
-
-        private static void RegisterPerfCountersTelemetryConsumer()
-        {
-#if !NETSTANDARD_TODO
-            LogManager.TelemetryConsumers.Add(new OrleansTelemetryConsumers.Counters.OrleansPerfCounterTelemetryConsumer());
-#endif
         }
 
         internal static AppDomainSetup GetAppDomainSetupInfo()

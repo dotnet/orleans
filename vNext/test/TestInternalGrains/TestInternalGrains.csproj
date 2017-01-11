@@ -1,6 +1,4 @@
-﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
-
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -9,6 +7,7 @@
     <TargetFramework>net462</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,74 +16,35 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\..\test\TestInternalGrains\**\*.cs" Exclude="      ..\..\..\test\TestInternalGrains\obj\**\*.cs;       ..\..\..\test\TestInternalGrains\bin\**\*.cs;       ..\..\..\test\TestInternalGrains\Properties\*.cs" />
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Runtime" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="Microsoft.CSharp" />
-</ItemGroup>
+  </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Sdk">
-      <Version>1.0.0-alpha-20161104-2</Version>
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="xunit.assert">
-      <Version>2.1.0</Version>
-    </PackageReference>
+    <PackageReference Include="xunit.assert" Version="2.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TestInternalGrains\ActivateDeactivateTestGrain.cs">
-      <Link>ActivateDeactivateTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\EchoTaskGrain.cs">
-      <Link>EchoTaskGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\ExtensionTestGrain.cs">
-      <Link>ExtensionTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\InterlockedFlag.cs">
-      <Link>InterlockedFlag.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\PersistenceTestGrains.cs">
-      <Link>PersistenceTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamingGrain.cs">
-      <Link>StreamingGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamingImmutabilityTestGrain.cs">
-      <Link>StreamingImmutabilityTestGrain.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamLifecycleTestGrains.cs">
-      <Link>StreamLifecycleTestGrains.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\StreamTestsConstants.cs">
-      <Link>StreamTestsConstants.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestExtension.cs">
-      <Link>TestExtension.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TestInternalGrains\TestGrain.cs">
-      <Link>TestGrain.cs</Link>
-    </Compile>
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
-
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to ClientGenerator.exe -->
@@ -92,7 +52,7 @@
     <!-- Visual Studio or MsBuild .sln build -->
     <OrleansReferencesBase>$(ProjectDir)..\..\src\Bootstrap\</OrleansReferencesBase>
     <!-- TFS build -->
-    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(TargetDir)</OrleansReferencesBase>
+    <OrleansReferencesBase Condition="'$(builduri)' != ''">$(ArtifactDirectory)Bootstrap\</OrleansReferencesBase>
   </PropertyGroup>
   <Import Project="$(ProjectDir)..\..\src\Orleans.SDK.targets" />
   <!--End Orleans -->

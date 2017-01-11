@@ -7,6 +7,7 @@ using System.Xml;
 using Orleans.MultiCluster;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.MultiClusterNetwork;
 
 namespace Orleans.Runtime.Management
 {
@@ -16,8 +17,26 @@ namespace Orleans.Runtime.Management
     [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
+        private readonly GlobalConfiguration globalConfig;
+        private readonly IMultiClusterOracle multiClusterOracle;
+        private readonly IInternalGrainFactory internalGrainFactory;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly MembershipTableFactory membershipTableFactory;
         private Logger logger;
-        private IMembershipTable membershipTable;
+
+        public ManagementGrain(
+            GlobalConfiguration globalConfig,
+            IMultiClusterOracle multiClusterOracle,
+            IInternalGrainFactory internalGrainFactory,
+            ISiloStatusOracle siloStatusOracle,
+            MembershipTableFactory membershipTableFactory)
+        {
+            this.globalConfig = globalConfig;
+            this.multiClusterOracle = multiClusterOracle;
+            this.internalGrainFactory = internalGrainFactory;
+            this.siloStatusOracle = siloStatusOracle;
+            this.membershipTableFactory = membershipTableFactory;
+        }
 
         public override Task OnActivateAsync()
         {
@@ -27,13 +46,17 @@ namespace Orleans.Runtime.Management
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
         {
-            var mTable = await GetMembershipTable();
-            var table = await mTable.ReadAll();
-            
-            var t = onlyActive ? 
-                table.Members.Where(item => item.Item1.Status == SiloStatus.Active).ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status) :
-                table.Members.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
-            return t;
+            // If the status oracle isn't MembershipOracle, then it is assumed that it does not use IMembershipTable.
+            // In that event, return the approximate silo statuses from the status oracle.
+            if (!(this.siloStatusOracle is MembershipOracle)) return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
+
+            // Explicitly read the membership table and return the results.
+            var table = await GetMembershipTable();
+            var members = await table.ReadAll();
+            var results = onlyActive
+                ? members.Members.Where(item => item.Item1.Status == SiloStatus.Active)
+                : members.Members;
+            return results.ToDictionary(item => item.Item1.SiloAddress, item => item.Item1.Status);
         }
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
@@ -269,26 +292,20 @@ namespace Orleans.Runtime.Management
             return await Task.WhenAll(actionPromises);
         }
 
-        private async Task<IMembershipTable> GetMembershipTable()
+        private Task<IMembershipTable> GetMembershipTable()
         {
-            if (membershipTable == null)
-            {
-                var factory = new MembershipFactory((IInternalGrainFactory)this.GrainFactory);
-                membershipTable = factory.GetMembershipTable(Silo.CurrentSilo.GlobalConfig);
-
-                await membershipTable.InitializeMembershipTable(Silo.CurrentSilo.GlobalConfig, false,
-                    LogManager.GetLogger(membershipTable.GetType().Name));
-            }
-            return membershipTable;
+            var membershipOracle = this.siloStatusOracle as MembershipOracle;
+            if (!(this.siloStatusOracle is MembershipOracle)) throw new InvalidOperationException("The current membership oracle does not support detailed silo status reporting.");
+            return this.membershipTableFactory.GetMembershipTable();
         }
 
-        private static SiloAddress[] GetSiloAddresses(SiloAddress[] silos)
+        private SiloAddress[] GetSiloAddresses(SiloAddress[] silos)
         {
             if (silos != null && silos.Length > 0)
                 return silos;
 
-            return InsideRuntimeClient.Current.Catalog.SiloStatusOracle
-                .GetApproximateSiloStatuses(true).Select(s => s.Key).ToArray();
+            return this.siloStatusOracle
+                       .GetApproximateSiloStatuses(true).Select(s => s.Key).ToArray();
         }
 
         /// <summary>
@@ -365,16 +382,16 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return InsideRuntimeClient.Current.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
         }
 
         #region MultiCluster
 
-        private MultiClusterNetwork.IMultiClusterOracle GetMultiClusterOracle()
+        private IMultiClusterOracle GetMultiClusterOracle()
         {
-            if (!Silo.CurrentSilo.GlobalConfig.HasMultiClusterNetwork)
+            if (!this.globalConfig.HasMultiClusterNetwork)
                 throw new OrleansException("No multicluster network configured");
-            return Silo.CurrentSilo.LocalMultiClusterOracle;
+            return this.multiClusterOracle;
         }
 
         public Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways()

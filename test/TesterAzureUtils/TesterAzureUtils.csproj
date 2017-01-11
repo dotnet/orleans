@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AzureGossipTableTests.cs" />
+    <Compile Include="AzureLivenessTests.cs" />
     <Compile Include="AzureMembershipTableTests.cs" />
     <Compile Include="AzureQueueDataManagerTests.cs" />
     <Compile Include="AzureRemindersTableTests.cs" />
@@ -63,14 +64,22 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Reminder\ReminderTests_AzureTable.cs" />
+    <Compile Include="Reminder\ReminderTests_Azure_Standalone.cs" />
     <Compile Include="SiloInstanceTableManagerTests.cs" />
     <Compile Include="Streaming\AQClientStreamTests.cs" />
     <Compile Include="Streaming\AQStreamingTests.cs" />
     <Compile Include="Streaming\AQSubscriptionMultiplicityTests.cs" />
     <Compile Include="Streaming\AzureQueueAdapterTests.cs" />
+    <Compile Include="Streaming\DelayedQueueRebalancingTests.cs" />
+    <Compile Include="Streaming\HaloStreamSubscribeTests.cs" />
     <Compile Include="Streaming\SampleAzureQueueStreamingTests.cs" />
     <Compile Include="Streaming\AQStreamFilteringTests.cs" />
+    <Compile Include="Streaming\StreamLifecycleTests.cs" />
+    <Compile Include="Streaming\StreamLimitTests.cs" />
+    <Compile Include="Streaming\StreamReliabilityTests.cs" />
     <Compile Include="Streaming\TestAzureQueueStreamProvider.cs" />
+    <Compile Include="StreamTypeSerializationTests.cs" />
     <Compile Include="UnitTestAzureTableDataManager.cs" />
   </ItemGroup>
   <ItemGroup>

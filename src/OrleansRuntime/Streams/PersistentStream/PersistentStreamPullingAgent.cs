@@ -56,10 +56,10 @@ namespace Orleans.Streams
             this.config = config;
             numMessages = 0;
 
-            logger = runtime.GetLogger(GrainId + "-" + streamProviderName);
+            logger = runtime.GetLogger(((ISystemTargetBase)this).GrainId + "-" + streamProviderName);
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
-                GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
@@ -91,7 +91,7 @@ namespace Orleans.Streams
         private void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
         {
             logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter;
@@ -349,7 +349,7 @@ namespace Orleans.Streams
                         i => ReadFromQueue((QueueId)state, receiver, maxCacheAddCount),
                         AsyncExecutorWithRetries.INFINITE_RETRIES,
                         (e, i) => !IsShutdown,
-                        TimeSpan.MaxValue,
+                        Constants.INFINITE_TIMESPAN,
                         ReadLoopBackoff);
                     if (!moreData)
                         return;

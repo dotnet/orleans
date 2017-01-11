@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    internal class GrainTimer : IDisposable
+    internal class GrainTimer : IGrainTimer
     {
         private Func<object, Task> asyncCallback;
         private AsyncTaskSafeTimer timer;
@@ -16,17 +16,17 @@ namespace Orleans.Runtime
         private int totalNumTicks;
         private static readonly Logger logger = LogManager.GetLogger("GrainTimer", LoggerType.Runtime);
         private Task currentlyExecutingTickTask;
-        private readonly ActivationData activationData;
+        private readonly IActivationData activationData;
 
-        internal string Name { get; private set; }
+        public string Name { get; }
         
         private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
 
-        private GrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        private GrainTimer(IActivationData activationData, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
             var ctxt = RuntimeContext.CurrentActivationContext;
             InsideRuntimeClient.Current.Scheduler.CheckSchedulingContextValidity(ctxt);
-            activationData = (ActivationData) RuntimeClient.Current.CurrentActivationData;
+            this.activationData = activationData;
 
             this.Name = name;
             this.asyncCallback = asyncCallback;
@@ -40,33 +40,35 @@ namespace Orleans.Runtime
         }
 
         internal static GrainTimer FromTimerCallback(
-                TimerCallback callback,
-                object state,
-                TimeSpan dueTime,
-                TimeSpan period,
-                string name = null)
+            TimerCallback callback,
+            object state,
+            TimeSpan dueTime,
+            TimeSpan period,
+            string name = null)
         {
             return new GrainTimer(
+                null,
                 ob =>
-                    {
-                        if (callback != null)
-                            callback(ob);
-                        return TaskDone.Done;
-                    },
+                {
+                    if (callback != null)
+                        callback(ob);
+                    return TaskDone.Done;
+                },
                 state,
                 dueTime,
                 period,
                 name);
         }
 
-        internal static GrainTimer FromTaskCallback(
+        internal static IGrainTimer FromTaskCallback(
                 Func<object, Task> asyncCallback,
                 object state,
                 TimeSpan dueTime,
                 TimeSpan period,
-                string name = null)
+                string name = null,
+                IActivationData activationData = null)
         {
-            return new GrainTimer(asyncCallback, state, dueTime, period, name);
+            return new GrainTimer(activationData, asyncCallback, state, dueTime, period, name);
         }
 
         public void Start()
@@ -138,7 +140,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal Task GetCurrentlyExecutingTickTask()
+        public Task GetCurrentlyExecutingTickTask()
         {
             return currentlyExecutingTickTask ?? TaskDone.Done;
         }
@@ -165,7 +167,7 @@ namespace Orleans.Runtime
                 Name == null ? "" : Name + ".", callbackTarget, callbackMethodInfo);
         }
 
-        internal int GetNumTicks()
+        public int GetNumTicks()
         {
             return totalNumTicks;
         }
@@ -173,7 +175,7 @@ namespace Orleans.Runtime
         // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer
         // is that SafeTimer may tick OK (no starvation by .NET thread pool), but then scheduler.QueueWorkItem
         // may not execute and starve this GrainTimer callback.
-        internal bool CheckTimerFreeze(DateTime lastCheckTime)
+        public bool CheckTimerFreeze(DateTime lastCheckTime)
         {
             if (TimerAlreadyStopped) return true;
             // check underlying SafeTimer (checking that .NET thread pool does not starve this timer)
@@ -185,7 +187,7 @@ namespace Orleans.Runtime
                 dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, true);
         }
 
-        internal bool CheckTimerDelay()
+        public bool CheckTimerDelay()
         {
             return SafeTimerBase.CheckTimerDelay(previousTickTime, totalNumTicks,
                 dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, false);
@@ -217,8 +219,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(tmp.Dispose);
             timer = null;
             asyncCallback = null;
-            if (activationData != null)
-                activationData.OnTimerDisposed(this);
+            activationData?.OnTimerDisposed(this);
         }
 
         #endregion

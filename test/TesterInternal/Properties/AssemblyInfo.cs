@@ -20,4 +20,6 @@ using Orleans.CodeGeneration;
 [assembly: SkipCodeGeneration]
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]

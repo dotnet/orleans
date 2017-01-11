@@ -1,11 +1,6 @@
 using System;
-using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.Extensions.DependencyInjection;
-
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
@@ -16,19 +11,53 @@ using Orleans.Streams;
 namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
-    { 
-        private static volatile SiloProviderRuntime instance;
-        private static readonly object syncRoot = new Object();
-
-        private IStreamPubSub grainBasedPubSub;
-        private IStreamPubSub implictPubSub;
-        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
-
-        private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
+    {
+        private readonly SiloInitializationParameters siloDetails;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly OrleansTaskScheduler scheduler;
+        private readonly ActivationDirectory activationDirectory;
+        private readonly IConsistentRingProvider consistentRingProvider;
+        private readonly ISiloRuntimeClient runtimeClient;
+        private readonly IStreamPubSub grainBasedPubSub;
+        private readonly IStreamPubSub implictPubSub;
+        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        
         private InvokeInterceptor invokeInterceptor;
 
-        public IGrainFactory GrainFactory { get; private set; }
-        public IServiceProvider ServiceProvider { get; private set; }
+        public IGrainFactory GrainFactory { get; }
+        public IServiceProvider ServiceProvider { get; }
+
+        public Guid ServiceId { get; }
+        public string SiloIdentity { get; }
+
+        public SiloProviderRuntime(
+            SiloInitializationParameters siloDetails,
+            GlobalConfiguration config,
+            IGrainFactory grainFactory,
+            IConsistentRingProvider consistentRingProvider,
+            ISiloRuntimeClient runtimeClient,
+            IServiceProvider serviceProvider,
+            ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
+            ISiloStatusOracle siloStatusOracle,
+            OrleansTaskScheduler scheduler,
+            ActivationDirectory activationDirectory)
+        {
+            this.siloDetails = siloDetails;
+            this.siloStatusOracle = siloStatusOracle;
+            this.scheduler = scheduler;
+            this.activationDirectory = activationDirectory;
+            this.consistentRingProvider = consistentRingProvider;
+            this.runtimeClient = runtimeClient;
+            this.ServiceId = config.ServiceId;
+            this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
+            this.GrainFactory = grainFactory;
+            this.ServiceProvider = serviceProvider;
+
+            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
+            var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
+            this.implictPubSub = tmp;
+            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
+        }
 
         public void SetInvokeInterceptor(InvokeInterceptor interceptor)
         {
@@ -40,79 +69,27 @@ namespace Orleans.Runtime.Providers
             return this.invokeInterceptor;
         }
 
-        public Guid ServiceId { get; private set; }
-        public string SiloIdentity { get; private set; }
-
-        private SiloProviderRuntime()
-        {
-        }
-
-        internal static void Initialize(GlobalConfiguration config, string siloIdentity, IGrainFactory grainFactory, IServiceProvider serviceProvider)
-        {
-            Instance.ServiceId = config.ServiceId;
-            Instance.SiloIdentity = siloIdentity;
-            Instance.GrainFactory = grainFactory;
-            Instance.ServiceProvider = serviceProvider;
-        }
-
-        public static SiloProviderRuntime Instance
-        {
-            get
-            {
-                if (instance == null)
-                {
-                    lock (syncRoot)
-                    {
-                        if (instance == null)
-                            instance = new SiloProviderRuntime();
-                    }
-                }
-                return instance;
-            }
-        }
-
-        public ImplicitStreamSubscriberTable ImplicitStreamSubscriberTable { get { return implicitStreamSubscriberTable; } }
-
-        public void StreamingInitialize()
-        {
-            this.implicitStreamSubscriberTable = new ImplicitStreamSubscriberTable();
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.implicitStreamSubscriberTable);
-            this.implictPubSub = tmp;
-            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
-
-            var typeManager = this.ServiceProvider.GetRequiredService<GrainTypeManager>();
-            Type[] types = typeManager.GrainClassTypeData.Select(t => t.Value.Type).ToArray();
-            this.ImplicitStreamSubscriberTable.InitImplicitStreamSubscribers(types);
-        }
-
-        public StreamDirectory GetStreamDirectory()
-        {
-            var currentActivation = GetCurrentActivationData();
-            return currentActivation.GetStreamDirectory();
-        }
-
         public Logger GetLogger(string loggerName)
         {
             return LogManager.GetLogger(loggerName, LoggerType.Provider);
         }
 
-        public string ExecutingEntityIdentity()
-        {
-            var currentActivation = GetCurrentActivationData();
-            return currentActivation.Address.ToString();
-        }
-
-        public SiloAddress ExecutingSiloAddress { get { return Silo.CurrentSilo.SiloAddress; } }
+        public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
 
         public void RegisterSystemTarget(ISystemTarget target)
         {
-            Silo.CurrentSilo.RegisterSystemTarget((SystemTarget)target);
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
+            activationDirectory.RecordNewSystemTarget(systemTarget);
         }
 
-        public void UnRegisterSystemTarget(ISystemTarget target)
+        public void UnregisterSystemTarget(ISystemTarget target)
         {
-            Silo.CurrentSilo.UnregisterSystemTarget((SystemTarget)target);
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            activationDirectory.RemoveSystemTarget(systemTarget);
+            scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -132,108 +109,16 @@ namespace Orleans.Runtime.Providers
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
-            return new EquallyDividedRangeRingProvider(InsideRuntimeClient.Current.ConsistentRingProvider, mySubRangeIndex, numSubRanges);
+            return new EquallyDividedRangeRingProvider(this.consistentRingProvider, mySubRangeIndex, numSubRanges);
         }
-
-        public bool InSilo { get { return true; } }
-
-        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
-            where TExtensionInterface : IGrainExtension
-        {
-            TExtension extension;
-            if (!TryGetExtensionHandler(out extension))
-            {
-                extension = newExtensionFunc();
-                if (!TryAddExtension(extension))
-                    throw new OrleansException("Failed to register " + typeof(TExtension).Name);
-            }
-
-            IAddressable currentGrain = RuntimeClient.Current.CurrentActivationData.GrainInstance;
-            var currentTypedGrain = currentGrain.AsReference<TExtensionInterface>();
-
-            return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
-        }
-
-        /// <summary>
-        /// Adds the specified extension handler to the currently running activation.
-        /// This method must be called during an activation turn.
-        /// </summary>
-        /// <param name="handler"></param>
-        /// <returns></returns>
-        internal bool TryAddExtension(IGrainExtension handler)
-        {
-            var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(handler.GetType());
-            if (invoker == null)
-                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            
-            return currentActivation.TryAddExtension(invoker, handler);
-        }
-
-        private static ActivationData GetCurrentActivationData()
-        {
-            var context = RuntimeContext.Current.ActivationContext as SchedulingContext;
-            if (context == null || context.Activation == null)
-                throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
-            
-            var currentActivation = context.Activation;
-            return currentActivation;
-        }
-
-        /// <summary>
-        /// Removes the specified extension handler (and any other extension that implements the same interface ID)
-        /// from the currently running activation.
-        /// This method must be called during an activation turn.
-        /// </summary>
-        /// <param name="handler"></param>
-        internal void RemoveExtension(IGrainExtension handler)
-        {
-            var currentActivation = GetCurrentActivationData();
-            currentActivation.RemoveExtension(handler);
-        }
-
-        internal bool TryGetExtensionHandler<TExtension>(out TExtension result)
-        {
-            var currentActivation = GetCurrentActivationData();
-            IGrainExtension untypedResult;
-            if (currentActivation.TryGetExtensionHandler(typeof(TExtension), out untypedResult))
-            {
-                result = (TExtension)untypedResult;
-                return true;
-            }
-            
-            result = default(TExtension);
-            return false;
-        }
-
-        private static IGrainExtensionMethodInvoker TryGetExtensionInvoker(Type handlerType)
-        {
-            var interfaces = CodeGeneration.GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
-            if(interfaces.Count != 1)
-                throw new InvalidOperationException(String.Format("Extension type {0} implements more than one grain interface.", handlerType.FullName));
-
-            var interfaceId = CodeGeneration.GrainInterfaceUtils.ComputeInterfaceId(interfaces.First());
-            var invoker = GrainTypeManager.Instance.GetInvoker(interfaceId);
-            if (invoker != null)
-                return (IGrainExtensionMethodInvoker) invoker;
-            
-            throw new ArgumentException("Provider extension handler type " + handlerType + " was not found in the type manager", "handler");
-        }
-
-        public object GetCurrentSchedulingContext()
-        {
-            return RuntimeContext.CurrentActivationContext;
-        }
-
+        
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config)
         {
-            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(
-                config.BalancerType, streamProviderName, Silo.CurrentSilo.LocalSiloStatusOracle, Silo.CurrentSilo.OrleansConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
+            IStreamQueueBalancer queueBalancer = StreamQueueBalancerFactory.Create(config.BalancerType, streamProviderName, this.siloStatusOracle, this.siloDetails.ClusterConfig, this, adapterFactory.GetStreamQueueMapper(), config.SiloMaturityPeriod);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config);
             this.RegisterSystemTarget(manager);
@@ -244,9 +129,16 @@ namespace Orleans.Runtime.Providers
             return pullingAgentManager;
         }
 
-        public Task<object> CallInvokeInterceptor(MethodInfo method, InvokeMethodRequest request, IAddressable target, IGrainMethodInvoker invoker)
+        /// <inheritdoc />
+        public string ExecutingEntityIdentity() => runtimeClient.ExecutingEntityIdentity();
+
+        /// <inheritdoc />
+        public StreamDirectory GetStreamDirectory() => runtimeClient.GetStreamDirectory();
+
+        /// <inheritdoc />
+        public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc) where TExtension : IGrainExtension where TExtensionInterface : IGrainExtension
         {
-            return this.invokeInterceptor(method, request, (IGrain)target, invoker);
+            return runtimeClient.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
     }
 }

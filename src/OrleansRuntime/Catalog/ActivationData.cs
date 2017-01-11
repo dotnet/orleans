@@ -147,17 +147,17 @@ namespace Orleans.Runtime
             }
         }
 
-        public readonly TimeSpan CollectionAgeLimit;
-        private readonly NodeConfiguration nodeConfiguration;
-        private readonly Logger logger;
-
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
+        private readonly TimeSpan maxWarningRequestProcessingTime;
+        private readonly NodeConfiguration nodeConfiguration;
+        public readonly TimeSpan CollectionAgeLimit;
+        private readonly Logger logger;
         private IGrainMethodInvoker lastInvoker;
 
         // This is the maximum number of enqueued request messages for a single activation before we write a warning log or reject new requests.
         private LimitValue maxEnqueuedRequestsLimit;
-        private HashSet<GrainTimer> timers;
+        private HashSet<IGrainTimer> timers;
         
         public ActivationData(
             ActivationAddress addr,
@@ -167,7 +167,8 @@ namespace Orleans.Runtime
             IActivationCollector collector,
             TimeSpan ageLimit,
             NodeConfiguration nodeConfiguration,
-            TimeSpan maxRequestProcessingTime)
+            TimeSpan maxWarningRequestProcessingTime,
+			TimeSpan maxRequestProcessingTime)
         {
             if (null == addr) throw new ArgumentNullException("addr");
             if (null == placedUsing) throw new ArgumentNullException("placedUsing");
@@ -175,6 +176,7 @@ namespace Orleans.Runtime
 
             logger = LogManager.GetLogger("ActivationData", LoggerType.Runtime);
             this.maxRequestProcessingTime = maxRequestProcessingTime;
+            this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.nodeConfiguration = nodeConfiguration;
             ResetKeepAliveRequest();
             Address = addr;
@@ -194,18 +196,22 @@ namespace Orleans.Runtime
         #region Method invocation
 
         private ExtensionInvoker extensionInvoker;
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType=null)
+        public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
         {
             // Return previous cached invoker, if applicable
             if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId) // extension invoker returns InterfaceId==0, so this condition will never be true if an extension is installed
                 return lastInvoker;
 
-            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId)) // HasExtensionInstalled(interfaceId)
+            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId))
+            {
                 // Shared invoker for all extensions installed on this grain
                 lastInvoker = extensionInvoker;
+            }
             else
+            {
                 // Find the specific invoker for this interface / grain type
-                lastInvoker = RuntimeClient.Current.GetInvoker(interfaceId, genericGrainType);
+                lastInvoker = typeManager.GetInvoker(interfaceId, genericGrainType);
+            }
 
             return lastInvoker;
         }
@@ -311,9 +317,9 @@ namespace Orleans.Runtime
 
         public ActivationAddress Address { get; private set; }
 
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period);
+            var timer = GrainTimer.FromTaskCallback(asyncCallback, state, dueTime, period, activationData: this);
             AddTimer(timer);
             timer.Start();
             return timer;
@@ -487,11 +493,18 @@ namespace Orleans.Runtime
             }
         }
 
+        public enum EnqueueMessageResult
+        {
+            Success,
+            ErrorInvalidActivation,
+            ErrorStuckActivation,
+        }
+
         /// <summary>
         /// Insert in a FIFO order
         /// </summary>
         /// <param name="message"></param>
-        public bool EnqueueMessage(Message message)
+        public EnqueueMessageResult EnqueueMessage(Message message)
         {
             lock (this)
             {
@@ -499,14 +512,19 @@ namespace Orleans.Runtime
                 {
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
-                    return false;
+                    return EnqueueMessageResult.ErrorInvalidActivation;
                 }
-                // If maxRequestProcessingTime is never set, then we will skip this check
-                if (maxRequestProcessingTime.TotalMilliseconds > 0 && Running != null)
+                if (Running != null)
                 {
-                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
+                    {
+                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
+                        return EnqueueMessageResult.ErrorStuckActivation;
+                    }
+                    // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
+                    else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
                     {
                         logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
@@ -516,7 +534,7 @@ namespace Orleans.Runtime
 
                 waiting = waiting ?? new List<Message>();
                 waiting.Add(message);
-                return true;
+                return EnqueueMessageResult.Success;
             }
         }
 
@@ -703,13 +721,13 @@ namespace Orleans.Runtime
         #endregion
 
         #region In-grain Timers
-        internal void AddTimer(GrainTimer timer)
+        internal void AddTimer(IGrainTimer timer)
         {
             lock(this)
             {
                 if (timers == null)
                 {
-                    timers = new HashSet<GrainTimer>();
+                    timers = new HashSet<IGrainTimer>();
                 }
                 timers.Add(timer);
             }
@@ -728,7 +746,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void OnTimerDisposed(GrainTimer orleansTimerInsideGrain)
+        public void OnTimerDisposed(IGrainTimer orleansTimerInsideGrain)
         {
             lock (this) // need to lock since dispose can be called on finalizer thread, outside garin context (not single threaded).
             {

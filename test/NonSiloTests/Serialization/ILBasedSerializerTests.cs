@@ -30,14 +30,20 @@ namespace UnitTests.Serialization
 
             var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType(), f => f.Name != "One", f => f.Name != "Three");
-            var copy = (FieldTest)serializers.DeepCopy(input);
+            var writer = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            var copy = (FieldTest)serializers.DeepCopy(input, writer);
             Assert.Equal(1, copy.One);
             Assert.Equal(2, copy.Two);
             Assert.Equal(0, copy.Three);
-
-            var writer = new BinaryTokenStreamWriter();
+            
             serializers.Serialize(input, writer, input.GetType());
-            var reader = new BinaryTokenStreamReader(writer.ToByteArray());
+            var reader = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
             var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
 
             Assert.Equal(0, deserialized.One);

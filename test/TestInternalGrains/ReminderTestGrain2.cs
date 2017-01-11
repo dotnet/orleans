@@ -7,6 +7,8 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
+using Orleans.Runtime.Services;
+using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 
 
@@ -16,6 +18,7 @@ namespace UnitTests.Grains
     // NOTE: if you make any changes here, copy them to ReminderTestCopyGrain
     public class ReminderTestGrain2 : Grain, IReminderTestGrain2, IRemindable
     {
+        private readonly IReminderRegistry unvalidatedReminderRegistry;
         Dictionary<string, IGrainReminder> allReminders;
         Dictionary<string, long> sequence;
         private TimeSpan period;
@@ -26,6 +29,11 @@ namespace UnitTests.Grains
         private string myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
+
+        public ReminderTestGrain2(IServiceProvider services)
+        {
+            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
+        }
 
         public override Task OnActivateAsync()
         {
@@ -53,7 +61,7 @@ namespace UnitTests.Grains
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
-                r = await RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
+                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
 
             allReminders[reminderName] = r;
             sequence[reminderName] = 0;
@@ -216,6 +224,7 @@ namespace UnitTests.Grains
     //      2. filePrefix should start with "gc", instead of "g"
     public class ReminderTestCopyGrain : Grain, IReminderTestCopyGrain, IRemindable
     {
+        private readonly IReminderRegistry unvalidatedReminderRegistry;
         Dictionary<string, IGrainReminder> allReminders;
         Dictionary<string, long> sequence;
         private TimeSpan period;
@@ -226,6 +235,11 @@ namespace UnitTests.Grains
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
+
+        public ReminderTestCopyGrain(IServiceProvider services)
+        {
+            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services); ;
+        }
 
         public override async Task OnActivateAsync()
         {
@@ -253,7 +267,10 @@ namespace UnitTests.Grains
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
-                r = await RuntimeClient.Current.RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
+                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
+                    reminderName,
+                    usePeriod - TimeSpan.FromSeconds(2),
+                    usePeriod);
             if (allReminders.ContainsKey(reminderName))
             {
                 allReminders[reminderName] = r;
@@ -398,5 +415,33 @@ namespace UnitTests.Grains
         }
     }
     #endregion
+
+
+    internal class UnvalidatedReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry
+    {
+        public UnvalidatedReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+            return this.GrainService.RegisterOrUpdateReminder(this.CallingGrainReference, reminderName, dueTime, period);
+        }
+
+        public Task UnregisterReminder(IGrainReminder reminder)
+        {
+            return this.GrainService.UnregisterReminder(reminder);
+        }
+
+        public Task<IGrainReminder> GetReminder(string reminderName)
+        {
+            return this.GrainService.GetReminder(this.CallingGrainReference, reminderName);
+        }
+
+        public Task<List<IGrainReminder>> GetReminders()
+        {
+            return this.GrainService.GetReminders(this.CallingGrainReference);
+        }
+    }
 }
 #pragma warning restore 612,618

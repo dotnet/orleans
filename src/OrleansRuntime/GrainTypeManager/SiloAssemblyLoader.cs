@@ -15,17 +15,21 @@ namespace Orleans.Runtime
 {
     internal class SiloAssemblyLoader
     {
+        private readonly List<string> excludedGrains;
         private readonly LoggerImpl logger = LogManager.GetLogger("AssemblyLoader.Silo");
         private List<string> discoveredAssemblyLocations;
         private Dictionary<string, SearchOption> directories;
 
         public SiloAssemblyLoader(NodeConfiguration nodeConfig)
-            : this(nodeConfig.AdditionalAssemblyDirectories)
+            : this(nodeConfig.AdditionalAssemblyDirectories, nodeConfig.ExcludedGrainTypes)
         {
         }
 
-        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories)
+        public SiloAssemblyLoader(IDictionary<string, SearchOption> additionalDirectories, IEnumerable<string> excludedGrains = null)
         {
+            this.excludedGrains = excludedGrains != null
+                ? new List<string>(excludedGrains)
+                : new List<string>();
             var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
             var cwd = Directory.GetCurrentDirectory();
@@ -82,6 +86,9 @@ namespace Orleans.Runtime
             foreach (var grainType in grainTypes)
             {
                 var className = TypeUtils.GetFullName(grainType);
+                if (excludedGrains.Contains(className))
+                    continue;
+
                 if (result.ContainsKey(className))
                     throw new InvalidOperationException(
                         string.Format("Precondition violated: GetLoadedGrainTypes should not return a duplicate type ({0})", className));

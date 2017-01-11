@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -10,8 +11,18 @@ namespace UnitTests.GrainInterfaces
         Task<string> NotIntercepted();
     }
 
+    public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
+    {
+        Task<string> GetInputAsString(T input);
+    }
+
     public interface IMethodFromAnotherInterface
     {
         Task<string> SayHello();
+    }
+    
+    public interface ITrickyMethodInterceptionGrain : IGenericMethodInterceptionGrain<string>, IGenericMethodInterceptionGrain<bool>
+    {
+        Task<int> GetBestNumber();
     }
 }

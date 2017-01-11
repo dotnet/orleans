@@ -69,6 +69,7 @@
     <Compile Include="IGeneratorTestDerivedGrain1.cs" />
     <Compile Include="IGeneratorTestDerivedGrain2.cs" />
     <Compile Include="IGeneratorTestGrain.cs" />
+    <Compile Include="IGrainServiceTestGrain.cs" />
     <Compile Include="IMethodInterceptionGrain.cs" />
     <Compile Include="IJournaledPersonGrain.cs" />
     <Compile Include="IGeneratedEventCollectorGrain.cs" />
@@ -113,6 +114,7 @@
     <Compile Include="IStreamLifecycleTestGrains.cs" />
     <Compile Include="IStreamLifecycleTestInternalGrains.cs" />
     <Compile Include="IStreamReliabilityTestGrains.cs" />
+    <Compile Include="IStuckGrain.cs" />
     <Compile Include="ITestExtension.cs" />
     <Compile Include="ITestGrain.cs" />
     <Compile Include="IStreaming_ProducerGrain.cs" />
@@ -120,7 +122,6 @@
     <Compile Include="IValueTypeTestGrain.cs" />
     <Compile Include="IConsiderForCodeGenerationGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="SerializerExclusions.cs" />
     <Compile Include="SQLAdapter\ICustomerGrain.cs" />
     <Compile Include="SQLAdapter\IDeviceGrain.cs" />

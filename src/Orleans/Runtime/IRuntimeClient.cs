@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
@@ -43,20 +42,6 @@ namespace Orleans.Runtime
 
         void ReceiveResponse(Message message);
 
-        /// <summary>
-        /// Return the currently storage provider configured for this grain, or null if no storage provider configured for this grain.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">If called from outside grain class</exception>
-        IStorageProvider CurrentStorageProvider { get; }
-
-        Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period);
-
-        Task UnregisterReminder(IGrainReminder reminder);
-
-        Task<IGrainReminder> GetReminder(string reminderName);
-
-        Task<List<IGrainReminder>> GetReminders();
-
         Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName);
 
         void Reset(bool cleanup);
@@ -65,26 +50,14 @@ namespace Orleans.Runtime
 
         void DeleteObjectReference(IAddressable obj);
 
-        IActivationData CurrentActivationData { get; }
-
-        ActivationAddress CurrentActivationAddress { get; }
-
         SiloAddress CurrentSilo { get; }
-
-        void DeactivateOnIdle(ActivationId id);
 
         Streams.IStreamProviderManager CurrentStreamProviderManager { get; }
 
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainTypeResolver GrainTypeResolver { get; }
-
-        string CaptureRuntimeEnvironment();
-
-        IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null);
-
-        SiloStatus GetSiloStatus(SiloAddress siloAddress);
-
+        
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
     }
 }

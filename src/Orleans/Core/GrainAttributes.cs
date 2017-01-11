@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-using System.Reflection;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 
@@ -239,7 +237,7 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Used to mark a method as providinga serializer function for that type.
+    /// Used to mark a method as providing a serializer function for that type.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class SerializerMethodAttribute : Attribute
@@ -312,64 +310,6 @@ namespace Orleans
             }
         }
 
-    }
-
-    [AttributeUsage(AttributeTargets.Interface)]
-    internal sealed class FactoryAttribute : Attribute
-    {
-        public enum FactoryTypes
-        {
-            Grain,
-            ClientObject,
-            Both
-        };
-
-        private readonly FactoryTypes factoryType;
-
-        public FactoryAttribute(FactoryTypes factoryType)
-        {
-            this.factoryType = factoryType;
-        }
-
-        internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
-        {
-            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
-
-            // if no attributes are specified, we default to FactoryTypes.Grain.
-            if (0 == attribs.Length)
-                return FactoryTypes.Grain;
-            
-            // otherwise, we'll consider all of them and aggregate the specifications
-            // like flags.
-            FactoryTypes? result = null;
-            foreach (var i in attribs)
-            {
-                var a = (FactoryAttribute)i;
-                if (result.HasValue)
-                {
-                    if (a.factoryType == FactoryTypes.Both)
-                        result = a.factoryType;
-                    else if (a.factoryType != result.Value)
-                        result = FactoryTypes.Both;
-                }
-                else
-                    result = a.factoryType;
-            }
-
-            if (result.Value == FactoryTypes.Both)
-            {
-                throw 
-                    new NotSupportedException(
-                        "Orleans doesn't currently support generating both a grain and a client object factory but we really want to!");
-            }
-            
-            return result.Value;
-        }
-
-        public static FactoryTypes CollectFactoryTypesSpecified<T>()
-        {
-            return CollectFactoryTypesSpecified(typeof(T));
-        }
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]

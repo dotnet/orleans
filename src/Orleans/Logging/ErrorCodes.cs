@@ -386,6 +386,8 @@ namespace Orleans
         SiloLoadedDI                    = SiloBase + 45, // Not used anymore
         SiloFailedToLoadDI              = SiloBase + 46, // Not used anymore
         SiloFileNotFoundLoadingDI       = SiloBase + 47, // Not used anymore
+        SiloStartupEventFailure           = SiloBase + 48,
+        SiloShutdownEventFailure        = SiloBase + 49,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -825,8 +827,9 @@ namespace Orleans
         Dispatcher_InvalidActivation            = DispatcherBase + 38,
         InvokeWorkItem_UnhandledExceptionInInvoke = DispatcherBase + 39,
         Dispatcher_ErrorCreatingActivation      = DispatcherBase + 40,
+        Dispatcher_StuckActivation = DispatcherBase + 41,
 
-        SerializationBase                       = Runtime + 1600,
+        SerializationBase = Runtime + 1600,
         Ser_IncompatibleIntermediateType        = Runtime_Error_100033, // Backward compatability
         Ser_CannotConstructBaseObj              = Runtime_Error_100034, // Backward compatability
         Ser_IncompatibleType                    = Runtime_Error_100035, // Backward compatability
@@ -1095,7 +1098,10 @@ namespace Orleans
         GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
         GlobalSingleInstance_MultipleOwners = GlobalSingleInstanceBase + 4,
 
-        LogConsistencyBase = Runtime + 4200,
+        TypeManagerBase = Runtime + 4200,
+        TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
+
+        LogConsistencyBase = Runtime + 4300,
         LogConsistency_UserCodeException = LogConsistencyBase + 1,
         LogConsistency_CaughtException = LogConsistencyBase + 2,
         LogConsistency_ProtocolError = LogConsistencyBase + 3,

@@ -16,6 +16,30 @@ using Xunit;
 
 namespace UnitTests.Grains
 {
+    internal static class TestRuntimeEnvironmentUtility
+    {
+        public static string CaptureRuntimeEnvironment()
+        {
+            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
+            return String.Format(
+                "   TaskScheduler={0}" + Environment.NewLine
+                + "   RuntimeContext={1}" + Environment.NewLine
+                + "   WorkerPoolThread={2}" + Environment.NewLine
+                + "   WorkerPoolThread.CurrentWorkerThread.ManagedThreadId={3}" + Environment.NewLine
+                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   StackTrace=" + Environment.NewLine
+                + "   {5}",
+                TaskScheduler.Current,
+                RuntimeContext.Current,
+                WorkerPoolThread.CurrentWorkerThread == null ? "null" : WorkerPoolThread.CurrentWorkerThread.Name,
+                WorkerPoolThread.CurrentWorkerThread == null
+                    ? "null"
+                    : WorkerPoolThread.CurrentWorkerThread.ManagedThreadId.ToString(CultureInfo.InvariantCulture),
+                System.Threading.Thread.CurrentThread.ManagedThreadId,
+                callStack);
+        }
+    }
+
     [Serializable]
     public class PersistenceTestGrainState
     {
@@ -745,23 +769,18 @@ namespace UnitTests.Grains
         {
             if (executing)
             {
-                var errorMsg = String.Format(
-                    "Found out that this grain is already in the middle of execution."
-                    + " Single threaded-ness violation!"
-                    + ".\n{0}",
-                    CaptureRuntimeEnvironment());
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                var errorMsg = "Found out that this grain is already in the middle of execution."
+                               + " Single threaded-ness violation!\n" +
+                               TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
 
             if (RuntimeContext.Current == null || RuntimeContext.Current.ActivationContext == null)
             {
-                var errorMsg = String.Format(
-                    "Found RuntimeContext.Current == null."
-                    + ".\n{0}",
-                    CaptureRuntimeEnvironment());
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -777,8 +796,9 @@ namespace UnitTests.Grains
         }
     }
 
-    public class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
+    internal class NonReentrentStressGrainWithoutState : Grain, INonReentrentStressGrainWithoutState
     {
+        private readonly OrleansTaskScheduler scheduler;
         private const int Multiple = 100;
         private Logger logger;
         private bool executing;
@@ -799,15 +819,19 @@ namespace UnitTests.Grains
             new Tuple<string, Severity>("Scheduler", Severity.Info),
             new Tuple<string, Severity>("Scheduler.ActivationTaskScheduler", Severity.Info)
         };
-
-        public NonReentrentStressGrainWithoutState()
+        
+        public NonReentrentStressGrainWithoutState(OrleansTaskScheduler scheduler)
         {
+            this.scheduler = scheduler;
         }
 
-        public NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
+        private NonReentrentStressGrainWithoutState(IGrainIdentity identity, IGrainRuntime runtime)
             : base(identity, runtime)
         {
         }
+
+        public static NonReentrentStressGrainWithoutState Create(IGrainIdentity identity, IGrainRuntime runtime)
+            => new NonReentrentStressGrainWithoutState(identity, runtime);
 
         public override Task OnActivateAsync()
         {
@@ -912,9 +936,11 @@ namespace UnitTests.Grains
                     "Found out that grain {0} is already in the middle of execution."
                     + "\n Single threaded-ness violation!"
                     + "\n {1} \n Call Stack={2}",
-                    _id, CaptureRuntimeEnvironment(), callStack);
-                logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                OrleansTaskScheduler.Instance.DumpSchedulerStatus();
+                    this._id,
+                    TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
+                    callStack);
+                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.scheduler.DumpSchedulerStatus();
                 LogManager.Flush();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);

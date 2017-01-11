@@ -3,6 +3,7 @@ using System.Linq;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Tester.Serialization;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -95,19 +96,19 @@ namespace UnitTests.Serialization
             return itemType == typeof(FakeSerialized);
         }
 
-        public object DeepCopy(object source)
+        public object DeepCopy(object source, ICopyContext context)
         {
             DeepCopyCalled = true;
             return null;
         }
 
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             SerializeCalled = true;
-            writer.WriteNull();
+            context.StreamWriter.WriteNull();
         }
 
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             DeserializeCalled = true;
             return new FakeSerialized { SomeData = "fake deserialization" };

@@ -36,7 +36,6 @@ namespace Orleans.Runtime
         public static readonly GrainId ClientObserverRegistrarId = GrainId.GetSystemTargetGrainId(13);
         public static readonly GrainId CatalogId = GrainId.GetSystemTargetGrainId(14);
         public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
-        public static readonly GrainId ReminderServiceId = GrainId.GetSystemTargetGrainId(16);
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId ProviderManagerSystemTargetId = GrainId.GetSystemTargetGrainId(19);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
@@ -85,7 +84,6 @@ namespace Orleans.Runtime
             {CatalogId,"Catalog"},
             {MembershipOracleId,"MembershipOracle"},
             {MultiClusterOracleId,"MultiClusterOracle"},
-            {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
             {ProtocolGatewayId,"ProtocolGateway"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},

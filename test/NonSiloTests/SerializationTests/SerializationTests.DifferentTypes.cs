@@ -84,7 +84,7 @@ namespace UnitTests.Serialization
             public ICollection<TestTypeA> Collection { get; set; }
         }
 
-        [global::Orleans.CodeGeneration.RegisterSerializerAttribute()]
+        [Orleans.CodeGeneration.RegisterSerializerAttribute()]
         internal class TestTypeASerialization
         {
 
@@ -93,32 +93,32 @@ namespace UnitTests.Serialization
                 Register();
             }
 
-            public static object DeepCopier(object original)
+            public static object DeepCopier(object original, ICopyContext context)
             {
-                TestTypeA input = ((TestTypeA)(original));
+                TestTypeA input = (TestTypeA)original;
                 TestTypeA result = new TestTypeA();
-                Orleans.Serialization.SerializationContext.Current.RecordObject(original, result);
-                result.Collection = ((System.Collections.Generic.ICollection<TestTypeA>)(Orleans.Serialization.SerializationManager.DeepCopyInner(input.Collection)));
+                context.RecordCopy(original, result);
+                result.Collection = (ICollection<TestTypeA>)SerializationManager.DeepCopyInner(input.Collection, context);
                 return result;
             }
 
-            public static void Serializer(object untypedInput, Orleans.Serialization.BinaryTokenStreamWriter stream, System.Type expected)
+            public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
-                TestTypeA input = ((TestTypeA)(untypedInput));
-                Orleans.Serialization.SerializationManager.SerializeInner(input.Collection, stream, typeof(System.Collections.Generic.ICollection<TestTypeA>));
+                TestTypeA input = (TestTypeA)untypedInput;
+                SerializationManager.SerializeInner(input.Collection, context, typeof(ICollection<TestTypeA>));
             }
 
-            public static object Deserializer(System.Type expected, global::Orleans.Serialization.BinaryTokenStreamReader stream)
+            public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 TestTypeA result = new TestTypeA();
-                DeserializationContext.Current.RecordObject(result);
-                result.Collection = ((System.Collections.Generic.ICollection<TestTypeA>)(Orleans.Serialization.SerializationManager.DeserializeInner(typeof(System.Collections.Generic.ICollection<TestTypeA>), stream)));
+                context.RecordObject(result);
+                result.Collection = (ICollection<TestTypeA>)SerializationManager.DeserializeInner(typeof(ICollection<TestTypeA>), context);
                 return result;
             }
 
             public static void Register()
             {
-                global::Orleans.Serialization.SerializationManager.Register(typeof(TestTypeA), DeepCopier, Serializer, Deserializer);
+                SerializationManager.Register(typeof(TestTypeA), DeepCopier, Serializer, Deserializer);
             }
         }
 

@@ -394,29 +394,6 @@ namespace Orleans.Runtime
             return !IsGeneratedType(type);
         }
 
-        public static bool IsSystemTargetClass(Type type)
-        {
-            Type systemTargetType;
-            if (!TryResolveType("Orleans.Runtime.SystemTarget, OrleansRuntime", out systemTargetType)) return false;
-
-            var systemTargetInterfaceType = typeof(ISystemTarget);
-            var systemTargetBaseInterfaceType = typeof(ISystemTargetBase);
-#if !NETSTANDARD
-            if (type.Assembly.ReflectionOnly)
-            {
-                systemTargetType = ToReflectionOnlyType(systemTargetType);
-                systemTargetInterfaceType = ToReflectionOnlyType(systemTargetInterfaceType);
-                systemTargetBaseInterfaceType = ToReflectionOnlyType(systemTargetBaseInterfaceType);
-            }
-#endif
-            if (!systemTargetInterfaceType.IsAssignableFrom(type) ||
-                !systemTargetBaseInterfaceType.IsAssignableFrom(type) ||
-                !systemTargetType.IsAssignableFrom(type)) return false;
-
-            // exclude generated classes.
-            return !IsGeneratedType(type);
-        }
-
         public static bool IsConcreteGrainClass(Type type, out IEnumerable<string> complaints, bool complain)
         {
             complaints = null;

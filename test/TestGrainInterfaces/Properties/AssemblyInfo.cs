@@ -19,5 +19,6 @@ using UnitTests.GrainInterfaces;
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("15F8D1EB-6A01-408B-81B0-6CF5FD0D190A")]
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
 [assembly: GenerateSerializer(typeof(SomeTypeDerivedFromTypeUsedInGrainInterface))]

@@ -40,8 +40,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// Creates a deep copy of an object
         /// </summary>
         /// <param name="original">The object to create a copy of</param>
+        /// <param name="context">The copy context.</param>
         /// <returns>The copy.</returns>
-        public static object DeepCopy(object original)
+        public static object DeepCopy(object original, ICopyContext context)
         {
             var source = original as AzureQueueBatchContainerV2;
             if (source == null)
@@ -50,11 +51,20 @@ namespace Orleans.Providers.Streams.AzureQueue
             }
 
             var copy = new AzureQueueBatchContainerV2();
-            SerializationContext.Current.RecordObject(original, copy);
+            context.RecordCopy(original, copy);
             var token = source.sequenceToken == null ? null : new EventSequenceTokenV2(source.sequenceToken.SequenceNumber, source.sequenceToken.EventIndex);
-            var events = source.events?.Select(SerializationManager.DeepCopyInner).ToList();
-            var context = source.requestContext?.ToDictionary(kv => kv.Key, kv => SerializationManager.DeepCopyInner(kv.Value));
-            copy.SetValues(source.StreamGuid, source.StreamNamespace, events, context, token);
+            List<object> events = null;
+            if (source.events != null)
+            {
+                events = new List<object>(source.events.Count);
+                foreach (var item in source.events)
+                {
+                    events.Add(SerializationManager.DeepCopyInner(item, context));
+                }
+            }
+            
+            var ctx = source.requestContext?.ToDictionary(kv => kv.Key, kv => SerializationManager.DeepCopyInner(kv.Value, context));
+            copy.SetValues(source.StreamGuid, source.StreamNamespace, events, ctx, token);
             return copy;
         }
 
@@ -62,9 +72,9 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// Serializes the container to the binary stream.
         /// </summary>
         /// <param name="untypedInput">The object to serialize</param>
-        /// <param name="writer">The stream to write to</param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expected">The expected type</param>
-        public static void Serialize(object untypedInput, BinaryTokenStreamWriter writer, Type expected)
+        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
             var typed = untypedInput as AzureQueueBatchContainerV2;
             if (typed == null)
@@ -72,29 +82,30 @@ namespace Orleans.Providers.Streams.AzureQueue
                 throw new SerializationException();
             }
 
-            writer.Write(typed.StreamGuid);
-            writer.Write(typed.StreamNamespace);
-            WriteOrSerializeInner(typed.sequenceToken, writer);
-            WriteOrSerializeInner(typed.events, writer);
-            WriteOrSerializeInner(typed.requestContext, writer);
+            context.StreamWriter.Write(typed.StreamGuid);
+            context.StreamWriter.Write(typed.StreamNamespace);
+            WriteOrSerializeInner(typed.sequenceToken, context);
+            WriteOrSerializeInner(typed.events, context);
+            WriteOrSerializeInner(typed.requestContext, context);
         }
 
         /// <summary>
         /// Deserializes the container from the data stream.
         /// </summary>
         /// <param name="expected">The expected type</param>
-        /// <param name="reader">The stream reader</param>
+        /// <param name="context">The deserialization context.</param>
         /// <returns>The deserialized value</returns>
-        public static object Deserialize(Type expected, BinaryTokenStreamReader reader)
+        public static object Deserialize(Type expected, IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             var deserialized = new AzureQueueBatchContainerV2();
-            DeserializationContext.Current.RecordObject(deserialized);
+            context.RecordObject(deserialized);
             var guid = reader.ReadGuid();
             var ns = reader.ReadString();
-            var eventToken = SerializationManager.DeserializeInner<EventSequenceTokenV2>(reader);
-            var events = SerializationManager.DeserializeInner<List<object>>(reader);
-            var context = SerializationManager.DeserializeInner<Dictionary<string, object>>(reader);
-            deserialized.SetValues(guid, ns, events, context, eventToken);
+            var eventToken = SerializationManager.DeserializeInner<EventSequenceTokenV2>(context);
+            var events = SerializationManager.DeserializeInner<List<object>>(context);
+            var ctx = SerializationManager.DeserializeInner<Dictionary<string, object>>(context);
+            deserialized.SetValues(guid, ns, events, ctx, eventToken);
             return deserialized;
         }
 
@@ -106,15 +117,15 @@ namespace Orleans.Providers.Streams.AzureQueue
             SerializationManager.Register(typeof(AzureQueueBatchContainerV2), DeepCopy, Serialize, Deserialize);
         }
 
-        private static void WriteOrSerializeInner<T>(T val, BinaryTokenStreamWriter writer) where T : class
+        private static void WriteOrSerializeInner<T>(T val, ISerializationContext context) where T : class
         {
             if (val == null)
             {
-                writer.WriteNull();
+                context.StreamWriter.WriteNull();
             }
             else
             {
-                SerializationManager.SerializeInner(val, writer, val.GetType());
+                SerializationManager.SerializeInner(val, context, val.GetType());
             }
         }
 

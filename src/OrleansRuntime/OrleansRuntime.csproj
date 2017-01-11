@@ -58,8 +58,13 @@
     <Compile Include="Cancellation\CancellationSourcesExtension.cs" />
     <Compile Include="Catalog\ActivationState.cs" />
     <Compile Include="Catalog\GrainCreator.cs" />
-    <Compile Include="Counters\CounterConfigData.cs" />
+    <Compile Include="Core\GrainRuntime.cs" />
+    <Compile Include="Core\IInvokable.cs" />
+    <Compile Include="Core\ISiloRuntimeClient.cs" />
     <Compile Include="Messaging\ObjectPool.cs" />
+    <Compile Include="ReminderService\ReminderRegistry.cs" />
+    <Compile Include="Services\GrainService.cs" />
+    <Compile Include="Services\GrainServiceClient.cs" />
     <Compile Include="Silo\SiloInitializationParameters.cs" />
     <Compile Include="Silo\TestHooks\ITestHooksSystemTarget.cs" />
     <Compile Include="Silo\TestHooks\TestHooksSystemTarget.cs" />
@@ -68,7 +73,7 @@
     <Compile Include="MultiClusterNetwork\MultiClusterData.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterOracle.cs" />
     <Compile Include="MultiClusterNetwork\MultiClusterOracleData.cs" />
-    <Compile Include="MultiClusterNetwork\MultiClusterOracleFactory.cs" />
+    <Compile Include="MultiClusterNetwork\MultiClusterGossipChannelFactory.cs" />
     <Compile Include="MultiClusterNetwork\IGossipChannel.cs" />
     <Compile Include="MultiClusterNetwork\IMultiClusterOracle.cs" />
     <Compile Include="GrainDirectory\MultiClusterRegistration\ClusterGrainDirectory.cs" />
@@ -153,7 +158,7 @@
     <Compile Include="GrainDirectory\ClientObserverRegistrar.cs" />
     <Compile Include="GrainTypeManager\GrainTypeManager.cs" />
     <Compile Include="MembershipService\GrainBasedMembershipTable.cs" />
-    <Compile Include="MembershipService\MembershipFactory.cs" />
+    <Compile Include="MembershipService\MembershipTableFactory.cs" />
     <Compile Include="MembershipService\MembershipOracle.cs" />
     <Compile Include="MembershipService\InMemoryMembershipTable.cs" />
     <Compile Include="Scheduler\InvokeWorkItem.cs" />
@@ -183,7 +188,6 @@
     <Compile Include="GrainTypeManager\SiloAssemblyLoader.cs" />
     <Compile Include="GrainTypeManager\GrainTypeData.cs" />
     <Compile Include="Messaging\IncomingMessageAgent.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Silo\Silo.cs" />
     <Compile Include="Catalog\Catalog.cs" />

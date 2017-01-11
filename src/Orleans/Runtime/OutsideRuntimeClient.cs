@@ -12,7 +12,6 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans
@@ -42,6 +41,8 @@ namespace Orleans
         private readonly GrainId handshakeClientId;
         private IGrainTypeResolver grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
+        private readonly Func<Message, bool> tryResendMessage;
+        private readonly Action<Message> unregisterCallback;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
         private static readonly TimeSpan initTimeout = TimeSpan.FromMinutes(1);
@@ -88,22 +89,7 @@ namespace Orleans
         {
             get { return CurrentActivationAddress.ToString(); }
         }
-
-        public IActivationData CurrentActivationData
-        {
-            get { return null; }
-        }
-
-        public IAddressable CurrentGrain
-        {
-            get { return null; }
-        }
-
-        public IStorageProvider CurrentStorageProvider
-        {
-            get { throw new InvalidOperationException("Storage provider only available from inside grain"); }
-        }
-
+        
         internal IList<Uri> Gateways
         {
             get
@@ -145,6 +131,9 @@ namespace Orleans
 
             BufferPool.InitGlobalBufferPool(config);
             this.handshakeClientId = GrainId.NewClientId();
+
+            tryResendMessage = TryResendMessage;
+            unregisterCallback = msg => UnRegisterCallback(msg.Id);
 
             try
             {
@@ -650,7 +639,13 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(callback, TryResendMessage, context, message, () => UnRegisterCallback(message.Id), config);
+                var callbackData = new CallbackData(
+                    callback,
+                    tryResendMessage,
+                    context,
+                    message,
+                    unregisterCallback,
+                    config);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.StartTimer(responseTimeout);
             }
@@ -812,32 +807,7 @@ namespace Orleans
         {
             return responseTimeout;
         }
-
-        public Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
-        {
-            throw new InvalidOperationException("RegisterReminder can only be called from inside a grain");
-        }
-
-        public Task UnregisterReminder(IGrainReminder reminder)
-        {
-            throw new InvalidOperationException("UnregisterReminder can only be called from inside a grain");
-        }
-
-        public Task<IGrainReminder> GetReminder(string reminderName)
-        {
-            throw new InvalidOperationException("GetReminder can only be called from inside a grain");
-        }
-
-        public Task<List<IGrainReminder>> GetReminders()
-        {
-            throw new InvalidOperationException("GetReminders can only be called from inside a grain");
-        }
-
-        public SiloStatus GetSiloStatus(SiloAddress silo)
-        {
-            throw new InvalidOperationException("GetSiloStatus can only be called on the silo.");
-        }
-
+        
         public async Task ExecAsync(Func<Task> asyncFunction, ISchedulingContext context, string activityName)
         {
             await Task.Run(asyncFunction); // No grain context on client - run on .NET thread pool
@@ -865,11 +835,6 @@ namespace Orleans
             LocalObjectData ignore;
             if (!localObjects.TryRemove(reference.ObserverId, out ignore))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
-        }
-
-        public void DeactivateOnIdle(ActivationId id)
-        {
-            throw new InvalidOperationException();
         }
 
         #endregion Implementation of IRuntimeClient
@@ -937,16 +902,6 @@ namespace Orleans
         public IGrainTypeResolver GrainTypeResolver
         {
             get { return grainInterfaceMap; }
-        }
-
-        public string CaptureRuntimeEnvironment()
-        {
-            throw new NotImplementedException();
-        }
-
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
-        {
-            throw new NotImplementedException();
         }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)

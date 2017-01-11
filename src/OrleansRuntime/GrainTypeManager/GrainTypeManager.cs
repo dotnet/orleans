@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -13,17 +15,25 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
+        private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
+        private Dictionary<int, IList<SiloAddress>> supportedSilosByTypeCode;
         private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<int, InvokerData> invokers = new Dictionary<int, InvokerData>();
         private readonly SiloAssemblyLoader loader;
         private static readonly object lockable = new object();
+		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        private readonly PlacementStrategy defaultPlacementStrategy;
+        internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo
+        {
+            get { return grainInterfaceMapsBySilo; }
+        }
 
         public static GrainTypeManager Instance { get; private set; }
 
         public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData { get { return grainTypes; } }
+
+        public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
 
         public static void Stop()
         {
@@ -40,6 +50,8 @@ namespace Orleans.Runtime
             this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
             this.loader = loader;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
+            ClusterGrainInterfaceMap = grainInterfaceMap;
+            grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
             lock (lockable)
             {
                 if (Instance != null)
@@ -131,8 +143,19 @@ namespace Orleans.Runtime
 
         internal void GetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
-            if (!grainInterfaceMap.TryGetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments))
+            if (!ClusterGrainInterfaceMap.TryGetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments))
                 throw new OrleansException(String.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
+        }
+
+        internal void SetInterfaceMapsBySilo(Dictionary<SiloAddress, GrainInterfaceMap> value)
+        {
+            grainInterfaceMapsBySilo = value;
+            RebuildFullGrainInterfaceMap();
+        }
+
+        internal IList<SiloAddress> GetSupportedSilos(int typeCode)
+        {
+            return supportedSilosByTypeCode[typeCode];
         }
 
         private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
@@ -193,7 +216,7 @@ namespace Orleans.Runtime
             return grainTypes.TryGetValue(name, out result);
         }
 
-        internal IGrainTypeResolver GetTypeCodeMap()
+        internal GrainInterfaceMap GetTypeCodeMap()
         {
             // the map is immutable at this point
             return grainInterfaceMap;
@@ -236,6 +259,28 @@ namespace Orleans.Runtime
 
             throw new OrleansException(String.Format("Cannot find an invoker for interface {0} (ID={1},0x{1, 8:X8}).",
                 interfaceName, interfaceId));
+        }
+
+        private void RebuildFullGrainInterfaceMap()
+        {
+            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, defaultPlacementStrategy);
+            var newSupportedSilosByTypeCode = new Dictionary<int, IList<SiloAddress>>();
+            newClusterGrainInterfaceMap.AddMap(grainInterfaceMap);
+            foreach (var kvp in grainInterfaceMapsBySilo)
+            {
+                newClusterGrainInterfaceMap.AddMap(kvp.Value);
+                foreach (var grainType in kvp.Value.SupportedGrainTypes)
+                {
+                    IList<SiloAddress> supportedSilos;
+                    if (!newSupportedSilosByTypeCode.TryGetValue(grainType, out supportedSilos))
+                    {
+                        newSupportedSilosByTypeCode[grainType] = supportedSilos = new List<SiloAddress>();
+                    }
+                    supportedSilos.Add(kvp.Key);
+                }
+            }
+            ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
+            supportedSilosByTypeCode = newSupportedSilosByTypeCode;
         }
 
         private class InvokerData

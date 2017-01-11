@@ -40,8 +40,11 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             var testEnvironment = new SerializationTestEnvironment();
-            storageProviderManager = new StorageProviderManager(testEnvironment.GrainFactory, null);
-            storageProviderManager.LoadEmptyStorageProviders(new ClientProviderRuntime(testEnvironment.GrainFactory, null)).WaitWithThrow(TestConstants.InitTimeout);
+            storageProviderManager = new StorageProviderManager(
+                testEnvironment.GrainFactory,
+                null,
+                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+            storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
             testEnvironment.InitializeForTesting();
             LocalDataStoreInstance.LocalDataStore = null;
@@ -316,6 +319,7 @@ namespace Tester.AzureUtils.Persistence
             output.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
         }
 
+#if !NETSTANDARD_TODO
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void LoadClassByName()
         {
@@ -324,6 +328,7 @@ namespace Tester.AzureUtils.Persistence
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IStorageProvider).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
+#endif
 
         #region Utility functions
 

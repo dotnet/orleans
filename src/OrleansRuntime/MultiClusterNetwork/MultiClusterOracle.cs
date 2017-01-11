@@ -3,19 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.MultiCluster;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {
     internal class MultiClusterOracle : SystemTarget, IMultiClusterOracle, ISiloStatusListener, IMultiClusterGossipService
     {
+        private readonly MultiClusterGossipChannelFactory channelFactory;
         // as a backup measure, current local active status is sent occasionally
         public static readonly TimeSpan ResendActiveStatusAfter = TimeSpan.FromMinutes(10);
 
         // time after which this gateway removes other gateways in this same cluster that are known to be gone 
         public static readonly TimeSpan CleanupSilentGoneGatewaysAfter = TimeSpan.FromSeconds(30);
 
-        private readonly List<IGossipChannel> gossipChannels;
         private readonly MultiClusterOracleData localData;
         private readonly Logger logger;
         private readonly SafeRandom random;
@@ -25,18 +24,20 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly TimeSpan backgroundGossipInterval;
         private TimeSpan resendActiveStatusAfter;
 
-        private GrainTimer timer;
-        private ISiloStatusOracle siloStatusOracle;
+        private List<IGossipChannel> gossipChannels;
+        private IGrainTimer timer;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private MultiClusterConfiguration injectedConfig;
 
-        public MultiClusterOracle(SiloAddress silo, List<IGossipChannel> sources, GlobalConfiguration config)
-            : base(Constants.MultiClusterOracleId, silo)
+        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle)
+            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress)
         {
-            if (sources == null) throw new ArgumentNullException("sources");
-            if (silo == null) throw new ArgumentNullException("silo");
+            this.channelFactory = channelFactory;
+            this.siloStatusOracle = siloStatusOracle;
+            if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
+            var config = siloDetails.GlobalConfig;
             logger = LogManager.GetLogger("MultiClusterOracle");
-            gossipChannels = sources;
             localData = new MultiClusterOracleData(logger);
             clusterId = config.ClusterId;
             defaultMultiCluster = config.DefaultMultiCluster;
@@ -129,16 +130,19 @@ namespace Orleans.Runtime.MultiClusterNetwork
         public Func<ILogConsistencyProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
 
 
-        public async Task Start(ISiloStatusOracle oracle)
+        public async Task Start()
         {
             logger.Info(ErrorCode.MultiClusterNetwork_Starting, "MultiClusterOracle starting on {0}, Severity={1} ", Silo, logger.SeverityLevel);
             try
             {
                 if (string.IsNullOrEmpty(clusterId))
                     throw new OrleansException("Internal Error: missing cluster id");
+                
+                gossipChannels = await this.channelFactory.CreateGossipChannels();
 
-                this.siloStatusOracle = oracle;
-
+                if (gossipChannels.Count == 0)
+                    logger.Warn(ErrorCode.MultiClusterNetwork_NoChannelsConfigured, "No gossip channels are configured.");
+                
                 // startup: pull all the info from the tables, then inject default multi cluster if none found
                 foreach (var ch in gossipChannels)
                 {

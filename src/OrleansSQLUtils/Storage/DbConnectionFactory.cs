@@ -1,16 +1,27 @@
 using System;
 using System.Collections.Concurrent;
-using System.Data;
+using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
+using System.Reflection;
 
 namespace Orleans.SqlUtils
 {
-    /// It turns out that <see cref="DbProviderFactories.GetFactory(string)"/> uses reflection to fetch the singleton instance on every call.
-    /// this class caches the references to all loaded factories
+    /// This class caches the references to all loaded factories
     internal static class DbConnectionFactory
     {
         private static readonly ConcurrentDictionary<string, CachedFactory> factoryCache =
             new ConcurrentDictionary<string, CachedFactory>();
+
+        private static readonly Dictionary<string, Tuple<string, string>> providerFactoryTypeMap =
+            new Dictionary<string, Tuple<string, string>>
+            {
+                { AdoNetInvariants.InvariantNameSqlServer, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
+                { AdoNetInvariants.InvariantNameMySql, new Tuple<string, string>("MySql.Data", "MySql.Data.MySqlClient.MySqlClientFactory") },
+                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
+                { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
+                { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
+            };
 
         private static CachedFactory GetFactory(string invariantName)
         {
@@ -19,21 +30,34 @@ namespace Orleans.SqlUtils
                 throw new ArgumentNullException(nameof(invariantName));
             }
 
-            // Seeks for database provider factory classes from GAC or as indicated by
-            // the configuration file, see at <see href="https://msdn.microsoft.com/en-us/library/dd0w4a2z%28v=vs.110%29.aspx">Obtaining a DbProviderFactory</see>.       
+            Tuple<string, string> providerFactoryDefinition;
+            if (!providerFactoryTypeMap.TryGetValue(invariantName, out providerFactoryDefinition))
+                throw new InvalidOperationException($"Database provider factory with '{invariantName}' invariant name not supported.");
 
-            DataRow factoryData = DbProviderFactories.GetFactoryClasses().Rows.Find(invariantName);
-
-            if (factoryData == null)
+            Assembly asm;
+            try
             {
-                throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please check the application configuration file to see if the provider is configured correctly or the configured ADO.NET provider libraries are deployed with the application.");
+                var asmName = new AssemblyName(providerFactoryDefinition.Item1);
+                asm = Assembly.Load(asmName);
             }
+            catch (Exception exc)
+            {
+                throw new InvalidOperationException($"Unable to find and/or load a candidate assembly for '{invariantName}' invariant name.", exc);
+            }
+            
+            if (asm == null)
+                throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please make sure that your ADO.Net provider package library is deployed with your application.");
 
-            var factoryName = factoryData["Name"].ToString();
-            var description = factoryData["Description"].ToString();
-            var assemblyQualifiedNameKey = factoryData["AssemblyQualifiedName"].ToString();
-            var factory = DbProviderFactories.GetFactory(invariantName);
-            return new CachedFactory(factory, factoryName, description, assemblyQualifiedNameKey);
+            var providerFactoryType = asm.GetType(providerFactoryDefinition.Item2);
+            if (providerFactoryType == null)
+                throw new InvalidOperationException($"Unable to load type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
+
+            var prop = providerFactoryType.GetFields().Where(p => string.Equals(p.Name, "Instance", StringComparison.OrdinalIgnoreCase) && p.IsStatic).SingleOrDefault();
+            if (prop == null)
+                throw new InvalidOperationException($"Invalid provider type '{providerFactoryDefinition.Item2}' for '{invariantName}' invariant name.");
+
+            var factory = (DbProviderFactory)prop.GetValue(null);
+            return new CachedFactory(factory, providerFactoryType.Name, "", providerFactoryType.AssemblyQualifiedName);
         }
 
         public static DbConnection CreateConnection(string invariantName, string connectionString)
@@ -59,7 +83,7 @@ namespace Orleans.SqlUtils
             connection.ConnectionString = connectionString;
             return connection;
         }
-        
+
         private class CachedFactory
         {
             public CachedFactory(DbProviderFactory factory, string factoryName, string factoryDescription, string factoryAssemblyQualifiedNameKey)

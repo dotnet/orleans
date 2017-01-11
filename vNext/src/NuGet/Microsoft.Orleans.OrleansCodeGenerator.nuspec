@@ -18,8 +18,9 @@
     <copyright>Copyright Microsoft 2015</copyright>
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
-      <group targetFramework=".NETFramework4.6.2">
+      <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
+        <dependency id="Microsoft.Orleans.PlatformServices" version="$version$" />
         <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.3.2" />
       </group>
     </dependencies>

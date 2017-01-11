@@ -245,7 +245,7 @@ namespace Orleans.Runtime
         internal static LoggerImpl GetLogger(string loggerName, LoggerType logType)
         {
             return loggerStoreInternCache != null ?
-                loggerStoreInternCache.FindOrCreate(loggerName, () => new LoggerImpl(loggerName, logType)) :
+                loggerStoreInternCache.FindOrCreate(loggerName, name => new LoggerImpl(name, logType)) :
                 new LoggerImpl(loggerName, logType);
         }
 

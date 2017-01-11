@@ -12,7 +12,7 @@ pushd "%CMDHOME%"
 
 SET OutDir=%CMDHOME%\..\Binaries\%CONFIGURATION%
 
-set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\Orleans.NonSiloTests.dll
+set TESTS=%OutDir%\Tester.dll,%OutDir%\TesterInternal.dll,%OutDir%\Orleans.NonSiloTests.dll,%OutDir%\Tester.AzureUtils.dll,%OutDir%\Tester.SQLUtils.dll,%OutDir%\DefaultCluster.Tests.dll
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait 'Category=BVT' -trait 'Category=SlowBVT'
 
 @Echo Test assemblies = %TESTS%

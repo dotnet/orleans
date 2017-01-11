@@ -14,17 +14,21 @@ namespace Orleans.Streams
     {
         /// <summary>
         /// Retrieves the opaque identity of currently executing grain or client object. 
-        /// Just for logging purposes.
         /// </summary>
+        /// <remarks>Exposed for logging purposes.</remarks>
         string ExecutingEntityIdentity();
 
         SiloAddress ExecutingSiloAddress { get; }
 
+        /// <summary>
+        /// Returns the stream directory.
+        /// </summary>
+        /// <returns>The stream directory.</returns>
         StreamDirectory GetStreamDirectory();
 
         void RegisterSystemTarget(ISystemTarget target);
 
-        void UnRegisterSystemTarget(ISystemTarget target);
+        void UnregisterSystemTarget(ISystemTarget target);
 
         /// <summary>
         /// Binds an extension to an addressable object, if not already done.
@@ -48,11 +52,6 @@ namespace Orleans.Streams
         /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
         /// <returns></returns>
         IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
-
-        /// <summary>Return true if this runtime executes inside silo, false otherwise (on the client).</summary>
-        bool InSilo { get; }
-
-        object GetCurrentSchedulingContext();
     }
 
         /// <summary>

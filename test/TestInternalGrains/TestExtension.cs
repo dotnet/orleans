@@ -4,7 +4,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class TestExtension : ITestExtension
+    internal class TestExtension : ITestExtension
     {
         private readonly ExtensionTestGrain grain;
         private readonly IGrainFactory grainFactory;

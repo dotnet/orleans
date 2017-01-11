@@ -1,5 +1,5 @@
 ﻿//#define USE_SQL_SERVER
-
+#if !NETSTANDARD_TODO
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +9,6 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.MembershipService;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -17,9 +16,9 @@ namespace UnitTests.MessageCenterTests
 {
     public class GatewaySelectionTest : IDisposable
     {
-        private readonly ITestOutputHelper output;
+        protected readonly ITestOutputHelper output;
 
-        private static readonly List<Uri> gatewayAddressUris = new[]
+        protected static readonly List<Uri> gatewayAddressUris = new[]
         {
             new Uri("gwy.tcp://127.0.0.1:1/0"),
             new Uri("gwy.tcp://127.0.0.1:2/0"),
@@ -74,70 +73,7 @@ namespace UnitTests.MessageCenterTests
             //Client.Initialize(cfg);
         }
 
-#if USE_SQL_SERVER || DEBUG
-#if !NETSTANDARD_TODO
-        //block by sqlMembership not ported over to vNext yet
-        [Fact, TestCategory("Gateway"), TestCategory("SqlServer")]
-        public async Task GatewaySelection_SqlServer()
-        {
-            string testName = Guid.NewGuid().ToString();// TestContext.TestName;
-
-            Guid serviceId = Guid.NewGuid();
-
-            GlobalConfiguration cfg = new GlobalConfiguration
-            {
-                ServiceId = serviceId,
-                DeploymentId = testName,
-                DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString()
-            };
-
-            var membership = new SqlMembershipTable();
-            var logger = LogManager.GetLogger(membership.GetType().Name);
-            await membership.InitializeMembershipTable(cfg, true, logger);
-
-            IMembershipTable membershipTable = membership;
-
-            // Pre-populate gateway table with data
-            int count = 1;
-            foreach (Uri gateway in gatewayAddressUris)
-            {
-                output.WriteLine("Adding gataway data for {0}", gateway);
-
-                SiloAddress siloAddress = gateway.ToSiloAddress();
-                Assert.NotNull(siloAddress);
-
-                MembershipEntry MembershipEntry = new MembershipEntry
-                {
-                    SiloAddress = siloAddress,
-                    HostName = gateway.Host,
-                    Status = SiloStatus.Active,
-                    ProxyPort = gateway.Port,
-                    StartTime = DateTime.UtcNow
-                };
-
-                var tableVersion = new TableVersion(count, Guid.NewGuid().ToString());
-
-                output.WriteLine("Inserting gataway data for {0} with TableVersion={1}", MembershipEntry, tableVersion);
-
-                bool ok = await membershipTable.InsertRow(MembershipEntry, tableVersion);
-                count++;
-                Assert.True(ok, $"Membership record should have been written OK but were not: {MembershipEntry}");
-
-                output.WriteLine("Successfully inserted Membership row {0}", MembershipEntry);
-            }
-
-            MembershipTableData membershipTableData = await membershipTable.ReadAll();
-            Assert.NotNull(membershipTableData);
-            Assert.Equal(gatewayAddressUris.Count, membershipTableData.Members.Count);  // "Number of gateway records read"
-
-            IGatewayListProvider listProvider = membership;
-
-            Test_GatewaySelection(listProvider);
-        }
-#endif
-#endif
-
-        private void Test_GatewaySelection(IGatewayListProvider listProvider)
+        protected void Test_GatewaySelection(IGatewayListProvider listProvider)
         {
             IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
@@ -192,7 +128,7 @@ namespace UnitTests.MessageCenterTests
                 list = gatewayUris;
             }
 
-            #region Implementation of IGatewayListProvider
+#region Implementation of IGatewayListProvider
 
             public Task<IList<Uri>> GetGateways()
             {
@@ -213,9 +149,10 @@ namespace UnitTests.MessageCenterTests
                 return TaskDone.Done;
             }
 
-            #endregion
+#endregion
 
 
         }
     }
 }
+#endif

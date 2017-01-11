@@ -19,15 +19,11 @@ namespace Orleans.CodeGeneration
         [Serializable]
         internal class CodeGenOptions
         {
-            public FileInfo InputLib;
-
-            public bool InvalidLanguage;
+            public FileInfo InputAssembly;
 
             public List<string> ReferencedAssemblies = new List<string>();
 
-            public string CodeGenFile;
-
-            public string SourcesDir;
+            public string OutputFileName;
         }
 
         [Serializable]
@@ -96,22 +92,24 @@ namespace Orleans.CodeGeneration
         {
             // Load input assembly 
             // special case Orleans.dll because there is a circular dependency.
-            var assemblyName = AssemblyName.GetAssemblyName(options.InputLib.FullName);
-            var grainAssembly = (Path.GetFileName(options.InputLib.FullName) != "Orleans.dll")
-                                    ? Assembly.LoadFrom(options.InputLib.FullName)
+            var assemblyName = AssemblyName.GetAssemblyName(options.InputAssembly.FullName);
+            var grainAssembly = (Path.GetFileName(options.InputAssembly.FullName) != "Orleans.dll")
+                                    ? Assembly.LoadFrom(options.InputAssembly.FullName)
                                     : Assembly.Load(assemblyName);
 
-            // Create sources directory
-            if (!Directory.Exists(options.SourcesDir)) Directory.CreateDirectory(options.SourcesDir);
+            // Create directory for output file if it does not exist
+            var outputFileDirectory = Path.GetDirectoryName(options.OutputFileName);
+
+            if (!String.IsNullOrEmpty(outputFileDirectory) && !Directory.Exists(outputFileDirectory))
+            {
+                Directory.CreateDirectory(outputFileDirectory);
+            }
 
             // Generate source
-            var outputFileName = Path.Combine(
-                options.SourcesDir,
-                Path.GetFileNameWithoutExtension(options.InputLib.Name) + ".codegen.cs");
-            ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", outputFileName);
+            ConsoleText.WriteStatus("Orleans-CodeGen - Generating file {0}", options.OutputFileName);
 
             SerializationManager.RegisterBuiltInSerializers();
-            using (var sourceWriter = new StreamWriter(outputFileName))
+            using (var sourceWriter = new StreamWriter(options.OutputFileName))
             {
                 sourceWriter.WriteLine("#if !EXCLUDE_CODEGEN");
                 DisableWarnings(sourceWriter, suppressCompilerWarnings);
@@ -120,16 +118,7 @@ namespace Orleans.CodeGeneration
                 sourceWriter.WriteLine("#endif");
             }
 
-            ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", outputFileName);
-
-#if !NETSTANDARD
-            // Copy intermediate file to permanent location, if newer.
-            ConsoleText.WriteStatus(
-                "Orleans-CodeGen - Updating IntelliSense file {0} -> {1}",
-                outputFileName,
-                options.CodeGenFile);
-            UpdateIntellisenseFile(options.CodeGenFile, outputFileName);
-#endif
+            ConsoleText.WriteStatus("Orleans-CodeGen - Generated file written {0}", options.OutputFileName);
 
             return true;
         }
@@ -144,122 +133,14 @@ namespace Orleans.CodeGeneration
             foreach (var warningNum in warnings) sourceWriter.WriteLine("#pragma warning restore {0}", warningNum);
         }
 
-        /// <summary>
-        /// Updates the source file in the project if required.
-        /// </summary>
-        /// <param name="sourceFileToBeUpdated">Path to file to be updated.</param>
-        /// <param name="outputFileGenerated">File that was updated.</param>
-        private static void UpdateIntellisenseFile(string sourceFileToBeUpdated, string outputFileGenerated)
-        {
-            if (string.IsNullOrEmpty(sourceFileToBeUpdated)) throw new ArgumentNullException("sourceFileToBeUpdated", "Output file must not be blank");
-            if (string.IsNullOrEmpty(outputFileGenerated)) throw new ArgumentNullException("outputFileGenerated", "Generated file must already exist");
-
-            var sourceToUpdateFileInfo = new FileInfo(sourceFileToBeUpdated);
-            var generatedFileInfo = new FileInfo(outputFileGenerated);
-
-            if (!generatedFileInfo.Exists) throw new Exception("Generated file must already exist");
-
-            if (File.Exists(sourceFileToBeUpdated))
-            {
-                bool filesMatch = CheckFilesMatch(generatedFileInfo, sourceToUpdateFileInfo);
-                if (filesMatch)
-                {
-                    ConsoleText.WriteStatus(
-                        "Orleans-CodeGen - No changes to the generated file {0}",
-                        sourceFileToBeUpdated);
-                    return;
-                }
-
-                // we come here only if files don't match
-                sourceToUpdateFileInfo.Attributes = sourceToUpdateFileInfo.Attributes & (~FileAttributes.ReadOnly);
-                    // remove read only attribute
-                ConsoleText.WriteStatus(
-                    "Orleans-CodeGen - copying file {0} to {1}",
-                    outputFileGenerated,
-                    sourceFileToBeUpdated);
-                File.Copy(outputFileGenerated, sourceFileToBeUpdated, true);
-                filesMatch = CheckFilesMatch(generatedFileInfo, sourceToUpdateFileInfo);
-                ConsoleText.WriteStatus(
-                    "Orleans-CodeGen - After copying file {0} to {1} Matchs={2}",
-                    outputFileGenerated,
-                    sourceFileToBeUpdated,
-                    filesMatch);
-            }
-            else
-            {
-                var dir = Path.GetDirectoryName(sourceFileToBeUpdated);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
-                ConsoleText.WriteStatus(
-                    "Orleans-CodeGen - copying file {0} to {1}",
-                    outputFileGenerated,
-                    sourceFileToBeUpdated);
-                File.Copy(outputFileGenerated, sourceFileToBeUpdated, true);
-                bool filesMatch = CheckFilesMatch(generatedFileInfo, sourceToUpdateFileInfo);
-                ConsoleText.WriteStatus(
-                    "Orleans-CodeGen - After copying file {0} to {1} Matchs={2}",
-                    outputFileGenerated,
-                    sourceFileToBeUpdated,
-                    filesMatch);
-            }
-        }
-
-        private static bool CheckFilesMatch(FileInfo file1, FileInfo file2)
-        {
-            bool isMatching;
-            long len1 = -1;
-            long len2 = -1;
-
-            if (file1.Exists) len1 = file1.Length;
-            if (file2.Exists) len2 = file2.Length;
-
-            if (len1 <= 0 || len2 <= 0)
-            {
-                isMatching = false;
-            }
-            else if (len1 != len2)
-            {
-                isMatching = false;
-            }
-            else
-            {
-                byte[] arr1 = File.ReadAllBytes(file1.FullName);
-                byte[] arr2 = File.ReadAllBytes(file2.FullName);
-
-                isMatching = true; // initially assume files match
-                for (int i = 0; i < arr1.Length; i++)
-                {
-                    if (arr1[i] != arr2[i])
-                    {
-                        isMatching = false; // unless we know they don't match
-                        break;
-                    }
-                }
-            }
-
-            if (GrainClientGeneratorFlags.Verbose)
-                ConsoleText.WriteStatus(
-                    "Orleans-CodeGen - CheckFilesMatch = {0} File1 = {1} Len = {2} File2 = {3} Len = {4}",
-                    isMatching,
-                    file1,
-                    len1,
-                    file2,
-                    len2);
-            return isMatching;
-        }
-
-        private static readonly string CodeGenFileRelativePathCSharp = Path.Combine("Properties", "orleans.codegen.cs");
-
         public int RunMain(string[] args)
         {
             ConsoleText.WriteStatus("Orleans-CodeGen - command-line = {0}", Environment.CommandLine);
 
             if (args.Length < 1)
             {
-                Console.WriteLine(
-                    "Usage: ClientGenerator.exe <grain interface dll path> [<client dll path>] [<key file>] [<referenced assemblies>]");
-                Console.WriteLine(
-                    "       ClientGenerator.exe /server <grain dll path> [<factory dll path>] [<key file>] [<referenced assemblies>]");
+                PrintUsage();
+
                 return 1;
             }
 
@@ -301,70 +182,40 @@ namespace Orleans.CodeGeneration
                         {
                             var infile = arg.Substring(arg.IndexOf(':') + 1);
                             AssertWellFormed(infile);
-                            options.InputLib = new FileInfo(infile);
+                            options.InputAssembly = new FileInfo(infile);
                         }
-                        else if (arg.StartsWith("/bootstrap") || arg.StartsWith("/boot"))
+                        else if (arg.StartsWith("/out:"))
                         {
-                            // special case for building circular dependecy in preprocessing: 
-                            // Do not build the input assembly, assume that some other build step 
-                            options.CodeGenFile = Path.GetFullPath(CodeGenFileRelativePathCSharp);
-                            if (GrainClientGeneratorFlags.Verbose)
-                            {
-                                Console.WriteLine(
-                                    "Orleans-CodeGen - Set CodeGenFile={0} from bootstrap",
-                                    options.CodeGenFile);
-                            }
-                        }
-                        else if (arg.StartsWith("/sources:") || arg.StartsWith("/src:"))
-                        {
-                            var sourcesStr = arg.Substring(arg.IndexOf(':') + 1);
-
-                            string[] sources = sourcesStr.Split(';');
-                            foreach (var source in sources)
-                            {
-                                HandleSourceFile(source, options);
-                            }
+                            var outfile = arg.Substring(arg.IndexOf(':') + 1);
+                            AssertWellFormed(outfile, false);
+                            options.OutputFileName = outfile;
                         }
                     }
                     else
                     {
-                        HandleSourceFile(arg, options);
+                        Console.WriteLine($"Invalid argument: {arg}.");
+
+                        PrintUsage();
+
+                        return 1;
                     }
                 }
 
-                if (options.InvalidLanguage)
-                {
-                    ConsoleText.WriteLine(
-                        "ERROR: Compile-time code generation is supported for C# only. "
-                        + "Remove code generation from your project in order to use run-time code generation.");
-                    return 2;
-                }
-
                 // STEP 2 : Validate and calculate unspecified parameters
-                if (options.InputLib == null)
+                if (options.InputAssembly == null)
                 {
                     Console.WriteLine("ERROR: Orleans-CodeGen - no input file specified.");
                     return 2;
                 }
 
-#if !NETSTANDARD
-                if (string.IsNullOrEmpty(options.CodeGenFile))
+                if (String.IsNullOrEmpty(options.OutputFileName))
                 {
-                    Console.WriteLine(
-                        "ERROR: No codegen file. Add a file '{0}' to your project",
-                        Path.Combine("Properties", "orleans.codegen.cs"));
+                    Console.WriteLine("ERROR: Orleans-Codegen - no output filename specified");
                     return 2;
                 }
-#endif
-
-                options.SourcesDir = Path.Combine(options.InputLib.DirectoryName, "Generated");
 
                 // STEP 3 : Dump useful info for debugging
-                Console.WriteLine(
-                    "Orleans-CodeGen - Options " + Environment.NewLine + "\tInputLib={0} " + Environment.NewLine
-                    + "\tCodeGenFile={1}",
-                    options.InputLib.FullName,
-                    options.CodeGenFile);
+                Console.WriteLine($"Orleans-CodeGen - Options {Environment.NewLine}\tInputLib={options.InputAssembly.FullName}{Environment.NewLine}\tOutputFileName={options.OutputFileName}");
 
                 if (options.ReferencedAssemblies != null)
                 {
@@ -385,20 +236,12 @@ namespace Orleans.CodeGeneration
             }
         }
 
-        private static void HandleSourceFile(string arg, CodeGenOptions options)
+        private static void PrintUsage()
         {
-            AssertWellFormed(arg, true);
-            options.InvalidLanguage |= arg.EndsWith(".vb", StringComparison.InvariantCultureIgnoreCase)
-                                       | arg.EndsWith(".fs", StringComparison.InvariantCultureIgnoreCase);
-
-            if (arg.EndsWith(CodeGenFileRelativePathCSharp, StringComparison.InvariantCultureIgnoreCase))
-            {
-                options.CodeGenFile = Path.GetFullPath(arg);
-                if (GrainClientGeneratorFlags.Verbose)
-                {
-                    Console.WriteLine("Orleans-CodeGen - Set CodeGenFile={0} from {1}", options.CodeGenFile, arg);
-                }
-            }
+            Console.WriteLine("Usage: ClientGenerator.exe /in:<grain assembly filename> /out:<fileName for output file> /r:<reference assemblies>");
+            Console.WriteLine("       ClientGenerator.exe @<arguments fileName> - Arguments will be read and processed from this file.");
+            Console.WriteLine();
+            Console.WriteLine("Example: ClientGenerator.exe /in:MyGrain.dll /out:C:\\OrleansSample\\MyGrain\\obj\\Debug\\MyGrain.codegen.cs /r:Orleans.dll;..\\MyInterfaces\\bin\\Debug\\MyInterfaces.dll");
         }
 
         private static void AssertWellFormed(string path, bool mustExist = false)

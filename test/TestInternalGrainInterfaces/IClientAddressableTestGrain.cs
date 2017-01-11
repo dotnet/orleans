@@ -3,7 +3,6 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    [Factory(FactoryAttribute.FactoryTypes.Grain)]
     public interface IClientAddressableTestGrain : IGrainWithIntegerKey
     {
         Task SetTarget(IClientAddressableTestClientObject target);

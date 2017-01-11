@@ -20,8 +20,6 @@
     <dependencies>
       <group targetFramework=".NETStandard1.5">
         <dependency id="Microsoft.Orleans.Core" version="$version$" />
-        <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-        <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
         <dependency id="WindowsAzure.Storage" version="7.2.1" />
         <dependency id="System.Net.Requests" version="4.3.0" />
       </group>

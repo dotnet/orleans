@@ -4,6 +4,18 @@ namespace Orleans.Runtime
 {
     internal static class ConsoleText
     {
+        public static bool IsConsoleAvailable
+        {
+            get
+            {
+#if !NETSTANDARD
+                return Environment.UserInteractive;
+#else
+                return true;
+#endif
+            }
+        }
+
         public static void WriteError(string msg)
         {
             WriteLine(ConsoleColor.Red, msg);
