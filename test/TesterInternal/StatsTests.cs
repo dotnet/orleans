@@ -13,7 +13,6 @@ using Xunit.Abstractions;
 using Tester;
 using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers.SqlServer;
 
 namespace UnitTests.Stats
 {

@@ -38,13 +38,11 @@
     <ProjectReference Include="..\Tester\Tester.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\..\test\TesterZooKeeperUtils\LivenessTests.cs">
-      <Link>LivenessTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\TesterZooKeeperUtils\ZookeeperMembershipTableTests.cs">
-      <Link>ZookeeperMembershipTableTests.cs</Link>
-    </Compile>
+   <ItemGroup>
+    <Compile Include="..\..\..\test\TesterZooKeeperUtils\**\*.cs" Exclude="
+    ..\..\..\test\TesterZooKeeperUtils\obj\**\*.cs;
+    ..\..\..\test\TesterZooKeeperUtils\bin\**\*.cs;
+    ..\..\..\test\TesterZooKeeperUtils\Properties\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

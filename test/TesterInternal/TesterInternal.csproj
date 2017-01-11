@@ -118,7 +118,6 @@
     <Compile Include="StreamingTests\StreamTestHelperClasses.cs" />
     <Compile Include="StreamingTests\StreamTestUtils.cs" />
     <Compile Include="StreamProvidersTests.cs" />
-    <Compile Include="TestingHost\TestingSiloHostTests.cs" />
     <Compile Include="TestStoreGrainState.cs" />
     <Compile Include="TestUtils.cs" />
     <Compile Include="TimeoutTests.cs" />

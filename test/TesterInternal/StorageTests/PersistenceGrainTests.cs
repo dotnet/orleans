@@ -1244,20 +1244,6 @@ namespace UnitTests.StorageTests
         }
         #endregion
     }
-
-    [Serializable]
-    public class GrainStateContainingGrainReferences
-    {
-        public IAddressable Grain { get; set; }
-        public List<IAddressable> GrainList { get; set; }
-        public Dictionary<string, IAddressable> GrainDict { get; set; }
-
-        public GrainStateContainingGrainReferences()
-        {
-            GrainList = new List<IAddressable>();
-            GrainDict = new Dictionary<string, IAddressable>();
-        }
-    }
 }
 
 // ReSharper restore RedundantAssignment

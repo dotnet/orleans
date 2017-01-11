@@ -33,56 +33,22 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
     <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
     <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\test\Tester\FakeSerializer.cs">
-      <Link>FakeSerializer.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\StreamFilteringTestsBase.cs">
-      <Link>StreamingTests\StreamFilteringTestsBase.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\MembershipTests\LivenessTests.cs">
-      <Link>MembershipTests\LivenessTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\CollectionFixtures.cs">
-      <Link>CollectionFixtures.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\ExceptionPropagationTests.cs">
-      <Link>ExceptionPropagationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\ClientStreamTestRunner.cs">
-      <Link>StreamingTests\ClientStreamTestRunner.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\SampleStreamingTests.cs">
-      <Link>StreamingTests\SampleStreamingTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\SubscriptionMultiplicityTestRunner.cs">
-      <Link>StreamingTests\SubscriptionMultiplicityTestRunner.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs">
-      <Link>StreamingTests\ImplicitSubscritionRecoverableStreamTestRunner.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\TestStreamProviders\FailureInjectionStreamProvider.cs">
-      <Link>TestStreamProviders\FailureInjectionStreamProvider.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs">
-      <Link>TestStreamProviders\TestAzureTableStorageStreamFailureHandler.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\TestUtils.cs">
-      <Link>TestUtils.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
-      <Link>SerializationTests\SerializationTestsUtils.cs</Link>
-    </Compile>
+    <Compile Include="..\..\..\test\Tester\**\*.cs" Exclude="..\..\..\test\Tester\obj\**\*.cs;..\..\..\test\Tester\bin\**\*.cs;..\..\..\test\Tester\Properties\*.cs;
+    ..\..\..\test\Tester\SerializationTests\SerializationTests.FSharpTypes.cs;
+    ..\..\..\test\Tester\SiloInitializationTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

@@ -491,18 +491,6 @@ namespace Orleans.Runtime
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
         }
 
-#if NETSTANDARD_TODO
-        public static Type ResolveType(string fullName)
-        {
-            return Type.GetType(fullName, true);
-        }
-
-        public static bool TryResolveType(string fullName, out Type type)
-        {
-            type = Type.GetType(fullName, false);
-            return type != null;
-        }
-#else
         public static Type ResolveType(string fullName)
         {
             return CachedTypeResolver.Instance.ResolveType(fullName);
@@ -512,7 +500,7 @@ namespace Orleans.Runtime
         {
             return CachedTypeResolver.Instance.TryResolveType(fullName, out type);
         }
-
+#if !NETSTANDARD
         public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
         {
             return CachedReflectionOnlyTypeResolver.Instance.ResolveType(assemblyQualifiedName);
@@ -523,7 +511,6 @@ namespace Orleans.Runtime
             return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
         }
 #endif
-
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, Logger logger)
         {
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Select(t => t.AsType()).Where(type => !type.GetTypeInfo().IsNestedPrivate && whereFunc(type));
