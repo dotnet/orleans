@@ -23,6 +23,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster?.StopAllSilos();
             var typesName = blackListedTypes.Select(t => t.FullName).ToList();
             var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.Globals.AssumeHomogenousSilosForTesting = false;
             options.ClusterConfiguration.Globals.TypeMapRefreshInterval = refreshInterval;
             options.ClusterConfiguration.Globals.DefaultPlacementStrategy = defaultPlacementStrategy;
             options.ClusterConfiguration.Overrides[Silo.PrimarySiloName].ExcludedGrainTypes = typesName;

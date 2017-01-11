@@ -174,6 +174,7 @@ namespace Orleans.TestingHost
             }
 
             config.Globals.ExpectedClusterSize = silosCount;
+            config.Globals.AssumeHomogenousSilosForTesting = true;
 
             config.AdjustForTestEnvironment(extendedOptions.DataConnectionString);
             return config;

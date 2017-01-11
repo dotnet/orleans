@@ -209,6 +209,19 @@ namespace Orleans.Runtime
             var compatibleSilos = GrainTypeManager.GetSupportedSilos(typeCode).Intersect(AllActiveSilos).ToList();
             if (compatibleSilos.Count == 0)
                 throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+
+            // For test only: if we have silos taht are not yet in the CLuster TypeMap, we assume that they are compatible
+            // with the current silo
+            if (this.config.AssumeHomogenousSilosForTesting)
+            {
+                var silosInTypeManager = GrainTypeManager.GrainInterfaceMapsBySilo.Keys;
+                var ignoredSilos = AllActiveSilos.Where(s => !silosInTypeManager.Contains(s)).ToList();
+                if (ignoredSilos.Any() && GrainTypeManager.GetTypeCodeMap().ContainsGrainImplementation(typeCode))
+                {
+                    compatibleSilos.AddRange(ignoredSilos);
+                }
+            }
+
             return compatibleSilos;
         }
 
