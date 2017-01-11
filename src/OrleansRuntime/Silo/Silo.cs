@@ -116,10 +116,17 @@ namespace Orleans.Runtime
 
         internal IServiceProvider Services { get; }
 
+
+        /// <summary> Gets whether this cluster is configured to be part of a multicluster. </summary>
+        public bool HasMultiClusterNetwork
+        {
+            get { return GlobalConfig.HasMultiClusterNetwork; }
+        }
+
         /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
         {
-            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : null; } 
+            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : ProtocolServices.PseudoClusterId; } 
         }
 
         /// <summary> SiloAddress for this silo. </summary>

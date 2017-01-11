@@ -36,7 +36,7 @@ namespace Orleans.Runtime.LogConsistency
             this.RegistrationStrategy = strategy;
 
             if (!Silo.CurrentSilo.GlobalConfig.HasMultiClusterNetwork)
-                PseudoMultiClusterConfiguration = new MultiClusterConfiguration(DateTime.UtcNow, new string[] { PseudoReplicaId }.ToList());
+                PseudoMultiClusterConfiguration = new MultiClusterConfiguration(DateTime.UtcNow, new string[] { PseudoClusterId }.ToList());
         }
 
 
@@ -96,7 +96,7 @@ namespace Orleans.Runtime.LogConsistency
 
         // pseudo-configuration to use if there is no actual multicluster network
         private static MultiClusterConfiguration PseudoMultiClusterConfiguration;
-        private static string PseudoReplicaId = "I";
+        internal static string PseudoClusterId = "I";
 
 
         public bool MultiClusterEnabled
@@ -112,7 +112,7 @@ namespace Orleans.Runtime.LogConsistency
             get
             {
                 if (PseudoMultiClusterConfiguration != null)
-                    return PseudoReplicaId;
+                    return PseudoClusterId;
                 else
                     return Silo.CurrentSilo.ClusterId;
             }
