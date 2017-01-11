@@ -436,7 +436,7 @@ namespace Orleans.Runtime.Configuration
 
         public int ActivationCountBasedPlacementChooseOutOf { get; set; }
 
-        public bool AssumeAllSilosEqualsForTesting { get; set; }
+        public bool AssumeHomogenousSilosForTesting { get; set; }
 
         /// <summary>
         /// Determines if ADO should be used for storage of Membership and Reminders info.
@@ -572,7 +572,7 @@ namespace Orleans.Runtime.Configuration
             NumVirtualBucketsConsistentRing = DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
             UseMockReminderTable = false;
             MockReminderTableTimeout = DEFAULT_MOCK_REMINDER_TABLE_TIMEOUT;
-            AssumeAllSilosEqualsForTesting = false;
+            AssumeHomogenousSilosForTesting = false;
 
             ProviderConfigurations = new Dictionary<string, ProviderCategoryConfiguration>();
             GrainServiceConfigurations = new GrainServiceConfigurations();

@@ -212,7 +212,7 @@ namespace Orleans.Runtime
 
             // For test only: if we have silos taht are not yet in the CLuster TypeMap, we assume that they are compatible
             // with the current silo
-            if (this.config.AssumeAllSilosEqualsForTesting)
+            if (this.config.AssumeHomogenousSilosForTesting)
             {
                 var silosInTypeManager = GrainTypeManager.GrainInterfaceMapsBySilo.Keys;
                 var ignoredSilos = AllActiveSilos.Where(s => !silosInTypeManager.Contains(s)).ToList();
