@@ -29,16 +29,22 @@ namespace Orleans.Runtime.LogConsistency
 
         private Grain grain;   // links to the grain that owns this service object
 
+        // pseudo-configuration to use if there is no actual multicluster network
+        private static MultiClusterConfiguration PseudoMultiClusterConfiguration;
+
         internal ProtocolServices(Grain gr, Logger log, IMultiClusterRegistrationStrategy strategy)
         {
             this.grain = gr;
             this.log = log;
             this.RegistrationStrategy = strategy;
 
-            if (!Silo.CurrentSilo.GlobalConfig.HasMultiClusterNetwork)
-                PseudoMultiClusterConfiguration = new MultiClusterConfiguration(DateTime.UtcNow, new string[] { PseudoClusterId }.ToList());
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+            {
+                // we are creating a default multi-cluster configuration containing exactly one cluster, this one.
+               PseudoMultiClusterConfiguration = new MultiClusterConfiguration(
+                   DateTime.UtcNow, new string[] { Silo.CurrentSilo.ClusterId }.ToList());
+            }
         }
-
 
         public async Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId)
         {
@@ -94,11 +100,6 @@ namespace Orleans.Runtime.LogConsistency
             }
         }
 
-        // pseudo-configuration to use if there is no actual multicluster network
-        private static MultiClusterConfiguration PseudoMultiClusterConfiguration;
-        internal static string PseudoClusterId = "I";
-
-
         public bool MultiClusterEnabled
         {
             get
@@ -111,10 +112,7 @@ namespace Orleans.Runtime.LogConsistency
         {
             get
             {
-                if (PseudoMultiClusterConfiguration != null)
-                    return PseudoClusterId;
-                else
-                    return Silo.CurrentSilo.ClusterId;
+                return Silo.CurrentSilo.ClusterId;
             }
         }
 
@@ -122,10 +120,7 @@ namespace Orleans.Runtime.LogConsistency
         {
             get
             {
-                if (PseudoMultiClusterConfiguration != null)
-                    return PseudoMultiClusterConfiguration;
-                else
-                    return Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
+                return PseudoMultiClusterConfiguration ?? Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
             }
         }
 

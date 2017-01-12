@@ -35,6 +35,7 @@ using Orleans.Services;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime
 {
@@ -129,7 +130,7 @@ namespace Orleans.Runtime
         /// <summary> Get the id of the cluster this silo is part of. </summary>
         public string ClusterId
         {
-            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : ProtocolServices.PseudoClusterId; } 
+            get { return GlobalConfig.HasMultiClusterNetwork ? GlobalConfig.ClusterId : GlobalConfig.DeploymentId; } 
         }
 
         /// <summary> SiloAddress for this silo. </summary>
