@@ -7,6 +7,7 @@ using Orleans.LogConsistency;
 using System.Diagnostics;
 using Orleans.Serialization;
 using Orleans.MultiCluster;
+using Orleans.Runtime;
 
 namespace Orleans.EventSourcing.Common
 {
@@ -123,7 +124,7 @@ namespace Orleans.EventSourcing.Common
         {
             if (lastVersionNotified > this.GetConfirmedVersion())
             {
-                Services.Verbose("force refresh because of version notification v{0}", lastVersionNotified);
+                Services.Log(Severity.Verbose, "force refresh because of version notification v{0}", lastVersionNotified);
                 needRefresh = true;
             }
         }
@@ -186,7 +187,7 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc/>
         public virtual async Task PreOnActivate()
         {
-            Services.Verbose2("PreActivation Started");
+            Services.Log(Severity.Verbose2, "PreActivation Started");
 
             // this flag indicates we have not done an initial load from storage yet
             // we do not act on this yet, but wait until after user OnActivate has run. 
@@ -198,18 +199,18 @@ namespace Orleans.EventSourcing.Common
             if (latestconf != null)
                 await OnMultiClusterConfigurationChange(latestconf);
 
-            Services.Verbose2("PreActivation Complete");
+            Services.Log(Severity.Verbose2, "PreActivation Complete");
         }
 
         public virtual Task PostOnActivate()
         {
-            Services.Verbose2("PostActivation Started");
+            Services.Log(Severity.Verbose2, "PostActivation Started");
 
             // start worker, if it has not already happened
             if (needInitialRead)
                 worker.Notify();
 
-            Services.Verbose2("PostActivation Complete");
+            Services.Log(Severity.Verbose2, "PostActivation Complete");
 
             return TaskDone.Done;
         }
@@ -217,7 +218,7 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc/>
         public virtual async Task PostOnDeactivate()
         {
-            Services.Verbose2("Deactivation Started");
+            Services.Log(Severity.Verbose2, "Deactivation Started");
 
             while (!worker.IsIdle())
             {
@@ -226,7 +227,7 @@ namespace Orleans.EventSourcing.Common
 
             Services.UnsubscribeFromMultiClusterConfigurationChanges();
 
-            Services.Verbose2("Deactivation Complete");
+            Services.Log(Severity.Verbose2, "Deactivation Complete");
         }
 
 
@@ -296,7 +297,7 @@ namespace Orleans.EventSourcing.Common
         {
             while (!IsMyClusterJoined())
             {
-                Services.Verbose("Waiting for join");
+                Services.Log(Severity.Verbose, "Waiting for join");
                 await Task.Delay(5000);
             }
         }
@@ -307,7 +308,7 @@ namespace Orleans.EventSourcing.Common
         {
             while (Configuration == null || Configuration.AdminTimestamp < adminTimestamp)
             {
-                Services.Verbose("Waiting for config {0}", adminTimestamp);
+                Services.Log(Severity.Verbose, "Waiting for config {0}", adminTimestamp);
 
                 await Task.Delay(5000);
             }
@@ -327,7 +328,7 @@ namespace Orleans.EventSourcing.Common
 
             if (stats != null) stats.EventCounters["SubmitCalled"]++;
 
-            Services.Verbose2("Submit");
+            Services.Log(Severity.Verbose2, "Submit");
 
             SubmitInternal(DateTime.UtcNow, logEntry);
 
@@ -342,7 +343,7 @@ namespace Orleans.EventSourcing.Common
 
             if (stats != null) stats.EventCounters["SubmitRangeCalled"]++;
 
-            Services.Verbose2("SubmitRange");
+            Services.Log(Severity.Verbose2, "SubmitRange");
 
             var time = DateTime.UtcNow;
 
@@ -360,7 +361,7 @@ namespace Orleans.EventSourcing.Common
 
             if (stats != null) stats.EventCounters["TryAppendCalled"]++;
 
-            Services.Verbose2("TryAppend");
+            Services.Log(Severity.Verbose2, "TryAppend");
 
             var promise = new TaskCompletionSource<bool>();
 
@@ -379,7 +380,7 @@ namespace Orleans.EventSourcing.Common
 
             if (stats != null) stats.EventCounters["TryAppendRangeCalled"]++;
 
-            Services.Verbose2("TryAppendRange");
+            Services.Log(Severity.Verbose2, "TryAppendRange");
 
             var promise = new TaskCompletionSource<bool>();
             var time = DateTime.UtcNow;
@@ -484,7 +485,7 @@ namespace Orleans.EventSourcing.Common
 
             if (notificationMessage != null)
             {
-                Services.Verbose("NotificationReceived v{0}", notificationMessage.Version);
+                Services.Log(Severity.Verbose, "NotificationReceived v{0}", notificationMessage.Version);
 
                 OnNotificationReceived(notificationMessage);
 
@@ -515,7 +516,7 @@ namespace Orleans.EventSourcing.Common
             if (!MultiClusterConfiguration.OlderThan(oldConfig, newConfig))
                 return;
 
-            Services.Verbose("Processing Configuration {0}", newConfig);
+            Services.Log(Severity.Verbose, "Processing Configuration {0}", newConfig);
 
             await this.OnConfigurationChange(newConfig); // updates Configuration and does any work required
 
@@ -526,7 +527,7 @@ namespace Orleans.EventSourcing.Common
             if (!needInitialRead && added.Contains(Services.MyClusterId))
             {
                 needRefresh = true;
-                Services.Verbose("Refresh Because of Join");
+                Services.Log(Severity.Verbose, "Refresh Because of Join");
                 worker.Notify();
             }
 
@@ -609,13 +610,13 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task Work()
         {
-            Services.Verbose("<1 ProcessNotifications");
+            Services.Log(Severity.Verbose, "<1 ProcessNotifications");
 
             var version = GetConfirmedVersion();
 
             ProcessNotifications();
 
-            Services.Verbose("<2 NotifyViewChanges");
+            Services.Log(Severity.Verbose, "<2 NotifyViewChanges");
 
             NotifyViewChanges(ref version);
 
@@ -623,7 +624,7 @@ namespace Orleans.EventSourcing.Common
 
             bool haveToRead = needInitialRead || (needRefresh && !haveToWrite);
 
-            Services.Verbose("<3 Storage htr={0} htw={1}", haveToRead, haveToWrite);
+            Services.Log(Severity.Verbose, "<3 Storage htr={0} htw={1}", haveToRead, haveToWrite);
 
             try
             {
@@ -654,7 +655,7 @@ namespace Orleans.EventSourcing.Common
 
             }
 
-            Services.Verbose("<4 Done");
+            Services.Log(Severity.Verbose, "<4 Done");
         }
 
 
@@ -774,12 +775,12 @@ namespace Orleans.EventSourcing.Common
             if (stats != null)
                 stats.EventCounters["SynchronizeNowCalled"]++;
 
-            Services.Verbose("SynchronizeNowStart");
+            Services.Log(Severity.Verbose, "SynchronizeNowStart");
 
             needRefresh = true;
             await worker.NotifyAndWaitForWorkToBeServiced();
 
-            Services.Verbose("SynchronizeNowComplete");
+            Services.Log(Severity.Verbose, "SynchronizeNowComplete");
         }
 
         /// <inheritdoc/>
@@ -797,12 +798,12 @@ namespace Orleans.EventSourcing.Common
             if (stats != null)
                 stats.EventCounters["ConfirmSubmittedEntriesCalled"]++;
 
-            Services.Verbose("ConfirmSubmittedEntriesStart");
+            Services.Log(Severity.Verbose, "ConfirmSubmittedEntriesStart");
 
             if (pending.Count != 0)
                 await worker.WaitForCurrentWorkToBeServiced();
 
-            Services.Verbose("ConfirmSubmittedEntriesEnd");
+            Services.Log(Severity.Verbose, "ConfirmSubmittedEntriesEnd");
         }
 
         /// <summary>

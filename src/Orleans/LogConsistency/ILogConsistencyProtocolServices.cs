@@ -97,14 +97,8 @@ namespace Orleans.LogConsistency
         /// <param name="e">The caught exception</param>
         void CaughtUserCodeException(string callback, string where, Exception e);
 
-        /// <summary> Output the specified message at <c>Info</c> log level. </summary>
-        void Info(string format, params object[] args);        
-        /// <summary> Output the specified message at <c>Verbose</c> log level. </summary>
-        void Verbose(string format, params object[] args);
-        /// <summary> Output the specified message at <c>Verbose2</c> log level. </summary>
-        void Verbose2(string format, params object[] args);
-        /// <summary> Output the specified message at <c>Verbose3</c> log level. </summary>
-        void Verbose3(string format, params object[] args);
+        /// <summary> Output the specified message at the specified log level. </summary>
+        void Log(Severity severity, string format, params object[] args);
 
         #endregion
     }

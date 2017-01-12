@@ -144,7 +144,7 @@ namespace Orleans.EventSourcing.CustomStorage
                         }              
                     }
 
-                    Services.Verbose("read success v{0}", version);
+                    Services.Log(Severity.Verbose, "read success v{0}", version);
 
                     LastPrimaryIssue.Resolve(Host, Services);
 
@@ -159,7 +159,7 @@ namespace Orleans.EventSourcing.CustomStorage
                     LastPrimaryIssue.Record(new ReadFromPrimaryFailed() { Exception = e }, Host, Services);
                 }
 
-                Services.Verbose("read failed {0}", LastPrimaryIssue);
+                Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
 
                 await LastPrimaryIssue.DelayBeforeRetry();
             }
@@ -193,7 +193,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             if (writesuccessful)
             {
-                Services.Verbose("write ({0} updates) success v{1}", updates.Count, version + updates.Count);
+                Services.Log(Severity.Verbose, "write ({0} updates) success v{1}", updates.Count, version + updates.Count);
 
                 // now we update the cached state by applying the same updates
                 // in case we encounter any exceptions we will re-read the whole state from storage
@@ -215,7 +215,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             if (!writesuccessful || !transitionssuccessful)
             {
-                Services.Verbose("{0} failed {1}", writesuccessful ? "transitions" : "write", LastPrimaryIssue);
+                Services.Log(Severity.Verbose, "{0} failed {1}", writesuccessful ? "transitions" : "write", LastPrimaryIssue);
 
                 while (true) // be stubborn until we can re-read the state from storage
                 {
@@ -227,7 +227,7 @@ namespace Orleans.EventSourcing.CustomStorage
                         version = result.Key;
                         cached = result.Value;
 
-                        Services.Verbose("read success v{0}", version);
+                        Services.Log(Severity.Verbose, "read success v{0}", version);
 
                         LastPrimaryIssue.Resolve(Host, Services);
 
@@ -242,7 +242,7 @@ namespace Orleans.EventSourcing.CustomStorage
                         LastPrimaryIssue.Record(new ReadFromPrimaryFailed() { Exception = e }, Host, Services);
                     }
 
-                    Services.Verbose("read failed {0}", LastPrimaryIssue);
+                    Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
                 }
             }
 
@@ -329,7 +329,7 @@ namespace Orleans.EventSourcing.CustomStorage
             // discard notifications that are behind our already confirmed state
             while (notifications.Count > 0 && notifications.ElementAt(0).Key < version)
             {
-                Services.Verbose("discarding notification {0}", notifications.ElementAt(0).Value);
+                Services.Log(Severity.Verbose, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
@@ -352,10 +352,10 @@ namespace Orleans.EventSourcing.CustomStorage
 
                 version = updatenotification.Version;
 
-                Services.Verbose("notification success ({0} updates) v{1}", updatenotification.Updates.Count, version);
+                Services.Log(Severity.Verbose, "notification success ({0} updates) v{1}", updatenotification.Updates.Count, version);
             }
 
-            Services.Verbose2("unprocessed notifications in queue: {0}", notifications.Count);
+            Services.Log(Severity.Verbose2, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
         
@@ -364,13 +364,13 @@ namespace Orleans.EventSourcing.CustomStorage
         [Conditional("DEBUG")]
         private void enter_operation(string name)
         {
-            Services.Verbose2("/-- enter {0}", name);
+            Services.Log(Severity.Verbose2, "/-- enter {0}", name);
         }
 
         [Conditional("DEBUG")]
         private void exit_operation(string name)
         {
-            Services.Verbose2("\\-- exit {0}", name);
+            Services.Log(Severity.Verbose2, "\\-- exit {0}", name);
         }
 
     }

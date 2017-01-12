@@ -201,8 +201,6 @@ namespace Orleans.Runtime.LogConsistency
                    PseudoMultiClusterConfiguration == null ? "" : (" " + Silo.CurrentSilo.ClusterId),
                    where),e);
         }
-     
-
 
         public void CaughtUserCodeException(string callback, string where, Exception e)
         {
@@ -214,50 +212,19 @@ namespace Orleans.Runtime.LogConsistency
                    where), e);
         }
 
-
-        public void Info(string format, params object[] args)
+        public void Log(Severity severity, string format, params object[] args)
         {
-            log?.Info("{0}{1} {2}",
-                    grain.GrainReference,
-                    PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
-                    string.Format(format, args));
-        }
-
-        public void Verbose(string format, params object[] args)
-        {
-            if (log != null && log.IsVerbose)
+            if (log != null && log.SeverityLevel >= severity)
             {
-                log.Verbose("{0}{1} {2}",
-                    grain.GrainReference,
-                    PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
-                    string.Format(format, args));
+                var msg = string.Format("{0}{1} {2}",
+                        grain.GrainReference,
+                        PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
+                        string.Format(format, args));
+                log.Log(0, severity, msg, EmptyObjectArray, null);
             }
         }
 
-        /// <summary> Output the specified message at <c>Verbose2</c> log level. </summary>
-        public void Verbose2(string format, params object[] args)
-        {
-            if (log != null && log.IsVerbose2)
-            {
-                log.Verbose2("{0}{1} {2}",
-                    grain.GrainReference,
-                    PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
-                    string.Format(format, args));
-            }
-        }
-
-        /// <summary> Output the specified message at <c>Verbose3</c> log level. </summary>
-        public void Verbose3(string format, params object[] args)
-        {
-            if (log != null && log.IsVerbose3)
-            {
-                log.Verbose3("{0}{1} {2}",
-                    grain.GrainReference,
-                    PseudoMultiClusterConfiguration != null ? "" : (" " + Silo.CurrentSilo.ClusterId),
-                    string.Format(format, args));
-            }
-        }
-
+        private static readonly object[] EmptyObjectArray = new object[0];
     }
 
 }
