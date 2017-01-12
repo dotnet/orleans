@@ -540,7 +540,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) { logger.Verbose("Storage provider manager created successfully."); }
 
             // Initialize log consistency providers once we have a basic silo runtime environment operating
-            logConsistencyProviderManager = new LogConsistencyProviderManager(grainFactory, Services);
+            logConsistencyProviderManager = new LogConsistencyProviderManager(grainFactory, Services, siloProviderRuntime);
             scheduler.QueueTask(
                 () => logConsistencyProviderManager.LoadLogConsistencyProviders(GlobalConfig.ProviderConfigurations),
                 providerManagerSystemTarget.SchedulingContext)

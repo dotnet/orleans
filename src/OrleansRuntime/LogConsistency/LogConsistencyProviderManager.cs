@@ -14,21 +14,21 @@ namespace Orleans.Runtime.LogConsistency
     internal class LogConsistencyProviderManager : ILogConsistencyProviderManager, ILogConsistencyProviderRuntime
     {
         private ProviderLoader<ILogConsistencyProvider> providerLoader;
-        private IProviderRuntime providerRuntime;
+        private IProviderRuntime runtime;
 
         public IGrainFactory GrainFactory { get; private set; }
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider)
+        public LogConsistencyProviderManager(IGrainFactory grainFactory, IServiceProvider serviceProvider, IProviderRuntime runtime)
         {
             GrainFactory = grainFactory;
             ServiceProvider = serviceProvider;
+            this.runtime = runtime;
         }
 
         internal Task LoadLogConsistencyProviders(IDictionary<string, ProviderCategoryConfiguration> configs)
         {
             providerLoader = new ProviderLoader<ILogConsistencyProvider>();
-            providerRuntime = SiloProviderRuntime.Instance;
 
             if (!configs.ContainsKey(ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME))
                 return TaskDone.Done;
@@ -59,12 +59,12 @@ namespace Orleans.Runtime.LogConsistency
 
         public void SetInvokeInterceptor(InvokeInterceptor interceptor)
         {
-            providerRuntime.SetInvokeInterceptor(interceptor);
+            runtime.SetInvokeInterceptor(interceptor);
         }
 
         public InvokeInterceptor GetInvokeInterceptor()
         {
-            return providerRuntime.GetInvokeInterceptor();
+            return runtime.GetInvokeInterceptor();
         }
 
         public Logger GetLogger(string loggerName)
@@ -74,12 +74,12 @@ namespace Orleans.Runtime.LogConsistency
 
         public Guid ServiceId
         {
-            get { return providerRuntime.ServiceId; }
+            get { return runtime.ServiceId; }
         }
 
         public string SiloIdentity
         {
-            get { return providerRuntime.SiloIdentity; }
+            get { return runtime.SiloIdentity; }
         }
 
         /// <summary>
