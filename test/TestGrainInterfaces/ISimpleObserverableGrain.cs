@@ -7,6 +7,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task Subscribe(ISimpleGrainObserver observer);
         Task Unsubscribe(ISimpleGrainObserver observer);
+        Task<string> GetRuntimeInstanceId();
     }
 
     public interface ISimpleGrainObserver : IGrainObserver
