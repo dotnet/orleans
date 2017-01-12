@@ -1022,6 +1022,17 @@ namespace UnitTests
             Assert.True(config.Globals.DataConnectionStringForReminders == "RemindersConnectionString");
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_TableGrain()
+        {
+            const string filename = "Config_TableGrain.xml";
+
+            var config = new ClusterConfiguration();
+            config.LoadFromFile(filename);
+            Assert.True(config.Globals.ReminderServiceType == GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
+            Assert.True(config.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.MembershipTableGrain);
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void SiloConfig_Azure_SystemStore()
         {

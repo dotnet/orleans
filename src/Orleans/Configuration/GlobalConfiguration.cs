@@ -773,9 +773,20 @@ namespace Orleans.Runtime.Configuration
                             {
                                 LivenessType = (LivenessProviderType)Enum.Parse(typeof(LivenessProviderType), sst);
                                 ReminderServiceProviderType reminderServiceProviderType;
-                                SetReminderServiceType(Enum.TryParse(sst, out reminderServiceProviderType)
-                                    ? reminderServiceProviderType
-                                    : ReminderServiceProviderType.Disabled);
+                                if (LivenessType == LivenessProviderType.MembershipTableGrain)
+                                {
+                                    // Special case for MembershipTableGrain -> ReminderTableGrain since we use the same setting
+                                    // for LivenessType and ReminderServiceType even if the enum are not 100% compatible
+                                    reminderServiceProviderType = ReminderServiceProviderType.ReminderTableGrain;
+                                }
+                                else
+                                {
+                                    // If LivenessType = ZooKeeper then we set ReminderServiceType to disabled
+                                    reminderServiceProviderType = Enum.TryParse(sst, out reminderServiceProviderType)
+                                        ? reminderServiceProviderType
+                                        : ReminderServiceProviderType.Disabled;
+                                }
+                                SetReminderServiceType(reminderServiceProviderType);
                             }
                         }
                         if (child.HasAttribute("MembershipTableAssembly"))
