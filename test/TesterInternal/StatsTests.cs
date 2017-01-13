@@ -28,8 +28,12 @@ namespace UnitTests.Stats
                 var options = new TestClusterOptions(initialSilosCount: 1);
 
                 options.ClusterConfiguration.Globals.RegisterStatisticsProvider<UnitTests.Stats.MockStatsSiloCollector>("MockStats");
+                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1));
+                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1));
 
                 options.ClientConfiguration.RegisterStatisticsProvider<UnitTests.Stats.MockStatsClientCollector>("MockStats");
+                options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(1);
+                options.ClientConfiguration.StatisticsLogWriteInterval = TimeSpan.FromSeconds(1);
 
                 return new TestCluster(options);
             }
@@ -135,59 +139,4 @@ namespace UnitTests.Stats
             output.WriteLine("Done. "+ sw.ElapsedMilliseconds);
         }
     }
-
-#if DEBUG || USE_SQL_SERVER
-
-    public class SqlClientInitTests : OrleansTestingBase, IClassFixture<SqlClientInitTests.Fixture>
-    {
-        public class Fixture : BaseTestClusterFixture
-        {
-            protected override TestCluster CreateTestCluster()
-            {
-                var options = new TestClusterOptions(initialSilosCount: 1);
-
-                options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
-                options.ClusterConfiguration.Globals.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>("SQL", new Dictionary<string,string>() { { "ConnectionString", "connection string" } });
-
-                options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
-                options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-
-                options.ClientConfiguration.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>("SQL", new Dictionary<string, string>() { { "ConnectionString", "connection string" } });
-                options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
-                options.ClientConfiguration.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-
-                return new TestCluster(options);
-            }
-
-        }
-
-        protected TestCluster HostedCluster { get; private set; }
-
-        public SqlClientInitTests(Fixture fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
-        }
-        
-        [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
-        public async Task ClientInit_SqlServer_WithStats()
-        {
-            Assert.True(GrainClient.IsInitialized);
-
-            ClientConfiguration config = this.HostedCluster.ClientConfiguration;
-
-            Assert.Equal(ClientConfiguration.GatewayProviderType.SqlServer,  config.GatewayProvider);  // "GatewayProviderType"
-
-            Assert.True(config.UseSqlSystemStore, "Client UseSqlSystemStore");
-
-            OutsideRuntimeClient ogc = (OutsideRuntimeClient) RuntimeClient.Current;
-            Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
-
-            Assert.Equal("SQL",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
-
-            SiloHandle silo = this.HostedCluster.Primary;
-            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
-            Assert.Equal("SQL",  silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
-        }
-    }
-#endif
 }

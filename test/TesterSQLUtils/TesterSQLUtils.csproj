@@ -69,6 +69,7 @@
     <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTests_SqlServer.cs" />
     <Compile Include="LivenessTests.cs" />
+    <Compile Include="SqlClientInitTests.cs" />
     <Compile Include="StorageTests\RelationalStoreTests.cs" />
     <Compile Include="StorageTests\Relational\AdotNetProviderFunctionalityTests.cs" />
     <Compile Include="StorageTests\Relational\CommonFixture.cs" />

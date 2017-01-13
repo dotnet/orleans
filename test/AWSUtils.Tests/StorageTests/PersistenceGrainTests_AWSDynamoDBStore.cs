@@ -21,7 +21,7 @@ namespace AWSUtils.Tests.StorageTests
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : TestExtensions.BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
