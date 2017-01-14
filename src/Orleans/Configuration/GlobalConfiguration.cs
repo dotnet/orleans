@@ -798,7 +798,10 @@ namespace Orleans.Runtime.Configuration
                         if (LivenessType == LivenessProviderType.Custom && string.IsNullOrEmpty(MembershipTableAssembly))
                             throw new FormatException("MembershipTableAssembly should be set when SystemStoreType is \"Custom\"");
                         if (ReminderServiceType == ReminderServiceProviderType.Custom && String.IsNullOrEmpty(ReminderTableAssembly))
-                            throw new FormatException("ReminderTableAssembly should be set when ReminderServiceType is \"Custom\"");
+                        { 
+                            logger.Info("No ReminderTableAssembly specified with SystemStoreType set to Custom: ReminderService will be disabled");
+                            SetReminderServiceType(ReminderServiceProviderType.Disabled);
+                        }
 
                         if (child.HasAttribute("ServiceId"))
                         {
