@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory
 {
@@ -34,9 +36,11 @@ namespace Orleans.GrainDirectory
             return GetType().GetHashCode();
         }
 
-        internal override bool IsSingleInstance()
+        public override IEnumerable<string> GetRemoteInstances(MultiClusterConfiguration mcConfig, string myClusterId)
         {
-            return true;
+            foreach (var clusterId in mcConfig.Clusters)
+                if (clusterId != myClusterId)
+                    yield return clusterId;
         }
     }
 }

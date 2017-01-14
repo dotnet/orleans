@@ -117,6 +117,10 @@
     <Compile Include="Messaging\MessageCenter.cs" />
     <Compile Include="Messaging\OutboundMessageQueue.cs" />
     <Compile Include="ReminderService\MockReminderTable.cs" />
+    <Compile Include="LogConsistency\ProtocolGateway.cs" />
+    <Compile Include="LogConsistency\ILogConsistencyProviderManager.cs" />
+    <Compile Include="LogConsistency\ProtocolServices.cs" />
+    <Compile Include="LogConsistency\LogConsistencyProviderManager.cs" />
     <Compile Include="Scheduler\ITaskScheduler.cs" />
     <Compile Include="Silo\IStartupBuilder.cs" />
     <Compile Include="Storage\IStorageProviderManager.cs" />

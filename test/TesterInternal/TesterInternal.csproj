@@ -80,9 +80,13 @@
     <Compile Include="General\LoggerTest.cs" />
     <Compile Include="General\RequestContextTest.cs" />
     <Compile Include="General\TestingBootstrapProviders.cs" />
+    <Compile Include="GeoClusterTests\BasicLogConsistentGrainTests.cs" />
     <Compile Include="GeoClusterTests\BasicMultiClusterTest.cs" />
     <Compile Include="GeoClusterTests\GatewaySelectionTest.cs" />
     <Compile Include="GeoClusterTests\GlobalSingleInstanceClusterTests.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestFixture.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestsFourClusters.cs" />
+    <Compile Include="GeoClusterTests\LogConsistencyTestsTwoClusters.cs" />
     <Compile Include="GeoClusterTests\MultiClusterNetworkTests.cs" />
     <Compile Include="GeoClusterTests\TestingClusterHost.cs" />
     <Compile Include="LivenessTests\ConsistentRingProviderTests.cs" />
@@ -134,6 +138,10 @@
     <ProjectReference Include="..\..\src\OrleansCounterControl\OrleansCounterControl.csproj">
       <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
       <Name>OrleansCounterControl</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansEventSourcing\OrleansEventSourcing.csproj">
+      <Project>{cf7ee78b-39e1-4660-beaf-0e2606098f8c}</Project>
+      <Name>OrleansEventSourcing</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>

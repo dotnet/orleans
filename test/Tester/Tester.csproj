@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
+    <Compile Include="EventSourcingTests\JournaledGrainTests.cs" />
     <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />

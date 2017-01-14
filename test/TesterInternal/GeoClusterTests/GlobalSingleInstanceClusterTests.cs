@@ -68,12 +68,12 @@ namespace Tests.GeoClusterTests
                 var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
-                return toWait.Result;
+                return toWait.GetResult();
             }
 
             public void InjectMultiClusterConf(params string[] args)
             {
-                systemManagement.InjectMultiClusterConfiguration(args).Wait();
+                systemManagement.InjectMultiClusterConfiguration(args).GetResult();
             }
 
             IManagementGrain systemManagement;

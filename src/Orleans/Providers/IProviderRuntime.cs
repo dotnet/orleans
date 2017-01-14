@@ -68,6 +68,15 @@ namespace Orleans.Providers
     }
 
     /// <summary>
+    /// Provider-facing interface for log consistency
+    /// </summary>
+    public interface ILogConsistencyProviderRuntime : IProviderRuntime
+    {
+        // for now empty, later can add provider specific runtime capabilities.
+    }
+
+
+    /// <summary>
     /// Handles the invocation of the provided <paramref name="request"/>.
     /// </summary>
     /// <param name="targetMethod">The method on <paramref name="target"/> being invoked.</param>
