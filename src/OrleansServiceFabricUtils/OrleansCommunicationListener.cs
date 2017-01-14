@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Fabric.Description;
+using Orleans.Runtime;
 
 namespace Microsoft.Orleans.ServiceFabric
 {
@@ -11,6 +12,9 @@ namespace Microsoft.Orleans.ServiceFabric
     using System.Text.RegularExpressions;
     using Newtonsoft.Json;
     using global::Orleans.Runtime.Configuration;
+
+    using Microsoft.Orleans.ServiceFabric.Models;
+    using Microsoft.Orleans.ServiceFabric.Utilities;
     using Microsoft.ServiceFabric.Services.Communication.Runtime;
 
     /// <summary>
@@ -18,6 +22,16 @@ namespace Microsoft.Orleans.ServiceFabric
     /// </summary>
     public class OrleansCommunicationListener : ICommunicationListener
     {
+        /// <summary>
+        /// The name used to identify the silo-to-silo communication endpoint.
+        /// </summary>
+        public const string SiloEndpointName = "OrleansSiloEndpoint";
+
+        /// <summary>
+        /// The name used to identify the client-to-silo communication endpoint.
+        /// </summary>
+        public const string GatewayEndpointName = "OrleansProxyEndpoint";
+
         /// <summary>
         /// The Orleans cluster configuration.
         /// </summary>
@@ -43,18 +57,17 @@ namespace Microsoft.Orleans.ServiceFabric
             // Gather configuration from Service Fabric.
             var activation = context.CodePackageActivationContext;
             var endpoints = activation.GetEndpoints();
-            var siloEndpoint = GetEndpoint(endpoints, "OrleansSiloEndpoint");
-            var gatewayEndpoint = GetEndpoint(endpoints, "OrleansProxyEndpoint");
+            var siloEndpoint = GetEndpoint(endpoints, SiloEndpointName);
+            var gatewayEndpoint = GetEndpoint(endpoints, GatewayEndpointName);
 
             // Set the endpoints according to Service Fabric configuration.
-            var nodeConfig = this.configuration.Defaults;
-            if (string.IsNullOrWhiteSpace(nodeConfig.HostNameOrIPAddress))
+            if (string.IsNullOrWhiteSpace(this.configuration.Defaults.HostNameOrIPAddress))
             {
-                nodeConfig.HostNameOrIPAddress = context.NodeContext.IPAddressOrFQDN;
+                this.configuration.Defaults.HostNameOrIPAddress = context.NodeContext.IPAddressOrFQDN;
             }
 
-            nodeConfig.Port = siloEndpoint.Port;
-            nodeConfig.ProxyGatewayEndpoint = new IPEndPoint(nodeConfig.Endpoint.Address, gatewayEndpoint.Port);
+            this.configuration.Defaults.Port = siloEndpoint.Port;
+            this.configuration.Defaults.ProxyGatewayEndpoint = new IPEndPoint(this.configuration.Defaults.Endpoint.Address, gatewayEndpoint.Port);
         }
 
         /// <summary>
@@ -75,9 +88,14 @@ namespace Microsoft.Orleans.ServiceFabric
         /// <returns>The silo endpoints, represented as a <see langword="string"/>.</returns>
         public Task<string> OpenAsync(CancellationToken cancellationToken)
         {
-            // Start the silo.
             try
             {
+                // Start the silo.
+                if (this.configuration.Defaults.Generation == 0)
+                {
+                    this.configuration.Defaults.Generation = SiloAddress.AllocateNewGeneration();
+                }
+
                 this.SiloHost.Start(this.SiloName, this.configuration);
             }
             catch
@@ -86,7 +104,7 @@ namespace Microsoft.Orleans.ServiceFabric
                 throw;
             }
 
-            return Task.FromResult(JsonConvert.SerializeObject(new OrleansFabricEndpoints(this.SiloHost.NodeConfig)));
+            return Task.FromResult(JsonConvert.SerializeObject(new FabricSiloInfo(this.SiloHost.NodeConfig)));
         }
 
         /// <summary>

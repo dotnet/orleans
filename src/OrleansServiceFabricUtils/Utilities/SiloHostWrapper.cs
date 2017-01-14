@@ -1,8 +1,8 @@
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
-
-namespace Microsoft.Orleans.ServiceFabric
+namespace Microsoft.Orleans.ServiceFabric.Utilities
 {
+    using global::Orleans.Runtime.Configuration;
+    using global::Orleans.Runtime.Host;
+
     internal class SiloHostWrapper : ISiloHost
     {
         private SiloHost host;
