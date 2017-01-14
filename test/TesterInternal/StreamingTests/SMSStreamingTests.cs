@@ -151,7 +151,8 @@ namespace UnitTests.StreamingTests
         private bool ExtractFireAndForgetDeliveryProperty(Fixture fixture)
         {
             ProviderCategoryConfiguration providerConfigs;
-            if (fixture.HostedCluster.ClusterConfiguration.Globals.ProviderConfigurations.TryGetValue("Stream", out providerConfigs))
+            if (fixture.HostedCluster.ClusterConfiguration.Globals.ProviderConfigurations.TryGetValue(ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, 
+                out providerConfigs))
             {
                 IProviderConfiguration provider;
                 if (providerConfigs.Providers.TryGetValue(SingleStreamTestRunner.SMS_STREAM_PROVIDER_NAME, out provider))

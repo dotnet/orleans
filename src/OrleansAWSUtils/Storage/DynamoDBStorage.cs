@@ -118,7 +118,8 @@ namespace OrleansAWSUtils.Storage
             if (service.StartsWith("http://", StringComparison.InvariantCultureIgnoreCase) ||
                 service.StartsWith("https://", StringComparison.InvariantCultureIgnoreCase))
             {
-                ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { ServiceURL = service });
+                var credentials = new BasicAWSCredentials("dummy", "dummyKey");
+                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service });
             }
             else
             {

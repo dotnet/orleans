@@ -210,9 +210,6 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="ReadMe.md" />
-    <Content Include="ClientConfig_StreamProviders.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -230,15 +227,6 @@
     </Content>
     <Content Include="..\..\src\OrleansTestingHost\OrleansConfigurationForTesting.xml">
       <Link>OrleansConfigurationForTesting.xml</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_DevStorage.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StorageErrors.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Config_StreamProviders.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="MockStats_ClientConfiguration.xml">

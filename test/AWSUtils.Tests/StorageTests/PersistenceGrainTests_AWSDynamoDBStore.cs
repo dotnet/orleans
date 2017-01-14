@@ -35,7 +35,6 @@ namespace AWSUtils.Tests.StorageTests
                     options.ClusterConfiguration.Globals.ServiceId = serviceId;
                     options.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
 
-                    options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
                     options.ClusterConfiguration.Globals.MaxResendCount = 0;
 
 
@@ -45,15 +44,12 @@ namespace AWSUtils.Tests.StorageTests
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
 
                     options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", "Service=http://localhost:8000" } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", "Service=http://localhost:8000" } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", "Service=http://localhost:8000" } });
-                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", "Service=http://localhost:8000" } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedDDBStore");
 
-                    //< Provider Name = "DDBStore1" />
-                    //< Provider Name = "DDBStore2" />
-                    //< Provider Name = "DDBStore3" />
                     IProviderConfiguration providerConfig;
                     if(options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
                     {
@@ -61,33 +57,34 @@ namespace AWSUtils.Tests.StorageTests
 
                         var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
 
-                        IProvider provider1 = GetNamedProviderForShardedProvider(providers, "DDBStore1");
-                        IProvider provider2 = GetNamedProviderForShardedProvider(providers, "DDBStore2");
-                        IProvider provider3 = GetNamedProviderForShardedProvider(providers, "DDBStore3");
-                        providerConfig.Children.Add(provider1);
-                        providerConfig.Children.Add(provider2);
-                        providerConfig.Children.Add(provider3);
+                        IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore1");
+                        IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore2");
+                        IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore3");
+                        providerConfig.AddChildConfiguration(provider1);
+                        providerConfig.AddChildConfiguration(provider2);
+                        providerConfig.AddChildConfiguration(provider3);
                     }
                     return new TestCluster(options);
                 }
                 return null;
             }
 
-            private static IProvider GetNamedProviderForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
+            private static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
             {
-                var ddbStore1 = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
+                var providerConfig = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
 
-                var pm = ddbStore1.First();
-
-                var provider = ((ProviderConfiguration) pm).ProviderManager.GetProvider(providerName);
-                return provider;
+                return providerConfig.First();
             }
         }
 
         public PersistenceGrainTests_AWSDynamoDBStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                output.WriteLine("Unable to connect to AWS DynamoDB simulator");
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+            
         }
 
         [SkippableFact, TestCategory("Functional")]

@@ -29,35 +29,35 @@ namespace UnitTests.StreamingTests
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
 
                 options.ClusterConfiguration.Globals.MaxResendCount = 0;
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 0);
+                options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromSeconds(30);
 
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
                 options.ClientConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
 
                 options.ClientConfiguration.MaxMessageBatchingSize = 100;
                 options.ClientConfiguration.ClientSenderBuckets = 8192;
+                options.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(30);
+                options.ClientConfiguration.MaxResendCount = 0;
 
                 return new TestCluster(options);
             }
         }
 
         private const string PubSubStoreProviderName = "PubSubStore";
-        protected TestCluster HostedCluster { get; private set; }
 
         public IGrainFactory GrainFactory { get; }
 
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
+        protected TestCluster HostedCluster;
 
         public StreamPubSubReliabilityTests(Fixture fixture)
         {
-            GrainFactory = fixture.GrainFactory;
-            HostedCluster = fixture.HostedCluster;
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
-
+            this.HostedCluster = fixture.HostedCluster;
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
 

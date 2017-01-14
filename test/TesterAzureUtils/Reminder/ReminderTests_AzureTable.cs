@@ -30,7 +30,6 @@ namespace UnitTests.TimerTests
 
                 options.ClusterConfiguration.Globals.ServiceId = serviceId;
                 options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
-                options.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
 
                 return new TestCluster(options);
             }
@@ -38,10 +37,6 @@ namespace UnitTests.TimerTests
 
         public ReminderTests_AzureTable(Fixture fixture) : base(fixture)
         {
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            //var controlProxy = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(-1);
-            //controlProxy.EraseReminderTable().WaitWithThrow(VSOTestConstants.InitTimeout);
         }
 
         // Basic tests
