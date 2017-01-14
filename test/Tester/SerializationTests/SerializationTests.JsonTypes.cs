@@ -42,23 +42,23 @@ namespace UnitTests.Serialization
                 Register();
             }
 
-            public static object DeepCopier(object original)
+            public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
                 // Alternatively, can copy via JObject.ToString and JObject.Parse().
                 return original;
             }
 
-            public static void Serializer(object untypedInput, BinaryTokenStreamWriter stream, Type expected)
+            public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
-                var input = (JObject)(untypedInput);
+                var input = (JObject)untypedInput;
                 string str = input.ToString();
-                SerializationManager.Serialize(str, stream);
+                SerializationManager.Serialize(str, context.StreamWriter);
             }
 
-            public static object Deserializer(Type expected, BinaryTokenStreamReader stream)
+            public static object Deserializer(Type expected, IDeserializationContext context)
             {
-                var str = (string)(SerializationManager.Deserialize(typeof(string), stream));
+                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
             }
 
@@ -146,22 +146,22 @@ namespace UnitTests.Serialization
                 Register();
             }
 
-            public static object DeepCopier(object original)
+            public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
                 // Alternatively, can copy via JObject.ToString and JObject.Parse().
                 return original;
             }
 
-            public static void Serialize(object obj, BinaryTokenStreamWriter stream, Type expected)
+            public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
-                SerializationManager.Serialize(str, stream);
+                SerializationManager.Serialize(str, context.StreamWriter);
             }
 
-            public static object Deserialize(Type expected, BinaryTokenStreamReader stream)
+            public static object Deserialize(Type expected, IDeserializationContext context)
             {
-                var str = (string)SerializationManager.Deserialize(typeof(string), stream);
+                var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
             }
 

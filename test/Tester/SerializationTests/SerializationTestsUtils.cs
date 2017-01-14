@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans.Serialization;
+﻿using Orleans.Serialization;
 using Xunit;
 
 namespace Tester.SerializationTests
@@ -12,9 +7,12 @@ namespace Tester.SerializationTests
     {
         public static void VerifyUsingFallbackSerializer(object ob)
         {
-            var writer = new BinaryTokenStreamWriter();
+            var writer = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
             SerializationManager.FallbackSerializer(ob, writer, ob.GetType());
-            var bytes = writer.ToByteArray();
+            var bytes = writer.StreamWriter.ToByteArray();
 
             var reader = new BinaryTokenStreamReader(bytes);
             var serToken = reader.ReadToken();

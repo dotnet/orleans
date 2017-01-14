@@ -6,6 +6,11 @@ namespace Orleans
     internal class ReferenceEqualsComparer : EqualityComparer<object>
     {
         /// <summary>
+        /// Gets an instance of this class.
+        /// </summary>
+        public static ReferenceEqualsComparer Instance { get; } = new ReferenceEqualsComparer();
+
+        /// <summary>
         /// Defines object equality by reference equality (eq, in LISP).
         /// </summary>
         /// <returns>

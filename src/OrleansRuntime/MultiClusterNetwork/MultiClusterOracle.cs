@@ -115,6 +115,21 @@ namespace Orleans.Runtime.MultiClusterNetwork
             PublishChanges();
         }
 
+        public bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)
+        {
+            return localData.SubscribeToMultiClusterConfigurationEvents(observer);
+        }
+
+        public bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer)
+        {
+            return localData.UnSubscribeFromMultiClusterConfigurationEvents(observer);
+        }
+
+
+        /// <inheritdoc/>
+        public Func<ILogConsistencyProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
+
+
         public async Task Start()
         {
             logger.Info(ErrorCode.MultiClusterNetwork_Starting, "MultiClusterOracle starting on {0}, Severity={1} ", Silo, logger.SeverityLevel);

@@ -20,7 +20,7 @@ namespace Orleans.Serialization
 
         private readonly ReflectedSerializationMethodInfo methods = new ReflectedSerializationMethodInfo();
 
-        private readonly SerializationManager.DeepCopier immutableTypeCopier = obj => obj;
+        private readonly SerializationManager.DeepCopier immutableTypeCopier = (obj, context) => obj;
 
         private readonly ILFieldBuilder fieldBuilder = new ILFieldBuilder();
         
@@ -127,7 +127,7 @@ namespace Orleans.Serialization
             il.CreateInstance(type, result);
 
             // Record the object.
-            il.Call(this.methods.GetCurrentSerializationContext);
+            il.LoadArgument(1); // Load 'context' parameter.
             il.LoadArgument(0); // Load 'original' parameter.
             il.LoadLocal(result); // Load 'result' local.
             il.BoxIfValueType(type);
@@ -147,6 +147,7 @@ namespace Orleans.Serialization
                     var copyMethod = this.methods.DeepCopyInner;
 
                     il.BoxIfValueType(field.FieldType);
+                    il.LoadArgument(1);
                     il.Call(copyMethod);
                     il.CastOrUnbox(field.FieldType);
                 }
@@ -191,6 +192,7 @@ namespace Orleans.Serialization
                 if (this.directSerializers.TryGetValue(typeHandle, out serializer))
                 {
                     il.LoadArgument(1);
+                    il.Call(this.methods.GetStreamFromSerializationContext);
                     il.LoadLocal(typedInput);
                     il.LoadField(field);
 
@@ -232,7 +234,7 @@ namespace Orleans.Serialization
             il.CreateInstance(type, result);
 
             // Record the object.
-            il.Call(this.methods.GetCurrentDeserializationContext);
+            il.LoadArgument(1); // Load the 'context' parameter.
             il.LoadLocal(result);
             il.BoxIfValueType(type);
             il.Call(this.methods.RecordObjectWhileDeserializing);
@@ -249,6 +251,7 @@ namespace Orleans.Serialization
                     il.LoadLocalAsReference(type, result);
                     
                     il.LoadArgument(1);
+                    il.Call(this.methods.GetStreamFromDeserializationContext);
                     il.Call(this.directSerializers[typeHandle].ReadMethod);
                     il.StoreField(field);
                 }
@@ -256,6 +259,7 @@ namespace Orleans.Serialization
                 {
                     il.LoadLocalAsReference(type, result);
                     il.LoadArgument(1);
+                    il.Call(this.methods.GetStreamFromDeserializationContext);
                     il.Call(serializer.ReadMethod);
 
                     il.StoreField(field);

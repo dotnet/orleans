@@ -1,5 +1,7 @@
 using System;
 using Orleans.GrainDirectory;
+using Orleans.Runtime;
+
 namespace Orleans
 {
     namespace Concurrency
@@ -235,7 +237,7 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Used to mark a method as providinga serializer function for that type.
+    /// Used to mark a method as providing a serializer function for that type.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class SerializerMethodAttribute : Attribute
@@ -272,15 +274,42 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StorageProviderAttribute : Attribute
         {
-            public StorageProviderAttribute()
-            {
-                    ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
-            }
             /// <summary>
-            /// The name of the storage provider to ne used for persisting state for this grain.
+            /// The name of the provider to be used for persisting of grain state
             /// </summary>
             public string ProviderName { get; set; }
+
+            public StorageProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
+            }
         }
+
+        /// <summary>
+        /// The [Orleans.Providers.LogConsistencyProvider] attribute is used to define which consistency provider to use for grains using the log-view state abstraction.
+        /// <para>
+        /// Specifying [Orleans.Providers.LogConsistencyProvider] property is recommended for all grains that derive
+        /// from ILogConsistentGrain, such as JournaledGrain.
+        /// If no [Orleans.Providers.LogConsistencyProvider] attribute is  specified, then the runtime tries to locate
+        /// one as follows. First, it looks for a 
+        /// "Default" provider in the configuration file, then it checks if the grain type defines a default.
+        /// If a consistency provider cannot be located for this grain, then the grain will fail to load into the Silo.
+        /// </para>
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class LogConsistencyProviderAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the provider to be used for consistency
+            /// </summary>
+            public string ProviderName { get; set; }
+
+            public LogConsistencyProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;
+            }
+        }
+
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]

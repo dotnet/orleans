@@ -57,7 +57,7 @@ namespace Tester.AzureUtils.Streaming
         public void AzureQueueBatchContainerV2_DeepCopy_IfNotNullAndUsingExternalSerializer()
         {
             var container = CreateAzureQueueBatchContainer();
-            var copy = AzureQueueBatchContainerV2.DeepCopy(container) as AzureQueueBatchContainerV2;
+            var copy = AzureQueueBatchContainerV2.DeepCopy(container, new SerializationContext()) as AzureQueueBatchContainerV2;
             ValidateIdenticalQueueBatchContainerButNotSame(container, copy);
             copy = SerializationManager.DeepCopy(container) as AzureQueueBatchContainerV2;
             ValidateIdenticalQueueBatchContainerButNotSame(container, copy);
@@ -67,16 +67,23 @@ namespace Tester.AzureUtils.Streaming
         public void AzureQueueBatchContainerV2_Serialize_IfNotNull()
         {
             var container = CreateAzureQueueBatchContainer();
-            var writer = new BinaryTokenStreamWriter();
+            var writer = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
             AzureQueueBatchContainerV2.Serialize(container, writer, null);
-            var reader = new BinaryTokenStreamReader(writer.ToByteArray());
+            var reader = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+            };
+
             var deserialized = AzureQueueBatchContainerV2.Deserialize(typeof(AzureQueueBatchContainer), reader) as AzureQueueBatchContainerV2;
             ValidateIdenticalQueueBatchContainerButNotSame(container, deserialized);
 
-            writer = new BinaryTokenStreamWriter();
-            SerializationManager.Serialize(container, writer);
-            reader = new BinaryTokenStreamReader(writer.ToByteArray());
-            deserialized = SerializationManager.Deserialize<AzureQueueBatchContainerV2>(reader);
+            var streamWriter = new BinaryTokenStreamWriter();
+            SerializationManager.Serialize(container, streamWriter);
+            var streamReader = new BinaryTokenStreamReader(streamWriter.ToByteArray());
+            deserialized = SerializationManager.Deserialize<AzureQueueBatchContainerV2>(streamReader);
             ValidateIdenticalQueueBatchContainerButNotSame(container, deserialized);
         }
 

@@ -58,7 +58,7 @@
             this.typeSerializer = new SerializerBundle(
                 typeof(Type),
                 new SerializationManager.SerializerMethods(
-                    original => original,
+                    (original, context) => original,
                     (original, writer, expected) => { this.WriteNamedType((Type)original, writer); },
                     (expected, reader) => this.ReadNamedType(reader)));
             this.generateSerializer = this.GenerateSerializer;
@@ -80,80 +80,68 @@
         public bool IsSupportedType(Type t)
             => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t.GetTypeInfo());
 
-        /// <summary>
-        /// Tries to create a copy of source.
-        /// </summary>
-        /// <param name="source">The item to create a copy of</param>
-        /// <returns>The copy</returns>
-        public object DeepCopy(object source)
+        /// <inheritdoc />
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null) return null;
             Type type = source.GetType();
-            return this.serializers.GetOrAdd(type, this.generateSerializer).Methods.DeepCopy(source);
+            return this.serializers.GetOrAdd(type, this.generateSerializer).Methods.DeepCopy(source, context);
         }
 
-        /// <summary>
-        /// Tries to serialize an item.
-        /// </summary>
-        /// <param name="item">The instance of the object being serialized</param>
-        /// <param name="writer">The writer used for serialization</param>
-        /// <param name="expectedType">The type that the deserializer will expect</param>
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        /// <inheritdoc />
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             if (item == null)
             {
-                writer.WriteNull();
+                context.StreamWriter.WriteNull();
                 return;
             }
 
             var actualType = item.GetType();
-            this.WriteType(actualType, expectedType, writer);
-            this.serializers.GetOrAdd(actualType, this.generateSerializer).Methods.Serialize(item, writer, expectedType);
+            this.WriteType(actualType, expectedType, context);
+            this.serializers.GetOrAdd(actualType, this.generateSerializer).Methods.Serialize(item, context, expectedType);
         }
 
-        /// <summary>
-        /// Tries to deserialize an item.
-        /// </summary>
-        /// <param name="expectedType">The type that should be deserialzied</param>
-        /// <param name="reader">The reader used for binary deserialization</param>
-        /// <returns>The deserialized object</returns>
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        /// <inheritdoc />
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             var token = reader.ReadToken();
             if (token == SerializationTokenType.Null) return null;
-            var actualType = this.ReadType(token, reader, expectedType);
+            var actualType = this.ReadType(token, context, expectedType);
             return this.serializers.GetOrAdd(actualType, this.generateSerializer)
-                       .Methods.Deserialize(expectedType, reader);
+                       .Methods.Deserialize(expectedType, context);
         }
 
-        private void WriteType(Type actualType, Type expectedType, BinaryTokenStreamWriter writer)
+        private void WriteType(Type actualType, Type expectedType, ISerializationContext context)
         {
             if (actualType == expectedType)
             {
-                writer.Write((byte)SerializationTokenType.ExpectedType);
+                context.StreamWriter.Write((byte)SerializationTokenType.ExpectedType);
             }
             else
             {
-                writer.Write((byte)SerializationTokenType.NamedType);
-                this.WriteNamedType(actualType, writer);
+                context.StreamWriter.Write((byte)SerializationTokenType.NamedType);
+                this.WriteNamedType(actualType, context);
             }
         }
 
-        private Type ReadType(SerializationTokenType token, BinaryTokenStreamReader reader, Type expectedType)
+        private Type ReadType(SerializationTokenType token, IDeserializationContext context, Type expectedType)
         {
             switch (token)
             {
                 case SerializationTokenType.ExpectedType:
                     return expectedType;
                 case SerializationTokenType.NamedType:
-                    return this.ReadNamedType(reader);
+                    return this.ReadNamedType(context);
                 default:
                     throw new NotSupportedException($"{nameof(SerializationTokenType)} of {token} is not supported.");
             }
         }
 
-        private Type ReadNamedType(BinaryTokenStreamReader reader)
+        private Type ReadNamedType(IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             var hashCode = reader.ReadInt();
             var count = reader.ReadUShort();
             var typeName = reader.ReadBytes(count);
@@ -162,8 +150,9 @@
                 k => Type.GetType(Encoding.UTF8.GetString(k.TypeName), throwOnError: true));
         }
 
-        private void WriteNamedType(Type type, BinaryTokenStreamWriter writer)
+        private void WriteNamedType(Type type, ISerializationContext context)
         {
+            var writer = context.StreamWriter;
             var key = this.typeCache.GetOrAdd(type, t => new TypeKey(Encoding.UTF8.GetBytes(t.AssemblyQualifiedName)));
             writer.Write(key.HashCode);
             writer.Write((ushort)key.TypeName.Length);

@@ -23,7 +23,7 @@ namespace NonSiloTests.UnitTests.SerializerTests
         }
 
         [CopierMethod]
-        private static object Copy(object input)
+        private static object Copy(object input, ICopyContext context)
         {
             CopyCounter++;
             var obj = input as ClassWithCustomCopier;
@@ -47,19 +47,21 @@ namespace NonSiloTests.UnitTests.SerializerTests
         }
 
         [SerializerMethod]
-        private static void Serialize(object input, BinaryTokenStreamWriter stream, Type expected)
+        private static void Serialize(object input, ISerializationContext context, Type expected)
         {
             SerializeCounter++;
             var obj = input as ClassWithCustomSerializer;
+            var stream = context.StreamWriter;
             stream.Write(obj.IntProperty);
             stream.Write(obj.StringProperty);
         }
 
         [DeserializerMethod]
-        private static object Deserialize(Type expected, BinaryTokenStreamReader stream)
+        private static object Deserialize(Type expected, IDeserializationContext context)
         {
             DeserializeCounter++;
             var result = new ClassWithCustomSerializer();
+            var stream = context.StreamReader;
             result.IntProperty = stream.ReadInt();
             result.StringProperty = stream.ReadString();
             return result;

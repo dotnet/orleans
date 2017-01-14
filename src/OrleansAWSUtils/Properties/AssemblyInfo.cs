@@ -19,7 +19,7 @@ using Orleans.CodeGeneration;
 [assembly: Guid("67738e6c-f292-46a2-994d-5b52e745205b")]
 
 [assembly: InternalsVisibleTo("UnitTests")]
-[assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: SkipCodeGeneration]
 

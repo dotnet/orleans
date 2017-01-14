@@ -21,6 +21,8 @@
       <group targetFramework=".NETStandard1.5">
         <dependency id="System.Runtime.Loader" version="4.3.0" />
       </group>
+      <group targetFramework=".NETFramework4.6.2">
+      </group>
     </dependencies>
   </metadata>
   <files>

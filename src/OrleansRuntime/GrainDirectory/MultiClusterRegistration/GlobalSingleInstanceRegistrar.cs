@@ -57,13 +57,13 @@ namespace Orleans.Runtime.GrainDirectory
             if (!singleActivation)
                 throw new OrleansException("global single instance protocol is incompatible with using multiple activations");
 
-            var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
             {
                 // no multicluster network. Go to owned state directly.
                 return directoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo, GrainDirectoryEntryStatus.Owned);
             }
+
+            var myClusterId = Silo.CurrentSilo.ClusterId;
 
             // examine the multicluster configuration
             var config = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration();
@@ -192,12 +192,12 @@ namespace Orleans.Runtime.GrainDirectory
             if (formerActivationsInThisCluster == null)
                 return TaskDone.Done;
 
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+                return TaskDone.Done; // single cluster - no broadcast required
+
             // we must also remove cached references to former activations in this cluster
             // from remote clusters; thus, we broadcast the unregistration
             var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
-                return TaskDone.Done; // single cluster - no broadcast required
 
             // target clusters in current configuration, other than this one
             var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetMultiClusterConfiguration().Clusters
@@ -241,11 +241,11 @@ namespace Orleans.Runtime.GrainDirectory
         {   
             directoryPartition.RemoveGrain(gid);
 
+            if (!Silo.CurrentSilo.HasMultiClusterNetwork)
+                return TaskDone.Done; // single cluster - no broadcast required
+
             // broadcast deletion to all other clusters
             var myClusterId = Silo.CurrentSilo.ClusterId;
-
-            if (myClusterId == null)
-                return TaskDone.Done; // single cluster - no broadcast required
 
             // target ALL clusters, not just clusters in current configuration
             var remoteClusters = Silo.CurrentSilo.LocalMultiClusterOracle.GetActiveClusters()

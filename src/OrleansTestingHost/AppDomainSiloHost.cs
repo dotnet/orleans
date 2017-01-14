@@ -14,6 +14,8 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.TestHooks;
 using Orleans.Storage;
+using Orleans.Runtime.MultiClusterNetwork;
+using Orleans.MultiCluster;
 
 namespace Orleans.TestingHost
 {
@@ -172,7 +174,21 @@ namespace Orleans.TestingHost
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
         }
-        
+
+        internal Func<ILogConsistencyProtocolMessage,bool> ProtocolMessageFilterForTesting
+        {
+            get
+            {
+                var mco = this.silo.LocalMultiClusterOracle;
+                return mco.ProtocolMessageFilterForTesting;
+            }
+            set
+            {
+                var mco = this.silo.LocalMultiClusterOracle;
+                mco.ProtocolMessageFilterForTesting = value;
+            }
+        }
+
         private bool ShouldDrop(Message msg)
         {
             if (simulatedMessageLoss != null)

@@ -106,6 +106,7 @@
     <Compile Include="ISimpleGrain.cs" />
     <Compile Include="ISimplePersistentGrain.cs" />
     <Compile Include="ILivenessTestGrain.cs" />
+    <Compile Include="ILogConsistentGrain.cs" />
     <Compile Include="IStatsCollectorGrain.cs" />
     <Compile Include="IStreamingGrain.cs" />
     <Compile Include="IStreamingImmutabilityTestGrain.cs" />

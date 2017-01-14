@@ -12,12 +12,17 @@ namespace Orleans.Serialization
     internal class ReflectedSerializationMethodInfo
     {
         /// <summary>
-        /// A reference to the <see cref="SerializationContext.Current"/> getter method.
+        /// A reference to the <see cref="SerializationContext.StreamWriter"/> getter.
         /// </summary>
-        public readonly MethodInfo GetCurrentSerializationContext;
+        public readonly MethodInfo GetStreamFromSerializationContext;
 
         /// <summary>
-        /// A reference to the <see cref="SerializationContext.RecordObject(object, object)"/> method.
+        /// A reference to the getter for <see cref="SerializationManager.CurrentDeserializationContext"/>.
+        /// </summary>
+        public readonly MethodInfo GetStreamFromDeserializationContext;
+
+        /// <summary>
+        /// A reference to the <see cref="SerializationContext.RecordCopy"/> method.
         /// </summary>
         public readonly MethodInfo RecordObjectWhileCopying;
 
@@ -27,24 +32,19 @@ namespace Orleans.Serialization
         public readonly MethodInfo DeepCopyInner;
 
         /// <summary>
-        /// A reference to the <see cref="SerializationManager.SerializeInner(object, BinaryTokenStreamWriter, Type)"/> method.
+        /// A reference to the <see cref="SerializationManager.SerializeInner(object, ISerializationContext, Type)"/> method.
         /// </summary>
         public readonly MethodInfo SerializeInner;
 
         /// <summary>
-        /// A reference to the <see cref="SerializationManager.DeserializeInner(Type, BinaryTokenStreamReader)"/> method.
+        /// A reference to the <see cref="SerializationManager.DeserializeInner(Type, IDeserializationContext)"/> method.
         /// </summary>
         public readonly MethodInfo DeserializeInner;
 
         /// <summary>
-        /// A reference to the <see cref="DeserializationContext.RecordObject(object)"/> method.
+        /// A reference to the <see cref="IDeserializationContext.RecordObject(object)"/> method.
         /// </summary>
         public readonly MethodInfo RecordObjectWhileDeserializing;
-
-        /// <summary>
-        /// A reference to the getter for <see cref="DeserializationContext.Current"/>.
-        /// </summary>
-        public readonly MethodInfo GetCurrentDeserializationContext;
 
         /// <summary>
         /// A reference to a method which returns an uninitialized object of the provided type.
@@ -78,20 +78,21 @@ namespace Orleans.Serialization
 #else
             this.GetUninitializedObject = TypeUtils.Method(() => FormatterServices.GetUninitializedObject(typeof(int)));
 #endif
-            this.GetTypeFromHandle = TypeUtils.Method(() => Type.GetTypeFromHandle(typeof(int).TypeHandle));
-            this.DeepCopyInner = TypeUtils.Method(() => SerializationManager.DeepCopyInner(typeof(int)));
-            this.SerializeInner = TypeUtils.Method(() => SerializationManager.SerializeInner(default(object), default(BinaryTokenStreamWriter), default(Type)));
-            this.DeserializeInner = TypeUtils.Method(() => SerializationManager.DeserializeInner(default(Type), default(BinaryTokenStreamReader)));
+            this.GetTypeFromHandle = TypeUtils.Method(() => Type.GetTypeFromHandle(typeof(Type).TypeHandle));
+            this.DeepCopyInner = TypeUtils.Method(() => SerializationManager.DeepCopyInner(default(Type), default(ICopyContext)));
+            this.SerializeInner = TypeUtils.Method(() => SerializationManager.SerializeInner(default(object), default(ISerializationContext), default(Type)));
+            this.DeserializeInner = TypeUtils.Method(() => SerializationManager.DeserializeInner(default(Type), default(IDeserializationContext)));
+            
+            this.RecordObjectWhileCopying = TypeUtils.Method((ICopyContext ctx) => ctx.RecordCopy(default(object), default(object)));
 
-            this.GetCurrentSerializationContext = TypeUtils.Property((object _) => SerializationContext.Current).GetMethod;
-            this.RecordObjectWhileCopying = TypeUtils.Method((SerializationContext ctx) => ctx.RecordObject(default(object), default(object)));
+            this.GetStreamFromDeserializationContext = TypeUtils.Property((IDeserializationContext ctx) => ctx.StreamReader).GetMethod;
+            this.GetStreamFromSerializationContext = TypeUtils.Property((ISerializationContext ctx) => ctx.StreamWriter).GetMethod;
 
-            this.GetCurrentDeserializationContext = TypeUtils.Property((object _) => DeserializationContext.Current).GetMethod;
-            this.RecordObjectWhileDeserializing = TypeUtils.Method((DeserializationContext ctx) => ctx.RecordObject(default(object)));
+            this.RecordObjectWhileDeserializing = TypeUtils.Method((IDeserializationContext ctx) => ctx.RecordObject(default(object)));
             this.SerializerDelegate =
-                TypeUtils.Method((SerializationManager.Serializer del) => del.Invoke(default(object), default(BinaryTokenStreamWriter), default(Type)));
-            this.DeserializerDelegate = TypeUtils.Method((SerializationManager.Deserializer del) => del.Invoke(default(Type), default(BinaryTokenStreamReader)));
-            this.DeepCopierDelegate = TypeUtils.Method((SerializationManager.DeepCopier del) => del.Invoke(default(object)));
+                TypeUtils.Method((SerializationManager.Serializer del) => del.Invoke(default(object), default(ISerializationContext), default(Type)));
+            this.DeserializerDelegate = TypeUtils.Method((SerializationManager.Deserializer del) => del.Invoke(default(Type), default(IDeserializationContext)));
+            this.DeepCopierDelegate = TypeUtils.Method((SerializationManager.DeepCopier del) => del.Invoke(default(object), default(ICopyContext)));
         }
     }
 }

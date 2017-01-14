@@ -820,6 +820,18 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="LogConsistencyProviders" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            The optional LogConsistencyProviders element contains configuration for log-consistency provider instances.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
       <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
       <xs:element name="Application" minOccurs="0" maxOccurs="1">
         <xs:complexType>

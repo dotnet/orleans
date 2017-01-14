@@ -32,22 +32,22 @@ namespace Tester.Serialization
             return typeof(FakeSerialized).IsAssignableFrom(itemType);
         }
 
-        public object DeepCopy(object source)
+        public object DeepCopy(object source, ICopyContext context)
         {
             DeepCopyCalled = true;
             return null;
         }
 
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             SerializeCalled = true;
-            writer.WriteNull();
+            context.StreamWriter.WriteNull();
         }
 
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             DeserializeCalled = true;
-            reader.ReadToken();
+            context.StreamReader.ReadToken();
             return (FakeSerialized)Activator.CreateInstance(expectedType);
         }
     }

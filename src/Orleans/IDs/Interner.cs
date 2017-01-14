@@ -60,7 +60,7 @@ namespace Orleans
         private readonly SafeTimer cacheCleanupTimer;
 
         [NonSerialized]
-        private readonly ConcurrentDictionary<K, WeakReference> internCache;
+        private readonly ConcurrentDictionary<K, WeakReference<T>> internCache;
 
         public Interner()
             : this(InternerConstants.SIZE_SMALL)
@@ -77,7 +77,7 @@ namespace Orleans
 
             logger = LogManager.GetLogger(internCacheName, LoggerType.Runtime);
 
-            this.internCache = new ConcurrentDictionary<K, WeakReference>(concurrencyLevel, initialSize);
+            this.internCache = new ConcurrentDictionary<K, WeakReference<T>>(concurrencyLevel, initialSize);
 
             this.cacheCleanupInterval = (cleanupFreq <= TimeSpan.Zero) ? Constants.INFINITE_TIMESPAN : cleanupFreq;
             if (Constants.INFINITE_TIMESPAN != cacheCleanupInterval)
@@ -96,31 +96,34 @@ namespace Orleans
         /// <param name="key">key to find</param>
         /// <param name="creatorFunc">function to create new object and store for this key if no cached copy exists</param>
         /// <returns>Object with specified key - either previous cached copy or newly created</returns>
-        public T FindOrCreate(K key, Func<T> creatorFunc)
+        public T FindOrCreate(K key, Func<K, T> creatorFunc)
         {
-            T obj = null;
-            WeakReference cacheEntry = internCache.GetOrAdd(key,
-                (k) =>
-                {
-                    obj = creatorFunc();
-                    return new WeakReference(obj);
-                });
-            if (cacheEntry != null)
+            T result;
+            WeakReference<T> cacheEntry;
+
+            // Attempt to get the existing value from cache.
+            internCache.TryGetValue(key, out cacheEntry);
+
+            // If no cache entry exists, create and insert a new one using the creator function.
+            if (cacheEntry == null)
             {
-                if (cacheEntry.IsAlive)
-                {
-                    // Re-use cached object
-                    obj = cacheEntry.Target as T;
-                }
+                result = creatorFunc(key);
+                cacheEntry = new WeakReference<T>(result);
+                internCache[key] = cacheEntry;
+                return result;
             }
-            if (obj == null)
+
+            // If a cache entry did exist, determine if it still holds a valid value.
+            cacheEntry.TryGetTarget(out result);
+            if (result == null)
             {
-                // Create new object
-                obj = creatorFunc();
-                cacheEntry = new WeakReference(obj);
-                obj = internCache.AddOrUpdate(key, cacheEntry, (k, w) => cacheEntry).Target as T;
+                // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                result = creatorFunc(key);
+                cacheEntry.SetTarget(result);
+                internCache[key] = cacheEntry;
             }
-            return obj;
+
+            return result;
         }
 
         /// <summary>
@@ -131,19 +134,8 @@ namespace Orleans
         public bool TryFind(K key, out T obj)
         {
             obj = null;
-            WeakReference cacheEntry;
-            if (internCache.TryGetValue(key, out cacheEntry))
-            {
-                if (cacheEntry != null)
-                {
-                    if (cacheEntry.IsAlive)
-                    {
-                        obj = cacheEntry.Target as T;
-                        return obj != null;
-                    }
-                }
-            }
-            return false;
+            WeakReference<T> cacheEntry;
+            return internCache.TryGetValue(key, out cacheEntry) && cacheEntry != null && cacheEntry.TryGetTarget(out obj);
         }
 
         /// <summary>
@@ -154,61 +146,13 @@ namespace Orleans
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, () => obj);
-        }
-
-        /// <summary>
-        /// Intern the specified object, replacing any previous cached copy of object with specified key if the new object has a more derived type than the cached object
-        /// </summary>
-        /// <param name="key">object key</param>
-        /// <param name="obj">object to be interned</param>
-        /// <returns>Interned copy of the object with specified key</returns>
-        public T InternAndUpdateWithMoreDerived(K key, T obj)
-        {
-            T obj1 = obj;
-            WeakReference cacheEntry = internCache.GetOrAdd(key, k => new WeakReference(obj1));
-            if (cacheEntry != null)
-            {
-                if (cacheEntry.IsAlive)
-                {
-                    T obj2 = cacheEntry.Target as T;
-
-                    // Decide whether the old object or the new one has the most specific / derived type
-                    Type tNew = obj.GetType();
-                    Type tOld = obj2.GetType();
-                    if (tNew != tOld && tOld.IsAssignableFrom(tNew))
-                    {
-                        // Keep and use the more specific type
-                        cacheEntry.Target = obj;
-                        return obj;
-                    }
-                    else
-                    {
-                        // Re-use cached object
-                        return obj2;
-                    }
-                }
-                else
-                {
-                    cacheEntry.Target = obj;
-                    return obj;
-                }
-            }
-            else
-            {
-                cacheEntry = new WeakReference(obj);
-                obj = internCache.AddOrUpdate(key, cacheEntry, (k, w) => cacheEntry).Target as T;
-                return obj;
-            }
+            return FindOrCreate(key, _ => obj);
         }
 
         public void StopAndClear()
         {
             internCache.Clear();
-            if (cacheCleanupTimer != null)
-            {
-                cacheCleanupTimer.Dispose();
-            }
+            cacheCleanupTimer?.Dispose();
         }
 
         public List<T> AllValues()
@@ -216,13 +160,10 @@ namespace Orleans
             List<T> values = new List<T>();
             foreach (var e in internCache)
             {
-                if (e.Value != null && e.Value.IsAlive && e.Value.Target != null)
+                T value;
+                if (e.Value != null && e.Value.TryGetTarget(out value))
                 {
-                    T obj = e.Value.Target as T;
-                    if (obj != null)
-                    {
-                        values.Add(obj);
-                    }
+                    values.Add(value);
                 }
             }
             return values;
@@ -242,9 +183,10 @@ namespace Orleans
 
             foreach (var e in internCache)
             {
-                if (e.Value == null || e.Value.IsAlive == false || e.Value.Target == null)
+                T ignored;
+                if (e.Value == null || e.Value.TryGetTarget(out ignored) == false)
                 {
-                    WeakReference weak;
+                    WeakReference<T> weak;
                     bool ok = internCache.TryRemove(e.Key, out weak);
                     if (!ok)
                     {
@@ -264,20 +206,6 @@ namespace Orleans
             {
                 if (logger.IsVerbose2) logger.Verbose2(ErrorCode.Runtime_Error_100296, "Removed {0} / {1} unused {2} entries in {3}", numRemoved, numEntries, internCacheName, clock.Elapsed);
             }
-        }
-
-        private string PrintInternerContent()
-        {
-            StringBuilder s = new StringBuilder();
-
-            foreach (var e in internCache)
-            {
-                if (e.Value != null && e.Value.IsAlive && e.Value.Target != null)
-                {
-                    s.AppendLine(String.Format("{0}->{1}", e.Key, e.Value.Target));
-                }
-            }
-            return s.ToString();
         }
 
         public void Dispose()

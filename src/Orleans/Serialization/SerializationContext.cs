@@ -3,6 +3,27 @@ using System.Collections.Generic;
 
 namespace Orleans.Serialization
 {
+    public interface ICopyContext
+    {
+        /// <summary>
+        /// Record an object-to-copy mapping into the current serialization context.
+        /// Used for maintaining the .NET object graph during serialization operations.
+        /// Used in generated code.
+        /// </summary>
+        /// <param name="original">Original object.</param>
+        /// <param name="copy">Copy object that will be the serialized form of the original.</param>
+        void RecordCopy(object original, object copy);
+
+        object CheckObjectWhileCopying(object raw);
+    }
+
+    public interface ISerializationContext
+    {
+        BinaryTokenStreamWriter StreamWriter { get; }
+        void RecordObject(object original);
+        int CheckObjectWhileSerializing(object raw);
+    }
+
     /// <summary>
     /// Maintains context information for current thread during serialization operations.
     /// </summary>
@@ -11,19 +32,8 @@ namespace Orleans.Serialization
     /// record the mapping of original object to the copied instance of that object
     /// so that object identity can be preserved when serializing .NET object graphs.
     /// </remarks>
-    public class SerializationContext
+    public class SerializationContext : ICopyContext, ISerializationContext
     {
-        [ThreadStatic]
-        private static SerializationContext ctx;
-
-        /// <summary>
-        /// The current serialization context in use for this thread.
-        /// Used in generated code.
-        /// </summary>
-        public static SerializationContext Current {
-            get { return ctx ?? (ctx = new SerializationContext()); }
-        }
-
         private struct Record
         {
             public readonly object Copy;
@@ -42,21 +52,18 @@ namespace Orleans.Serialization
             }
         }
 
+        public BinaryTokenStreamWriter StreamWriter { get; set; }
+
         private readonly Dictionary<object, Record> processedObjects;
 
-        private readonly Dictionary<Type, short> processedTypes;
-
-        private SerializationContext()
+        public SerializationContext()
         {
-            processedObjects = new Dictionary<object, Record>(new ReferenceEqualsComparer());
-            processedTypes = new Dictionary<Type, short>();
+            processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
         }
 
         internal void Reset()
         {
             processedObjects.Clear();
-            processedTypes.Clear();
-            this.nextTypeIndex = 0;
         }
 
         /// <summary>
@@ -66,7 +73,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="original">Original object.</param>
         /// <param name="copy">Copy object that will be the serialized form of the original.</param>
-        public void RecordObject(object original, object copy)
+        public void RecordCopy(object original, object copy)
         {
             if (!processedObjects.ContainsKey(original))
             {
@@ -74,28 +81,13 @@ namespace Orleans.Serialization
             }
         }
 
-        internal void RecordObject(object original, int offset)
+        public void RecordObject(object original)
         {
-            processedObjects[original] = new Record(offset);
+            processedObjects[original] = new Record(this.StreamWriter.CurrentOffset);
         }
-
-        private short nextTypeIndex;
-
-        internal short CheckTypeWhileSerializing(Type type)
-        {
-            short typeIndex;
-            if (!processedTypes.TryGetValue(type, out typeIndex)) typeIndex = -1;
-            
-            return typeIndex;
-        }
-
-        internal void RecordType(Type type)
-        {
-            this.processedTypes[type] = this.nextTypeIndex++;
-        }
-
+        
         // Returns an object suitable for insertion if this is a back-reference, or null if it's new
-        internal object CheckObjectWhileCopying(object raw)
+        public object CheckObjectWhileCopying(object raw)
         {
             Record record;
             bool found = processedObjects.TryGetValue(raw, out record);
@@ -108,7 +100,7 @@ namespace Orleans.Serialization
         }
 
         // Returns an offset where the first version of this object was seen, or -1 if it's new
-        internal int CheckObjectWhileSerializing(object raw)
+        public int CheckObjectWhileSerializing(object raw)
         {
             Record record;
             bool found = processedObjects.TryGetValue(raw, out record);

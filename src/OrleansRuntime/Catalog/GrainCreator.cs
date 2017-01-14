@@ -2,7 +2,10 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
+using Orleans.LogConsistency;
 using Orleans.Storage;
+using Orleans.Runtime.LogConsistency;
+using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -52,32 +55,47 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Create a new instance of a grain
+        /// Install the storage bridge into a stateful grain.
         /// </summary>
+        /// <param name="grain">The grain.</param>
         /// <param name="grainType">The grain type.</param>
-        /// <param name="identity">Identity for the new grain</param>
-        /// <param name="stateType">If the grain is a stateful grain, the type of the state it persists.</param>
-        /// <param name="storageProvider">If the grain is a stateful grain, the storage provider used to persist the state.</param>
-        /// <returns>The newly created grain.</returns>
-        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType, IStorageProvider storageProvider)
+        /// <param name="stateType">The type of the state it persists.</param>
+        /// <param name="storageProvider">The provider used to store the state.</param>
+        public void InstallStorageBridge(Grain grain, Type grainType, Type stateType, IStorageProvider storageProvider)
         {
-            // Create a new instance of the grain
-            var grain = this.CreateGrainInstance(grainType, identity);
+            var statefulgrain = (IStatefulGrain) grain;
 
-            var statefulGrain = grain as IStatefulGrain;
-
-            if (statefulGrain == null)
-            {
-                return grain;
-            }
-
-            var storage = new GrainStateStorageBridge(grainType.FullName, statefulGrain, storageProvider);
+            var storage = new GrainStateStorageBridge(grainType.FullName, statefulgrain, storageProvider);
 
             //Inject state and storage data into the grain
-            statefulGrain.GrainState.State = Activator.CreateInstance(stateType);
-            statefulGrain.SetStorage(storage);
+            statefulgrain.GrainState.State = Activator.CreateInstance(stateType);
+            statefulgrain.SetStorage(storage);
+        }
 
-            return grain;
+
+        /// <summary>
+        /// Install the log-view adaptor into a log-consistent grain.
+        /// </summary>
+        /// <param name="grain">The grain.</param>
+        /// <param name="grainType">The grain type.</param>
+        /// <param name="stateType">The type of the grain state.</param>
+        /// <param name="mcRegistrationStrategy">The multi-cluster registration strategy.</param>
+        /// <param name="factory">The consistency adaptor factory</param>
+        /// <param name="storageProvider">The storage provider, or null if none needed</param>
+        /// <returns>The newly created grain.</returns>
+        public void InstallLogViewAdaptor(Grain grain, Type grainType, 
+            Type stateType, IMultiClusterRegistrationStrategy mcRegistrationStrategy,
+            ILogViewAdaptorFactory factory, IStorageProvider storageProvider)
+        {
+            // try to find a suitable logger that we can use to trace consistency protocol information
+            var logger = (factory as ILogConsistencyProvider)?.Log ?? storageProvider?.Log;
+           
+            // encapsulate runtime services used by consistency adaptors
+            var svc = new ProtocolServices(grain, logger, mcRegistrationStrategy);
+
+            var state = Activator.CreateInstance(stateType);
+
+            ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, svc);
         }
     }
 }
