@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Streams;
-using static System.String;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -127,6 +126,9 @@ namespace Orleans.Providers.Streams.Common
 
         #region IDisposable Members
 
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
         public void Dispose()
         {
             Dispose(true);

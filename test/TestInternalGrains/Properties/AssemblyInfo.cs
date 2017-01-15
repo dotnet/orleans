@@ -18,3 +18,6 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrainInterfaces")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]

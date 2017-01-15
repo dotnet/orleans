@@ -1,7 +1,7 @@
 using System;
-using System.Reflection;
 using Orleans.GrainDirectory;
-using System.Linq;
+using Orleans.Runtime;
+
 namespace Orleans
 {
     namespace Concurrency
@@ -76,6 +76,28 @@ namespace Orleans
         }
 
         /// <summary>
+        /// The MayInterleaveAttribute attribute is used to mark classes 
+        /// that want to control request interleaving via supplied method callback.
+        /// </summary>
+        /// <remarks>
+        /// The callback method name should point to a public static function declared on the same class 
+        /// and having the following signature: <c>public static bool MayInterleave(InvokeMethodRequest req)</c>
+        /// </remarks>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class MayInterleaveAttribute : Attribute
+        {
+            /// <summary>
+            /// The name of the callback method
+            /// </summary>
+            internal string CallbackMethodName { get; private set; }
+
+            public MayInterleaveAttribute(string callbackMethodName)
+            {
+                CallbackMethodName = callbackMethodName;
+            }
+        }
+
+        /// <summary>
         /// The Immutable attribute indicates that instances of the marked class or struct are never modified
         /// after they are created.
         /// </summary>
@@ -101,6 +123,17 @@ namespace Orleans
             internal RegistrationAttribute(MultiClusterRegistrationStrategy strategy)
             {
                 RegistrationStrategy = strategy ?? MultiClusterRegistrationStrategy.GetDefault();
+            }
+        }
+
+        /// <summary>
+        /// This attribute indicates that instances of the marked grain class will have a single instance across all available clusters. Any requests in any clusters will be forwarded to the single activation instance.
+        /// </summary>
+        public class GlobalSingleInstanceAttribute : RegistrationAttribute
+        {
+            public GlobalSingleInstanceAttribute()
+                : base(GlobalSingleInstanceRegistration.Singleton)
+            {
             }
         }
 
@@ -132,7 +165,9 @@ namespace Orleans
 
             internal PlacementAttribute(PlacementStrategy placement)
             {
-                PlacementStrategy = placement ?? PlacementStrategy.GetDefault();
+                if (placement == null) throw new ArgumentNullException(nameof(placement));
+
+                PlacementStrategy = placement;
             }
         }
 
@@ -202,7 +237,7 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Used to mark a method as providinga serializer function for that type.
+    /// Used to mark a method as providing a serializer function for that type.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class SerializerMethodAttribute : Attribute
@@ -239,73 +274,42 @@ namespace Orleans
         [AttributeUsage(AttributeTargets.Class)]
         public sealed class StorageProviderAttribute : Attribute
         {
-            public StorageProviderAttribute()
-            {
-                    ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
-            }
             /// <summary>
-            /// The name of the storage provider to ne used for persisting state for this grain.
+            /// The name of the provider to be used for persisting of grain state
             /// </summary>
             public string ProviderName { get; set; }
-        }
-    }
 
-    [AttributeUsage(AttributeTargets.Interface)]
-    internal sealed class FactoryAttribute : Attribute
-    {
-        public enum FactoryTypes
-        {
-            Grain,
-            ClientObject,
-            Both
-        };
-
-        private readonly FactoryTypes factoryType;
-
-        public FactoryAttribute(FactoryTypes factoryType)
-        {
-            this.factoryType = factoryType;
-        }
-
-        internal static FactoryTypes CollectFactoryTypesSpecified(Type type)
-        {
-            var attribs = type.GetTypeInfo().GetCustomAttributes(typeof(FactoryAttribute), inherit: true).ToArray();
-
-            // if no attributes are specified, we default to FactoryTypes.Grain.
-            if (0 == attribs.Length)
-                return FactoryTypes.Grain;
-            
-            // otherwise, we'll consider all of them and aggregate the specifications
-            // like flags.
-            FactoryTypes? result = null;
-            foreach (var i in attribs)
+            public StorageProviderAttribute()
             {
-                var a = (FactoryAttribute)i;
-                if (result.HasValue)
-                {
-                    if (a.factoryType == FactoryTypes.Both)
-                        result = a.factoryType;
-                    else if (a.factoryType != result.Value)
-                        result = FactoryTypes.Both;
-                }
-                else
-                    result = a.factoryType;
+                ProviderName = Runtime.Constants.DEFAULT_STORAGE_PROVIDER_NAME;
             }
-
-            if (result.Value == FactoryTypes.Both)
-            {
-                throw 
-                    new NotSupportedException(
-                        "Orleans doesn't currently support generating both a grain and a client object factory but we really want to!");
-            }
-            
-            return result.Value;
         }
 
-        public static FactoryTypes CollectFactoryTypesSpecified<T>()
+        /// <summary>
+        /// The [Orleans.Providers.LogConsistencyProvider] attribute is used to define which consistency provider to use for grains using the log-view state abstraction.
+        /// <para>
+        /// Specifying [Orleans.Providers.LogConsistencyProvider] property is recommended for all grains that derive
+        /// from ILogConsistentGrain, such as JournaledGrain.
+        /// If no [Orleans.Providers.LogConsistencyProvider] attribute is  specified, then the runtime tries to locate
+        /// one as follows. First, it looks for a 
+        /// "Default" provider in the configuration file, then it checks if the grain type defines a default.
+        /// If a consistency provider cannot be located for this grain, then the grain will fail to load into the Silo.
+        /// </para>
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class)]
+        public sealed class LogConsistencyProviderAttribute : Attribute
         {
-            return CollectFactoryTypesSpecified(typeof(T));
+            /// <summary>
+            /// The name of the provider to be used for consistency
+            /// </summary>
+            public string ProviderName { get; set; }
+
+            public LogConsistencyProviderAttribute()
+            {
+                ProviderName = Runtime.Constants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME;
+            }
         }
+
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple=true)]

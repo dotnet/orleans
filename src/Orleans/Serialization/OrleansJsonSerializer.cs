@@ -7,16 +7,25 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal class OrleansJsonSerializer : IExternalSerializer
+    using Orleans.Providers;
+
+    public class OrleansJsonSerializer : IExternalSerializer
     {
+        public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
+        public const string IndentJsonProperty = "IndentJSON";
         private static JsonSerializerSettings defaultSettings;
         private Logger logger;
 
+        static OrleansJsonSerializer()
+        {
+            defaultSettings = GetDefaultSerializerSettings();
+        }
+
         /// <summary>
-        /// Returns a configured <see cref="JsonSerializerSettings"/> 
+        /// Returns the default serializer settings.
         /// </summary>
-        /// <returns></returns>
-        internal static JsonSerializerSettings GetDefaultSerializerSettings()
+        /// <returns>The default serializer settings.</returns>
+        public static JsonSerializerSettings GetDefaultSerializerSettings()
         {
             var settings = new JsonSerializerSettings
             {
@@ -27,7 +36,9 @@ namespace Orleans.Serialization
                 MissingMemberHandling = MissingMemberHandling.Ignore,
                 NullValueHandling = NullValueHandling.Ignore,
                 ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+#if !NETSTANDARD_TODO
                 TypeNameAssemblyFormat = FormatterAssemblyStyle.Simple,
+#endif
                 Formatting = Formatting.None
             };
 
@@ -40,61 +51,82 @@ namespace Orleans.Serialization
             return settings;
         }
 
-        static OrleansJsonSerializer()
+        /// <summary>
+        /// Customises the given serializer settings using provider configuration.
+        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
+        /// </summary>
+        /// <param name="settings">The settings to update.</param>
+        /// <param name="config">The provider config.</param>
+        /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
         {
-            defaultSettings = GetDefaultSerializerSettings();
+            if (config.Properties.ContainsKey(UseFullAssemblyNamesProperty))
+            {
+                bool useFullAssemblyNames;
+                if (bool.TryParse(config.Properties[UseFullAssemblyNamesProperty], out useFullAssemblyNames) && useFullAssemblyNames)
+                {
+#if !NETSTANDARD_TODO
+                    settings.TypeNameAssemblyFormat = FormatterAssemblyStyle.Full;
+#endif
+                }
+            }
+
+            if (config.Properties.ContainsKey(IndentJsonProperty))
+            {
+                bool indentJson;
+                if (bool.TryParse(config.Properties[IndentJsonProperty], out indentJson) && indentJson)
+                {
+                    settings.Formatting = Formatting.Indented;
+                }
+            }
+            return settings;
         }
 
-        /// <summary>
-        /// Initializes the serializer
-        /// </summary>
-        /// <param name="logger">The logger to use to capture any serialization events</param>
+        /// <inheritdoc />
         public void Initialize(Logger logger)
         {
             this.logger = logger;
         }
 
-        /// <summary>
-        /// Informs the serialization manager whether this serializer supports the type for serialization.
-        /// </summary>
-        /// <param name="itemType">The type of the item to be serialized</param>
-        /// <returns>A value indicating whether the item can be serialized.</returns>
+        /// <inheritdoc />
         public bool IsSupportedType(Type itemType)
         {
             return true;
         }
 
-        /// <summary>
-        /// Creates a deep copy of an object
-        /// </summary>
-        /// <param name="source">The source object to be copy</param>
-        /// <returns>The copy that was created</returns>
-        public object DeepCopy(object source)
+        /// <inheritdoc />
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null)
             {
                 return null;
             }
 
-            var writer = new BinaryTokenStreamWriter();
-            Serialize(source, writer, source.GetType());
-            var retVal = Deserialize(source.GetType(), new BinaryTokenStreamReader(writer.ToByteArray()));
+            var serializationContext = new SerializationContext
+            {
+                StreamWriter = new BinaryTokenStreamWriter()
+            };
+            
+            Serialize(source, serializationContext, source.GetType());
+            var deserializationContext = new DeserializationContext
+            {
+                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
+            };
+
+            var retVal = Deserialize(source.GetType(), deserializationContext);
+            serializationContext.StreamWriter.ReleaseBuffers();
             return retVal;
         }
 
-        /// <summary>
-        /// Deserializes an object from a binary stream
-        /// </summary>
-        /// <param name="expectedType">The type that is expected to be deserialized</param>
-        /// <param name="reader">The <see cref="BinaryTokenStreamReader"/></param>
-        /// <returns>The deserialized object</returns>
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        /// <inheritdoc />
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
-            if (reader == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(context));
             }
 
+            var reader = context.StreamReader;
             var str = reader.ReadString();
             return JsonConvert.DeserializeObject(str, expectedType, defaultSettings);
         }
@@ -103,15 +135,16 @@ namespace Orleans.Serialization
         /// Serializes an object to a binary stream
         /// </summary>
         /// <param name="item">The object to serialize</param>
-        /// <param name="writer">The <see cref="BinaryTokenStreamWriter"/></param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expectedType">The type the deserializer should expect</param>
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
-            if (writer == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("writer");
+                throw new ArgumentNullException(nameof(context));
             }
 
+            var writer = context.StreamWriter;
             if (item == null)
             {
                 writer.WriteNull();
@@ -123,7 +156,7 @@ namespace Orleans.Serialization
         }
     }
 
-    #region JsonConverters
+#region JsonConverters
 
     internal class IPAddressConverter : JsonConverter
     {
@@ -243,5 +276,5 @@ namespace Orleans.Serialization
             return new IPEndPoint(address, port);
         }
     }
-    #endregion
+#endregion
 }

@@ -1,12 +1,11 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.AzureUtils;
-using Orleans.MultiCluster;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.AzureUtils;
+using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {

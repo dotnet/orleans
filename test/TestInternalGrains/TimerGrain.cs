@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
@@ -15,6 +13,7 @@ namespace UnitTestGrains
 {
     public class TimerGrain : Grain, ITimerGrain
     {
+        private bool deactivating;
         int counter = 0;
         Dictionary<string, IDisposable> allTimers;
         IDisposable defaultTimer;
@@ -26,14 +25,17 @@ namespace UnitTestGrains
 
         public override Task OnActivateAsync()
         {
+            ThrowIfDeactivating();
             logger = (Logger)this.GetLogger("TimerGrain_" + base.Data.Address.ToString());
             context = RuntimeContext.Current.ActivationContext;
             defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, TimeSpan.Zero, period);
             allTimers = new Dictionary<string, IDisposable>();
             return TaskDone.Done;
         }
+
         public Task StopDefaultTimer()
         {
+            ThrowIfDeactivating();
             defaultTimer.Dispose();
             return TaskDone.Done;
         }
@@ -68,15 +70,17 @@ namespace UnitTestGrains
 
         public Task<TimeSpan> GetTimerPeriod()
         {
-            return Task<TimeSpan>.FromResult(period);
+            return Task.FromResult(period);
         }
 
         public Task<int> GetCounter()
         {
-            return Task<int>.FromResult(counter);
+            ThrowIfDeactivating();
+            return Task.FromResult(counter);
         }
         public Task SetCounter(int value)
         {
+            ThrowIfDeactivating();
             lock (this)
             {
                 counter = value;
@@ -85,6 +89,7 @@ namespace UnitTestGrains
         }
         public Task StartTimer(string timerName)
         {
+            ThrowIfDeactivating();
             IDisposable timer = this.RegisterTimer(Tick, timerName, TimeSpan.Zero, period);
             allTimers.Add(timerName, timer);
             return TaskDone.Done;
@@ -92,6 +97,7 @@ namespace UnitTestGrains
 
         public Task StopTimer(string timerName)
         {
+            ThrowIfDeactivating();
             IDisposable timer = allTimers[timerName];
             timer.Dispose();
             return TaskDone.Done;
@@ -99,10 +105,22 @@ namespace UnitTestGrains
 
         public Task LongWait(TimeSpan time)
         {
+            ThrowIfDeactivating();
             Thread.Sleep(time);
             return TaskDone.Done;
         }
 
+        public Task Deactivate()
+        {
+            deactivating = true;
+            DeactivateOnIdle();
+            return TaskDone.Done;
+        }
+
+        private void ThrowIfDeactivating()
+        {
+            if (deactivating) throw new InvalidOperationException("This activation is deactivating");
+        }
     }
 
     public class TimerCallGrain : Grain, ITimerCallGrain

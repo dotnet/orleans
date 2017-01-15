@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -9,8 +9,8 @@ namespace Orleans.Streams
     [Serializable]
     internal class PubSubGrainState
     {
-        public HashSet<PubSubPublisherState> Producers { get; set; }
-        public HashSet<PubSubSubscriptionState> Consumers { get; set; }
+        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+        public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
 
     [Providers.StorageProvider(ProviderName = "PubSubStore")]
@@ -25,6 +25,7 @@ namespace Orleans.Streams
         private static readonly CounterStatistic counterConsumersAdded;
         private static readonly CounterStatistic counterConsumersRemoved;
         private static readonly CounterStatistic counterConsumersTotal;
+        private readonly ISiloStatusOracle siloStatusOracle;
 
         static PubSubRendezvousGrain()
         {
@@ -36,15 +37,15 @@ namespace Orleans.Streams
             counterConsumersTotal   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_TOTAL);
         }
 
+        public PubSubRendezvousGrain(ISiloStatusOracle siloStatusOracle)
+        {
+            this.siloStatusOracle = siloStatusOracle;
+        }
+
         public override async Task OnActivateAsync()
         {
             logger = GetLogger(GetType().Name + "-" + RuntimeIdentity + "-" + IdentityString);
             LogPubSubCounts("OnActivateAsync");
-
-            if (State.Consumers == null)
-                State.Consumers = new HashSet<PubSubSubscriptionState>();
-            if (State.Producers == null)
-                State.Producers = new HashSet<PubSubPublisherState>();
 
             int numRemoved = RemoveDeadProducers();
             if (numRemoved > 0)
@@ -79,20 +80,20 @@ namespace Orleans.Streams
         }
 
         /// accept and notify only Active producers.
-        private static bool IsActiveProducer(IStreamProducerExtension producer)
+        private bool IsActiveProducer(IStreamProducerExtension producer)
         {
             var grainRef = producer as GrainReference;
             if (grainRef !=null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Active);
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Active;
             
             return true;
         }
 
-        private static bool IsDeadProducer(IStreamProducerExtension producer)
+        private bool IsDeadProducer(IStreamProducerExtension producer)
         {
             var grainRef = producer as GrainReference;
             if (grainRef != null && grainRef.GrainId.IsSystemTarget && grainRef.IsInitializedSystemTarget)
-                return RuntimeClient.Current.GetSiloStatus(grainRef.SystemTargetSilo).Equals(SiloStatus.Dead);
+                return siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo) == SiloStatus.Dead;
             
             return false;
         }

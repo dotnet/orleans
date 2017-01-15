@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
         private static ActivationId FindOrCreate(UniqueKey key)
         {
-            return interner.FindOrCreate(key, () => new ActivationId(key));
+            return interner.FindOrCreate(key, k => new ActivationId(k));
         }
 
         public override bool Equals(UniqueIdentifier obj)

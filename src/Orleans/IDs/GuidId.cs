@@ -1,7 +1,7 @@
 using System;
+using System.Runtime.Serialization;
 using Orleans.Concurrency;
 using Orleans.Serialization;
-using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -36,7 +36,7 @@ namespace Orleans.Runtime
 
         private static GuidId FindOrCreateGuidId(Guid guid)
         {
-            return guidIdInternCache.Value.FindOrCreate(guid, () => new GuidId(guid));
+            return guidIdInternCache.Value.FindOrCreate(guid, g => new GuidId(g));
         }
 
         #region IComparable<GuidId> Members

@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Counters
 {
-    internal class SiloPerformanceMetrics : MarshalByRefObject, ISiloPerformanceMetrics, IDisposable
+    internal class SiloPerformanceMetrics : ISiloPerformanceMetrics, IDisposable
     {
         internal OrleansTaskScheduler Scheduler { get; set; }
         internal ActivationDirectory ActivationDirectory { get; set; }

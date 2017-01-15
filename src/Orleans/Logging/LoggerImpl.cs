@@ -69,6 +69,7 @@ namespace Orleans.Runtime
         /// <param name="source">The name of the source of log entries for this Logger.
         /// Typically this is the full name of the class that is using this Logger.</param>
         /// <param name="logType">The category of Logger to create.</param>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2214:DoNotCallOverridableMethodsInConstructors")]
         internal LoggerImpl(string source, LoggerType logType)
         {
             defaultCopiedCounter = -1;

@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using UnitTests.Tester;
 
 namespace UnitTests.CancellationTests
 {
@@ -99,7 +99,7 @@ namespace UnitTests.CancellationTests
             Assert.Equal(true, result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksThrow_ExceptionShouldBePropagated()
         {
             var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());

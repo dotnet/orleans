@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans
@@ -32,7 +32,7 @@ namespace Orleans
         /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
         /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
         /// </summary>
-        /// <param name="entry">The address of the silo whose membership information needs to be read.</param>
+        /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
         Task<MembershipTableData> ReadRow(SiloAddress key);
@@ -150,8 +150,8 @@ namespace Orleans
             list.Sort(
                (x, y) =>
                {
-                   if (x.Item1.Status.Equals(SiloStatus.Dead)) return 1; // put Deads at the end
-                   if (y.Item1.Status.Equals(SiloStatus.Dead)) return -1; // put Deads at the end
+                   if (x.Item1.Status == SiloStatus.Dead) return 1; // put Deads at the end
+                   if (y.Item1.Status == SiloStatus.Dead) return -1; // put Deads at the end
                    return String.Compare(x.Item1.SiloName, y.Item1.SiloName, StringComparison.Ordinal);
                });
             Members = list.AsReadOnly();

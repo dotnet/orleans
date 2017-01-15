@@ -2,8 +2,6 @@
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Runtime.Startup
 {
@@ -12,14 +10,13 @@ namespace Orleans.Runtime.Startup
     /// </summary>
     internal class StartupBuilder
     {
-        internal static IServiceProvider ConfigureStartup(string startupTypeName, out bool usingCustomServiceProvider)
+        internal static IServiceProvider ConfigureStartup(string startupTypeName, IServiceCollection serviceCollection)
         {
-            usingCustomServiceProvider = false;
-            IServiceCollection serviceCollection = new ServiceCollection();
+            var usingCustomServiceProvider = false;
             ConfigureServicesBuilder servicesMethod = null;
             Type startupType = null;
 
-            if (!String.IsNullOrWhiteSpace(startupTypeName))
+            if (!string.IsNullOrWhiteSpace(startupTypeName))
             {
                 startupType = Type.GetType(startupTypeName);
                 if (startupType == null)
@@ -33,9 +30,7 @@ namespace Orleans.Runtime.Startup
                     usingCustomServiceProvider = true;
                 }
             }
-
-            RegisterSystemTypes(serviceCollection);
-
+            
             if (usingCustomServiceProvider)
             {
                 var instance = Activator.CreateInstance(startupType);
@@ -43,15 +38,6 @@ namespace Orleans.Runtime.Startup
             }
 
             return serviceCollection.BuildServiceProvider();
-        }
-
-        private static void RegisterSystemTypes(IServiceCollection serviceCollection)
-        {
-            // Register the system classes and grains in this method.
-            // Note: this method will probably have to be moved out into the Silo class to include internal runtime types.
-
-            serviceCollection.AddTransient<GrainBasedMembershipTable>();
-            serviceCollection.AddTransient<GrainBasedReminderTable>();
         }
 
         private static ConfigureServicesBuilder FindConfigureServicesDelegate(Type startupType)

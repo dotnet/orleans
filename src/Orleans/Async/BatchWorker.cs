@@ -1,10 +1,5 @@
-﻿using Orleans;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace Orleans
 {
@@ -18,15 +13,17 @@ namespace Orleans
     /// </summary>
     public abstract class BatchWorker
     {
-        // Subclass overrides this to define what constitutes a work cycle
+        /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
+
+        protected object lockable = new object();
 
         /// <summary>
         /// Notify the worker that there is more work.
         /// </summary>
         public void Notify()
         {
-            lock (this)
+            lock (lockable)
             {
                 if (currentWorkCycle != null)
                 {
@@ -64,9 +61,10 @@ namespace Orleans
         // on the same task scheduler
         private void CheckForMoreWork()
         {
-            Action signalThunk = null;
+            TaskCompletionSource<Task> signal = null;
+            Task taskToSignal = null;
 
-            lock (this)
+            lock (lockable)
             {
                 if (moreWork)
                 {
@@ -74,15 +72,14 @@ namespace Orleans
 
                     // see if someone created a promise for waiting for the next work cycle
                     // if so, take it and remove it
-                    var x = this.nextWorkCyclePromise;
+                    signal = this.nextWorkCyclePromise;
                     this.nextWorkCyclePromise = null;
 
                     // start the next work cycle
                     Start();
 
-                    // if someone is waiting, signal them
-                    if (x != null)
-                        signalThunk = () => { x.SetResult(currentWorkCycle); };
+                    // the current cycle is what we need to signal
+                    taskToSignal = currentWorkCycle;
                 }
                 else
                 {
@@ -91,8 +88,7 @@ namespace Orleans
             }
 
             // to be safe, must do the signalling out here so it is not under the lock
-            if (signalThunk != null)
-                signalThunk();
+            signal?.SetResult(taskToSignal);
         }
 
         /// <summary>
@@ -115,7 +111,7 @@ namespace Orleans
             Task waitfortask = null;
 
             // figure out exactly what we need to wait for
-            lock (this)
+            lock (lockable)
             {
                 if (!moreWork)
                     // just wait for current work cycle
@@ -137,6 +133,54 @@ namespace Orleans
 
             else if (waitfortask != null)
                 await waitfortask;
+        }
+
+        /// <summary>
+        /// Notify the worker that there is more work, and wait for the current work cycle, and also the next work cycle if there is currently unserviced work.
+        /// </summary>
+        public async Task NotifyAndWaitForWorkToBeServiced()
+        {
+            Task<Task> waitForTaskTask = null;
+            Task waitForTask = null;
+
+            lock (lockable)
+            {
+                if (currentWorkCycle != null)
+                {
+                    moreWork = true;
+                    if (nextWorkCyclePromise == null)
+                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                    waitForTaskTask = nextWorkCyclePromise.Task;
+                }
+                else
+                {
+                    Start();
+                    waitForTask = currentWorkCycle;
+                }
+            }
+
+            if (waitForTaskTask != null)
+                await await waitForTaskTask;
+
+            else if (waitForTask != null)
+                await waitForTask;
+        }
+    }
+
+    /// A convenient variant of a batch worker 
+    /// that allows the work function to be passed as a constructor argument
+    public class BatchWorkerFromDelegate : BatchWorker
+    {
+        public BatchWorkerFromDelegate(Func<Task> work)
+        {
+            this.work = work;
+        }
+
+        private Func<Task> work;
+
+        protected override Task Work()
+        {
+            return work();
         }
     }
 }

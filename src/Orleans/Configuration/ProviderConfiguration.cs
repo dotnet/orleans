@@ -23,6 +23,8 @@ namespace Orleans.Runtime.Configuration
 
         public string Type { get; private set; }
         public string Name { get; private set; }
+        public IProviderManager ProviderManager {get { return providerManager; } }
+
 
         private ReadOnlyDictionary<string, string> readonlyCopyOfProperties;
         /// <summary>
@@ -195,6 +197,7 @@ namespace Orleans.Runtime.Configuration
         public const string BOOTSTRAP_PROVIDER_CATEGORY_NAME = "Bootstrap";
         public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
         public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
+        public const string LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME = "LogConsistency";
 
         public string Name { get; set; }
         public IDictionary<string, IProviderConfiguration> Providers { get; set; }

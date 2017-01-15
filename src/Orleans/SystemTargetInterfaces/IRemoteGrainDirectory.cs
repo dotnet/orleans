@@ -10,7 +10,8 @@ namespace Orleans.Runtime
     {
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
-        MultiClusterStatus RegistrationStatus { get; set; }
+        GrainDirectoryEntryStatus RegistrationStatus { get; set; }
+        bool OkToRemove(UnregistrationCause cause);
     }
 
     internal interface IGrainInfo
@@ -19,12 +20,11 @@ namespace Orleans.Runtime
         int VersionTag { get; }
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
-        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, MultiClusterStatus registrationStatus = MultiClusterStatus.Owned);
-        bool RemoveActivation(ActivationAddress addr);
-        bool RemoveActivation(ActivationId act, bool force);
+        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
+        bool RemoveActivation(ActivationId act, UnregistrationCause cause, out IActivationInfo entry, out bool wasRemoved);
         bool Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
-        bool UpdateClusterRegistrationStatus(ActivationId activationId, MultiClusterStatus registrationStatus, MultiClusterStatus? compareWith = null);
+        bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null);
     }
 
     /// <summary>
@@ -47,7 +47,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainAndETagList">list of grains and generation (version) numbers. The latter denote the versions of 
         /// the lists of activations currently held by the invoker of this method.</param>
-        /// <param name="retries">Number of retries to execute the method in case the virtual ring (servers) changes.</param>
         /// <returns>list of tuples holding a grain, generation number of the list of activations, and the list of activations. 
         /// If the generation number of the invoker matches the number of the destination, the list is null. If the destination does not
         /// hold the information on the grain, generation counter -1 is returned (and the list of activations is null)</returns>

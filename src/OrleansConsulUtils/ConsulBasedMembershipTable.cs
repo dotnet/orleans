@@ -1,10 +1,10 @@
-﻿using Consul;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Consul;
+using Orleans.Messaging;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Host
 {
@@ -67,11 +67,7 @@ namespace Orleans.Runtime.Host
             _connectionString = dataConnectionString;
 
             _consulClient =
-                new ConsulClient(
-                    new ConsulClientConfiguration
-                    {
-                        Address = new Uri(dataConnectionString)
-                    });
+                new ConsulClient( config => config.Address = new Uri(dataConnectionString));
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)

@@ -1,0 +1,34 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansAzureUtils</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Azure Utilities</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Azure Utilities Library of Microsoft Orleans - OrleansAzureUtils.dll
+    </summary>
+    <description>
+      Support library for hosting Orleans on Microsoft Azure
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.5">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+        <dependency id="WindowsAzure.Storage" version="7.2.1" />
+        <dependency id="System.Net.Requests" version="4.3.0" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansAzureUtils.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansAzureUtils.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansAzureUtils.xml" target="lib\netstandard1.5" />
+    <file src="$SRC_DIR$OrleansAzureUtils\**\*.cs" exclude="$SRC_DIR$OrleansAzureUtils\obj\**\*.*;$SRC_DIR$OrleansAzureUtils\bin\**\*.*" target="src" />
+  </files>
+</package>

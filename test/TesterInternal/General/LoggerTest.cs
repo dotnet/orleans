@@ -5,12 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-
 using Orleans;
 using Orleans.Runtime;
 using Tester;
+using TestExtensions;
 using Xunit;
-using UnitTests.Tester;
 using Xunit.Abstractions;
 
 namespace UnitTests

@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans.Async;
-using Orleans.Serialization;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -17,6 +15,8 @@ namespace Orleans.Runtime
     [Serializable]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
+        private static readonly Action<Message, TaskCompletionSource<object>> ResponseCallbackDelegate = ResponseCallback;
+
         private readonly string genericArguments;
         private readonly GuidId observerId;
         
@@ -58,10 +58,11 @@ namespace Orleans.Runtime
 
         #region Constructors
 
-        /// <summary>
-        /// Constructs a reference to the grain with the specified Id.
-        /// </summary>
+        /// <summary>Constructs a reference to the grain with the specified Id.</summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
+        /// <param name="genericArgument">Type arguments in case of a generic grain.</param>
+        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
+        /// <param name="observerId">Observer ID in case of an observer reference.</param>
         private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId)
         {
             GrainId = grainId;
@@ -123,10 +124,10 @@ namespace Orleans.Runtime
 
         #region Instance creator factory functions
 
-        /// <summary>
-        /// Constructs a reference to the grain with the specified ID.
-        /// </summary>
+        /// <summary>Constructs a reference to the grain with the specified ID.</summary>
         /// <param name="grainId">The ID of the grain to refer to.</param>
+        /// <param name="genericArguments">Type arguments in case of a generic grain.</param>
+        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
         internal static GrainReference FromGrainId(GrainId grainId, string genericArguments = null, SiloAddress systemTargetSilo = null)
         {
             return new GrainReference(grainId, genericArguments, systemTargetSilo, null);
@@ -326,7 +327,10 @@ namespace Orleans.Runtime
             {
                 if (USE_DEBUG_CONTEXT_PARAMS)
                 {
+#pragma warning disable 162
+                    // This is normally unreachable code, but kept for debugging purposes
                     debugContext = GetDebugContext(this.InterfaceName, GetMethodName(this.InterfaceId, request.MethodId), request.Arguments);
+#pragma warning restore 162
                 }
                 else
                 {
@@ -345,7 +349,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, genericArguments);
+            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallbackDelegate, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
@@ -431,56 +435,9 @@ namespace Orleans.Runtime
 
             return RuntimeClient.Current.GrainTypeResolver != null && RuntimeClient.Current.GrainTypeResolver.IsUnordered(GrainId.GetTypeCode());
         }
-        
+
         #endregion
-
-        /// <summary>
-        /// Internal implementation of Cast operation for grain references
-        /// Called from generated code.
-        /// </summary>
-        /// <param name="targetReferenceType">Type that this grain reference should be cast to</param>
-        /// <param name="grainRefCreatorFunc">Delegate function to create grain references of the target type</param>
-        /// <param name="grainRef">Grain reference to cast from</param>
-        /// <param name="interfaceId">Interface id value for the target cast type</param>
-        /// <returns>GrainReference that is usable as the target type</returns>
-        /// <exception cref="System.InvalidCastException">if the grain cannot be cast to the target type</exception>
-        protected internal static IAddressable CastInternal(
-            Type targetReferenceType,
-            Func<GrainReference, IAddressable> grainRefCreatorFunc,
-            IAddressable grainRef,
-            int interfaceId)
-        {
-            if (grainRef == null) throw new ArgumentNullException("grainRef");
-
-            Type sourceType = grainRef.GetType();
-
-            if (!typeof(IAddressable).IsAssignableFrom(targetReferenceType))
-            {
-                throw new InvalidCastException(String.Format("Target type must be derived from Orleans.IAddressable - cannot handle {0}", targetReferenceType));
-            }
-            else if (typeof(Grain).IsAssignableFrom(sourceType))
-            {
-                Grain grainClassRef = (Grain)grainRef;
-                GrainReference g = FromGrainId(grainClassRef.Data.Identity);
-                grainRef = g;
-            }
-            else if (!typeof(GrainReference).IsAssignableFrom(sourceType))
-            {
-                throw new InvalidCastException(String.Format("Grain reference object must an Orleans.GrainReference - cannot handle {0}", sourceType));
-            }
-
-            if (targetReferenceType.IsAssignableFrom(sourceType))
-            {
-                // Already compatible - no conversion or wrapping necessary
-                return grainRef;
-            }
-
-            // We have an untyped grain reference that may resolve eventually successfully -- need to enclose in an apprroately typed wrapper class
-            var grainReference = (GrainReference) grainRef;
-            var grainWrapper = (GrainReference) grainRefCreatorFunc(grainReference);
-            return grainWrapper;
-        }
-
+        
         private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
         {
             // String concatenation is approx 35% faster than string.Format here
@@ -526,52 +483,54 @@ namespace Orleans.Runtime
         /// <summary> Serializer function for grain reference.</summary>
         /// <seealso cref="SerializationManager"/>
         [SerializerMethod]
-        protected internal static void SerializeGrainReference(object obj, BinaryTokenStreamWriter stream, Type expected)
+        protected internal static void SerializeGrainReference(object obj, ISerializationContext context, Type expected)
         {
+            var writer = context.StreamWriter;
             var input = (GrainReference)obj;
-            stream.Write(input.GrainId);
+            writer.Write(input.GrainId);
             if (input.IsSystemTarget)
             {
-                stream.Write((byte)1);
-                stream.Write(input.SystemTargetSilo);
+                writer.Write((byte)1);
+                writer.Write(input.SystemTargetSilo);
             }
             else
             {
-                stream.Write((byte)0);
+                writer.Write((byte)0);
             }
 
             if (input.IsObserverReference)
             {
-                input.observerId.SerializeToStream(stream);
+                input.observerId.SerializeToStream(writer);
             }
 
             // store as null, serialize as empty.
             var genericArg = String.Empty;
             if (input.HasGenericArgument)
                 genericArg = input.genericArguments;
-            stream.Write(genericArg);
+            writer.Write(genericArg);
         }
 
         /// <summary> Deserializer function for grain reference.</summary>
         /// <seealso cref="SerializationManager"/>
         [DeserializerMethod]
-        protected internal static object DeserializeGrainReference(Type t, BinaryTokenStreamReader stream)
+        protected internal static object DeserializeGrainReference(Type t, IDeserializationContext context)
         {
-            GrainId id = stream.ReadGrainId();
+            var reader = context.StreamReader;
+            GrainId id = reader.ReadGrainId();
             SiloAddress silo = null;
             GuidId observerId = null;
-            byte siloAddressPresent = stream.ReadByte();
+            byte siloAddressPresent = reader.ReadByte();
             if (siloAddressPresent != 0)
             {
-                silo = stream.ReadSiloAddress();
+                silo = reader.ReadSiloAddress();
             }
             bool expectObserverId = id.IsClient;
             if (expectObserverId)
             {
-                observerId = GuidId.DeserializeFromStream(stream);
+                observerId = GuidId.DeserializeFromStream(reader);
             }
             // store as null, serialize as empty.
-            var genericArg = stream.ReadString();
+            var genericArg = reader.ReadString();
             if (String.IsNullOrEmpty(genericArg))
                 genericArg = null;
 
@@ -585,7 +544,7 @@ namespace Orleans.Runtime
         /// <summary> Copier function for grain reference. </summary>
         /// <seealso cref="SerializationManager"/>
         [CopierMethod]
-        protected internal static object CopyGrainReference(object original)
+        protected internal static object CopyGrainReference(object original, ICopyContext context)
         {
             return (GrainReference)original;
         }

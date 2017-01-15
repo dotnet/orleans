@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -57,7 +57,7 @@ namespace Orleans.Messaging
     // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
     // so there's no need to worry about the order in which we take and release those locks.
     // </summary>
-    internal class ProxiedMessageCenter : IMessageCenter
+    internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
         #region Constants
 
@@ -129,7 +129,7 @@ namespace Orleans.Messaging
         public void Stop()
         {
             Running = false;
-            
+
             Utils.SafeExecute(() =>
             {
                 PendingInboundMessages.CompleteAdding();
@@ -278,7 +278,7 @@ namespace Orleans.Messaging
         public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
+            return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
         public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
@@ -307,6 +307,7 @@ namespace Orleans.Messaging
 #endif
                 return msg;
             }
+#if !NETSTANDARD
             catch (ThreadAbortException exc)
             {
                 // Silo may be shutting-down, so downgrade to verbose log
@@ -314,6 +315,7 @@ namespace Orleans.Messaging
                 Thread.ResetAbort();
                 return null;
             }
+#endif
             catch (OperationCanceledException exc)
             {
                 logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
@@ -395,9 +397,9 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private ITypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
+        private IClusterTypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
         {
-            return grainFactory.GetSystemTarget<ITypeManager>(Constants.TypeManagerId, destination);
+            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()
@@ -410,6 +412,28 @@ namespace Orleans.Messaging
             }
 
             return gateway.ToSiloAddress();
+        }
+
+        internal void UpdateClientId(GrainId clientId)
+        {
+            if (ClientId.Category != UniqueKey.Category.Client)
+                throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
+
+            if (clientId.Category != UniqueKey.Category.GeoClient)
+                throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
+
+            ClientId = clientId;
+        }
+
+        public void Dispose()
+        {
+            PendingInboundMessages.Dispose();
+            if (gatewayConnections != null)
+                foreach (var item in gatewayConnections)
+                {
+                    item.Value.Dispose();
+                }
+            GatewayManager.Dispose();
         }
     }
 }

@@ -70,7 +70,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (!localTableCopy.TryGetValue(siloAddress, out status))
                 {
-                    if (CurrentStatus.Equals(SiloStatus.Active))
+                    if (CurrentStatus == SiloStatus.Active)
                         if (logger.IsVerbose) logger.Verbose(ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", siloAddress.ToLongString());
                     status = SiloStatus.None;
                 }
@@ -129,14 +129,14 @@ namespace Orleans.Runtime.MembershipService
 
             // make copies
             var tmpLocalTableCopy = GetSiloStatuses(st => true, true); // all the silos including me.
-            var tmpLocalTableCopyOnlyActive = GetSiloStatuses(st => st.Equals(SiloStatus.Active), true);    // only active silos including me.
+            var tmpLocalTableCopyOnlyActive = GetSiloStatuses(st => st == SiloStatus.Active, true);    // only active silos including me.
             var tmpLocalTableNamesCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
 
             CurrentStatus = status;
 
             tmpLocalTableCopy[MyAddress] = status;
 
-            if (status.Equals(SiloStatus.Active))
+            if (status == SiloStatus.Active)
             {
                 tmpLocalTableCopyOnlyActive[MyAddress] = status;
             }
@@ -218,7 +218,7 @@ namespace Orleans.Runtime.MembershipService
             if (!TryUpdateStatus(entry)) return false;
 
             localTableCopy = GetSiloStatuses(status => true, true); // all the silos including me.
-            localTableCopyOnlyActive = GetSiloStatuses(status => status.Equals(SiloStatus.Active), true);    // only active silos including me.
+            localTableCopyOnlyActive = GetSiloStatuses(status => status == SiloStatus.Active, true);    // only active silos including me.
             localNamesTableCopy = localTable.ToDictionary(pair => pair.Key, pair => pair.Value.SiloName);   // all the silos excluding me.
 
             if (this.multiClusterActive)

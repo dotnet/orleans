@@ -2,8 +2,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-using Orleans.CodeGeneration;
-
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
@@ -22,3 +20,7 @@ using Orleans.CodeGeneration;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
+[assembly: InternalsVisibleTo("TestExtensions")]
+[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]

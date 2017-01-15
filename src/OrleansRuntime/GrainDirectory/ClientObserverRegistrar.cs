@@ -9,7 +9,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar
+    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ISiloStatusListener
     {
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromSeconds(30);
@@ -20,15 +20,19 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
-        private GrainTimer clientRefreshTimer;
+        private IGrainTimer clientRefreshTimer;
         private Gateway gateway;
-       
 
-        internal ClientObserverRegistrar(SiloAddress myAddr, ILocalGrainDirectory dir, OrleansTaskScheduler scheduler, ClusterConfiguration config)
-            : base(Constants.ClientObserverRegistrarId, myAddr)
+
+        public ClientObserverRegistrar(
+            SiloInitializationParameters initializationParameters,
+            ILocalGrainDirectory dir,
+            OrleansTaskScheduler scheduler,
+            ClusterConfiguration config)
+            : base(Constants.ClientObserverRegistrarId, initializationParameters.SiloAddress)
         {
             grainDirectory = dir;
-            myAddress = myAddr;
+            myAddress = initializationParameters.SiloAddress;
             this.scheduler = scheduler;
             orleansConfig = config;
             logger = LogManager.GetLogger(typeof(ClientObserverRegistrar).Name);
@@ -71,7 +75,7 @@ namespace Orleans.Runtime
         {
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
-                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, force:true), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
+                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, Orleans.GrainDirectory.UnregistrationCause.Force), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
                 this.SchedulingContext)
                         .Ignore();
         }
@@ -131,7 +135,17 @@ namespace Orleans.Runtime
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
             return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetClientGWActivation(clientId, myAddress));
         }
-     }
+
+        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            if (status != SiloStatus.Dead)
+            {
+                return;
+            }
+
+            scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
+        }
+    }
 }
 
 

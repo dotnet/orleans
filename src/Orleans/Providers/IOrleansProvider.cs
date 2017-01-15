@@ -1,17 +1,20 @@
-
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
-    #pragma warning disable 1574
+#pragma warning disable 1574
     /// <summary>
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>
     /// <seealso cref="Orleans.Providers.IBootstrapProvider"/>
     /// <seealso cref="Orleans.Storage.IStorageProvider"/>
+    /// <seealso cref="Orleans.LogConsistency.ILogConsistencyProvider"/>
+
     public interface IProvider
     {
         /// <summary>The name of this provider instance, as given to it in the config.</summary>
@@ -159,5 +162,26 @@ namespace Orleans.Providers
             string s;
             return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
         }
+    }
+
+    /// <summary>
+    /// Exception thrown whenever a provider has failed to be initialized.
+    /// </summary>
+    [Serializable]
+    public class ProviderInitializationException : OrleansException
+    {
+        public ProviderInitializationException()
+        { }
+        public ProviderInitializationException(string msg)
+            : base(msg)
+        { }
+        public ProviderInitializationException(string msg, Exception exc)
+            : base(msg, exc)
+        { }
+#if !NETSTANDARD
+        protected ProviderInitializationException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+#endif
     }
 }

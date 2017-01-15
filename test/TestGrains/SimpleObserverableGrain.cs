@@ -1,10 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Collections;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -92,6 +87,11 @@ namespace UnitTests.Grains
         {
             Observers.Unsubscribe(observer);
             return TaskDone.Done;
+        }
+
+        public Task<string> GetRuntimeInstanceId()
+        {
+            return Task.FromResult(RuntimeIdentity);
         }
 
         protected void RaiseStateUpdateEvent()

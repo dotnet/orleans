@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using Tester;
 using Xunit;
 
 // ReSharper disable InconsistentNaming

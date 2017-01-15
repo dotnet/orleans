@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -14,7 +14,7 @@ namespace UnitTests.StreamingTests
 {
     public class SingleStreamTestRunner
     {
-        public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         public const string SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA = "SMSProviderDoNotOptimizeForImmutableData";
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);

@@ -2,20 +2,19 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Orleans.MultiCluster;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {
     internal class MultiClusterOracle : SystemTarget, IMultiClusterOracle, ISiloStatusListener, IMultiClusterGossipService
     {
+        private readonly MultiClusterGossipChannelFactory channelFactory;
         // as a backup measure, current local active status is sent occasionally
         public static readonly TimeSpan ResendActiveStatusAfter = TimeSpan.FromMinutes(10);
 
         // time after which this gateway removes other gateways in this same cluster that are known to be gone 
         public static readonly TimeSpan CleanupSilentGoneGatewaysAfter = TimeSpan.FromSeconds(30);
 
-        private readonly List<IGossipChannel> gossipChannels;
         private readonly MultiClusterOracleData localData;
         private readonly Logger logger;
         private readonly SafeRandom random;
@@ -25,18 +24,20 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly TimeSpan backgroundGossipInterval;
         private TimeSpan resendActiveStatusAfter;
 
-        private GrainTimer timer;
-        private ISiloStatusOracle siloStatusOracle;
+        private List<IGossipChannel> gossipChannels;
+        private IGrainTimer timer;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private MultiClusterConfiguration injectedConfig;
 
-        public MultiClusterOracle(SiloAddress silo, List<IGossipChannel> sources, GlobalConfiguration config)
-            : base(Constants.MultiClusterOracleId, silo)
+        public MultiClusterOracle(SiloInitializationParameters siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle)
+            : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress)
         {
-            if (sources == null) throw new ArgumentNullException("sources");
-            if (silo == null) throw new ArgumentNullException("silo");
+            this.channelFactory = channelFactory;
+            this.siloStatusOracle = siloStatusOracle;
+            if (siloDetails == null) throw new ArgumentNullException(nameof(siloDetails));
 
+            var config = siloDetails.GlobalConfig;
             logger = LogManager.GetLogger("MultiClusterOracle");
-            gossipChannels = sources;
             localData = new MultiClusterOracleData(logger);
             clusterId = config.ClusterId;
             defaultMultiCluster = config.DefaultMultiCluster;
@@ -62,12 +63,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public IEnumerable<string> GetActiveClusters()
         {
-            var clusters = localData.Current.Gateways.Values
-                 .Where(g => g.Status == GatewayStatus.Active)
-                 .Select(g => g.ClusterId)
-                 .Distinct();
-
-            return clusters;
+            return localData.ActiveGatewaysByCluster.Keys;
         }
 
         public IEnumerable<GatewayEntry> GetGateways()
@@ -77,15 +73,12 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public SiloAddress GetRandomClusterGateway(string cluster)
         {
-            var activeGateways = this.localData.Current.Gateways.Values
-                .Where(gw => gw.ClusterId == cluster && gw.Status == GatewayStatus.Active)
-                .Select(gw => gw.SiloAddress)
-                .ToList();
+            List<SiloAddress> gatewaylist;
 
-            if (activeGateways.Count == 0)
+            if (!localData.ActiveGatewaysByCluster.TryGetValue(cluster, out gatewaylist))
                 return null;
-
-            return activeGateways[random.Next(activeGateways.Count)];
+          
+            return gatewaylist[random.Next(gatewaylist.Count)];
         }
 
         public MultiClusterConfiguration GetMultiClusterConfiguration()
@@ -122,16 +115,34 @@ namespace Orleans.Runtime.MultiClusterNetwork
             PublishChanges();
         }
 
-        public async Task Start(ISiloStatusOracle oracle)
+        public bool SubscribeToMultiClusterConfigurationEvents(GrainReference observer)
+        {
+            return localData.SubscribeToMultiClusterConfigurationEvents(observer);
+        }
+
+        public bool UnSubscribeFromMultiClusterConfigurationEvents(GrainReference observer)
+        {
+            return localData.UnSubscribeFromMultiClusterConfigurationEvents(observer);
+        }
+
+
+        /// <inheritdoc/>
+        public Func<ILogConsistencyProtocolMessage, bool> ProtocolMessageFilterForTesting { get; set; }
+
+
+        public async Task Start()
         {
             logger.Info(ErrorCode.MultiClusterNetwork_Starting, "MultiClusterOracle starting on {0}, Severity={1} ", Silo, logger.SeverityLevel);
             try
             {
                 if (string.IsNullOrEmpty(clusterId))
                     throw new OrleansException("Internal Error: missing cluster id");
+                
+                gossipChannels = await this.channelFactory.CreateGossipChannels();
 
-                this.siloStatusOracle = oracle;
-
+                if (gossipChannels.Count == 0)
+                    logger.Warn(ErrorCode.MultiClusterNetwork_NoChannelsConfigured, "No gossip channels are configured.");
+                
                 // startup: pull all the info from the tables, then inject default multi cluster if none found
                 foreach (var ch in gossipChannels)
                 {
@@ -471,6 +482,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private SiloGossipWorker GetSiloWorker(SiloAddress silo)
         {
+            if (silo == null) throw new ArgumentNullException("silo");
             SiloGossipWorker worker;
             if (!this.siloWorkers.TryGetValue(silo, out worker))
                 this.siloWorkers[silo] = worker = new SiloGossipWorker(this, silo);
@@ -478,6 +490,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
         private SiloGossipWorker GetClusterWorker(string cluster)
         {
+            if (cluster == null) throw new ArgumentNullException("cluster");
             SiloGossipWorker worker;
             if (!this.clusterWorkers.TryGetValue(cluster, out worker))
                 this.clusterWorkers[cluster] = worker = new SiloGossipWorker(this, cluster);
@@ -485,6 +498,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         }
         private ChannelGossipWorker GetChannelWorker(IGossipChannel channel)
         {
+            if (channel == null) throw new ArgumentNullException("channel");
             ChannelGossipWorker worker;
             if (!this.channelWorkers.TryGetValue(channel, out worker))
                 this.channelWorkers[channel] = worker = new ChannelGossipWorker(this, channel);

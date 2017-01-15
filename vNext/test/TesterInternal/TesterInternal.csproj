@@ -1,0 +1,153 @@
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.1.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\..\src\OrleansAzureUtils\OrleansAzureUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <Content Include="..\..\..\test\TesterInternal\TesterInternal.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TesterInternal\TestUtils.cs">
+      <Link>TestUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\GatewaySelectionTest.cs">
+      <Link>GatewaySelectionTest.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\TestStoreGrainState.cs">
+      <Link>TestStoreGrainState.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\ConnectionStringFixture.cs">
+      <Link>ConnectionStringFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\ErrorInjectionStorageProvider.cs">
+      <Link>ErrorInjectionStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\MembershipTests\MembershipTableTestsBase.cs">
+      <Link>MembershipTests\MembershipTableTestsBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\RemindersTest\ReminderTableTestsBase.cs">
+      <Link>ReminderTests\ReminderTableTestsBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\CommonStorageTests.cs">
+      <Link>StorageTests\CommonStorageTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\CommonStorageUtilities.cs">
+      <Link>StorageTests\CommonStorageUtilities.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\HierarchicalKeyStoreTests.cs">
+      <Link>StorageTests\HierarchicalKeyStoreTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\LocalStoreTests.cs">
+      <Link>StorageTests\LocalStoreTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\RandomUtilities.cs">
+      <Link>StorageTests\RandomUtilities.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\Range.cs">
+      <Link>StorageTests\Range.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\SymbolSet.cs">
+      <Link>StorageTests\SymbolSet.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\GrainTypeGenerator.cs">
+      <Link>StorageTests\TestDataSets\GrainTypeGenerator.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs">
+      <Link>StorageTests\TestDataSets\StorageDataSet2CyrillicIdsAndGrainNames.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\StorageDataSetGeneric.cs">
+      <Link>StorageTests\TestDataSets\StorageDataSetGeneric.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\StorageDataSetPlain.cs">
+      <Link>StorageTests\TestDataSets\StorageDataSetPlain.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\StorageDateSetGenericHuge.cs">
+      <Link>StorageTests\TestDataSets\StorageDateSetGenericHuge.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\TestState1.cs">
+      <Link>StorageTests\TestDataSets\TestState1.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\TestDataSets\TestStateGeneric1.cs">
+      <Link>StorageTests\TestDataSets\TestStateGeneric1.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\StorageProviders\BaseJSONStorageProvider.cs">
+      <Link>StorageTests\StorageProvidesr\BaseJSONStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\StorageProviders\FileStorageProvider.cs">
+      <Link>StorageTests\StorageProvidesr\FileStorageProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StorageTests\StorageProviders\IJSONStateDataManager.cs">
+      <Link>StorageTests\StorageProvidesr\IJSONStateDataManager.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StreamingTests\MultipleStreamsTestRunner.cs">
+      <Link>StreamingTests\MultipleStreamsTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StreamingTests\SingleStreamTestRunner.cs">
+      <Link>StreamingTests\SingleStreamTestRunner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StreamingTests\StreamTestHelperClasses.cs">
+      <Link>StreamingTests\StreamTestHelperClasses.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\StreamingTests\StreamTestUtils.cs">
+      <Link>StreamingTests\StreamTestUtils.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

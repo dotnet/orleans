@@ -1,0 +1,39 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" />
+    <PropertyGroup>
+      <ExcludeCodegenConstants>$(DefineConstants);EXCLUDE_CODEGEN;ORLEANS_BOOTSTRAP;NETSTANDARD;NETSTANDARD_TODO</ExcludeCodegenConstants>
+      <BootstrapOutputPath Condition="'$(BootstrapOutputPath)' == ''">$(MSBuildProjectDirectory)\bin\$(Configuration)\Bootstrap\</BootstrapOutputPath>
+      <TargetFramework />
+      <TargetFrameworks />
+      <RuntimeIdentifier />
+      <MsBuildProperties>
+        Configuration=$(Configuration);
+        Bootstrap=true;
+        OutputPath=$(BootstrapOutputPath);
+        IntermediateOutputPath=$(BootstrapOutputPath)obj\;
+        DefineConstants=$(ExcludeCodegenConstants)
+      </MsBuildProperties>
+    </PropertyGroup>
+    <Target Name="Build">
+      <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
+      <MSBuild
+        Projects="ClientGenerator.csproj"
+        Properties="$(MsBuildProperties);TargetFramework=net462"
+        Targets="Build"
+        UnloadProjectsOnCompletion="true"
+        UseResultsCache="false"
+        BuildInParallel="true"
+        ToolsVersion="15.0" />
+    </Target>
+    <Target Name="Clean">
+      <Message Text="[OrleansDllBootstrapUsingCodeGen] - Compiling code generators for bootstrap" Importance="high" />
+      <MSBuild
+        Projects="ClientGenerator.csproj"
+        Properties="$(MsBuildProperties);TargetFramework=net462"
+        Targets="Clean"
+        UnloadProjectsOnCompletion="true"
+        UseResultsCache="false"
+        BuildInParallel="true"
+        ToolsVersion="15.0" />
+    </Target>
+</Project>

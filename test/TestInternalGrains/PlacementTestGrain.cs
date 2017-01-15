@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Placement;
@@ -65,7 +66,7 @@ namespace UnitTests.Grains
         {
             // force the latched statistics to propigate throughout the cluster.
             IManagementGrain mgmtGrain =
-                grainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+                grainFactory.GetGrain<IManagementGrain>(0);
 
             var hosts = await mgmtGrain.GetHosts(true);
             var keys = hosts.Select(kvp => kvp.Key).ToArray();
@@ -123,6 +124,14 @@ namespace UnitTests.Grains
         PlacementTestGrainBase, IActivationCountBasedPlacementTestGrain
     {}
 
+    internal class DefaultPlacementGrain : Grain, IDefaultPlacementGrain
+    {
+        public Task<PlacementStrategy> GetDefaultPlacement()
+        {
+            var defaultStrategy = this.ServiceProvider.GetRequiredService<DefaultPlacementStrategy>();
+            return Task.FromResult(defaultStrategy.PlacementStrategy);
+        }
+    }
 
     //----------------------------------------------------------//
     // Grains for LocalContent grain case, when grain is activated on every silo by bootstrap provider.

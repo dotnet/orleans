@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
-using System.Xml;
 using Orleans.Runtime;
 
 namespace Orleans.Storage
@@ -114,7 +113,7 @@ namespace Orleans.Storage
 
             private static string NewEtag()
             {
-                return Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+                return Guid.NewGuid().ToString("N");
             }
 
             private void ValidateEtag(string currentETag, string receivedEtag, string grainStoreKey, string operation)

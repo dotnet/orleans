@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
-using UnitTests.Tester;
-using Tester;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
@@ -119,7 +116,7 @@ namespace UnitTests.StreamingTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }

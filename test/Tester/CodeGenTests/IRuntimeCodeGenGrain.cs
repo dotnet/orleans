@@ -5,7 +5,6 @@ namespace Tester.CodeGenTests
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
-
     using Orleans;
     using Orleans.Providers;
 

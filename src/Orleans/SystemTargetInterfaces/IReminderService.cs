@@ -2,12 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Concurrency;
-
+using Orleans.Services;
 
 namespace Orleans
 {
-    internal interface IReminderService : ISystemTarget
+    public interface IReminderService : IGrainService
     {
         Task Start();
         Task Stop();

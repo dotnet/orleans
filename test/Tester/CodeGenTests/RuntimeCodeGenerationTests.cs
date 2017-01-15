@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Serialization;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.CodeGenTests
@@ -14,7 +14,7 @@ namespace Tester.CodeGenTests
     {
         public RuntimeCodeGenerationTests()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]

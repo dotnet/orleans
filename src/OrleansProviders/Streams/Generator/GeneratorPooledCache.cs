@@ -115,12 +115,12 @@ namespace Orleans.Providers.Streams.Generator
                 var stream = new BinaryTokenStreamReader(cachedMessage.Payload);
                 object payloadObject = SerializationManager.Deserialize(stream);
                 return new GeneratedBatchContainer(cachedMessage.StreamGuid, cachedMessage.StreamNamespace,
-                    payloadObject, new EventSequenceToken(cachedMessage.SequenceNumber));
+                    payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
             }
 
             public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
             {
-                return new EventSequenceToken(cachedMessage.SequenceNumber);
+                return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
             }
 
             public StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
@@ -128,7 +128,7 @@ namespace Orleans.Providers.Streams.Generator
                 return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
             }
 
-            public bool ShouldPurge(ref CachedMessage cachedMessage, IDisposable purgeRequest)
+            public bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, IDisposable purgeRequest, DateTime nowUtc)
             {
                 var purgedResource = (FixedSizeBuffer) purgeRequest;
                 // if we're purging our current buffer, don't use it any more

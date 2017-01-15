@@ -5,12 +5,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
-
-using Orleans.Runtime;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -20,14 +20,19 @@ namespace Orleans.Serialization
     public class BinaryTokenStreamReader
     {
         private readonly IList<ArraySegment<byte>> buffers;
+        private readonly int buffersCount;
         private int currentSegmentIndex;
         private ArraySegment<byte> currentSegment;
         private byte[] currentBuffer;
         private int currentOffset;
+        private int currentSegmentOffset;
+        private int currentSegmentCount;
         private int totalProcessedBytes;
+        private int currentSegmentOffsetPlusCount;
         private readonly int totalLength;
 
         private static readonly ArraySegment<byte> emptySegment = new ArraySegment<byte>(new byte[0]);
+        private static readonly byte[] emptyByteArray = new byte[0];
 
         /// <summary>
         /// Create a new BinaryTokenStreamReader to read from the specified input byte array.
@@ -47,11 +52,20 @@ namespace Orleans.Serialization
             buffers = buffs;
             totalProcessedBytes = 0;
             currentSegmentIndex = 0;
-            currentSegment = buffs[0];
+            InitializeCurrentSegment(0);
+            totalLength = buffs.Sum(b => b.Count);
+            buffersCount = buffs.Count;
+            Trace("Starting new stream reader");
+        }
+
+        private void InitializeCurrentSegment(int segmentIndex)
+        {
+            currentSegment = buffers[segmentIndex];
             currentBuffer = currentSegment.Array;
             currentOffset = currentSegment.Offset;
-            totalLength = buffs.Sum(b => b.Count);
-            Trace("Starting new stream reader");
+            currentSegmentOffset = currentOffset;
+            currentSegmentCount = currentSegment.Count;
+            currentSegmentOffsetPlusCount = currentSegmentOffset + currentSegmentCount;
         }
 
         /// <summary>
@@ -64,7 +78,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary> Current read position in the stream. </summary>
-        public int CurrentPosition { get { return currentOffset + totalProcessedBytes - currentSegment.Offset; } }
+        public int CurrentPosition => currentOffset + totalProcessedBytes - currentSegmentOffset;
 
         /// <summary>
         /// Creates a copy of the current stream reader.
@@ -79,34 +93,63 @@ namespace Orleans.Serialization
         {
             totalProcessedBytes += currentSegment.Count;
             currentSegmentIndex++;
-            if (currentSegmentIndex < buffers.Count)
+            if (currentSegmentIndex < buffersCount)
             {
-                currentSegment = buffers[currentSegmentIndex];
-                currentBuffer = currentSegment.Array;
-                currentOffset = currentSegment.Offset;
+                InitializeCurrentSegment(currentSegmentIndex);
             }
             else
             {
                 currentSegment = emptySegment;
                 currentBuffer = null;
                 currentOffset = 0;
+                currentSegmentOffset = 0;
+                currentSegmentOffsetPlusCount = currentSegmentOffset + currentSegmentCount;
             }
         }
 
-        private ArraySegment<byte> CheckLength(int n)
+        private byte[] CheckLength(int n, out int offset)
         {
             bool ignore;
-            return CheckLength(n, out ignore);
-        }
+            byte[] res;
+            if (TryCheckLengthFast(n, out res, out offset, out ignore))
+            {
+                return res;
+            }
 
-        private ArraySegment<byte> CheckLength(int n, out bool safeToUse)
+            return CheckLength(n, out offset, out ignore);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TryCheckLengthFast(int n, out byte[] res, out int offset, out bool safeToUse)
         {
             safeToUse = false;
-
-            if (n == 0)
+            res = null;
+            offset = 0;
+            var nextOffset = currentOffset + n;
+            if (nextOffset <= currentSegmentOffsetPlusCount)
             {
-                safeToUse = true;
-                return emptySegment;
+                offset = currentOffset;
+                currentOffset = nextOffset;
+                res = currentBuffer;
+                return true;
+            }
+
+            return false;
+        }
+
+        private byte[] CheckLength(int n, out int offset, out bool safeToUse)
+        {
+            safeToUse = false;
+            offset = 0;
+            if (currentOffset == currentSegmentOffsetPlusCount)
+            {
+                StartNextSegment();
+            }
+
+            byte[] res;
+            if (TryCheckLengthFast(n, out res, out offset, out safeToUse))
+            {
+                return res;
             }
 
             if ((CurrentPosition + n > totalLength))
@@ -116,52 +159,39 @@ namespace Orleans.Serialization
                     CurrentPosition, n, totalLength));
             }
 
-            if (currentSegmentIndex >= buffers.Count)
-            {
-                throw new SerializationException(
-                    String.Format("Attempt to read past buffers.Count: currentSegmentIndex={0}, buffers.Count={1}.", currentSegmentIndex, buffers.Count));
-            }
-
-            if (currentOffset == currentSegment.Offset + currentSegment.Count)
-            {
-                StartNextSegment();
-            }
-
-            if (currentOffset + n <= currentSegment.Offset + currentSegment.Count)
-            {
-                var result = new ArraySegment<byte>(currentBuffer, currentOffset, n);
-                currentOffset += n;
-                if (currentOffset >= currentSegment.Offset + currentSegment.Count)
-                {
-                    StartNextSegment();
-                }
-                return result;
-            }
-
             var temp = new byte[n];
             var i = 0;
+
             while (i < n)
             {
-                var bytesFromThisBuffer = Math.Min(currentSegment.Offset + currentSegment.Count - currentOffset,
-                                                   n - i);
+                var segmentOffsetPlusCount = currentSegmentOffsetPlusCount;
+                var bytesFromThisBuffer = Math.Min(segmentOffsetPlusCount - currentOffset, n - i);
                 Buffer.BlockCopy(currentBuffer, currentOffset, temp, i, bytesFromThisBuffer);
                 i += bytesFromThisBuffer;
                 currentOffset += bytesFromThisBuffer;
-                if (currentOffset >= currentSegment.Offset + currentSegment.Count)
+                if (currentOffset >= segmentOffsetPlusCount)
                 {
+                    if (currentSegmentIndex >= buffersCount)
+                    {
+                        throw new SerializationException(
+                            String.Format("Attempt to read past buffers.Count: currentSegmentIndex={0}, buffers.Count={1}.", currentSegmentIndex, buffers.Count));
+                    }
+
                     StartNextSegment();
                 }
             }
             safeToUse = true;
-            return new ArraySegment<byte>(temp);
+            offset = 0;
+            return temp;
         }
 
         /// <summary> Read an <c>Int32</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public int ReadInt()
         {
-            var buff = CheckLength(sizeof(int));
-            var val = BitConverter.ToInt32(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(int), out offset);
+            var val = BitConverter.ToInt32(buff, offset);
             Trace("--Read int {0}", val);
             return val;
         }
@@ -170,8 +200,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public uint ReadUInt()
         {
-            var buff = CheckLength(sizeof(uint));
-            var val = BitConverter.ToUInt32(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(uint), out offset);
+            var val = BitConverter.ToUInt32(buff, offset);
             Trace("--Read uint {0}", val);
             return val;
         }
@@ -180,8 +211,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public short ReadShort()
         {
-            var buff = CheckLength(sizeof(short));
-            var val = BitConverter.ToInt16(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(short), out offset);
+            var val = BitConverter.ToInt16(buff, offset);
             Trace("--Read short {0}", val);
             return val;
         }
@@ -190,8 +222,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public ushort ReadUShort()
         {
-            var buff = CheckLength(sizeof(ushort));
-            var val = BitConverter.ToUInt16(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(ushort), out offset);
+            var val = BitConverter.ToUInt16(buff, offset);
             Trace("--Read ushort {0}", val);
             return val;
         }
@@ -200,8 +233,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public long ReadLong()
         {
-            var buff = CheckLength(sizeof(long));
-            var val = BitConverter.ToInt64(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(long), out offset);
+            var val = BitConverter.ToInt64(buff, offset);
             Trace("--Read long {0}", val);
             return val;
         }
@@ -210,8 +244,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public ulong ReadULong()
         {
-            var buff = CheckLength(sizeof(ulong));
-            var val = BitConverter.ToUInt64(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(ulong), out offset);
+            var val = BitConverter.ToUInt64(buff, offset);
             Trace("--Read ulong {0}", val);
             return val;
         }
@@ -220,8 +255,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public float ReadFloat()
         {
-            var buff = CheckLength(sizeof(float));
-            var val = BitConverter.ToSingle(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(float), out offset);
+            var val = BitConverter.ToSingle(buff, offset);
             Trace("--Read float {0}", val);
             return val;
         }
@@ -230,8 +266,9 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public double ReadDouble()
         {
-            var buff = CheckLength(sizeof(double));
-            var val = BitConverter.ToDouble(buff.Array, buff.Offset);
+            int offset;
+            var buff = CheckLength(sizeof(double), out offset);
+            var val = BitConverter.ToDouble(buff, offset);
             Trace("--Read double {0}", val);
             return val;
         }
@@ -240,16 +277,23 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public decimal ReadDecimal()
         {
-            var buff = CheckLength(4 * sizeof(int));
+            int offset;
+            var buff = CheckLength(4 * sizeof(int), out offset);
             var raw = new int[4];
             Trace("--Read decimal");
-            var n = buff.Offset;
+            var n = offset;
             for (var i = 0; i < 4; i++)
             {
-                raw[i] = BitConverter.ToInt32(buff.Array, n);
+                raw[i] = BitConverter.ToInt32(buff, n);
                 n += sizeof(int);
             }
             return new decimal(raw);
+        }
+
+        public DateTime ReadDateTime()
+        {
+            var n = ReadLong();
+            return n == 0 ? default(DateTime) : DateTime.FromBinary(n);
         }
 
         /// <summary> Read an <c>string</c> value from the stream. </summary>
@@ -260,15 +304,16 @@ namespace Orleans.Serialization
             if (n == 0)
             {
                 Trace("--Read empty string");
-                return String.Empty;                
+                return String.Empty;
             }
 
             string s = null;
             // a length of -1 indicates that the string is null.
             if (-1 != n)
             {
-                var buff = CheckLength(n);
-                s = Encoding.UTF8.GetString(buff.Array, buff.Offset, n);
+                int offset;
+                var buff = CheckLength(n, out offset);
+                s = Encoding.UTF8.GetString(buff, offset, n);
             }
 
             Trace("--Read string '{0}'", s);
@@ -282,20 +327,27 @@ namespace Orleans.Serialization
         {
             if (count == 0)
             {
-                return new byte[0];
+                return emptyByteArray;
             }
             bool safeToUse;
-            var buff = CheckLength(count, out safeToUse);
+
+            int offset;
+            byte[] buff;
+            if (!TryCheckLengthFast(count, out buff, out offset, out safeToUse))
+            {
+                buff = CheckLength(count, out offset, out safeToUse);
+            }
+
             Trace("--Read byte array of length {0}", count);
             if (!safeToUse)
             {
                 var result = new byte[count];
-                Array.Copy(buff.Array, buff.Offset, result, 0, count);
+                Array.Copy(buff, offset, result, 0, count);
                 return result;
             }
             else
             {
-                return buff.Array;
+                return buff;
             }
         }
 
@@ -309,8 +361,10 @@ namespace Orleans.Serialization
             {
                 throw new ArgumentOutOfRangeException("count", "Reading into an array that is too small");
             }
-            var buff = CheckLength(count);
-            Buffer.BlockCopy(buff.Array, buff.Offset, destination, offset, count);
+
+            var buffOffset = 0;
+            var buff = count == 0 ? emptyByteArray : CheckLength(count, out buffOffset);
+            Buffer.BlockCopy(buff, buffOffset, destination, offset, count);
         }
 
         /// <summary> Read an <c>char</c> value from the stream. </summary>
@@ -325,29 +379,32 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public byte ReadByte()
         {
-            var buff = CheckLength(1);
+            int offset;
+            var buff = CheckLength(1, out offset);
             Trace("--Read byte");
-            return buff.Array[buff.Offset];
+            return buff[offset];
         }
 
         /// <summary> Read an <c>sbyte</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public sbyte ReadSByte()
         {
-            var buff = CheckLength(1);
+            int offset;
+            var buff = CheckLength(1, out offset);
             Trace("--Read sbyte");
-            return unchecked((sbyte)(buff.Array[buff.Offset]));
+            return unchecked((sbyte)(buff[offset]));
         }
 
         /// <summary> Read an <c>IPAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public IPAddress ReadIPAddress()
         {
-            var buff = CheckLength(16);
+            int offset;
+            var buff = CheckLength(16, out offset);
             bool v4 = true;
             for (var i = 0; i < 12; i++)
             {
-                if (buff.Array[buff.Offset + i] != 0)
+                if (buff[offset + i] != 0)
                 {
                     v4 = false;
                     break;
@@ -359,7 +416,7 @@ namespace Orleans.Serialization
                 var v4Bytes = new byte[4];
                 for (var i = 0; i < 4; i++)
                 {
-                    v4Bytes[i] = buff.Array[buff.Offset + 12 + i];
+                    v4Bytes[i] = buff[offset + 12 + i];
                 }
                 return new IPAddress(v4Bytes);
             }
@@ -368,7 +425,7 @@ namespace Orleans.Serialization
                 var v6Bytes = new byte[16];
                 for (var i = 0; i < 16; i++)
                 {
-                    v6Bytes[i] = buff.Array[buff.Offset + i];
+                    v6Bytes[i] = buff[offset + i];
                 }
                 return new IPAddress(v6Bytes);
             }
@@ -423,10 +480,20 @@ namespace Orleans.Serialization
             return new Guid(bytes);
         }
 
-        internal MultiClusterStatus ReadMultiClusterStatus()
+        public TimeSpan ReadTimeSpan()
+        {
+            return new TimeSpan(ReadLong());
+        }
+
+        internal CorrelationId ReadCorrelationId()
+        {
+            return new CorrelationId(ReadBytes(CorrelationId.SIZE_BYTES));
+        }
+
+        internal GrainDirectoryEntryStatus ReadMultiClusterStatus()
         {
             byte val = ReadByte();
-            return (MultiClusterStatus) val;
+            return (GrainDirectoryEntryStatus)val;
         }
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
@@ -436,7 +503,6 @@ namespace Orleans.Serialization
             var silo = ReadSiloAddress();
             var grain = ReadGrainId();
             var act = ReadActivationId();
-            var mcstatus = ReadMultiClusterStatus();
 
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
@@ -444,7 +510,7 @@ namespace Orleans.Serialization
             if (act.Equals(ActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act, mcstatus);
+            return ActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>
@@ -454,8 +520,9 @@ namespace Orleans.Serialization
         /// <param name="n">Number of bytes to read.</param>
         public void ReadBlockInto(Array array, int n)
         {
-            var buff = CheckLength(n);
-            Buffer.BlockCopy(buff.Array, buff.Offset, array, 0, n);
+            int offset;
+            var buff = CheckLength(n, out offset);
+            Buffer.BlockCopy(buff, offset, array, 0, n);
             Trace("--Read block of {0} bytes", n);
         }
 
@@ -475,9 +542,10 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal SerializationTokenType ReadToken()
         {
-            var buff = CheckLength(1);
-            Trace("--Read token {0}", (SerializationTokenType)buff.Array[buff.Offset]);
-            return (SerializationTokenType)buff.Array[buff.Offset];
+            int offset;
+            var buff = CheckLength(1, out offset);
+            Trace("--Read token {0}", (SerializationTokenType)buff[offset]);
+            return (SerializationTokenType)buff[offset];
         }
 
         internal bool TryReadSimpleType(out object result, out SerializationTokenType token)
@@ -843,6 +911,8 @@ namespace Orleans.Serialization
                     return typeof(char[]);
                 case SerializationTokenType.BoolArray:
                     return typeof(bool[]);
+                case SerializationTokenType.SByteArray:
+                    return typeof(sbyte[]);
                 case SerializationTokenType.NamedType:
                     var typeName = ReadString();
                     try

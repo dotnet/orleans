@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Streams;
-
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers
 {
@@ -109,7 +108,7 @@ namespace Orleans.Providers
             throw new NotImplementedException();
         }
 
-        public void UnRegisterSystemTarget(ISystemTarget target)
+        public void UnregisterSystemTarget(ISystemTarget target)
         {
             throw new NotImplementedException();
         }
@@ -140,7 +139,7 @@ namespace Orleans.Providers
                     var obj = ((GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
 
                     addressable = obj;
-
+                     
                     if (null == addressable)
                     {
                         throw new NullReferenceException("addressable");
@@ -174,13 +173,6 @@ namespace Orleans.Providers
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
             throw new NotImplementedException("GetConsistentRingProvider");
-        }
-
-        public bool InSilo { get { return false; } }
-
-        public object GetCurrentSchedulingContext()
-        {
-            return null;
         }
     }
 }

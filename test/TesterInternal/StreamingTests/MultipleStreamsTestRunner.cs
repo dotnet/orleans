@@ -9,7 +9,7 @@ namespace UnitTests.Streaming
 {
     public class MultipleStreamsTestRunner
     {
-        public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
@@ -62,7 +62,7 @@ namespace UnitTests.Streaming
 
             if (stopSiloFunc != null)
             {
-                logger.Info("\n\n\nAbout to stop silo  {0} \n\n", silo.Silo.SiloAddress);
+                logger.Info("\n\n\nAbout to stop silo  {0} \n\n", silo.SiloAddress);
 
                 stopSiloFunc(silo);
 

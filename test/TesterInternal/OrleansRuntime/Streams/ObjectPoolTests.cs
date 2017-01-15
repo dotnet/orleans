@@ -1,7 +1,6 @@
 ﻿
 using System;
 using System.Linq;
-
 using Orleans.Providers.Streams.Common;
 using Xunit;
 

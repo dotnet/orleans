@@ -1,9 +1,3 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 
@@ -13,6 +7,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task Subscribe(ISimpleGrainObserver observer);
         Task Unsubscribe(ISimpleGrainObserver observer);
+        Task<string> GetRuntimeInstanceId();
     }
 
     public interface ISimpleGrainObserver : IGrainObserver

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Net;
-
 using Orleans.Runtime;
 using Orleans.Runtime.Host;
 using Xunit;

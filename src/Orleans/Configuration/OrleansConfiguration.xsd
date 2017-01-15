@@ -249,6 +249,22 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="FallbackSerializationProvider" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            Specifies the fallback serialization provider, which is used for objects which can not otherwise be serialized.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:attribute name="type" type="xs:string">
+            <xs:annotation>
+              <xs:documentation>
+                The fully qualified type name of a non-abstract, non-generic class that has a default parameterless constructor and implements Orleans.Serialization.IExternalSerializer
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="ResponseTimeout" type="tns:TimeSpan" use="optional">
       <xs:annotation>
@@ -297,16 +313,6 @@
           of grain to gateway (messages to the same grain go to the same gateway, while evenly spreading grains across gateways).
           This number should be about 10 to 100 times larger than the expected number of gateway connections.
           If this attribute is not specified, then Math.Pow(2, 13) is used.
-        </xs:documentation>
-      </xs:annotation>
-    </xs:attribute>
-    <xs:attribute name="UseStandardSerializer" type="xs:boolean" use="optional">
-      <xs:annotation>
-        <xs:documentation>
-          The UseStandardSerializer attribute, if provided and set to "true", forces the use of the standard .NET serializer instead
-          of the custom Orleans serializer.
-          This parameter is intended for use only for testing and troubleshooting.
-          In production, the custom Orleans serializer should always be used because it performs significantly better.
         </xs:documentation>
       </xs:annotation>
     </xs:attribute>
@@ -814,6 +820,18 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
+      <xs:element name="LogConsistencyProviders" minOccurs="0" maxOccurs="1">
+        <xs:annotation>
+          <xs:documentation>
+            The optional LogConsistencyProviders element contains configuration for log-consistency provider instances.
+          </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Provider" type="tns:ProviderInstanceConfig" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
       <xs:element name="StreamProviders" minOccurs="0" maxOccurs="1" type="tns:StreamProvidersConfig" />
       <xs:element name="Application" minOccurs="0" maxOccurs="1">
         <xs:complexType>
@@ -964,6 +982,20 @@
               </xs:documentation>
             </xs:annotation>
           </xs:attribute>
+          <xs:attribute name="UseGlobalSingleInstanceByDefault" type="xs:boolean" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                Whether to use the global single instance protocol as the default multicluster registration strategy.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
+          <xs:attribute name="GlobalSingleInstanceRetryInterval" type="tns:TimeSpan" use="optional">
+            <xs:annotation>
+              <xs:documentation>
+                The time between retries for DOUBTFUL activations.
+              </xs:documentation>
+            </xs:annotation>
+          </xs:attribute>
           <xs:attribute name="DefaultMultiCluster" type="xs:string" use="optional">
             <xs:annotation>
               <xs:documentation>
@@ -990,6 +1022,14 @@
       </xs:documentation>
     </xs:annotation>
     <xs:sequence>
+      <xs:element name="Startup" minOccurs="0" maxOccurs="1" type="tns:StartupConfiguration">
+        <xs:annotation>
+          <xs:documentation>
+            The Startup element specifies the start-up class to be used to bootstrap dependency injection.
+            Typically the Startup element is filled in for the default configuration.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:element>
       <xs:element name="Networking" minOccurs="0" type="tns:IPEndPoint">
         <xs:annotation>
           <xs:documentation>
@@ -1257,5 +1297,18 @@
       </xs:annotation>
     </xs:attribute>
   </xs:complexType>
-
+  <xs:complexType name="StartupConfiguration">
+    <xs:annotation>
+      <xs:documentation>
+        Start-up class configuration for dependency injection.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Type" use="required" type="xs:string">
+      <xs:annotation>
+        <xs:documentation>
+          The assembly qualified name of the start-up class to be used to bootstrap dependency injection.
+        </xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
 </xs:schema>

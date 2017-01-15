@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Net;
+using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.MultiClusterNetwork;
-using Orleans.MultiCluster;
 using Xunit;
 
 namespace Tester.GeoClusterTests

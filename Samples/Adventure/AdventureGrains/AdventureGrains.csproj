@@ -51,11 +51,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MonsterGrain.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureGrains\MonsterGrain.cs" />
     <Compile Include="Properties\orleans.codegen.cs" />
-    <Compile Include="PlayerGrain.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureGrains\PlayerGrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RoomGrain.cs" />
+    <Compile Include="..\..\AdventureDotNetCli\AdventureGrains\RoomGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AdventureGrainInterfaces\AdventureGrainInterfaces.csproj">

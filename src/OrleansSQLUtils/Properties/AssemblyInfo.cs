@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using Orleans.CodeGeneration;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -21,4 +22,6 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("UnitTests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("UnitTestGrains")]
+[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: SkipCodeGeneration]
 

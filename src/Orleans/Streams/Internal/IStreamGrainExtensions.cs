@@ -1,13 +1,11 @@
 using System;
 using System.Threading.Tasks;
-
-using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
     // This is the extension interface for stream consumers
-    [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     internal interface IStreamConsumerExtension : IGrainExtension
     {
         Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
@@ -19,7 +17,6 @@ namespace Orleans.Streams
     }
 
     // This is the extension interface for stream producers
-    [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     internal interface IStreamProducerExtension : IGrainExtension
     {
         [AlwaysInterleave]

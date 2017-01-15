@@ -2,16 +2,14 @@ namespace Orleans.CodeGenerator.Utilities
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
-
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
-
     using Orleans.Runtime;
-    using System.Globalization;
-	
+
     /// <summary>
     /// The syntax factory extensions.
     /// </summary>
@@ -288,7 +286,7 @@ namespace Orleans.CodeGenerator.Utilities
                 foreach (var genericParameter in typeInfo.GetGenericArguments())
                 {
                     var parameterConstraints = new List<TypeParameterConstraintSyntax>();
-                    var attributes = genericParameter.GenericParameterAttributes;
+                    var attributes = genericParameter.GetTypeInfo().GenericParameterAttributes;
 
                     // The "class" or "struct" constraints must come first.
                     if (attributes.HasFlag(GenericParameterAttributes.ReferenceTypeConstraint))
@@ -301,7 +299,7 @@ namespace Orleans.CodeGenerator.Utilities
                     }
 
                     // Follow with the base class or interface constraints.
-                    foreach (var genericType in genericParameter.GetGenericParameterConstraints())
+                    foreach (var genericType in genericParameter.GetTypeInfo().GetGenericParameterConstraints())
                     {
                         // If the "struct" constraint was specified, skip the corresponding "ValueType" constraint.
                         if (genericType == typeof(ValueType))

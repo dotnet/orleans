@@ -9,10 +9,13 @@ namespace Orleans.Runtime
 {
     internal class AssemblyLoader
     {
+#if !NETSTANDARD_TODO
         private readonly Dictionary<string, SearchOption> dirEnumArgs;
         private readonly HashSet<AssemblyLoaderPathNameCriterion> pathNameCriteria;
         private readonly HashSet<AssemblyLoaderReflectionCriterion> reflectionCriteria;
         private readonly Logger logger;
+        private readonly Lazy<ExeImageInfo> exeInfo = new Lazy<ExeImageInfo>(LoadImageInformation);
+
         internal bool SimulateExcludeCriteriaFailure { get; set; }
         internal bool SimulateLoadCriteriaFailure { get; set; }
         internal bool SimulateReflectionOnlyLoadFailure { get; set; }
@@ -32,9 +35,6 @@ namespace Orleans.Runtime
             SimulateLoadCriteriaFailure = false;
             SimulateReflectionOnlyLoadFailure = false;
             RethrowDiscoveryExceptions = false;
-
-            // Ensure that each assembly which is loaded is processed.
-            AssemblyProcessor.Initialize();
         }
         
         /// <summary>
@@ -78,7 +78,7 @@ namespace Orleans.Runtime
             loader.logger.Info("{0} assemblies loaded.", count);
             return discoveredAssemblyLocations;
         }
-
+#endif
         public static T TryLoadAndCreateInstance<T>(string assemblyName, Logger logger) where T : class
         {
             try
@@ -89,7 +89,7 @@ namespace Orleans.Runtime
                         assembly,
                         type =>
                         typeof(T).IsAssignableFrom(type) && !type.GetTypeInfo().IsInterface
-                        && type.GetTypeInfo().GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
+                        && type.GetConstructor(Type.EmptyTypes) != null, logger).FirstOrDefault();
                 if (foundType == null)
                 {
                     return null;
@@ -125,6 +125,7 @@ namespace Orleans.Runtime
             }
         }
 
+#if !NETSTANDARD_TODO
         // this method is internal so that it can be accessed from unit tests, which only test the discovery
         // process-- not the actual loading of assemblies.
         internal static AssemblyLoader NewAssemblyLoader(
@@ -320,8 +321,19 @@ namespace Orleans.Runtime
             {
                 if (SimulateReflectionOnlyLoadFailure)
                     throw NewTestUnexpectedException();
-                
+
                 assembly = Assembly.ReflectionOnlyLoadFrom(pathName);
+                if (!IsCompatibleWithCurrentProcess(assembly, out complaints))
+                {
+                    assembly = null;
+                    return false;
+                }
+            }
+            catch (BadImageFormatException)
+            {
+                complaints = new[] { "The image was not a CLR image." };
+                assembly = null;
+                return false;
             }
             catch (FileLoadException e)
             {
@@ -349,6 +361,42 @@ namespace Orleans.Runtime
             return true;
         }
 
+        private bool IsCompatibleWithCurrentProcess(Assembly assembly, out string[] complaints)
+        {
+            complaints = null;
+            ImageFileMachine machine;
+            PortableExecutableKinds peKind;
+            assembly.Modules.First().GetPEKind(out peKind, out machine);
+            if (peKind == PortableExecutableKinds.ILOnly && machine == ImageFileMachine.I386)
+            {
+                // anycpu
+                return true;
+            }
+
+            if (peKind.HasFlag(PortableExecutableKinds.NotAPortableExecutableImage) ||
+                peKind.HasFlag(PortableExecutableKinds.Unmanaged32Bit))
+            {
+                // this block of code should never run since the assembly was successfully loaded
+                throw new InvalidOperationException("Unexpected block of code reached");
+            }
+
+            if ((peKind.HasFlag(PortableExecutableKinds.Required32Bit) && Environment.Is64BitProcess) || 
+                (peKind.HasFlag(PortableExecutableKinds.PE32Plus) && !Environment.Is64BitProcess))
+            {
+                // targets wrong bitness
+                complaints = new[] { $"The assembly {assembly.FullName} is compiled for a different platform than the running process" };
+                return false;
+            }
+
+            if (machine != this.exeInfo.Value.MachineType)
+            {
+                complaints = new[] { $"The assembly {assembly.FullName} was compiled for {machine} but the current exe was compiled for {this.exeInfo.Value.MachineType}" };
+                return false;
+            }
+
+            return true;
+        }
+
         private void LogComplaint(string pathName, string complaint)
         {
             LogComplaints(pathName, new string[] { complaint });
@@ -373,6 +421,15 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException("No complaint provided for assembly.");
             // we can't use an error code here because we want each log message to be displayed.
             logger.Info(msg.ToString());
+        }
+
+        private static ExeImageInfo LoadImageInformation()
+        {
+            PortableExecutableKinds peKind;
+            ImageFileMachine machine;
+
+            Assembly.GetEntryAssembly().Modules.First().GetPEKind(out peKind, out machine);
+            return new ExeImageInfo {PEKind = peKind, MachineType = machine};
         }
 
         private static AggregateException NewTestUnexpectedException()
@@ -428,5 +485,13 @@ namespace Orleans.Runtime
         {
             return !ShouldExcludeAssembly(pathName) && ShouldLoadAssembly(pathName);
         }
+
+        private class ExeImageInfo
+        {
+            public PortableExecutableKinds PEKind;
+
+            public ImageFileMachine MachineType;
+        }
+#endif
     }
 }

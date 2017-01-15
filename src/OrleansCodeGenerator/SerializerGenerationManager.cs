@@ -6,10 +6,8 @@ namespace Orleans.CodeGenerator
     using System.Collections.Generic;
     using System.Reflection;
     using System.Threading.Tasks;
-
     using Orleans.Runtime;
     using Orleans.Serialization;
-
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
     /// <summary>
@@ -74,11 +72,12 @@ namespace Orleans.CodeGenerator
                     ErrorCode.CodeGenIgnoringTypes,
                     "Skipping serializer generation for nested type {0}. If this type is used frequently, you may wish to consider making it non-nested.",
                     t.Name);
+                return false;
             }
 
             if (t.IsConstructedGenericType)
             {
-                var args = t.GetGenericArguments();
+                var args = typeInfo.GetGenericArguments();
                 foreach (var arg in args)
                 {
                     RecordTypeToGenerate(arg, module, targetAssembly);
@@ -93,7 +92,7 @@ namespace Orleans.CodeGenerator
                 return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), module, targetAssembly);
             }
 
-            if (typeInfo.IsOrleansPrimitive() || (SerializationManager.GetSerializer(t) != null) ||
+            if (typeInfo.IsOrleansPrimitive() || SerializationManager.HasSerializer(t) ||
                 typeof(IAddressable).GetTypeInfo().IsAssignableFrom(t)) return false;
 
             if (typeInfo.Namespace != null && (typeInfo.Namespace.Equals("System") || typeInfo.Namespace.StartsWith("System.")))
@@ -107,20 +106,22 @@ namespace Orleans.CodeGenerator
             if (TypeUtils.HasAllSerializationMethods(t)) return false;
 
             // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
-            var skipSerialzerGeneration = t.GetAllFields()
-                .Any(
-                    field => !field.IsNotSerialized &&
-                        TypeUtilities.IsTypeIsInaccessibleForSerialization(
-                            field.FieldType,
-                            module,
-                            targetAssembly));
-            if (skipSerialzerGeneration)
+            var skipSerializerGeneration =
+                t.GetAllFields().Any(field => IsFieldInaccessibleForSerialization(module, targetAssembly, field));
+            if (skipSerializerGeneration)
             {
                 return false;
             }
 
             typesToProcess.Add(t);
             return true;
+        }
+
+        private static bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
+        {
+            return field.GetCustomAttributes().All(attr => attr.GetType().Name != "NonSerializedAttribute")
+                   && !SerializationManager.HasSerializer(field.FieldType)
+                   && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }
 
         internal bool GetNextTypeToProcess(out Type next)

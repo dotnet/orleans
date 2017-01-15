@@ -1,5 +1,5 @@
-using Orleans.Runtime.Configuration;
 using System.Threading.Tasks;
+using Orleans.Runtime.Configuration;
 using Orleans.SqlUtils;
 
 
