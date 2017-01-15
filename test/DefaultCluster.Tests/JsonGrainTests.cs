@@ -44,14 +44,10 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [RegisterSerializer]
+        [Serializer(typeof(JObject))]
         public class JObjectSerializationExample1
         {
-            static JObjectSerializationExample1()
-            {
-                Register();
-            }
-
+            [CopierMethod]
             public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
@@ -59,6 +55,7 @@ namespace DefaultCluster.Tests.General
                 return original;
             }
 
+            [SerializerMethod]
             public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 var input = (JObject)untypedInput;
@@ -66,15 +63,11 @@ namespace DefaultCluster.Tests.General
                 SerializationManager.Serialize(str, context.StreamWriter);
             }
 
+            [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JObject.Parse(str);
-            }
-
-            public static void Register()
-            {
-                SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }
     }
