@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.EventSourcing</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Event-Sourcing</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Event-Sourcing support for Microsoft Orleans - OrleansEventSourcing.dll
+    </summary>
+    <description>
+      Base types for creating Microsoft Orleans grains with event-sourced state.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET Event-Sourcing</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.5">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansEventSourcing.dll" target="lib\netstandard1.5\" />
+    <file src="netstandard1.5\OrleansEventSourcing.pdb" target="lib\netstandard1.5\" />
+    <file src="netstandard1.5\OrleansEventSourcing.xml" target="lib\netstandard1.5\" />
+    <file src="$SRC_DIR$OrleansEventSourcing\**\*.cs" target="src" />
+  </files>
+</package>
