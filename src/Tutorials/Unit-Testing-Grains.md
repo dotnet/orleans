@@ -12,7 +12,7 @@ Orleans makes it possible to mock many of its parts ([example](https://github.co
 
 The steps are
 
-- You should create a test project in your favorite unit testing framework.
+- You should create a project using your favorite unit testing framework.
 - Add references to `Microsoft.Orleans.TestingHost`, `Microsoft.Orleans.OrleansProviders` and `Microsoft.Orleans.OrleansTelemetryConsumers.Counters` packages from NuGet to the project.
 - Reference your interfaces and collection projects in the test project.
 - Inherit your test classes from `Orleans.TestingHost.TestingSiloHost`.
@@ -25,23 +25,21 @@ The test cases like ordinary grain code should call grains and then wait for the
 
 ## Writing the code
 The `TestingSiloHost` which we inherit from starts the silos up for us but we need to shutdown them ourselves.
-The samples here are using MS Test but you can use NUnit, XUnit or any other testing framework that you want. Let's use the hello world sample's code here as an example.
+The samples here are using xUnit but you can use NUnit, MsTest, or any other testing framework that you want. Let's use the hello world sample's code here as an example.
 
 ``` csharp
 using System;
 using System.Threading.Tasks;
 using HelloWorldInterfaces;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Tests
 {
-    [TestClass]
-    public class HelloWorldSiloTests : TestingSiloHost
+    public class HelloWorldSiloTests : TestingSiloHost, IDisposable
     {
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public void Dispose()
         {
             // Optional.
             // By default, the next test class which uses TestingSiloHost will
@@ -49,8 +47,8 @@ namespace Tests
             StopAllSilos();
         }
 
-        [TestMethod]
-        public async Task SayHelloTest()
+        [Fact]
+        public async Task SayHelloRespondsCorrectly()
         {
             // The Orleans silo / client test environment is already set up at this point.
 
@@ -62,9 +60,9 @@ namespace Tests
             // This will create and call a Hello grain with specified 'id' in one of the test silos.
             string reply = await grain.SayHello(greeting);
 
-            Assert.IsNotNull(reply, "Grain replied with some message");
-            string expected = string.Format("You said: '{0}', I say: Hello!", greeting);
-            Assert.AreEqual(expected, reply, "Grain replied with expected message");
+            Assert.NotNull(reply);
+            string expected = $"You said: '{greeting}', I say: Hello!";
+            Assert.AreEqual(expected, reply);
         }
     }
 }   
