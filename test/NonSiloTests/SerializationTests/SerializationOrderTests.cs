@@ -1,3 +1,5 @@
+using TestExtensions;
+
 namespace UnitTests.Serialization
 {
     using System;

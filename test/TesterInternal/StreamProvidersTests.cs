@@ -58,7 +58,7 @@ namespace UnitTests.Streaming
             Guid streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
             try
             {
                 consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null).Wait();
@@ -120,6 +120,8 @@ namespace UnitTests.Streaming
 
     public class StreamProvidersTests_ProviderConfigLoaded : OrleansTestingBase, IClassFixture<StreamProvidersTests_ProviderConfigLoaded.Fixture>
     {
+        private readonly IGrainFactory grainFactory;
+
         public class Fixture : BaseClusterFixture
         {
             protected override TestingSiloHost CreateClusterHost()
@@ -131,6 +133,11 @@ namespace UnitTests.Streaming
             }
         }
 
+        public StreamProvidersTests_ProviderConfigLoaded(Fixture fixture)
+        {
+            this.grainFactory = fixture.GrainFactory;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
         public void ProvidersTests_ProviderWrongName()
         {
@@ -138,7 +145,7 @@ namespace UnitTests.Streaming
             Guid streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            IStreaming_ConsumerGrain consumer = this.grainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
             try
             {
                 consumer.BecomeConsumer(streamId, "WrongProviderName", null).Wait();

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
@@ -15,7 +16,7 @@ namespace Orleans.TestingHost
 
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
-    /// Runs a Primary and optionally secondary silos in seperate app domains, and client in the main app domain.
+    /// Runs a Primary and optionally secondary silos in separate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process on demand if required for particular test cases.
     /// </summary>
     /// <remarks>
@@ -60,6 +61,16 @@ namespace Orleans.TestingHost
         /// </summary>
         public IGrainFactory GrainFactory { get; private set; }
 
+        /// <summary>
+        /// The client-side <see cref="StreamProviderManager"/>.
+        /// </summary>
+        public IStreamProviderManager StreamProviderManager { get; private set; }
+
+        /// <summary>
+        /// GrainFactory to use in the tests
+        /// </summary>
+        internal IInternalGrainFactory InternalGrainFactory { get; private set; }
+        
         /// <summary>
         /// Configure the default Primary test silo, plus client in-process.
         /// </summary>
@@ -402,9 +413,11 @@ namespace Orleans.TestingHost
             }
 
             GrainClient.Initialize(clientConfig);
-            GrainFactory = GrainClient.GrainFactory;
+            this.GrainFactory = GrainClient.GrainFactory;
+            this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
+            this.StreamProviderManager = RuntimeClient.Current.CurrentStreamProviderManager;
         }
-
+        
         private async Task InitializeAsync(IEnumerable<string> siloNames)
         {
             var silos = siloNames.ToList();

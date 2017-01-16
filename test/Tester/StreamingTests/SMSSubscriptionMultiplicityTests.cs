@@ -31,9 +31,9 @@ namespace UnitTests.StreamingTests
         private const string StreamNamespace = "SMSSubscriptionMultiplicityTestsNamespace";
         private SubscriptionMultiplicityTestRunner runner;
         
-        public SMSSubscriptionMultiplicityTests()
+        public SMSSubscriptionMultiplicityTests(Fixture fixture)
         {
-            runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, GrainClient.Logger);
+            runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, GrainClient.Logger, fixture.HostedCluster);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]

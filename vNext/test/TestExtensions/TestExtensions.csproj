@@ -43,6 +43,12 @@
     <Compile Include="..\..\..\test\TestExtensions\BaseClusterFixture.cs">
       <Link>BaseClusterFixture.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\TestEnvironmentFixture.cs">
+      <Link>TestEnvironmentFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TestExtensions\SerializationTestEnvironment.cs">
+      <Link>SerializationTestEnvironment.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TestExtensions\DefaultClusterFixture.cs">
       <Link>DefaultClusterFixture.cs</Link>
     </Compile>

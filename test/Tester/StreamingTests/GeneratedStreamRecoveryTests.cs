@@ -18,7 +18,12 @@ namespace UnitTests.StreamingTests
 {
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
+        private readonly Fixture fixture;
+        private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
+
+
+        public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 
@@ -49,14 +54,11 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
-
-        private ImplicitSubscritionRecoverableStreamTestRunner runner;
-
-        public GeneratedImplicitSubscriptionStreamRecoveryTests()
+        public GeneratedImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
         {
-            runner = new ImplicitSubscritionRecoverableStreamTestRunner(
-                GrainClient.GrainFactory,
+            this.fixture = fixture;
+            this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(
+                this.fixture.GrainFactory,
                 Fixture.StreamProviderName);
         }
 
@@ -88,7 +90,7 @@ namespace UnitTests.StreamingTests
                 EventsInStream = eventsInStream
             };
 
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
             Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();

@@ -47,6 +47,7 @@
     <Compile Include="Async_AsyncExecutorWithRetriesTests.cs" />
     <Compile Include="Async_TimingTests.cs" />
     <Compile Include="CodeGeneratorTests.cs" />
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="ConfigTests.cs" />
     <Compile Include="CounterTests.cs" />
     <Compile Include="General\CounterStatisticTests.cs" />

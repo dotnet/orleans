@@ -33,11 +33,6 @@ namespace UnitTests.GeoClusterTests
         {
         }
 
-
-    
-
-
-
         [Fact, TestCategory("Functional"), TestCategory("GeoCluster")]
         public async Task TwoClusterBattery()
         {
@@ -170,11 +165,11 @@ namespace UnitTests.GeoClusterTests
         {
             public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> clientconfig_customizer) : base(name, gatewayport, clusterId, clientconfig_customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+                this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
             public int CallGrain(int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("Call Grain {0}", grainRef);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
@@ -182,7 +177,7 @@ namespace UnitTests.GeoClusterTests
             }
             public string GetRuntimeId(int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("GetRuntimeId {0}", grainRef);
                 Task<string> toWait = grainRef.GetRuntimeId();
                 toWait.Wait();
@@ -190,7 +185,7 @@ namespace UnitTests.GeoClusterTests
             }
             public void Deactivate(int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("Deactivate {0}", grainRef);
                 Task toWait = grainRef.Deactivate();
                 toWait.GetResult();
@@ -198,7 +193,7 @@ namespace UnitTests.GeoClusterTests
 
             public void EnableStreamNotifications(int i)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("EnableStreamNotifications {0}", grainRef);
                 Task toWait = grainRef.EnableStreamNotifications();
                 toWait.GetResult();
@@ -207,10 +202,10 @@ namespace UnitTests.GeoClusterTests
             // observer-based notification
             public void Subscribe(int i, IClusterTestListener listener)
             {
-                var grainRef = GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i);
+                var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
                 GrainClient.Logger.Info("Create Listener object {0}", grainRef);
                 listeners.Add(listener);
-                var obj = GrainClient.GrainFactory.CreateObjectReference<IClusterTestListener>(listener).Result;
+                var obj = this.GrainFactory.CreateObjectReference<IClusterTestListener>(listener).Result;
                 listeners.Add(obj);
                 GrainClient.Logger.Info("Subscribe {0}", grainRef);
                 Task toWait = grainRef.Subscribe(obj);
@@ -235,7 +230,7 @@ namespace UnitTests.GeoClusterTests
             IManagementGrain systemManagement;
             public string GetGrainRef(int i)
             {
-                return GrainClient.GrainFactory.GetGrain<IClusterTestGrain>(i).ToString();
+                return this.GrainFactory.GetGrain<IClusterTestGrain>(i).ToString();
             }
         }
 

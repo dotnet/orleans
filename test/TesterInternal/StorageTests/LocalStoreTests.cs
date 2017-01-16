@@ -40,13 +40,16 @@ namespace UnitTests.StorageTests
         }
     }
 
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-        public LocalStoreTests(ITestOutputHelper output)
+        public LocalStoreTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             LocalDataStoreInstance.LocalDataStore = null;
         }
 

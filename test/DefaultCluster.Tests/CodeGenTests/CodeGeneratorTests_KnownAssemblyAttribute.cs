@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
+using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -12,17 +13,21 @@ namespace DefaultCluster.Tests.General
     /// </summary
     public class KnownAssemblyAttributeTests : HostedTestClusterEnsureDefaultStarted
     {
+        public KnownAssemblyAttributeTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         private async Task SiloSerializerExists(Type t)
         {
             var id = Guid.NewGuid();
-            var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(id);
+            var grain = this.GrainFactory.GetGrain<ISerializerPresenceTest>(id);
             var serializerExists = await grain.SerializerExistsForType(t);
             Assert.True(serializerExists);
         }
 
         private void ClientSerializerExists(Type t)
         {
-            Assert.True(Orleans.Serialization.SerializationManager.HasSerializer(t));
+            Assert.True(SerializationManager.HasSerializer(t));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]

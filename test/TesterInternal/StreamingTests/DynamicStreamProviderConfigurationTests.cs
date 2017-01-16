@@ -82,7 +82,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, providerNames.Count);
 
             providerNames = new List<string>(new [] { GeneratedStreamTestConstants.StreamProviderName });
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
             try
             {
                 await AddGeneratorStreamProviderAndVerify(providerNames);
@@ -232,7 +232,7 @@ namespace UnitTests.StreamingTests
 
         private async Task AddProvidersAndVerify(ICollection<string> streamProviderNames)
         {
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            this.mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             ICollection<string> names = await fixture.HostedCluster.Primary.TestHook.GetStreamProviderNames();
 
             IDictionary<string, bool> hasNewProvider = new Dictionary<string, bool>();
@@ -270,7 +270,7 @@ namespace UnitTests.StreamingTests
 
         private async Task RemoveProvidersAndVerify(ICollection<string> streamProviderNames)
         {
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            this.mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             ICollection<string> names = await fixture.HostedCluster.Primary.TestHook.GetStreamProviderNames();
             int Count = names.Count;
             foreach (string name in streamProviderNames)
@@ -298,7 +298,7 @@ namespace UnitTests.StreamingTests
 
         private async Task<bool> CheckCounters(bool assertIsTrue)
         {
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
             var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, Fixture.StreamNamespace);
             if (assertIsTrue)

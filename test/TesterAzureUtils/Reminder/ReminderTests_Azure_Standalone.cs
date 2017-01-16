@@ -18,17 +18,20 @@ using Xunit.Abstractions;
 
 namespace UnitTests.TimerTests
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ReminderTests_Azure_Standalone
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
         private Guid ServiceId;
 
         private Logger log;
         
-        public ReminderTests_Azure_Standalone(ITestOutputHelper output)
+        public ReminderTests_Azure_Standalone(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             log = LogManager.GetLogger(GetType().Name, LoggerType.Application);
 
             ServiceId = Guid.NewGuid();

@@ -52,7 +52,7 @@ namespace UnitTests.StreamingTests
         public StreamLifecycleTests(ITestOutputHelper output)
         {
             this.output = output;
-            watcher = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
+            this.watcher = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
@@ -96,13 +96,13 @@ namespace UnitTests.StreamingTests
 
             int numProducers = 10;
 
-            var consumer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
+            var consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
 
             var producers = new IStreamLifecycleProducerInternalGrain[numProducers];
             for (int i = 1; i <= producers.Length; i++)
             {
-                var producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
+                var producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
                 producers[i - 1] = producer;
             }
             int expectedReceived = 0;
@@ -169,11 +169,11 @@ namespace UnitTests.StreamingTests
         {
             StreamTestUtils.LogStartTest(testName, StreamId, StreamProviderName, logger, HostedCluster);
 
-            var producer1 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
-            var producer2 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
+            var producer1 = this.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
+            var producer2 = this.GrainFactory.GetGrain<IStreamLifecycleProducerInternalGrain>(Guid.NewGuid());
 
-            var consumer1 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
-            var consumer2 = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
+            var consumer1 = this.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
+            var consumer2 = this.GrainFactory.GetGrain<IStreamLifecycleConsumerInternalGrain>(Guid.NewGuid());
 
             await consumer1.BecomeConsumer(StreamId, StreamNamespace, StreamProviderName);
             await producer1.BecomeProducer(StreamId, StreamNamespace, StreamProviderName);

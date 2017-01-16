@@ -33,7 +33,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("MethodInterception")]
         public async Task PreInvocationCallbackTest()
         {
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());
             
             // This grain method reads the context and returns it
             var context = await grain.GetRequestContext();
@@ -51,7 +51,7 @@ namespace UnitTests.General
             var streamProvider = GrainClient.GetStreamProvider("SMSProvider");
             var id = Guid.NewGuid();
             var stream = streamProvider.GetStream<int>(id, "InterceptedStream");
-            var grain = GrainFactory.GetGrain<IStreamInterceptionGrain>(id);
+            var grain = this.GrainFactory.GetGrain<IStreamInterceptionGrain>(id);
 
             // The intercepted grain should double the value passed to the stream.
             const int TestValue = 43;

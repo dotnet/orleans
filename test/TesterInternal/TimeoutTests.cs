@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,9 +14,9 @@ namespace UnitTests
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;
-        private TimeSpan originalTimeout;
+        private readonly TimeSpan originalTimeout;
         
-        public TimeoutTests(ITestOutputHelper output)
+        public TimeoutTests(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
             originalTimeout = RuntimeClient.Current.GetResponseTimeout();
@@ -33,7 +32,7 @@ namespace UnitTests
         {
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
             RuntimeClient.Current.SetResponseTimeout(timeout);
 

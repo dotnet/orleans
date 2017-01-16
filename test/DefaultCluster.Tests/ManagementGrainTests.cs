@@ -25,7 +25,7 @@ namespace DefaultCluster.Tests.Management
             : base(fixture)
         {
             this.output = output;
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
@@ -92,7 +92,7 @@ namespace DefaultCluster.Tests.Management
             string grainType = typeof(TGrain).FullName;
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            var grain1 = GrainClient.GrainFactory.GetGrain<TGrainInterface>(random.Next());
+            var grain1 = this.GrainFactory.GetGrain<TGrainInterface>(random.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = GetSimpleGrainStatistics("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);

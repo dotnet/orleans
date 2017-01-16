@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 

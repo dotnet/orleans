@@ -4,6 +4,7 @@ using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Tester.Serialization;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.Serialization

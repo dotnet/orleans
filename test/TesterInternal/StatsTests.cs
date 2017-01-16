@@ -16,6 +16,7 @@ namespace UnitTests.Stats
     public class StatsInitTests : OrleansTestingBase, IClassFixture<StatsInitTests.Fixture>
     {
         private readonly ITestOutputHelper output;
+        private readonly Fixture fixture;
 
         public class Fixture : BaseClusterFixture
         {
@@ -34,12 +35,14 @@ namespace UnitTests.Stats
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestingSiloHost HostedCluster => this.fixture.HostedCluster;
+        protected IGrainFactory GrainFactory => this.fixture.GrainFactory;
 
         public StatsInitTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
-            HostedCluster = fixture.HostedCluster;
+            this.fixture = fixture;
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]

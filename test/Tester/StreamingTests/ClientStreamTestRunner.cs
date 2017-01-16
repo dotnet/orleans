@@ -54,7 +54,7 @@ namespace Tester.StreamingTests
                 (e, t) => { eventCount++; return TaskDone.Done; });
 
             // setup producer
-            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             // produce some events
@@ -81,7 +81,7 @@ namespace Tester.StreamingTests
                 (e, t) => { eventCount++; return TaskDone.Done; });
 
             // setup producer
-            producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             // produce more events
@@ -112,7 +112,7 @@ namespace Tester.StreamingTests
         private async Task ProduceEventsFromClient(string streamProviderName, Guid streamGuid, string streamNamespace, int eventsProduced)
         {
             // get reference to a consumer
-            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
+            var consumer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
 
             // subscribe
             await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);

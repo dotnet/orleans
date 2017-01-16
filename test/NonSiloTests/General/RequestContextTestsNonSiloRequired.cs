@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.General

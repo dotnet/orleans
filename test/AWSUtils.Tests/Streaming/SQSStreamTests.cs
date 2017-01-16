@@ -64,7 +64,7 @@ namespace AWSUtils.Tests.Streaming
 
         public SQSStreamTests()
         {
-            runner = new SingleStreamTestRunner(SQS_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(this.HostedCluster.InternalGrainFactory, SQS_STREAM_PROVIDER_NAME);
         }
 
         public override void Dispose()
@@ -176,14 +176,14 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(SQS_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SQS_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [Fact]
         public async Task SQS_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(SQS_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster.InternalGrainFactory, SQS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 this.HostedCluster.StartAdditionalSilo);
         }

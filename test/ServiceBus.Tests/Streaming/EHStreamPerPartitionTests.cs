@@ -23,6 +23,7 @@ namespace ServiceBus.Tests.StreamingTests
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {
+        private readonly Fixture fixture;
         private const string StreamProviderName = "EHStreamPerPartition";
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
@@ -41,7 +42,7 @@ namespace ServiceBus.Tests.StreamingTests
         private static readonly EventHubStreamProviderSettings ProviderSettings =
             new EventHubStreamProviderSettings(StreamProviderName);
 
-        private class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -77,6 +78,11 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
+        public EHStreamPerPartitionTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
@@ -89,7 +95,7 @@ namespace ServiceBus.Tests.StreamingTests
             List<ISampleStreaming_ConsumerGrain> consumers = new List<ISampleStreaming_ConsumerGrain>(partitionCount);
             for (int i = 0; i < partitionCount; i++)
             {
-                consumers.Add(GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()));
+                consumers.Add(this.fixture.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()));
             }
 
             // subscribe to each partition

@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using Orleans.TestingHost;
 using TestExtensions;
 using TestGrainInterfaces;
 using Xunit;
@@ -10,9 +9,13 @@ namespace DefaultCluster.Tests.GeoClusterTests
     {
         private const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
 
+        public SimpleGlobalSingleInstanceGrainTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         public ISimpleGlobalSingleInstanceGrain GetGlobalSingleInstanceGrain()
         {
-            return GrainFactory.GetGrain<ISimpleGlobalSingleInstanceGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
+            return this.GrainFactory.GetGrain<ISimpleGlobalSingleInstanceGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GeoCluster"), TestCategory("Azure")]

@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using Google.Protobuf;
 using Orleans.Serialization;
+using TestExtensions;
 using Xunit;
 
 namespace GoogleUtils.Tests.Serialization

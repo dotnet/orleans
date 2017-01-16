@@ -57,9 +57,6 @@
     <Compile Include="SerializationTests\SerializationTestsUtils.cs" />
     <Compile Include="SiloInitializationTests.cs" />
     <Compile Include="StreamingTests\ClientStreamTestRunner.cs" />
-    <Compile Include="CodeGenTests\GeneratorGrainTest.cs" />
-    <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
-    <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="GeoClusterTests\MultiClusterDataTests.cs" />
     <Compile Include="DependencyInjectionGrainTests.cs" />
     <Compile Include="DuplicateActivationsTests.cs" />

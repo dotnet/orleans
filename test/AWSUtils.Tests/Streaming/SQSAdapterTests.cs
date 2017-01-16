@@ -14,29 +14,30 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace AWSUtils.Tests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class SQSAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
         private const int NumBatches = 20;
         private const int NumMessagesPerBatch = 20;
-        private string deploymentId;
+        private readonly string deploymentId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
 
-        public SQSAdapterTests(ITestOutputHelper output)
+        public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
+            this.fixture = fixture;
             this.deploymentId = MakeDeploymentId();
-            LogManager.Initialize(new NodeConfiguration());
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationTestEnvironment.Initialize();
         }
 
         public void Dispose()

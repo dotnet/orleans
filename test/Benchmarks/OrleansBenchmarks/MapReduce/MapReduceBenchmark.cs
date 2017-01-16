@@ -55,26 +55,26 @@ namespace OrleansBenchmarks.MapReduce
         private async Task BenchCore()
         {
             List<Task> initializationTasks = new List<Task>();
-            var mapper = GrainClient.GrainFactory.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid());
+            var mapper = _host.GrainFactory.GetGrain<ITransformGrain<string, List<string>>>(Guid.NewGuid());
             initializationTasks.Add(mapper.Initialize(new MapProcessor()));
             var reducer =
-                GrainClient.GrainFactory.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid());
+                _host.GrainFactory.GetGrain<ITransformGrain<List<string>, Dictionary<string, int>>>(Guid.NewGuid());
             initializationTasks.Add(reducer.Initialize(new ReduceProcessor()));
 
             // used for imitation of complex processing pipelines
             var intermediateGrains = Enumerable
-                .Range(0, _intermediateStagesCount)
+                .Range(0, this._intermediateStagesCount)
                 .Select(i =>
                 {
                     var intermediateProcessor =
-                        GrainClient.GrainFactory.GetGrain<ITransformGrain<Dictionary<string, int>, Dictionary<string, int>>>
+                        _host.GrainFactory.GetGrain<ITransformGrain<Dictionary<string, int>, Dictionary<string, int>>>
                             (Guid.NewGuid());
                     initializationTasks.Add(intermediateProcessor.Initialize(new EmptyProcessor()));
                     return intermediateProcessor;
                 });
 
             initializationTasks.Add(mapper.LinkTo(reducer));
-            var collector = GrainClient.GrainFactory.GetGrain<IBufferGrain<Dictionary<string, int>>>(Guid.NewGuid());
+            var collector = _host.GrainFactory.GetGrain<IBufferGrain<Dictionary<string, int>>>(Guid.NewGuid());
             using (var e = intermediateGrains.GetEnumerator())
             {
                 ITransformGrain<Dictionary<string, int>, Dictionary<string, int>> previous = null;

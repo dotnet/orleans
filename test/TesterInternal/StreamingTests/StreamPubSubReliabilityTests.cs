@@ -35,12 +35,15 @@ namespace UnitTests.StreamingTests
         private const string PubSubStoreProviderName = "PubSubStore";
         protected TestingSiloHost HostedCluster { get; private set; }
 
+        public IGrainFactory GrainFactory { get; }
+
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
 
         public StreamPubSubReliabilityTests(Fixture fixture)
         {
+            GrainFactory = fixture.GrainFactory;
             HostedCluster = fixture.HostedCluster;
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
@@ -85,11 +88,11 @@ namespace UnitTests.StreamingTests
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
         {
             // Consumer
-            IStreamLifecycleConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
 
             // Producer
-            IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            IStreamLifecycleProducerGrain producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(StreamId, this.StreamNamespace, streamProviderName);
 
             await producer.SendItem(1);

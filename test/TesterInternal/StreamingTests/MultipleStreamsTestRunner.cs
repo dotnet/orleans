@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.StreamingTests;
+using Xunit;
 
 namespace UnitTests.Streaming
 {
@@ -14,12 +17,14 @@ namespace UnitTests.Streaming
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
         private Logger logger;
+        private readonly IInternalGrainFactory grainFactory;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
 
-        public MultipleStreamsTestRunner(string streamProvider, int testNum = 0, bool fullTest = true)
+        internal MultipleStreamsTestRunner(IInternalGrainFactory grainFactory, string streamProvider, int testNum = 0, bool fullTest = true)
         {
+            this.grainFactory = grainFactory;
             this.streamProviderName = streamProvider;
             this.logger = LogManager.GetLogger("MultipleStreamsTestRunner", LoggerType.Application);
             this.testNumber = testNum;
@@ -38,7 +43,7 @@ namespace UnitTests.Streaming
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
-                runners.Add(new SingleStreamTestRunner(this.streamProviderName, i, runFullTest));
+                runners.Add(new SingleStreamTestRunner(this.grainFactory, this.streamProviderName, i, runFullTest));
             }
             foreach (var runner in runners)
             {

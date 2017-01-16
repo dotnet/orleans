@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.SqlUtils;
+using TestExtensions;
 using UnitTests.General;
 using Xunit;
 
@@ -10,7 +11,7 @@ namespace UnitTests.RemindersTest
 {
     public class PostgreSqlRemindersTableTests : ReminderTableTestsBase
     {
-        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public PostgreSqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride(nameof(PostgreSqlRemindersTableTests), Severity.Verbose3);
         }

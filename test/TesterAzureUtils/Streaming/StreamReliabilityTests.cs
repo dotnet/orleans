@@ -569,7 +569,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
             long consumerGrainId = random.Next();
-            var consumerGrain = GrainClient.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
+            var consumerGrain = this.GrainFactory.GetGrain<IStreamUnsubscribeTestGrain>(consumerGrainId);
 
             logger.Info("Subscribe: StreamId={0} Provider={1}", _streamId, _streamProviderName);
             await consumerGrain.Subscribe(_streamId, _streamProviderName);
@@ -954,7 +954,7 @@ namespace UnitTests.Streaming.Reliability
 #if USE_GENERICS
             return StreamReliabilityTestGrainFactory<int>.GetGrain(grainId);
 #else
-            return GrainClient.GrainFactory.GetGrain<IStreamReliabilityTestGrain>(grainId);
+            return this.GrainFactory.GetGrain<IStreamReliabilityTestGrain>(grainId);
 #endif
         }
 
@@ -1014,7 +1014,7 @@ namespace UnitTests.Streaming.Reliability
 #else
             string grainType = typeof(StreamReliabilityTestGrain).FullName;
 #endif
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
             SimpleGrainStatistic[] grainStats = await mgmtGrain.GetSimpleGrainStatistics();
             output.WriteLine("Found grains " + Utils.EnumerableToString(grainStats));

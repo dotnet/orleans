@@ -7,6 +7,10 @@ namespace DefaultCluster.Tests
 {
     public class SerializationTests : HostedTestClusterEnsureDefaultStarted
     {
+        public SerializationTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("BVT"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()
         {

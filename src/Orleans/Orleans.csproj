@@ -156,9 +156,9 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Services\IGrainServiceClient.cs" />
     <Compile Include="Services\IGrainService.cs" />
+    <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
-    <Compile Include="Serialization\SerializationTestEnvironment.cs" />
     <Compile Include="Streams\Core\StreamIdentity.cs" />
     <Compile Include="Streams\Internal\StreamHandshakeToken.cs" />
     <Compile Include="Streams\PersistentStreams\IDeploymentConfiguration.cs" />
@@ -448,14 +448,14 @@
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
-      <CodeGenArgs Include="/out:$(CodeGenFilename)"/>
+      <CodeGenArgs Include="/out:$(CodeGenFilename)" />
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
     </ItemGroup>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
     <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
-       <Output TaskParameter="Outputs" ItemName="Compile" />
-       <Output TaskParameter="Outputs" ItemName="FileWrites" />
+      <Output TaskParameter="Outputs" ItemName="Compile" />
+      <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
   </Target>
 </Project>

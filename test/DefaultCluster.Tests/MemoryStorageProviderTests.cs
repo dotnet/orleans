@@ -11,17 +11,21 @@ namespace DefaultCluster.Tests.StorageTests
 {
     public class MemoryStorageProviderTests : HostedTestClusterEnsureDefaultStarted
     {
+        public MemoryStorageProviderTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Storage")]
         public async Task MemoryStorageProvider_RestoreStateTest()
         {
-            var grainWithState = GrainClient.GrainFactory.GetGrain<IInitialStateGrain>(0);
+            var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
             Assert.NotNull(await grainWithState.GetNames());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Storage")]
         public async Task MemoryStorageProvider_WriteReadStateTest()
         {
-            var grainWithState = GrainClient.GrainFactory.GetGrain<IInitialStateGrain>(0);
+            var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
 
             List<string> names = await grainWithState.GetNames();
             Assert.NotNull(names);
@@ -46,7 +50,7 @@ namespace DefaultCluster.Tests.StorageTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Storage")]
         public async Task MemoryStorageGrainEnforcesEtagsTest()
         {
-            var memoryStorageGrain = GrainClient.GrainFactory.GetGrain<IMemoryStorageGrain>(random.Next());
+            var memoryStorageGrain = this.GrainFactory.GetGrain<IMemoryStorageGrain>(random.Next());
 
             // Delete grain state from empty grain, should be safe.
             await memoryStorageGrain.DeleteStateAsync("stateStore", "grainStoreKey", "eTag");

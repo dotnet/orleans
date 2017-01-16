@@ -6,7 +6,6 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
-using Orleans.Serialization;
 using Orleans.SqlUtils;
 using Orleans.Storage;
 
@@ -21,7 +20,7 @@ namespace UnitTests.StorageTests.Relational
     /// instantiation, so this is used to coordinate environment invariant enforcing and to cache
     /// heavier setup.
     /// </summary>
-    public class CommonFixture
+    public class CommonFixture : TestEnvironmentFixture
     {
         /// <summary>
         /// Caches storage provider for multiple uses using a unique, back-end specific key.
@@ -50,20 +49,16 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public RelationalStorageForTesting Storage { get; set; }
 
-
         /// <summary>
         /// Constructor.
         /// </summary>
         public CommonFixture()
         {
-            var testEnvironment = new SerializationTestEnvironment();
             DefaultProviderRuntime = new StorageProviderManager(
-                testEnvironment.GrainFactory,
+                this.GrainFactory,
                 null,
-                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+                new ClientProviderRuntime(this.InternalGrainFactory, null));
             ((StorageProviderManager) DefaultProviderRuntime).LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
-
-            testEnvironment.InitializeForTesting();
         }
 
 

@@ -10,10 +10,14 @@ namespace DefaultCluster.Tests
 {
     public class ProviderTests : HostedTestClusterEnsureDefaultStarted
     {
+        public ProviderTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = GrainClient.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
+            IExtensionTestGrain grain = this.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
             bool exceptionThrown = true;
 
@@ -78,7 +82,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = this.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             var extension = grain.AsReference<ISimpleExtension>(); //generic base grain not yet activated - virt refs only
 
             try
@@ -95,7 +99,7 @@ namespace DefaultCluster.Tests
 
         [Fact, TestCategory("Functional"), TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
-            var grain = GrainClient.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = this.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             await grain.DoSomething(); //original generic grain activates here
 
             var extension = grain.AsReference<ISimpleExtension>();
