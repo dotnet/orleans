@@ -59,7 +59,6 @@
   <ItemGroup>
     <None Include="IGrain1.cs" />
     <None Include="AssemblyInfo.cs" />
-    <None Include="orleans.codegen.cs" />
     <None Include="packages.config" />
     <None Include="ProjectTemplate.csproj" />
   </ItemGroup>

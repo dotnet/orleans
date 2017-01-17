@@ -50,13 +50,10 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Grain1.cs" />
     <None Include="AssemblyInfo.cs" />
-    <None Include="orleans.codegen.cs" />
     <None Include="packages.config" />
     <None Include="ProjectTemplate.csproj" />
   </ItemGroup>
