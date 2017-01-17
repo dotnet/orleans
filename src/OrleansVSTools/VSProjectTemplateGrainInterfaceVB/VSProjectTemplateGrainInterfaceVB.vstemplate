@@ -38,6 +38,7 @@
       <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
       <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
       <Asset Type="Microsoft.Orleans.Core.1.4.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.4.0.nupkg" d:VsixSubPath="Packages" />
+      <Asset Type="System.Collections.Immutable.1.1.37.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.37.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
     </Assets>
   </WizardData>

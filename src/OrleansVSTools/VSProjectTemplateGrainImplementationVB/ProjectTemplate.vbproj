@@ -34,15 +34,7 @@
 
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Orleans">
-      <Private>False</Private>
-      <HintPath>$(SolutionDir)packages\Microsoft.Orleans.Core.1.4.0\lib\net451\Orleans.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -51,11 +43,9 @@
     <Import Include="System" />
     <Import Include="System.Collections" />
     <Import Include="System.Collections.Generic" />
-    <Import Include="System.Data" />
     <Import Include="System.Diagnostics" />
     <Import Include="System.Linq" />
     <Import Include="System.Threading.Tasks" />
-    <Import Include="System.Xml.Linq" />
   </ItemGroup>
 
   <ItemGroup>

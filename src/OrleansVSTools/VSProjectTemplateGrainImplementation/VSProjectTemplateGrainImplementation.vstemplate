@@ -18,7 +18,6 @@
   <TemplateContent>
     <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
       <ProjectItem ReplaceParameters="true" TargetFileName="Properties\AssemblyInfo.cs">AssemblyInfo.cs</ProjectItem>
-      <ProjectItem ReplaceParameters="true" TargetFileName="Properties\orleans.codegen.cs">orleans.codegen.cs</ProjectItem>
       <ProjectItem ReplaceParameters="true" OpenInEditor="true">Grain1.cs</ProjectItem>
     </Project>
   </TemplateContent>
