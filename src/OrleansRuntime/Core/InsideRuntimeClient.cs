@@ -474,8 +474,9 @@ namespace Orleans.Runtime
                 "PrepForRemoting",
                 BindingFlags.Instance | BindingFlags.NonPublic);
 
+            //This was added to avoid failure on .Net Core since Remoting APIs aren't available there.
             if (methodInfo == null)
-                return new Func<Exception, Exception>(exc => exc);
+                return exc => exc;
 
             var method = new DynamicMethod(
                 "PrepForRemoting",
