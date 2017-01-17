@@ -220,6 +220,14 @@
       <Link>Config_TestSiloConfig.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+        <Content Include="..\..\..\test\NonSiloTests\Config_TableGrain.xml">
+      <Link>Config_TableGrain.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\test\NonSiloTests\Config_Custom_Membership_No_Reminders.xml">
+      <Link>Config_Custom_Membership_No_Reminders.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\..\..\test\NonSiloTests\DevTestClientConfiguration.xml">
       <Link>DevTestClientConfiguration.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

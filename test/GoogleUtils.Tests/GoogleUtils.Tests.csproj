@@ -114,6 +114,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
     <None Include="GoogleUtils.Tests.xunit.runner.json" />
     <None Include="ProtobufSerialization\addressbook.proto" />

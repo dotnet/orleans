@@ -114,8 +114,11 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="project.json" />
-    <None Include="PSClient\PSClientTests.ps1" />
+    <None Include="PSClient\PSClientTests.ps1">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="PSUtils.Tests.xunit.runner.json" />
   </ItemGroup>
   <ItemGroup>
