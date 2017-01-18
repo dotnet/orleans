@@ -35,7 +35,7 @@ namespace UnitTests.MembershipTests
 
             SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
 
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
             Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
@@ -157,7 +157,7 @@ namespace UnitTests.MembershipTests
         {
             try
             {
-                ILivenessTestGrain grain = GrainClient.GrainFactory.GetGrain<ILivenessTestGrain>(key);
+                ILivenessTestGrain grain = this.GrainFactory.GetGrain<ILivenessTestGrain>(key);
                 Assert.Equal(key, grain.GetPrimaryKeyLong());
                 Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);

@@ -13,11 +13,15 @@ namespace DefaultCluster.Tests.General
     /// </summary>
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
+        public GrainReferenceTest(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReferenceComparison_DifferentReference()
         {
-            ISimpleGrain ref1 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
-            ISimpleGrain ref2 = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain ref2 = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
             Assert.True(ref1 != ref2);
             Assert.True(ref2 != ref1);
             Assert.False(ref1 == ref2);
@@ -42,8 +46,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this()
         {
-            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             
             g1.PassThis(g2).Wait();
         }
@@ -51,8 +55,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
         public void GrainReference_Pass_this_Nested()
         {
-            IChainedGrain g1 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            IChainedGrain g2 = GrainClient.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
             g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
         }

@@ -14,6 +14,10 @@ namespace DefaultCluster.Tests.SchedulerTests
     [TestCategory("BVT")]
     public class STSchedulerLongTurnTest : HostedTestClusterEnsureDefaultStarted
     {
+        public STSchedulerLongTurnTest(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_LongTurnTest()
         {
@@ -23,7 +27,7 @@ namespace DefaultCluster.Tests.SchedulerTests
             var grainFullName = typeof(ErrorGrain).FullName;
             for (int i = 0; i < 100; i++)
             {
-                grains.Add(GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
+                grains.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             }
 
             // Send a bunch of do-nothing requests just to get the grains activated

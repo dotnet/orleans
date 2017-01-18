@@ -20,7 +20,7 @@ namespace Tests.GeoClusterTests
                 // use null clusterId, in this test, because we are testing non-geo clients
                 : base(name, gatewayport, null, customizer)
             {
-                systemManagement = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+                this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
             IManagementGrain systemManagement;
 

@@ -8,10 +8,8 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
-using Orleans.Serialization;
 using Orleans.Storage;
 using Samples.StorageProviders;
-using Tester;
 using TestExtensions;
 using UnitTests.StorageTests;
 using UnitTests.Persistence;
@@ -20,33 +18,24 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence
 {
-    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_Local.Fixture>, IDisposable
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class PersistenceProviderTests_Local : IDisposable
     {
-        public class Fixture
-        {
-            public Fixture()
-            {
-                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-                LogManager.Initialize(cfg);
-            }
-        }
-
         private readonly StorageProviderManager storageProviderManager;
         private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
         private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-        public PersistenceProviderTests_Local(ITestOutputHelper output)
+        public PersistenceProviderTests_Local(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            var testEnvironment = new SerializationTestEnvironment();
+            this.fixture = fixture;
             storageProviderManager = new StorageProviderManager(
-                testEnvironment.GrainFactory,
+                fixture.GrainFactory,
                 null,
-                new ClientProviderRuntime(testEnvironment.GrainFactory, null));
+                new ClientProviderRuntime(fixture.InternalGrainFactory, null));
             storageProviderManager.LoadEmptyStorageProviders().WaitWithThrow(TestConstants.InitTimeout);
             providerCfgProps.Clear();
-            testEnvironment.InitializeForTesting();
             LocalDataStoreInstance.LocalDataStore = null;
         }
 

@@ -14,11 +14,15 @@ namespace DefaultCluster.Tests.General
     /// </summary>
     public class JsonGrainTests : HostedTestClusterEnsureDefaultStarted
     {
+        public JsonGrainTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("JSON"), TestCategory("GetGrain")]
         public async Task JSON_GetGrain()
         {
             int id = random.Next();
-            var grain = GrainFactory.GetGrain<IJsonEchoGrain>(id);
+            var grain = this.GrainFactory.GetGrain<IJsonEchoGrain>(id);
             await grain.Ping();
         }
 
@@ -26,7 +30,7 @@ namespace DefaultCluster.Tests.General
         public async Task JSON_EchoJson()
         {
             int id = random.Next();
-            var grain = GrainFactory.GetGrain<IJsonEchoGrain>(id);
+            var grain = this.GrainFactory.GetGrain<IJsonEchoGrain>(id);
 
             // Compare to: SerializationTests_JObject_Example1
             const string json = 

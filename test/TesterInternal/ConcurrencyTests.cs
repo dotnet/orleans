@@ -15,7 +15,9 @@ namespace UnitTests.ConcurrencyTests
     /// </summary>
     public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -26,10 +28,15 @@ namespace UnitTests.ConcurrencyTests
             }
         }
 
+        public ConcurrencyTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public async Task ConcurrencyTest_ReadOnly()
         {
-            IConcurrentGrain first = GrainClient.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
+            IConcurrentGrain first = this.fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
             first.Initialize(0).Wait();
 
             List<Task> promises = new List<Task>();
@@ -44,7 +51,7 @@ namespace UnitTests.ConcurrencyTests
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public void ConcurrencyTest_ModifyReturnList()
         {
-            IConcurrentGrain grain = GrainClient.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
+            IConcurrentGrain grain = this.fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
 
             Task<List<int>>[] ll = new Task<List<int>>[20];
             for (int i = 0; i < 2000; i++)

@@ -58,7 +58,7 @@ namespace UnitTests.StreamingTests
         {
             this.output = output;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
-            mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            this.mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
         }
         
         [Fact]
@@ -72,7 +72,7 @@ namespace UnitTests.StreamingTests
             output.WriteLine("Starting search for MaxConsumersPerStream value using stream {0}", streamId);
 
 
-            IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            IStreamLifecycleProducerGrain producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, this.StreamNamespace, streamProviderName);
 
             int loopCount = 0;
@@ -81,13 +81,13 @@ namespace UnitTests.StreamingTests
                 // Loop until something breaks!
                 for (loopCount = 1; loopCount <= MaxExpectedPerStream; loopCount++)
                 {
-                    IStreamLifecycleConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+                    IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
                     await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
                 }
             }
             catch (Exception exc)
             {
-                output.WriteLine("Stopping loop at loopCount={0} due to exception {1}", loopCount, exc);
+                this.output.WriteLine("Stopping loop at loopCount={0} due to exception {1}", loopCount, exc);
             }
             MaxConsumersPerStream = loopCount - 1;
             output.WriteLine("Finished search for MaxConsumersPerStream with value {0}", MaxConsumersPerStream);
@@ -105,7 +105,7 @@ namespace UnitTests.StreamingTests
 
             output.WriteLine("Starting search for MaxProducersPerStream value using stream {0}", streamId);
 
-            IStreamLifecycleConsumerGrain consumer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
 
             int loopCount = 0;
@@ -114,13 +114,13 @@ namespace UnitTests.StreamingTests
                 // Loop until something breaks!
                 for (loopCount = 1; loopCount <= MaxExpectedPerStream; loopCount++)
                 {
-                    IStreamLifecycleProducerGrain producer = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+                    IStreamLifecycleProducerGrain producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
                     await producer.BecomeProducer(streamId, this.StreamNamespace, streamProviderName);
                 }
             }
             catch (Exception exc)
             {
-                output.WriteLine("Stopping loop at loopCount={0} due to exception {1}", loopCount, exc);
+                this.output.WriteLine("Stopping loop at loopCount={0} due to exception {1}", loopCount, exc);
             }
             MaxProducersPerStream = loopCount - 1;
             output.WriteLine("Finished search for MaxProducersPerStream with value {0}", MaxProducersPerStream);
@@ -369,14 +369,14 @@ namespace UnitTests.StreamingTests
                 for (int i = 0; i < numProducers; i++)
                 {
                     producerIds[i] = Guid.NewGuid();
-                    var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(producerIds[i]);
+                    var grain = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(producerIds[i]);
                     Task promise = grain.Ping();
 
                     pipeline.Add(promise);
                 }
                 pipeline.Wait();
 
-                int activePublisherGrains = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
+                int activePublisherGrains = this.ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
                 Assert.Equal(numProducers,  activePublisherGrains);  //  "Initial Publisher count -- should all be warmed up"
             }
 
@@ -391,7 +391,7 @@ namespace UnitTests.StreamingTests
                 {
                     Guid streamId = streamIds[i];
                     Guid producerId = producerIds[i % numProducers];
-                    var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(producerId);
+                    var grain = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(producerId);
 
                     Task promise = grain.BecomeProducer(streamId, this.StreamNamespace, streamProviderName);
 
@@ -525,9 +525,9 @@ namespace UnitTests.StreamingTests
             for (int i = 0; i < numStreams; i++)
             {
                 Guid streamId = streamIds[i];
-                string extKey = streamProviderName + "_" + StreamNamespace;
+                string extKey = streamProviderName + "_" + this.StreamNamespace;
 
-                IPubSubRendezvousGrain pubsub = GrainClient.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId, extKey, null);
+                IPubSubRendezvousGrain pubsub = this.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId, extKey, null);
 
                 Task promise = pubsub.Validate();
 
@@ -574,14 +574,14 @@ namespace UnitTests.StreamingTests
             return Task.WhenAll(promises);
         }
 
-        private static IList<Task> SetupProducers(Guid streamId, string streamNamespace, string streamProviderName, AsyncPipeline pipeline, int numProducers)
+        private IList<Task> SetupProducers(Guid streamId, string streamNamespace, string streamProviderName, AsyncPipeline pipeline, int numProducers)
         {
             var producers = new List<IStreamLifecycleProducerGrain>();
             var promises = new List<Task>();
 
             for (int loopCount = 0; loopCount < numProducers; loopCount++)
             {
-                var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
                 producers.Add(grain);
 
                 Task promise = grain.BecomeProducer(streamId, streamNamespace, streamProviderName);
@@ -598,7 +598,7 @@ namespace UnitTests.StreamingTests
             return promises;
         }
 
-        private static IList<Task> SetupConsumers(Guid streamId, string streamNamespace, string streamProviderName, AsyncPipeline pipeline, int numConsumers, bool normalSubscribeCalls)
+        private IList<Task> SetupConsumers(Guid streamId, string streamNamespace, string streamProviderName, AsyncPipeline pipeline, int numConsumers, bool normalSubscribeCalls)
         {
             var consumers = new List<IStreamLifecycleConsumerGrain>();
             var promises = new List<Task>();
@@ -606,7 +606,7 @@ namespace UnitTests.StreamingTests
             long consumerIdStart = random.Next();
             for (int loopCount = 0; loopCount < numConsumers; loopCount++)
             {
-                var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
                 consumers.Add(grain);
 
                 Task promise; 
@@ -745,7 +745,7 @@ namespace UnitTests.StreamingTests
             return rps;
         }
 
-        private static async Task InitializeTopology(Guid streamId, string streamNamespace, string streamProviderName,
+        private async Task InitializeTopology(Guid streamId, string streamNamespace, string streamProviderName,
             int numProducers, int numConsumers,
             List<IStreamLifecycleProducerGrain> producers, List<IStreamLifecycleConsumerGrain> consumers,
             bool useFanOut)
@@ -759,7 +759,7 @@ namespace UnitTests.StreamingTests
             long consumerIdStart = nextGrainId;
             for (int loopCount = 0; loopCount < numConsumers; loopCount++)
             {
-                var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
                 consumers.Add(grain);
 
                 Task promise = grain.BecomeConsumer(streamId, streamNamespace, streamProviderName);
@@ -796,7 +796,7 @@ namespace UnitTests.StreamingTests
             pipeline = new AsyncPipeline(InitPipelineSize);
             for (int loopCount = 0; loopCount < numProducers; loopCount++)
             {
-                var grain = GrainClient.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
                 producers.Add(grain);
 
                 Task promise = grain.BecomeProducer(streamId, streamNamespace, streamProviderName);

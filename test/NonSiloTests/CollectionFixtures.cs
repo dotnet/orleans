@@ -1,11 +1,13 @@
-﻿using TestExtensions;
+﻿using Orleans.Serialization;
+using TestExtensions;
 using Xunit;
 
-namespace DefaultCluster.Tests
+namespace Orleans.NonSiloTests
 {
     // Assembly collections must be defined once in each assembly
     [CollectionDefinition("DefaultCluster")]
     public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
+
 
     [CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
     public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }

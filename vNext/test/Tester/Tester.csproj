@@ -81,15 +81,6 @@
     <Compile Include="..\..\..\test\Tester\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\RuntimeCodeGenerationTests.cs">
-      <Link>CodeGenTests\RuntimeCodeGenerationTests.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\GeneratorGrainTest.cs">
-      <Link>CodeGenTests\GeneratorGrainTest.cs</Link>
-    </Compile>
-    <Compile Include="..\..\..\test\Tester\CodeGenTests\IRuntimeCodeGenGrain.cs">
-      <Link>CodeGenTests\IRuntimeCodeGenGrain.cs</Link>
-    </Compile>
     <Compile Include="..\..\..\test\Tester\SerializationTests\SerializationTestsUtils.cs">
       <Link>SerializationTests\SerializationTestsUtils.cs</Link>
     </Compile>

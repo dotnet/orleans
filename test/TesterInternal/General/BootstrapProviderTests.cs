@@ -18,6 +18,7 @@ namespace UnitTests.General
     public class BootstrapProvidersTests : OrleansTestingBase, IClassFixture<BootstrapProvidersTests.Fixture>
     {
         private readonly ITestOutputHelper output;
+        private readonly Fixture fixture;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -36,13 +37,13 @@ namespace UnitTests.General
             }
         }
 
-
-        protected TestCluster HostedCluster { get; private set; }
+        protected TestCluster HostedCluster => this.fixture.HostedCluster;
+        protected IGrainFactory GrainFactory => this.fixture.GrainFactory;
 
         public BootstrapProvidersTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
-            this.HostedCluster = fixture.HostedCluster;
+            this.fixture = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Providers"), TestCategory("Bootstrap")]
@@ -65,7 +66,7 @@ namespace UnitTests.General
             long grainId = GrainCallBootstrapTestConstants.GrainId;
             int a = GrainCallBootstrapTestConstants.A;
             int b = GrainCallBootstrapTestConstants.B;
-            ISimpleGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleGrain>(grainId, SimpleGrain.SimpleGrainNamePrefix);
+            ISimpleGrain grain = this.GrainFactory.GetGrain<ISimpleGrain>(grainId, SimpleGrain.SimpleGrainNamePrefix);
             int axb = await grain.GetAxB();
             Assert.Equal((a * b), axb);
         }
@@ -75,9 +76,9 @@ namespace UnitTests.General
         {
             for (int i = 0; i < 20; i++ )
             {
-                ITestContentGrain grain = GrainClient.GrainFactory.GetGrain<ITestContentGrain>(i);
+                ITestContentGrain grain = this.GrainFactory.GetGrain<ITestContentGrain>(i);
                 object content = await grain.FetchContentFromLocalGrain();
-                logger.Info(content.ToString());
+                this.logger.Info(content.ToString());
                 string testGrainSiloId = await grain.GetRuntimeInstanceId();
                 Assert.Equal(testGrainSiloId, content);
             }

@@ -9,11 +9,15 @@ namespace DefaultCluster.Tests.General
 {
     public class DeactivationTests : HostedTestClusterEnsureDefaultStarted
     {
+        public DeactivationTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional")]
         public async Task DeactivateReactivateTiming()
         {
             var x = GetRandomGrainId();
-            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x);
+            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(x);
             var originalVersion = await grain.GetVersion();
 
             var sw = Stopwatch.StartNew();

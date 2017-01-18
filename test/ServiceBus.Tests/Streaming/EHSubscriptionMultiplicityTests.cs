@@ -41,7 +41,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private readonly SubscriptionMultiplicityTestRunner runner;
 
-        private class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -75,9 +75,9 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        public EHSubscriptionMultiplicityTests()
+        public EHSubscriptionMultiplicityTests(Fixture fixture)
         {
-            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, GrainClient.Logger);            
+            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, GrainClient.Logger, fixture.HostedCluster);            
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]

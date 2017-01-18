@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Linq;
 using Orleans.Serialization;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 

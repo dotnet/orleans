@@ -24,6 +24,7 @@ namespace ServiceBus.Tests.StreamingTests
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
+        private readonly Fixture fixture;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest";
         private const string EHConsumerGroup = "orleansnightly";
@@ -44,7 +45,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
 
-        private class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
             {
@@ -83,9 +84,10 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        public EHImplicitSubscriptionStreamRecoveryTests()
+        public EHImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
         {
-            runner = new ImplicitSubscritionRecoverableStreamTestRunner(GrainClient.GrainFactory, StreamProviderName);
+            this.fixture = fixture;
+            this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(this.fixture.GrainFactory, StreamProviderName);
         }
 
         [Fact]
@@ -104,7 +106,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = GrainClient.GetStreamProvider(StreamProviderName);
+            IStreamProvider streamProvider = (IStreamProvider)this.fixture.HostedCluster.StreamProviderManager.GetProvider(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(Guid.NewGuid(), streamNamespace))

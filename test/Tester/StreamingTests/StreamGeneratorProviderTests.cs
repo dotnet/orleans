@@ -20,7 +20,9 @@ namespace UnitTests.StreamingTests
 {
     public class StreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<StreamGeneratorProviderTests.Fixture>
     {
-        private class Fixture : BaseTestClusterFixture
+        private readonly Fixture fixture;
+
+        public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
@@ -57,6 +59,11 @@ namespace UnitTests.StreamingTests
             }
         }
 
+        public StreamGeneratorProviderTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
@@ -68,7 +75,7 @@ namespace UnitTests.StreamingTests
 
         private async Task<bool> CheckCounters(bool assertIsTrue)
         {
-            var reporter = GrainClient.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
             var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace);
             if (assertIsTrue)

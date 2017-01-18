@@ -21,7 +21,7 @@ namespace DefaultCluster.Tests
         private readonly Logger Logger = LogManager.GetLogger("AssemblyLoaderTests", Orleans.Runtime.LoggerType.Application);
         private readonly ITestOutputHelper output;
 
-        public ErrorGrainTest(ITestOutputHelper output)
+        public ErrorGrainTest(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
         }
@@ -30,7 +30,7 @@ namespace DefaultCluster.Tests
         public async Task ErrorGrain_GetGrain()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             int ignored = await grain.GetA();
         }
 
@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests
         public void ErrorHandlingGrainError1()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
 
             Task<int> intPromise = grain.GetAxBError();
             try
@@ -91,7 +91,7 @@ namespace DefaultCluster.Tests
         public void ErrorHandlingTimedMethod()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
 
             Task promise = grain.LongMethod(2000);
 
@@ -116,7 +116,7 @@ namespace DefaultCluster.Tests
         public void ErrorHandlingTimedMethodWithError()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
 
             Task promise = grain.LongMethodWithError(2000);
 
@@ -145,7 +145,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
         public void StressHandlingMultipleDelayedRequests()
         {
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
             bool once = true;
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 500; i++)
@@ -168,9 +168,9 @@ namespace DefaultCluster.Tests
         {
             var grainFullName = typeof(ErrorGrain).FullName;
             List<IErrorGrain> list = new List<IErrorGrain>();
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
-            list.Add(GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
-            list.Add(GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
+            list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             bool ok = grain.AddChildren(list).Wait(timeout);
             if (!ok) throw new TimeoutException();
         }
@@ -179,7 +179,7 @@ namespace DefaultCluster.Tests
         public async Task AC_DelayedExecutor_2()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
-            IErrorGrain grain = GrainClient.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
+            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             Task<bool> promise = grain.ExecuteDelayed(TimeSpan.FromMilliseconds(2000));
             bool result = await promise;
             Assert.Equal(true, result);
@@ -188,7 +188,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_AsyncMethods()
         {
-            ISimpleGrainWithAsyncMethods grain = GrainClient.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(GetRandomGrainId());
+            ISimpleGrainWithAsyncMethods grain = this.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(GetRandomGrainId());
             Task setPromise = grain.SetA_Async(10);
             setPromise.Wait();
 
@@ -202,7 +202,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
         public void SimpleGrain_PromiseForward()
         {
-            ISimpleGrain forwardGrain = GrainClient.GrainFactory.GetGrain<IPromiseForwardGrain>(GetRandomGrainId());
+            ISimpleGrain forwardGrain = this.GrainFactory.GetGrain<IPromiseForwardGrain>(GetRandomGrainId());
             Task<int> promise = forwardGrain.GetAxB(5, 6);
             int result = promise.Result;
             Assert.Equal(30, result);
@@ -240,7 +240,7 @@ namespace DefaultCluster.Tests
             {
                 guid = Guid.Parse(string.Format("{0:X8}-0000-0000-0000-000000000000", n));
             }
-            IEchoGrain grain = GrainClient.GrainFactory.GetGrain<IEchoGrain>(guid);
+            IEchoGrain grain = this.GrainFactory.GetGrain<IEchoGrain>(guid);
             GrainId grainId = ((GrainReference)grain.AsReference<IEchoGrain>()).GrainId;
             output.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());
         }

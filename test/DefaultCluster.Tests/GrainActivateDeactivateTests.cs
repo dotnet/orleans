@@ -13,9 +13,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
     {
         private IActivateDeactivateWatcherGrain watcher;
 
-        public GrainActivateDeactivateTests()
+        public GrainActivateDeactivateTests(DefaultClusterFixture fixture) : base(fixture)
         {
-            watcher = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
+            watcher = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             watcher.Clear().Wait();
         }
 
@@ -27,7 +27,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
-            IActivateDeactivateWatcherGrain grain = GrainClient.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);
+            IActivateDeactivateWatcherGrain grain = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);
             await grain.Clear();
         }
 
@@ -35,7 +35,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Activate_Simple()
         {
             int id = random.Next();
-            ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             string activation = await grain.DoSomething();
 
@@ -46,7 +46,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Deactivate_Simple()
         {
             int id = random.Next();
-            ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -62,7 +62,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Reactivate_Simple()
         {
             int id = random.Next();
-            ISimpleActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -83,7 +83,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Activate_TailCall()
         {
             int id = random.Next();
-            ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             string activation = await grain.DoSomething();
 
@@ -94,7 +94,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Deactivate_TailCall()
         {
             int id = random.Next();
-            ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -110,7 +110,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Reactivate_TailCall()
         {
             int id = random.Next();
-            ITailCallActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -131,7 +131,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task LongRunning_Deactivate()
         {
             int id = random.Next();
-            ILongRunningActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ILongRunningActivateDeactivateTestGrain>(id);
+            ILongRunningActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ILongRunningActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -158,7 +158,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             try
             {
                 int id = random.Next();
-                IBadActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
+                IBadActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
 
                 await grain.ThrowSomething();
 
@@ -177,7 +177,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             try
             {
                 int id = random.Next();
-                IBadActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
+                IBadActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
 
                 long key = await grain.GetKey();
 
@@ -195,9 +195,9 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             try
             {
                 int id = random.Next();
-                ICreateGrainReferenceTestGrain grain = GrainClient.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
+                ICreateGrainReferenceTestGrain grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
-                await grain.ForwardCall(GrainClient.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id));
+                await grain.ForwardCall(this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id));
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
             }
@@ -213,7 +213,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             try
             {
                 int id = random.Next();
-                IBadConstructorTestGrain grain = GrainClient.GrainFactory.GetGrain<IBadConstructorTestGrain>(id);
+                IBadConstructorTestGrain grain = this.GrainFactory.GetGrain<IBadConstructorTestGrain>(id);
 
                 await grain.DoSomething();
 
@@ -234,7 +234,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task Constructor_CreateGrainReference()
         {
             int id = random.Next();
-            ICreateGrainReferenceTestGrain grain = GrainClient.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
+            ICreateGrainReferenceTestGrain grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
             string activation = await grain.DoSomething();
             Assert.NotNull(activation);
@@ -244,7 +244,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task TaskAction_Deactivate()
         {
             int id = random.Next();
-            ITaskActionActivateDeactivateTestGrain grain = GrainClient.GrainFactory.GetGrain<ITaskActionActivateDeactivateTestGrain>(id);
+            ITaskActionActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITaskActionActivateDeactivateTestGrain>(id);
 
             // Activate
             string activation = await grain.DoSomething();
@@ -260,7 +260,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         public async Task DeactivateOnIdleWhileActivate()
         {
             int id = random.Next();
-            IDeactivatingWhileActivatingTestGrain grain = GrainClient.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
+            IDeactivatingWhileActivatingTestGrain grain = this.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
 
             try
             {

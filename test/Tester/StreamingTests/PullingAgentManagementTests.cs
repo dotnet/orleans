@@ -15,6 +15,8 @@ namespace UnitTests.StreamingTests
 {
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
+        private readonly Fixture fixture;
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -35,10 +37,15 @@ namespace UnitTests.StreamingTests
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
 
+        public PullingAgentManagementTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);;
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
             await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
 
@@ -56,7 +63,7 @@ namespace UnitTests.StreamingTests
 
         private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
         {
-            var mgmt = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
             Assert.Equal(2, states.Length);

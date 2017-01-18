@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -74,6 +75,9 @@ namespace Orleans.TestingHost
 
         /// <summary> GrainFactory to use in the tests </summary>
         public IGrainFactory GrainFactory { get; private set; }
+
+        /// <summary> GrainFactory to use in the tests </summary>
+        internal IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         /// <summary> Get the logger to use in tests </summary>
         protected Logger logger
@@ -523,9 +527,9 @@ namespace Orleans.TestingHost
                 {
                     clientConfig.PropagateActivityId = clientOptions.PropagateActivityId;
                 }
-                if (!String.IsNullOrEmpty(DeploymentId))
+                if (!String.IsNullOrEmpty(this.DeploymentId))
                 {
-                    clientConfig.DeploymentId = DeploymentId;
+                    clientConfig.DeploymentId = this.DeploymentId;
                 }
                 if (Debugger.IsAttached)
                 {
@@ -545,7 +549,8 @@ namespace Orleans.TestingHost
                 this.ClientConfig = clientConfig;
 
                 GrainClient.Initialize(clientConfig);
-                GrainFactory = GrainClient.GrainFactory;
+                this.GrainFactory = GrainClient.GrainFactory;
+                this.InternalGrainFactory = this.GrainFactory as IInternalGrainFactory;
             }
         }
 

@@ -17,6 +17,8 @@ namespace UnitTests.HaloTests.Streaming
     [TestCategory("Streaming"), TestCategory("Halo")]
     public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
+        private readonly Fixture fixture;
+
         public class Fixture : BaseTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
@@ -61,6 +63,7 @@ namespace UnitTests.HaloTests.Streaming
 
         public HaloStreamSubscribeTests(Fixture fixture)
         {
+            this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
         }
         
@@ -124,10 +127,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ConsumerProducerTest(Guid consumerGuid, Guid producerGuid)
         {
             // consumer joins first, producer later
-            IConsumerEventCountingGrain consumer = GrainClient.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
-            IProducerEventCountingGrain producer = GrainClient.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
             await producer.SendEvent();
@@ -142,10 +145,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ProducerConsumerTest(Guid producerGuid, Guid consumerGuid)
         {
             // producer joins first, consumer later
-            IProducerEventCountingGrain producer = GrainClient.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
-            IConsumerEventCountingGrain consumer = GrainClient.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
             await producer.SendEvent();

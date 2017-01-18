@@ -80,7 +80,7 @@ namespace UnitTests.TimerTests
         public async Task Rem_Azure_Basic()
         {
             // start up a test grain and get the period that it's programmed to use.
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
             // start up the 'DR' reminder and wait for two ticks to pass.
             await grain.StartReminder(DR);
@@ -100,7 +100,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Basic_Restart()
         {
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             TimeSpan period = await grain.GetReminderPeriod(DR);
             await grain.StartReminder(DR);
             Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
@@ -128,7 +128,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_MultipleReminders()
         {
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
         #endregion
@@ -137,11 +137,11 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -171,11 +171,11 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             Task<bool>[] tasks =
             {
@@ -196,7 +196,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_1F_Basic()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -217,11 +217,11 @@ namespace UnitTests.TimerTests
         {
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(2);
 
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -254,11 +254,11 @@ namespace UnitTests.TimerTests
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -298,7 +298,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             Task<IGrainReminder> promise1 = grain.StartReminder(DR);
             Task<IGrainReminder> promise2 = grain.StartReminder(DR);
             Task<IGrainReminder>[] tasks = { promise1, promise2 };
@@ -312,8 +312,8 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_GT_Basic()
         {
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestCopyGrain g2 = GrainClient.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestCopyGrain g2 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
             TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
 
             await g1.StartReminder(DR);
@@ -340,10 +340,10 @@ namespace UnitTests.TimerTests
             List<SiloHandle> silos = this.HostedCluster.StartAdditionalSilos(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            IReminderTestGrain2 g1 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestCopyGrain g3 = GrainClient.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-            IReminderTestCopyGrain g4 = GrainClient.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestCopyGrain g3 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -382,7 +382,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
-            IReminderTestGrain2 grain = GrainClient.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
         }
@@ -392,7 +392,7 @@ namespace UnitTests.TimerTests
         [SkippableFact, TestCategory("Functional"), TestCategory("ReminderService")]
         public async Task Rem_Azure_Wrong_Grain()
         {
-            IReminderGrainWrong grain = GrainClient.GrainFactory.GetGrain<IReminderGrainWrong>(0);
+            IReminderGrainWrong grain = this.GrainFactory.GetGrain<IReminderGrainWrong>(0);
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 grain.StartReminder(DR));

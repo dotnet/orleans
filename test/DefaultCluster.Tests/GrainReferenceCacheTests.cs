@@ -9,6 +9,10 @@ namespace DefaultCluster.Tests.General
 {
     public class GrainReferenceCacheTests : HostedTestClusterEnsureDefaultStarted
     {
+        public GrainReferenceCacheTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain()
         {
@@ -96,7 +100,7 @@ namespace DefaultCluster.Tests.General
         private ISimpleGrain GrainCreatorFunc(int key)
         {
             numGrainsCreated++;
-            return GrainClient.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            return this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
         }
     }
 }

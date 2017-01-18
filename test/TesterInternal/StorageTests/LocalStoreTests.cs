@@ -23,30 +23,22 @@ namespace UnitTests.StorageTests
         File,
         Sql
     }
-
-    public class LocalStoreTestsFixture : IDisposable
+    
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class LocalStoreTests : IDisposable
     {
-        public LocalStoreTestsFixture()
-        {
-            BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
+        private readonly ITestOutputHelper output;
+        private readonly TestEnvironmentFixture fixture;
 
-            ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-            LogManager.Initialize(cfg);
+        public LocalStoreTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
+        {
+            this.output = output;
+            this.fixture = fixture;
+            LocalDataStoreInstance.LocalDataStore = null;
         }
 
         public void Dispose()
         {
-            LocalDataStoreInstance.LocalDataStore = null;
-        }
-    }
-
-    public class LocalStoreTests : IClassFixture<LocalStoreTestsFixture>
-    {
-        private readonly ITestOutputHelper output;
-
-        public LocalStoreTests(ITestOutputHelper output)
-        {
-            this.output = output;
             LocalDataStoreInstance.LocalDataStore = null;
         }
 

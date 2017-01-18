@@ -1,6 +1,5 @@
 ﻿using System;
 using Orleans;
-using Orleans.Serialization;
 using Orleans.TestingHost;
 
 namespace TestExtensions
@@ -17,7 +16,6 @@ namespace TestExtensions
         protected BaseTestClusterFixture()
         {
             GrainClient.Uninitialize();
-            SerializationTestEnvironment.Initialize();
             var testCluster = CreateTestCluster();
             if (testCluster.Primary == null)
             {
@@ -28,7 +26,9 @@ namespace TestExtensions
 
         protected abstract TestCluster CreateTestCluster();
 
-        public TestCluster HostedCluster { get; private set; }
+        public TestCluster HostedCluster { get; }
+
+        public IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
 
         public virtual void Dispose()
         {

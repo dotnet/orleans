@@ -1,4 +1,5 @@
 using Bond;
+using TestExtensions;
 using Xunit;
 
 namespace BondUtils.Tests.Serialization

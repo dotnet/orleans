@@ -20,6 +20,7 @@ namespace AWSUtils.Tests.StorageTests
     public abstract class Base_PersistenceGrainTests_AWSStore : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;
+        private readonly BaseClusterFixture fixture;
         protected TestingSiloHost HostedCluster { get; private set; }
         private readonly double timingFactor;
 
@@ -35,6 +36,7 @@ namespace AWSUtils.Tests.StorageTests
                 throw new SkipException("Unable to connect to DynamoDB simulator");
 
             this.output = output;
+            this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
             timingFactor = TestUtils.CalibrateTimings();
         }
@@ -42,7 +44,7 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_AWSStore_Delete()
         {
             Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
             await grain.DoWrite(1);
 
@@ -60,7 +62,7 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_AWSStore_Read()
         {
             Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
             int val = await grain.GetValue();
 
@@ -70,7 +72,7 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_GuidKey_AWSStore_Read_Write()
         {
             Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
             int val = await grain.GetValue();
 
@@ -92,7 +94,7 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_LongKey_AWSStore_Read_Write()
         {
             long id = random.Next();
-            IAWSStorageTestGrain_LongKey grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain_LongKey>(id);
+            IAWSStorageTestGrain_LongKey grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongKey>(id);
 
             int val = await grain.GetValue();
 
@@ -117,7 +119,7 @@ namespace AWSUtils.Tests.StorageTests
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
 
             IAWSStorageTestGrain_LongExtendedKey
-                grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain_LongExtendedKey>(id, extKey, null);
+                grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongExtendedKey>(id, extKey, null);
 
             int val = await grain.GetValue();
 
@@ -147,7 +149,7 @@ namespace AWSUtils.Tests.StorageTests
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
 
             IAWSStorageTestGrain_GuidExtendedKey
-                grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain_GuidExtendedKey>(id, extKey, null);
+                grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_GuidExtendedKey>(id, extKey, null);
 
             int val = await grain.GetValue();
 
@@ -175,7 +177,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             long id = random.Next();
 
-            IAWSStorageGenericGrain<int> grain = GrainClient.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id);
+            IAWSStorageGenericGrain<int> grain = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id);
 
             int val = await grain.GetValue();
 
@@ -200,11 +202,11 @@ namespace AWSUtils.Tests.StorageTests
             long id2 = id1;
             long id3 = id1;
 
-            IAWSStorageGenericGrain<int> grain1 = GrainClient.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id1);
+            IAWSStorageGenericGrain<int> grain1 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id1);
 
-            IAWSStorageGenericGrain<string> grain2 = GrainClient.GrainFactory.GetGrain<IAWSStorageGenericGrain<string>>(id2);
+            IAWSStorageGenericGrain<string> grain2 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<string>>(id2);
 
-            IAWSStorageGenericGrain<double> grain3 = GrainClient.GrainFactory.GetGrain<IAWSStorageGenericGrain<double>>(id3);
+            IAWSStorageGenericGrain<double> grain3 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<double>>(id3);
 
             int val1 = await grain1.GetValue();
             Assert.Equal(0, val1);  // "Initial value - 1"
@@ -266,7 +268,7 @@ namespace AWSUtils.Tests.StorageTests
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
             int val = await grain.GetValue();
 
@@ -372,10 +374,10 @@ namespace AWSUtils.Tests.StorageTests
             for (int i = 0; i < n; i++)
             {
                 Guid id = Guid.NewGuid();
-                noStateGrains[i] = GrainClient.GrainFactory.GetGrain<IEchoTaskGrain>(id);
-                memoryGrains[i] = GrainClient.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
-                awsStoreGrains[i] = GrainClient.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
-                memoryStoreGrains[i] = GrainClient.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
+                noStateGrains[i] = this.fixture.GrainFactory.GetGrain<IEchoTaskGrain>(id);
+                memoryGrains[i] = this.fixture.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+                awsStoreGrains[i] = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+                memoryStoreGrains[i] = this.fixture.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
             }
 
             TimeSpan baseline, elapsed;

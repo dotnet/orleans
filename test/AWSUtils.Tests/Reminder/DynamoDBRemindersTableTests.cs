@@ -2,6 +2,7 @@
 using AWSUtils.Tests.StorageTests;
 using Orleans;
 using OrleansAWSUtils.Reminders;
+using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
 using Xunit;
@@ -9,9 +10,10 @@ using Xunit;
 namespace AWSUtils.Tests.RemindersTest
 {
     [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class DynamoDBRemindersTableTests : ReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
-        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public DynamoDBRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
         }
 

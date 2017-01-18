@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -14,17 +12,16 @@ namespace Tester.CodeGenTests
     /// <summary>
     /// Summary description for GrainClientTest
     /// </summary>
-    public class GeneratorGrainTest : OrleansTestingBase, IClassFixture<DefaultClusterFixture>
+    public class GeneratorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
-        public GeneratorGrainTest()
+        public GeneratorGrainTest(DefaultClusterFixture fixture) : base(fixture)
         {
-            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public async Task CodeGenRoundTripSerialization()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<ISerializationGenerationGrain>(GetRandomGrainId());
+            var grain = this.GrainFactory.GetGrain<ISerializationGenerationGrain>(GetRandomGrainId());
 
             // Test struct serialization.
             var expectedStruct = new SomeStruct(10) { Id = Guid.NewGuid(), PublicValue = 6, ValueWithPrivateGetter = 7 };
@@ -97,7 +94,7 @@ namespace Tester.CodeGenTests
         public async Task GeneratorGrainControlFlow()
         {
             var grainName = typeof(GeneratorTestGrain).FullName;
-            IGeneratorTestGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
+            IGeneratorTestGrain grain = this.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
             
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
@@ -128,7 +125,7 @@ namespace Tester.CodeGenTests
         [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorDerivedGrain1ControlFlow()
         {
-            IGeneratorTestDerivedGrain1 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
@@ -160,7 +157,7 @@ namespace Tester.CodeGenTests
         public async Task GeneratorDerivedGrain2ControlFlow()
         {
             var grainName = typeof(GeneratorTestDerivedGrain2).FullName;
-            IGeneratorTestDerivedGrain2 grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
+            IGeneratorTestDerivedGrain2 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
 
             bool boolPromise = await grain.StringIsNullOrEmpty();
             Assert.True(boolPromise);
@@ -194,7 +191,7 @@ namespace Tester.CodeGenTests
         [Fact, TestCategory("Functional"), TestCategory("GetGrain")]
         public async Task GeneratorDerivedDerivedGrainControlFlow()
         {
-            IGeneratorTestDerivedDerivedGrain grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
+            IGeneratorTestDerivedDerivedGrain grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
             
             bool isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
@@ -237,7 +234,7 @@ namespace Tester.CodeGenTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen")]
         public async Task CodeGenDerivedFromCSharpInterfaceInDifferentAssembly()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
             var input = 1;
             var output = await grain.Echo(input);
             Assert.Equal(input, output);
@@ -247,7 +244,7 @@ namespace Tester.CodeGenTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("FSharp")]
         public async Task CodeGenDerivedFromFSharpInterfaceInDifferentAssembly()
         {
-            var grain = GrainClient.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain>(Guid.NewGuid());
             var input = 1;
             var output = await grain.Echo(input);
             Assert.Equal(input, output);

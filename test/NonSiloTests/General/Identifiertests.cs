@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

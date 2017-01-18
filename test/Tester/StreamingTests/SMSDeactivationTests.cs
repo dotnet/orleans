@@ -18,7 +18,7 @@ namespace UnitTests.StreamingTests
 
         public SMSDeactivationTests()
         {
-            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger);
+            runner = new DeactivationTestRunner(SMSStreamProviderName, GrainClient.Logger, this.GrainFactory);
         }
 
         public override TestCluster CreateTestCluster()

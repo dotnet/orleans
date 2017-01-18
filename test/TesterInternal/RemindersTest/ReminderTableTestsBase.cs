@@ -6,22 +6,25 @@ using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 using UnitTests.MembershipTests;
-using UnitTests.StorageTests;
 using Xunit;
 
 namespace UnitTests.RemindersTest
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
+        protected readonly TestEnvironmentFixture ClusterFixture;
         private readonly Logger logger;
 
         private readonly IReminderTable remindersTable;
 
         protected const string testDatabaseName = "OrleansReminderTest";//for relational storage
         
-        protected ReminderTableTestsBase(ConnectionStringFixture fixture)
+        protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture)
         {
+            this.ClusterFixture = clusterFixture;
             LogManager.Initialize(new NodeConfiguration());
             
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
@@ -153,7 +156,7 @@ namespace UnitTests.RemindersTest
             };
         }
 
-        private static GrainReference MakeTestGrainReference()
+        private GrainReference MakeTestGrainReference()
         {
             GrainId regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
             GrainReference grainRef = GrainReference.FromGrainId(regularGrainId);

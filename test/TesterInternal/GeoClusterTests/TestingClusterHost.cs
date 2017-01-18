@@ -336,7 +336,9 @@ namespace Tests.GeoClusterTests
                 clientconfig_customizer?.Invoke(config);
 
                 GrainClient.Initialize(config);
+                this.GrainFactory = GrainClient.GrainFactory;
             }
+            public IGrainFactory GrainFactory { get; }
         }
 
         // Create a client, loaded in a new app domain.

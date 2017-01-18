@@ -13,10 +13,14 @@ namespace DefaultCluster.Tests
     [TestCategory("MethodInterception")]
     public class MethodInterceptionTests : HostedTestClusterEnsureDefaultStarted
     {
+        public MethodInterceptionTests(DefaultClusterFixture fixture) : base(fixture)
+        {
+        }
+
         [Fact, TestCategory("BVT")]
         public async Task GrainMethodInterceptionTest()
         {
-            var grain = GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
+            var grain = this.GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
             var result = await grain.One();
             Assert.Equal("intercepted one with no args", result);
 
@@ -33,7 +37,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task GenericGrainMethodInterceptionTest()
         {
-            var grain = GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(0);
+            var grain = this.GrainFactory.GetGrain<IGenericMethodInterceptionGrain<int>>(0);
             var result = await grain.GetInputAsString(679);
             Assert.Contains("Hah!", result);
             Assert.Contains("679", result);
@@ -45,7 +49,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task ConstructedInheritanceGenericGrainMethodInterceptionTest()
         {
-            var grain = GrainFactory.GetGrain<ITrickyMethodInterceptionGrain>(0);
+            var grain = this.GrainFactory.GetGrain<ITrickyMethodInterceptionGrain>(0);
 
             var result = await grain.GetInputAsString("2014-12-19T14:32:50Z");
             Assert.Contains("Hah!", result);

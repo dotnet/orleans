@@ -54,6 +54,7 @@
     <Compile Include="AzureTableDataManagerStressTests.cs" />
     <Compile Include="AzureTableDataManagerTests.cs" />
     <Compile Include="AzureTableErrorCodeTests.cs" />
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="Deployment\AzureSiloTests.cs" />
     <Compile Include="GenericGrainsInAzureStorageTests.cs" />
     <Compile Include="Persistence\PersistenceGrainTests_AzureBlobStore.cs" />
