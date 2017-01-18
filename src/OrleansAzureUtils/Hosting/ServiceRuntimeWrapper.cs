@@ -183,11 +183,9 @@ namespace Orleans.Runtime.Host
                 logger.Warn(ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
 
                 // Microsoft.WindowsAzure.ServiceRuntime isn't loaded. We may be running within a web role or not in Azure.
-                // Trying to load by partial name, so that we are not version specific.
-                // Assembly.LoadWithPartialName has been deprecated. Is there a better way to load any version of a known assembly?
-                #pragma warning disable 618
-                assembly = Assembly.LoadWithPartialName("Microsoft.WindowsAzure.ServiceRuntime");
-                #pragma warning restore 618
+#pragma warning disable 618
+                assembly = Assembly.Load(new AssemblyName("Microsoft.WindowsAzure.ServiceRuntime, Version = 2.7.0.0, Culture = neutral, PublicKeyToken = 31bf3856ad364e35"));
+#pragma warning restore 618
                 if (assembly == null)
                 {
                     const string msg2 = "Failed to find or load Microsoft.WindowsAzure.ServiceRuntime.";

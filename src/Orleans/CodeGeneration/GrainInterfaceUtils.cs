@@ -115,11 +115,11 @@ namespace Orleans.CodeGeneration
             var dict = new Dictionary<int, Type>();
 
             if (IsGrainInterface(type))
-                dict.Add(ComputeInterfaceId(type), type);
-
+                dict.Add(GetGrainInterfaceId(type), type);
+            
             Type[] interfaces = type.GetInterfaces();
             foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
-                dict.Add(ComputeInterfaceId(interfaceType), interfaceType);
+                dict.Add(GetGrainInterfaceId(interfaceType), interfaceType);
 
             return dict;
         }
@@ -165,13 +165,6 @@ namespace Orleans.CodeGeneration
             return typeof (IGrain).IsAssignableFrom(grainType);
         }
 
-        public static int ComputeInterfaceId(Type interfaceType)
-        {
-            var ifaceName = TypeUtils.GetFullName(interfaceType);
-            var ifaceId = Utils.CalculateIdHash(ifaceName);
-            return ifaceId;
-        }
-
         public static int GetGrainClassTypeCode(Type grainClass)
         {
             return GetTypeCode(grainClass);
@@ -190,8 +183,11 @@ namespace Orleans.CodeGeneration
             List<string> violations;
             if (!TryValidateInterfaceRules(type, out violations))
             {
-                foreach (var violation in violations)
-                    ConsoleText.WriteLine("ERROR: " + violation);
+                if (ConsoleText.IsConsoleAvailable)
+                {
+                    foreach (var violation in violations)
+                        ConsoleText.WriteLine("ERROR: " + violation);
+                }
 
                 throw new RulesViolationException(
                     string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);

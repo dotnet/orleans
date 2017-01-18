@@ -1,0 +1,177 @@
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+  <PropertyGroup Label="Configuration">
+    <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+    <EmbeddedResource Include="**\*.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.1.0" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.3.0" />
+    <PackageReference Include="FluentAssertions" Version="4.17.0" />
+    <PackageReference Include="Microsoft.Data.SQLite" Version="1.1.0" />
+    <PackageReference Include="Npgsql" Version="3.1.9" />
+    <PackageReference Include="MySql.Data" Version="7.0.6-IR31" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
+    <ProjectReference Include="..\..\src\OrleansSQLUtils\OrleansSQLUtils.csproj" />
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj" />
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj" />
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj" />
+    <ProjectReference Include="..\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="..\Tester\Tester.csproj" />
+    <ProjectReference Include="..\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="..\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="..\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrainInterface\TestInternalGrainInterfaces.csproj" />
+    <ProjectReference Include="..\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\test\TesterSQLUtils\RelationalUtilities\MySqlStorageForTesting.cs">
+      <Link>RelationalUtilities\MySqlStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\RelationalUtilities\PostgreSqlStorageForTesting.cs">
+      <Link>RelationalUtilities\PostgreSqlStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\RelationalUtilities\RelationalStorageForTesting.cs">
+      <Link>RelationalUtilities\RelationalStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\RelationalUtilities\SqlServerStorageForTesting.cs">
+      <Link>RelationalUtilities\SqlServerStorageForTesting.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\DummyCounter.cs">
+      <Link>SqlStatisticsPublisherTests\DummyCounter.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs">
+      <Link>SqlStatisticsPublisherTests\DummyPerformanceMetrics.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs">
+      <Link>SqlStatisticsPublisherTests\MySqlStatisticsPublisherTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs">
+      <Link>SqlStatisticsPublisherTests\PostgreSqlStatisticsPublisherTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs">
+      <Link>SqlStatisticsPublisherTests\SqlServerStatisticsPublisherTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs">
+      <Link>SqlStatisticsPublisherTests\SqlStatisticsPublisherTestsBase.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs">
+      <Link>SqlStatisticsPublisherTests\StatisticsPublisherProviderConfig.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs">
+      <Link>SqlStatisticsPublisherTests\StatisticsPublisherProviderRuntime.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\RelationalStoreTests.cs">
+      <Link>StorageTests\RelationalStoreTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\AdotNetProviderFunctionalityTests.cs">
+      <Link>StorageTests\Relational\AdotNetProviderFunctionalityTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\CommonFixture.cs">
+      <Link>StorageTests\Relational\CommonFixture.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\ConstantHasher.cs">
+      <Link>StorageTests\Relational\ConstantHasher.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\MySqlStorageTests.cs">
+      <Link>StorageTests\Relational\MySqlStorageTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\RelationalStorageTests.cs">
+      <Link>StorageTests\Relational\RelationalStorageTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\SqlServerStorageTests.cs">
+      <Link>StorageTests\Relational\SqlServerStorageTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\StreamingTestRelationalStoragePicker.cs">
+      <Link>StorageTests\Relational\StreamingTestRelationalStoragePicker.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\StorageTests\Relational\TestEnvironmentInvariant.cs">
+      <Link>StorageTests\Relational\TestEnvironmentInvariant.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\LivenessTests.cs">
+      <Link>LivenessTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\MySqlMembershipTableTests.cs">
+      <Link>MySqlMembershipTableTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\MySqlRemindersTableTests.cs">
+      <Link>MySqlRemindersTableTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\PostgreSqlMembershipTableTests.cs">
+      <Link>PostgreSqlMembershipTableTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\PostgreSqlRemindersTableTests.cs">
+      <Link>PostgreSqlRemindersTableTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\ReminderTests_SqlServer.cs">
+      <Link>ReminderTests_SqlServer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlServerMembershipTableTests.cs">
+      <Link>SqlServerMembershipTableTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\TesterSQLUtils\SqlServerRemindersTableTests.cs">
+      <Link>SqlServerRemindersTableTests.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_MySql.sql">
+      <Link>CreateOrleansTables_MySql.sql</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_PostgreSql.sql">
+      <Link>CreateOrleansTables_PostgreSql.sql</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\OrleansSQLUtils\CreateOrleansTables_SqlServer.sql">
+      <Link>CreateOrleansTables_SqlServer.sql</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\test\TesterSQLUtils\Data\TestDb.mdf">
+      <Link>Data\TestDb.mdf</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="App.config" />
+    <None Include="Tester.SQLUtils.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+</Project>

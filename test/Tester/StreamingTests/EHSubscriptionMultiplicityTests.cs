@@ -12,7 +12,7 @@ using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StreamingTests
@@ -26,15 +26,17 @@ namespace UnitTests.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        public static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        public static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-            EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
-                TimeSpan.FromSeconds(1));
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
+                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private readonly SubscriptionMultiplicityTestRunner runner;
 
@@ -59,8 +61,8 @@ namespace UnitTests.StreamingTests
             {
                 var settings = new Dictionary<string, string>();
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
-                EventHubConfig.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
+                EventHubConfig.Value.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting

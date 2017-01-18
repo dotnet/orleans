@@ -1,18 +1,10 @@
-﻿using Orleans;
-
-
-namespace Orleans.Storage
+﻿namespace Orleans.Storage
 {
     /// <summary>
     /// A default implementation uses the same hash as Orleans in grains placement.
     /// </summary>
     public class OrleansDefaultHasher: IHasher
     {
-        /// <summary>
-        /// The hash function as given in description.
-        /// </summary>
-        private JenkinsHash HashFunction { get; } = JenkinsHash.Factory.GetHashGenerator(threadLocal: true);
-
         /// <summary>
         /// <see cref="IHasher.Description"/>
         /// </summary>
@@ -24,7 +16,7 @@ namespace Orleans.Storage
         /// </summary>
         public int Hash(byte[] data)
         {
-            return unchecked((int)HashFunction.ComputeHash(data));
+            return unchecked((int)JenkinsHash.ComputeHash(data));
         }
     }
 }

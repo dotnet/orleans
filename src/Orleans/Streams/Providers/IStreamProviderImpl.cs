@@ -25,8 +25,10 @@ namespace Orleans.Streams
         public ProviderStartException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected ProviderStartException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 }

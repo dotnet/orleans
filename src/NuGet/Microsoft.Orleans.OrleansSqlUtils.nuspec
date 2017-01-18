@@ -4,11 +4,11 @@
     <id>Microsoft.Orleans.OrleansSqlUtils</id>
     <version>$version$</version>
     <title>Microsoft Orleans Sql Utilities</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
-    <iconUrl>https://raw.githubusercontent.com/jthelin/jthelin.github.io/master/images/Orleans-nuget.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
     <summary>
       Sql Utilities Library of Microsoft Orleans - OrleansSqlUtils.dll
     </summary>
@@ -28,5 +28,6 @@
     <file src="OrleansSqlUtils.xml" target="lib\net451" />
     <file src="CreateOrleansTables_SqlServer.sql" target="lib\net451\SQLServer" />
     <file src="CreateOrleansTables_MySql.sql" target="lib\net451\MySql" />
+    <file src="CreateOrleansTables_PostgreSql.sql" target="lib\net451\PostgreSql" />
   </files>
 </package>

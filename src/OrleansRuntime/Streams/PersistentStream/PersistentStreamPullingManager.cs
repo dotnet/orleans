@@ -295,12 +295,12 @@ namespace Orleans.Streams
             {
                 try
                 {
-                    providerRuntime.UnRegisterSystemTarget(agent);
+                    providerRuntime.UnregisterSystemTarget(agent);
                 }
                 catch (Exception exc)
                 {
                     Log(ErrorCode.PersistentStreamPullingManager_12, 
-                        "Exception while UnRegisterSystemTarget of PersistentStreamPullingAgent {0}. Ignoring. Exc.Message = {1}.", agent.GrainId, exc.Message);
+                        "Exception while UnRegisterSystemTarget of PersistentStreamPullingAgent {0}. Ignoring. Exc.Message = {1}.", ((ISystemTargetBase)agent).GrainId, exc.Message);
                 }
             }
             if (agents.Count > 0)

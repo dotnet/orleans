@@ -122,20 +122,18 @@ namespace UnitTests.GrainInterfaces
         }
     }
 
-    public interface IValueTypeTestGrain : IGrainWithIntegerKey
+    public interface IValueTypeTestGrain : IGrainWithGuidKey
     {
         Task<ValueTypeTestData> GetStateData();
 
         Task SetStateData(ValueTypeTestData d);
-
-        Task<CampaignEnemyTestType> GetEnemyType();
     }
 
-    public interface IEnumResultGrain : IGrainWithIntegerKey
+    public interface IRoundtripSerializationGrain : IGrainWithIntegerKey
     {
         Task<CampaignEnemyTestType> GetEnemyType();
 
-        Task<ClusterConfiguration> GetConfiguration();
+        Task<object> GetClosedGenericValue();
     }
 
     [Serializable]

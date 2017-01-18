@@ -50,6 +50,31 @@ namespace Orleans.Providers.Streams.Common
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
+        // this is a workaround until an IServiceProvider instance is used in the Orleans client
+        private class GrainFactoryServiceProvider : IServiceProvider
+        {
+            private IStreamProviderRuntime providerRuntime;
+            public GrainFactoryServiceProvider(IStreamProviderRuntime providerRuntime)
+            {
+                this.providerRuntime = providerRuntime;
+            }
+            public object GetService(Type serviceType)
+            {
+                var service = providerRuntime.ServiceProvider?.GetService(serviceType);
+                if (service != null)
+                {
+                    return service;
+                }
+
+                if (serviceType == typeof(IGrainFactory))
+                {
+                    return providerRuntime.GrainFactory;
+                }
+
+                return null;
+            }
+        }
+
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
             if(!stateManager.PresetState(ProviderState.Initialized)) return;
@@ -61,7 +86,9 @@ namespace Orleans.Providers.Streams.Common
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
             logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
+            // Temporary change, but we need GrainFactory inside ServiceProvider for now, 
+            // so will change it back as soon as we have an action item to add GrainFactory to ServiceProvider.
+            adapterFactory.Init(config, Name, logger, new GrainFactoryServiceProvider(providerRuntime));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             string startup;
@@ -122,6 +149,10 @@ namespace Orleans.Providers.Streams.Common
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
+            if (queueAdapter.Direction == StreamProviderDirection.ReadOnly)
+            {
+                throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
+            }
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable);
         }
 

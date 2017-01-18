@@ -4,11 +4,12 @@ using System.Runtime.InteropServices;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Stopwatch for CPU time of a thread. 
+    /// Stopwatch for CPU time of a thread.
     /// You must only use Start, Stop, and Restart from thread being measured!
-    /// CANNOT call this class from a different thread that is not the currently executing thread. 
-    /// Otherwise, QueryThreadCycleTime returns undefined (garbage) results. 
+    /// CANNOT call this class from a different thread that is not the currently executing thread.
+    /// Otherwise, QueryThreadCycleTime returns undefined (garbage) results.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1049:TypesThatOwnNativeResourcesShouldBeDisposable")]
     internal class TimeIntervalThreadCycleCounterBased : ITimeInterval
     {
         private readonly double cyclesPerSecond;
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         /// </summary>
         public TimeSpan Elapsed
         {
-            get { return TimeSpan.FromSeconds(((double) elapsedCycles)/(cyclesPerSecond)); }
+            get { return TimeSpan.FromSeconds(((double)elapsedCycles) / (cyclesPerSecond)); }
         }
 
         /// <summary>
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
             // System call returns what seems to be (from measurements) a value that is in cycles per 1/1024 of a second (close to millisecond)
             long cyclesPerMillisecond;
             NativeMethods.QueryPerformanceFrequency(out cyclesPerMillisecond);
-            cyclesPerSecond = (double) (1024.0*(double) cyclesPerMillisecond);
+            cyclesPerSecond = (double)(1024.0 * (double)cyclesPerMillisecond);
 
             handle = IntPtr.Zero;
             elapsedCycles = 0;
@@ -98,10 +99,12 @@ namespace Orleans.Runtime
         {
             [DllImport("Kernel32.dll")]
             public static extern bool QueryThreadCycleTime(IntPtr handle, out ulong cycles);
+
             [DllImport("Kernel32.dll")]
             public static extern bool QueryPerformanceFrequency(out long lpFrequency);
+
             [DllImport("Kernel32.dll")]
-            public static extern IntPtr GetCurrentThread();    
+            public static extern IntPtr GetCurrentThread();
         }
     }
 }

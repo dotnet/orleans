@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.Core</id>
     <version>$version$</version>
     <title>Microsoft Orleans Core Library</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
@@ -19,6 +19,7 @@
     <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
     <dependencies>
       <dependency id="Newtonsoft.Json" version="7.0.1" />
+      <dependency id="System.Collections.Immutable" version="1.1.37" />
     </dependencies>
   </metadata>
   <files>

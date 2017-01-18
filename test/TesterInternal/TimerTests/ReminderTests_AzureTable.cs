@@ -8,6 +8,8 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -27,7 +29,7 @@ namespace UnitTests.TimerTests
                 {
                     StartFreshOrleans = true,
                     ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable,
-                    DataConnectionString = StorageTestConstants.DataConnectionString,
+                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                     LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain, // Separate testing of Reminders storage from membership storage
                     AdjustConfig = config =>
                     {

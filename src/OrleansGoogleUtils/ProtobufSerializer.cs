@@ -11,7 +11,7 @@ namespace Orleans.Serialization
     /// </summary>
     public class ProtobufSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, object> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, object>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new ConcurrentDictionary<RuntimeTypeHandle, MessageParser>();
 
         private Logger logger;
 
@@ -42,19 +42,15 @@ namespace Orleans.Serialization
                     }
 
                     var parser = prop.GetValue(null, null);
-                    Parsers.TryAdd(itemType.TypeHandle, parser);
+                    Parsers.TryAdd(itemType.TypeHandle, parser as MessageParser);
                 }
                 return true;
             }
             return false;
         }
 
-        /// <summary>
-        /// Creates a deep copy of an object
-        /// </summary>
-        /// <param name="source">The source object to be copy</param>
-        /// <returns>The copy that was created</returns>
-        public object DeepCopy(object source)
+        /// <inheritdoc />
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null)
             {
@@ -65,25 +61,20 @@ namespace Orleans.Serialization
             return dynamicSource.Clone();
         }
 
-        /// <summary>
-        /// Serializes an object to a binary stream
-        /// </summary>
-        /// <param name="item">The object to serialize</param>
-        /// <param name="writer">The <see cref="BinaryTokenStreamWriter"/></param>
-        /// <param name="expectedType">The type the deserializer should expect</param>
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        /// <inheritdoc />
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
-            if (writer == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("writer");
+                throw new ArgumentNullException(nameof(context));
             }
 
             if (item == null)
             {
                 // Special handling for null value. 
-                // Since in this ProtobufSerializer we are usualy writing the data lengh as 4 bytes
+                // Since in this ProtobufSerializer we are usually writing the data lengh as 4 bytes
                 // we also have to write the Null object as 4 bytes lengh of zero.
-                writer.Write(0);
+                context.StreamWriter.Write(0);
                 return;
             }
 
@@ -103,45 +94,35 @@ namespace Orleans.Serialization
             // Alternatively, we could force to always append to BinaryTokenStreamWriter, but that could create a lot of small ArraySegments.
             // The plan is to ask the ProtoBuff team to add support for some "InputStream" interface, like Bond does.
             byte[] outBytes = iMessage.ToByteArray();
-            writer.Write(outBytes.Length);
-            writer.Write(outBytes);
+            context.StreamWriter.Write(outBytes.Length);
+            context.StreamWriter.Write(outBytes);
         }
-
-        /// <summary>
-        /// Deserializes an object from a binary stream
-        /// </summary>
-        /// <param name="expectedType">The type that is expected to be deserialized</param>
-        /// <param name="reader">The <see cref="BinaryTokenStreamReader"/></param>
-        /// <returns>The deserialized object</returns>
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        
+        /// <inheritdoc />
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             if (expectedType == null)
             {
-                throw new ArgumentNullException("expectedType");
+                throw new ArgumentNullException(nameof(expectedType));
             }
 
-            if (reader == null)
+            if (context == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(context));
             }
 
             var typeHandle = expectedType.TypeHandle;
-            object parser = null;
+            MessageParser parser = null;
             if (!Parsers.TryGetValue(typeHandle, out parser))
             {
-                throw new ArgumentException("No parser found for the expected type " + expectedType, "expectedType");
+                throw new ArgumentException("No parser found for the expected type " + expectedType, nameof(expectedType));
             }
 
+            var reader = context.StreamReader;
             int length = reader.ReadInt();
-            if (length == 0)
-            {
-                // the special null case.
-                return null;
-            }
             byte[] data = reader.ReadBytes(length);
 
-            dynamic dynamicParser = parser;
-            object message = dynamicParser.ParseFrom(data);
+            object message = parser.ParseFrom(data);
 
             return message;
         }

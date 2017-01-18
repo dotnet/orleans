@@ -1,46 +1,42 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Placement
 {
     internal class PlacementDirectorsManager
     {
-        private readonly Dictionary<Type, PlacementDirector> directors = new Dictionary<Type, PlacementDirector>();
-        private PlacementStrategy defaultPlacementStrategy;
-        private ClientObserversPlacementDirector clientObserversPlacementDirector;
+        private readonly ConcurrentDictionary<Type, IPlacementDirector> directors = new ConcurrentDictionary<Type, IPlacementDirector>();
+        private readonly PlacementStrategy defaultPlacementStrategy;
+        private readonly ClientObserversPlacementDirector clientObserversPlacementDirector;
 
-        public static PlacementDirectorsManager Instance { get; private set; }
+        private readonly IServiceProvider serviceProvider;
 
-        private PlacementDirectorsManager()
-        { }
-
-        public static void CreatePlacementDirectorsManager(GlobalConfiguration globalConfig)
+        public PlacementDirectorsManager(
+            IServiceProvider services,
+            DefaultPlacementStrategy defaultPlacementStrategy,
+            ClientObserversPlacementDirector clientObserversPlacementDirector)
         {
-            Instance = new PlacementDirectorsManager();
-            Instance.Register<RandomPlacement, RandomPlacementDirector>();
-            Instance.Register<PreferLocalPlacement, PreferLocalPlacementDirector>();
-            Instance.Register<StatelessWorkerPlacement, StatelessWorkerDirector>();
-            Instance.Register<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
-
-            var acDirector = (ActivationCountPlacementDirector)Instance.directors[typeof(ActivationCountBasedPlacement)];
-            acDirector.Initialize(globalConfig);
-
-            Instance.defaultPlacementStrategy = PlacementStrategy.GetDefault();
-            Instance.clientObserversPlacementDirector = new ClientObserversPlacementDirector();
+            this.serviceProvider = services;
+            this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
+            this.clientObserversPlacementDirector = clientObserversPlacementDirector;
+            this.ResolveBuiltInStrategies();
         }
 
-        private void Register<TStrategy, TDirector>()
-            where TDirector : PlacementDirector, new()
-            where TStrategy : PlacementStrategy
+        private IPlacementDirector ResolveDirector(PlacementStrategy strategy)
         {
-            directors.Add(typeof(TStrategy), new TDirector());
-        }
+            IPlacementDirector result;
+            var strategyType = strategy.GetType();
+            if (!this.directors.TryGetValue(strategyType, out result))
+            {
+                var directorType = typeof(IPlacementDirector<>).MakeGenericType(strategyType);
+                result = (IPlacementDirector)this.serviceProvider.GetRequiredService(directorType);
+                this.directors[strategyType] = result;
+            }
 
-        private PlacementDirector ResolveDirector(PlacementStrategy strategy)
-        {
-            return directors[strategy.GetType()];
+            return result;
         }
 
         public async Task<PlacementResult> SelectOrAddActivation(
@@ -85,6 +81,21 @@ namespace Orleans.Runtime.Placement
 
             var director = ResolveDirector(strategy);
             return director.OnAddActivation(strategy, grain, context);
+        }
+
+        private void ResolveBuiltInStrategies()
+        {
+            var strategies = new PlacementStrategy[]
+            {
+                RandomPlacement.Singleton,
+                ActivationCountBasedPlacement.Singleton,
+                new StatelessWorkerPlacement(),
+                PreferLocalPlacement.Singleton
+            };
+            foreach (var strategy in strategies)
+            {
+                this.ResolveDirector(strategy);
+            }
         }
     }
 }

@@ -1,32 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.StreamingTests
 {
-    public class StreamLifecycleTests : HostedTestClusterPerTest
+    [TestCategory("Streaming"), TestCategory("Cleanup")]
+    public class StreamLifecycleTests : TestClusterPerTest
     {
-        protected static readonly TestingSiloOptions SiloRunOptions = new TestingSiloOptions
-        {
-            StartFreshOrleans = true,
-            SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-            LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain,
-            ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain
-        };
-
-        protected static readonly TestingClientOptions ClientRunOptions = new TestingClientOptions
-        {
-            ClientConfigFile = new FileInfo("ClientConfig_StreamProviders.xml")
-        };
+        public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+        public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
         protected Guid StreamId;
         protected string StreamProviderName;
@@ -34,12 +25,30 @@ namespace UnitTests.StreamingTests
 
         private readonly ITestOutputHelper output;
         private IActivateDeactivateWatcherGrain watcher;
-        
-        public override TestingSiloHost CreateSiloHost()
+
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(SiloRunOptions, ClientRunOptions);
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+
+            return new TestCluster(options);
         }
-        
+
         public StreamLifecycleTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -48,38 +57,38 @@ namespace UnitTests.StreamingTests
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
         }
-        
+
         public override void Dispose()
         {
             watcher.Clear().WaitWithThrow(TimeSpan.FromSeconds(15));
             base.Dispose();
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, false);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_Deactivate()
         {
             await DoStreamCleanupTest_Deactivate(false, true);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task StreamCleanup_UseAfter_BadDeactivate()
         {
             await DoStreamCleanupTest_Deactivate(true, true);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Cleanup")]
+        [Fact, TestCategory("Functional")]
         public async Task Stream_Lifecycle_AddRemoveProducers()
         {
             string testName = "Stream_Lifecycle_AddRemoveProducers";
@@ -147,7 +156,7 @@ namespace UnitTests.StreamingTests
 
                 // These Producers test grains always send first message when they register
                 await StreamTestUtils.CheckPubSubCounts(
-                    output, 
+                    output,
                     string.Format("producer #{0} create - {1}", i, when),
                     i, 1,
                     StreamId, StreamProviderName, StreamNamespace);

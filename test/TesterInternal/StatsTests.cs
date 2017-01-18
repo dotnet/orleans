@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -44,7 +43,7 @@ namespace UnitTests.Stats
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
-        public void Stats_Init_Mock()
+        public async Task Stats_Init_Mock()
         {
             ClientConfiguration config = this.HostedCluster.ClientConfig;
 
@@ -53,25 +52,24 @@ namespace UnitTests.Stats
 
             Assert.Equal("MockStats",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
-            Silo silo = this.HostedCluster.Primary.Silo;
-            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
-            Assert.Equal("MockStats",  silo.LocalConfig.StatisticsProviderName);  // "Silo.StatisticsProviderName"
+            SiloHandle silo = this.HostedCluster.Primary;
+            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = this.HostedCluster.Primary.Silo.TestHook.StatisticsProvider as MockStatsSiloCollector;
+            var siloStatsCollector = GrainFactory.GetGrain<IStatsCollectorGrain>(0);
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 
             // Stats publishing is set to 1s interval in config files.
-            Thread.Sleep(TimeSpan.FromSeconds(2));
+            await Task.Delay(TimeSpan.FromSeconds(3));
 
             long numClientStatsCalls = clientStatsCollector.NumStatsCalls;
             long numClientMetricsCalls = clientMetricsCollector.NumMetricsCalls;
-            long numSiloStatsCalls = siloStatsCollector.NumStatsCalls;
-            long numSiloMetricsCalls = siloStatsCollector.NumMetricsCalls;
+            long numSiloStatsCalls = await siloStatsCollector.GetReportStatsCallCount();
+            long numSiloMetricsCalls = await siloStatsCollector.GetReportMetricsCallCount();
             output.WriteLine("Client - Metrics calls = {0} Stats calls = {1}", numClientMetricsCalls,
-                numSiloMetricsCalls);
-            output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numClientStatsCalls, numSiloStatsCalls);
+                numClientMetricsCalls);
+            output.WriteLine("Silo - Metrics calls = {0} Stats calls = {1}", numSiloStatsCalls, numSiloStatsCalls);
 
             Assert.True(numClientMetricsCalls > 0, $"Some client metrics calls = {numClientMetricsCalls}");
             Assert.True(numSiloMetricsCalls > 0, $"Some silo metrics calls = {numSiloMetricsCalls}");
@@ -79,7 +77,8 @@ namespace UnitTests.Stats
             Assert.True(numSiloStatsCalls > 0, $"Some silo stats calls = {numSiloStatsCalls}");
         }
     }
-    
+
+
     public class StatsTestsNoSilo
     {
         private readonly ITestOutputHelper output;
@@ -170,7 +169,7 @@ namespace UnitTests.Stats
         }
 
         [Fact, TestCategory("Client"), TestCategory("Stats"), TestCategory("SqlServer")]
-        public void ClientInit_SqlServer_WithStats()
+        public async Task ClientInit_SqlServer_WithStats()
         {
             Assert.True(GrainClient.IsInitialized);
 
@@ -185,9 +184,9 @@ namespace UnitTests.Stats
 
             Assert.Equal("SQL",  config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
-            Silo silo = this.HostedCluster.Primary.Silo;
-            Assert.True(silo.TestHook.HasStatisticsProvider, "Silo StatisticsProviderManager is setup");
-            Assert.Equal("SQL",  silo.LocalConfig.StatisticsProviderName);  // "Silo.StatisticsProviderName"
+            SiloHandle silo = this.HostedCluster.Primary;
+            Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
+            Assert.Equal("SQL",  silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }
 #endif

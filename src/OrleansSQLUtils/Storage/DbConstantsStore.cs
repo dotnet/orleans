@@ -20,6 +20,11 @@ namespace Orleans.SqlUtils
                                     endEscapeIndicator: '`',
                                     unionAllSelectTemplate: " UNION ALL SELECT ")
                 },
+                {AdoNetInvariants.InvariantNamePostgreSql, new DbConstants(
+                                    startEscapeIndicator: '"',
+                                    endEscapeIndicator: '"',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ")
+                },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
                                     endEscapeIndicator: '\"',

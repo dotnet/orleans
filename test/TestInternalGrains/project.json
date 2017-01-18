@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "Newtonsoft.Json": "7.0.1",
     "xunit.assert": "2.1.0"
   },
   "frameworks": {

@@ -1,13 +1,12 @@
 {
   "dependencies": {
-"FSharp.Core": "4.0.0.1",
-"Newtonsoft.Json": "7.0.1"
+    "FSharp.Core": "4.0.0.1"
   },
   "frameworks": {
     "net451": {}
   },
-    "runtimes":  {
-        "win-anycpu": {},
-        "win": {}
-    }
+  "runtimes": {
+    "win-anycpu": {},
+    "win": {}
+  }
 }

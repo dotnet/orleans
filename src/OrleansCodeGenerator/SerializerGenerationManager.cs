@@ -76,7 +76,7 @@ namespace Orleans.CodeGenerator
 
             if (t.IsConstructedGenericType)
             {
-                var args = t.GetGenericArguments();
+                var args = typeInfo.GetGenericArguments();
                 foreach (var arg in args)
                 {
                     RecordTypeToGenerate(arg, module, targetAssembly);
@@ -105,13 +105,8 @@ namespace Orleans.CodeGenerator
             if (TypeUtils.HasAllSerializationMethods(t)) return false;
 
             // This check is here and not within TypeUtilities.IsTypeIsInaccessibleForSerialization() to prevent potential infinite recursions 
-            var skipSerialzerGeneration = t.GetAllFields()
-                .Any(
-                    field => !field.IsNotSerialized &&
-                        TypeUtilities.IsTypeIsInaccessibleForSerialization(
-                            field.FieldType,
-                            module,
-                            targetAssembly));
+            var skipSerialzerGeneration =
+                t.GetAllFields().Any(field => IsFieldInaccessibleForSerialization(module, targetAssembly, field));
             if (skipSerialzerGeneration)
             {
                 return false;
@@ -119,6 +114,13 @@ namespace Orleans.CodeGenerator
 
             typesToProcess.Add(t);
             return true;
+        }
+
+        private static bool IsFieldInaccessibleForSerialization(Module module, Assembly targetAssembly, FieldInfo field)
+        {
+            return field.GetCustomAttributes().All(attr => attr.GetType().Name != "NonSerializedAttribute")
+                   && !SerializationManager.HasSerializer(field.FieldType)
+                   && TypeUtilities.IsTypeIsInaccessibleForSerialization(field.FieldType, module, targetAssembly);
         }
 
         internal bool GetNextTypeToProcess(out Type next)

@@ -17,16 +17,6 @@ namespace Orleans.CodeGeneration
         private const string CodeGenAssemblyName = "OrleansCodeGenerator";
 
         /// <summary>
-        /// The runtime code generator.
-        /// </summary>
-        private static IRuntimeCodeGenerator CodeGeneratorInstance;
-
-        /// <summary>
-        /// The code generator cache.
-        /// </summary>
-        private static ICodeGeneratorCache CodeGeneratorCacheInstance;
-
-        /// <summary>
         /// The log.
         /// </summary>
         private static readonly Logger Log = LogManager.GetLogger("CodeGenerator");
@@ -34,16 +24,26 @@ namespace Orleans.CodeGeneration
         /// <summary>
         /// Empty generated assemblies.
         /// </summary>
-        private static readonly ReadOnlyDictionary<string, byte[]> EmptyGeneratedAssemblies =
-            new ReadOnlyDictionary<string, byte[]>(new Dictionary<string, byte[]>());
+        private static readonly ReadOnlyDictionary<string, GeneratedAssembly> EmptyGeneratedAssemblies =
+            new ReadOnlyDictionary<string, GeneratedAssembly>(new Dictionary<string, GeneratedAssembly>());
+
+        /// <summary>
+        /// The runtime code generator.
+        /// </summary>
+        private static IRuntimeCodeGenerator codeGeneratorInstance;
+
+        /// <summary>
+        /// The code generator cache.
+        /// </summary>
+        private static ICodeGeneratorCache codeGeneratorCacheInstance;
 
         /// <summary>
         /// Loads the code generator on demand
         /// </summary>
         public static void Initialize()
         {
-            CodeGeneratorInstance = LoadCodeGenerator();
-            CodeGeneratorCacheInstance = CodeGeneratorInstance as ICodeGeneratorCache;
+            codeGeneratorInstance = LoadCodeGenerator();
+            codeGeneratorCacheInstance = codeGeneratorInstance as ICodeGeneratorCache;
         }
 
         /// <summary>
@@ -52,34 +52,29 @@ namespace Orleans.CodeGeneration
         /// <param name="input">
         /// The input assembly.
         /// </param>
-        public static void GenerateAndCacheCodeForAssembly(Assembly input)
+        public static GeneratedAssembly GenerateAndCacheCodeForAssembly(Assembly input)
         {
-            if (CodeGeneratorInstance != null)
-            {
-                CodeGeneratorInstance.GenerateAndLoadForAssembly(input);
-            }
+            return codeGeneratorInstance?.GenerateAndLoadForAssembly(input);
         }
 
         /// <summary>
         /// Ensures code for all currently loaded assemblies has been generated and loaded.
         /// </summary>
-        public static void GenerateAndCacheCodeForAllAssemblies()
+        /// <param name="inputs">The assemblies to generate code for.</param>
+        public static IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(Assembly[] inputs)
         {
-            if (CodeGeneratorInstance != null)
-            {
-                CodeGeneratorInstance.GenerateAndLoadForAssemblies(AppDomain.CurrentDomain.GetAssemblies());
-            }
+            return codeGeneratorInstance?.GenerateAndLoadForAssemblies(inputs);
         }
 
         /// <summary>
         /// Returns the collection of generated assemblies as pairs of target assembly name to raw assembly bytes.
         /// </summary>
         /// <returns>The collection of generated assemblies.</returns>
-        public static IDictionary<string, byte[]> GetGeneratedAssemblies()
+        public static IDictionary<string, GeneratedAssembly> GetGeneratedAssemblies()
         {
-            if (CodeGeneratorCacheInstance != null)
+            if (codeGeneratorCacheInstance != null)
             {
-                return CodeGeneratorCacheInstance.GetGeneratedAssemblies();
+                return codeGeneratorCacheInstance.GetGeneratedAssemblies();
             }
 
             return EmptyGeneratedAssemblies;
@@ -94,11 +89,11 @@ namespace Orleans.CodeGeneration
         /// <param name="generatedAssembly">
         /// The generated assembly.
         /// </param>
-        public static void AddGeneratedAssembly(string targetAssemblyName, byte[] generatedAssembly)
+        public static void AddGeneratedAssembly(string targetAssemblyName, GeneratedAssembly generatedAssembly)
         {
-            if (CodeGeneratorCacheInstance != null)
+            if (codeGeneratorCacheInstance != null)
             {
-                CodeGeneratorCacheInstance.AddGeneratedAssembly(targetAssemblyName, generatedAssembly);
+                codeGeneratorCacheInstance.AddGeneratedAssembly(targetAssemblyName, generatedAssembly);
             }
             else
             {

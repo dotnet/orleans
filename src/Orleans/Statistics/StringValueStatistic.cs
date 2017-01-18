@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace Orleans.Runtime
         private static readonly Dictionary<string, StringValueStatistic> registeredStatistics;
         private static readonly object lockable;
 
-        public string Name { get; private set; }
+        public string Name { get; }
         public CounterStorage Storage { get; private set; }
 
         private Func<string> fetcher;
@@ -27,7 +28,7 @@ namespace Orleans.Runtime
             fetcher = f;
         }
 
-        static public StringValueStatistic Find(StatisticName name)
+        public static StringValueStatistic Find(StatisticName name)
         {
             lock (lockable)
             {
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public StringValueStatistic FindOrCreate(StatisticName name, Func<string> f, CounterStorage storage = CounterStorage.LogOnly)
+        public static StringValueStatistic FindOrCreate(StatisticName name, Func<string> f, CounterStorage storage = CounterStorage.LogOnly)
         {
             lock (lockable)
             {
@@ -50,7 +51,7 @@ namespace Orleans.Runtime
             }
         }
 
-        static public void Delete(string name)
+        public static void Delete(string name)
         {
             lock (lockable)
             {
@@ -89,7 +90,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsValueDelta { get { return false; } }
+        public bool IsValueDelta => false;
 
         public string GetValueString()
         {
@@ -114,6 +115,11 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return Name + "=" + GetCurrentValue();
+        }
+
+        public void TrackMetric(Logger logger)
+        {
+            // String values are not tracked.
         }
     }
 }

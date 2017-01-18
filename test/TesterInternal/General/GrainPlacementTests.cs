@@ -8,13 +8,14 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    public class GrainPlacementTests : HostedTestClusterPerTest
+    public class GrainPlacementTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
 
@@ -24,32 +25,25 @@ namespace UnitTests.General
             output.WriteLine("GrainPlacementTests - constructor");
         }
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            return new TestingSiloHost(
-                new TestingSiloOptions
-                {
-                    StartFreshOrleans = true,
-                    SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
-                }, new TestingClientOptions
-                {
-                    ProxiedGateway = true,
-                    Gateways = new List<IPEndPoint>(new[] { new IPEndPoint(IPAddress.Loopback, 40000), new IPEndPoint(IPAddress.Loopback, 40001) }),
-                    PreferedGatewayIndex = -1,
-                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml"),
-                });
+            var options = new TestClusterOptions();
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
+
+            return new TestCluster(options);
         }
-        
+
+
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task DefaultPlacementShouldBeRandom()
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.Info("********************** Starting the test DefaultPlacementShouldBeRandom ******************************");
             TestSilosStarted(2);
 
-            Assert.Equal(
-                RandomPlacement.Singleton,
-                PlacementStrategy.GetDefault());
+            var actual = await GrainFactory.GetGrain<IDefaultPlacementGrain>(GetRandomGrainId()).GetDefaultPlacement();
+            Assert.IsType<RandomPlacement>(actual);
         }
 
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
@@ -60,8 +54,7 @@ namespace UnitTests.General
             TestSilosStarted(2);
 
             logger.Info("********************** TestSilosStarted passed OK. ******************************");
-
-            var placement = RandomPlacement.Singleton;
+            
             var grains =
                 Enumerable.Range(0, 20).
                 Select(
@@ -197,7 +190,7 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.Silo.LocalConfig;
+                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
                 Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -207,11 +200,11 @@ namespace UnitTests.General
             IPEndPoint targetSilo;
             if (value == "Primary")
             {
-                targetSilo = HostedCluster.Primary.Endpoint;
+                targetSilo = HostedCluster.Primary.SiloAddress.Endpoint;
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -231,7 +224,7 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.Endpoint.Equals(expected));
+            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
             HostedCluster.StopSilo(siloToKill);
 
@@ -252,7 +245,7 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.Silo.LocalConfig;
+                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
                 Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -262,11 +255,11 @@ namespace UnitTests.General
             IPEndPoint targetSilo;
             if (value == "Primary")
             {
-                targetSilo = HostedCluster.Primary.Endpoint;
+                targetSilo = HostedCluster.Primary.SiloAddress.Endpoint;
             }
             else
             {
-                targetSilo = HostedCluster.Secondary.Endpoint;
+                targetSilo = HostedCluster.SecondarySilos.First().SiloAddress.Endpoint;
             }
             Guid proxyKey;
             IRandomPlacementTestGrain proxy;
@@ -286,13 +279,28 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.Endpoint.Equals(expected));
+            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing other silo {0} not hosting locally placed grain", siloToKill);
             HostedCluster.StopSilo(siloToKill);
 
             IPEndPoint newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain is now located on silo {0}", newActual);
             Assert.Equal(expected, newActual);  // "PreferLocalPlacement strategy should not move activations when other non-hosting silo fails."
+        }
+
+        private void TestSilosStarted(int expected)
+        {
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+
+            Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
+            foreach (var pair in statuses)
+            {
+                logger.Info("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
+                Assert.Equal(
+                    SiloStatus.Active,
+                    pair.Value);
+            }
+            Assert.Equal(expected, statuses.Count);
         }
     }
 }

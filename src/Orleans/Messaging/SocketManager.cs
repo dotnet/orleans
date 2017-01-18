@@ -64,7 +64,7 @@ namespace Orleans.Runtime
                 // Prep the socket so it will reset on close and won't Nagle
                 s.LingerState = new LingerOption(true, 0);
                 s.NoDelay = true;
-                WriteConnectionPreemble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
+                WriteConnectionPreamble(s, Constants.SiloDirectConnectionId); // Identifies this client as a direct silo-to-silo socket
                 // Start an asynch receive off of the socket to detect closure
                 var receiveAsyncEventArgs = new SocketAsyncEventArgs
                 {
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
             return s;
         }
 
-        internal static void WriteConnectionPreemble(Socket socket, GrainId grainId)
+        internal static void WriteConnectionPreamble(Socket socket, GrainId grainId)
         {
             int size = 0;
             byte[] grainIdByteArray = null;
@@ -193,6 +193,7 @@ namespace Orleans.Runtime
                 // Ignore
             }
 
+#if !NETSTANDARD
             try
             {
                 s.Disconnect(false);
@@ -201,6 +202,7 @@ namespace Orleans.Runtime
             {
                 // Ignore
             }
+#endif
             try
             {
                 s.Dispose();

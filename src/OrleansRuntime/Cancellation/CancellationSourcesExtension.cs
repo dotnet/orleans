@@ -45,7 +45,12 @@ namespace Orleans.Runtime
         /// <param name="target"></param>
         /// <param name="request"></param>
         /// <param name="logger"></param>
-        internal static void RegisterCancellationTokens(IAddressable target, InvokeMethodRequest request, Logger logger)
+        /// <param name="siloRuntimeClient"></param>
+        internal static void RegisterCancellationTokens(
+            IAddressable target,
+            InvokeMethodRequest request,
+            Logger logger,
+            ISiloRuntimeClient siloRuntimeClient)
         {
             for (var i = 0; i < request.Arguments.Length; i++)
             {
@@ -54,10 +59,10 @@ namespace Orleans.Runtime
                 var grainToken = ((GrainCancellationToken) request.Arguments[i]);
 
                 CancellationSourcesExtension cancellationExtension;
-                if (!SiloProviderRuntime.Instance.TryGetExtensionHandler(out cancellationExtension))
+                if (!siloRuntimeClient.TryGetExtensionHandler(out cancellationExtension))
                 {
                     cancellationExtension = new CancellationSourcesExtension();
-                    if (!SiloProviderRuntime.Instance.TryAddExtension(cancellationExtension))
+                    if (!siloRuntimeClient.TryAddExtension(cancellationExtension))
                     {
                         logger.Error(
                             ErrorCode.CancellationExtensionCreationFailed,

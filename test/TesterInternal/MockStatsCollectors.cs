@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Scheduler;
 
 namespace UnitTests.Stats
 {
@@ -85,25 +86,25 @@ namespace UnitTests.Stats
         }
     }
 
-    public class MockStatsSiloCollector : MarshalByRefObject,
+    public class MockStatsSiloCollector :
         IStatisticsPublisher, ISiloMetricsDataPublisher, // Stats providers have to be both Stats and Metrics publishers
         IProvider // Needs to be IProvider as well as *Publisher
     {
         public string Name { get; private set; }
 
-        public long NumStatsCalls = -1;
-        public long NumMetricsCalls = -1;
+        private IStatsCollectorGrain grain;
+        private OrleansTaskScheduler taskScheduler;
+        private SchedulingContext schedulingContext;
+        private Logger logger;
 
-        public MockStatsSiloCollector()
-        {
-            Trace.TraceInformation("{0} created", GetType().FullName);
-            NumStatsCalls = 0;
-            NumMetricsCalls = 0;
-        }
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
-            Trace.TraceInformation("{0} Init called", GetType().Name);
             Name = name;
+            this.logger = providerRuntime.GetLogger("MockStatsSiloCollector");
+            this.grain = providerRuntime.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
+            this.taskScheduler = Silo.CurrentSilo.LocalScheduler;
+            this.schedulingContext = Silo.CurrentSilo.testHook.SchedulingContext;
+            logger.Info("{0} Init called", GetType().Name);
             return TaskDone.Done;
         }
 
@@ -115,14 +116,14 @@ namespace UnitTests.Stats
 
         public Task ReportMetrics(ISiloPerformanceMetrics metricsData)
         {
-            Trace.TraceInformation("{0} ReportMetrics called", GetType().Name);
-            Interlocked.Increment(ref NumMetricsCalls);
+            logger.Info("{0} ReportMetrics called", GetType().Name);
+            taskScheduler.QueueTask(() => grain.ReportMetricsCalled(), schedulingContext).Ignore();
             return TaskDone.Done;
         }
         public Task ReportStats(List<ICounter> statsCounters)
         {
-            Trace.TraceInformation("{0} ReportStats called", GetType().Name);
-            Interlocked.Increment(ref NumStatsCalls);
+            logger.Info("{0} ReportStats called", GetType().Name);
+            taskScheduler.QueueTask(() => grain.ReportStatsCalled(), schedulingContext).Ignore();
             return TaskDone.Done;
         }
 

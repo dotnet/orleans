@@ -10,12 +10,13 @@ using Orleans.ServiceBus.Providers;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
 using Tester.TestStreamProviders.EventHub;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
+    [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
@@ -25,14 +26,16 @@ namespace Tester.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-                EHConsumerGroup, EHPath);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
 
-        private static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName, 3);
+        private static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName) { CacheSizeMb = 3 };
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable,
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString, EHCheckpointTable,
                 CheckpointNamespace,
                 TimeSpan.FromSeconds(10));
 
@@ -62,14 +65,14 @@ namespace Tester.StreamingTests
             TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
@@ -94,8 +97,8 @@ namespace Tester.StreamingTests
         {
             var settings = new Dictionary<string, string>();
             // get initial settings from configs
-            ProviderConfig.WriteProperties(settings);
-            EventHubConfig.WriteProperties(settings);
+            ProviderSettings.WriteProperties(settings);
+            EventHubConfig.Value.WriteProperties(settings);
             CheckpointerSettings.WriteProperties(settings);
             return settings;
         }

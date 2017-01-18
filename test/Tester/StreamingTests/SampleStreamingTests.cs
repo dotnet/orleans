@@ -7,8 +7,8 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StreamingTests
@@ -77,44 +77,6 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(nRedEvents, counters.Item1);
             Assert.Equal(nBlueEvents, counters.Item2);
-        }
-    }
-
-    [TestCategory("Streaming")]
-    public class SampleAzureQueueStreamingTests : TestClusterPerTest
-    {
-        private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-
-        public override TestCluster CreateTestCluster()
-        {
-            TestUtils.CheckForAzureStorage();
-            var options = new TestClusterOptions(2);
-
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamProvider);
-            return new TestCluster(options);
-        }
-
-        public override void Dispose()
-        {
-            var deploymentId = HostedCluster.DeploymentId;
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(StreamProvider, deploymentId, StorageTestConstants.DataConnectionString).Wait();
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task SampleStreamingTests_4()
-        {
-            logger.Info("************************ SampleStreamingTests_4 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger);
-            await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task SampleStreamingTests_5()
-        {
-            logger.Info("************************ SampleStreamingTests_5 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, logger);
-            await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
     }
 

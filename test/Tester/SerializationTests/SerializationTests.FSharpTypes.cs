@@ -12,7 +12,7 @@ namespace UnitTests.Serialization
     {
         public SerializationTestsFsharpTypes()
         {
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
         }
 
         void RoundtripSerializationTest<T>(T input)

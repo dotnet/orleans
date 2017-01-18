@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +7,6 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
@@ -57,7 +57,7 @@ namespace Orleans.Messaging
     // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
     // so there's no need to worry about the order in which we take and release those locks.
     // </summary>
-    internal class ProxiedMessageCenter : IMessageCenter
+    internal class ProxiedMessageCenter : IMessageCenter, IDisposable
     {
         #region Constants
 
@@ -67,10 +67,9 @@ namespace Orleans.Messaging
         #endregion
         internal GrainId ClientId { get; private set; }
         internal bool Running { get; private set; }
-        internal readonly GatewayManager GatewayManager;
-        internal readonly BufferBlock<Message> PendingInboundMessages;
 
-        internal  Action<Message> MessageHandler;
+        internal readonly GatewayManager GatewayManager;
+        internal readonly BlockingCollection<Message> PendingInboundMessages;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -80,11 +79,9 @@ namespace Orleans.Messaging
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference[] grainBuckets;
         private readonly Logger logger;
-        internal bool _initialized;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
-        public  ManualResetEvent Completion { get; } = new ManualResetEvent(false);
         private readonly QueueTrackingStatistic queueTracking;
 
         public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
@@ -95,7 +92,7 @@ namespace Orleans.Messaging
             Running = false;
             MessagingConfiguration = config;
             GatewayManager = new GatewayManager(config, gatewayListProvider);
-            PendingInboundMessages = new BufferBlock<Message>();
+            PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
@@ -132,10 +129,10 @@ namespace Orleans.Messaging
         public void Stop()
         {
             Running = false;
-            
+
             Utils.SafeExecute(() =>
             {
-                PendingInboundMessages.Complete();
+                PendingInboundMessages.CompleteAdding();
             });
 
             if (StatisticsCollector.CollectQueueStats)
@@ -281,7 +278,7 @@ namespace Orleans.Messaging
         public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
+            return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
         public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
@@ -290,17 +287,54 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-        public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
+        public Message WaitMessage(Message.Categories type, CancellationToken ct)
         {
-            MessageHandler = actionBlock;
-            _initialized = true;
-            IList<Message> msgs;
-            if (PendingInboundMessages.TryReceiveAll(out msgs))
+            try
             {
-                foreach (var msg in msgs)
+                if (ct.IsCancellationRequested)
                 {
-                    MessageHandler(msg);
+                    return null;
                 }
+
+                // Don't pass CancellationToken to Take. It causes too much spinning.
+                Message msg = PendingInboundMessages.Take();
+#if TRACK_DETAILED_STATS
+                if (StatisticsCollector.CollectQueueStats)
+                {
+                    queueTracking.OnDeQueueRequest(msg);
+                }
+#endif
+                return msg;
+            }
+#if !NETSTANDARD
+            catch (ThreadAbortException exc)
+            {
+                // Silo may be shutting-down, so downgrade to verbose log
+                logger.Verbose(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
+                Thread.ResetAbort();
+                return null;
+            }
+#endif
+            catch (OperationCanceledException exc)
+            {
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
+                return null;
+            }
+            catch (ObjectDisposedException exc)
+            {
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
+                return null;
+            }
+            catch (InvalidOperationException exc)
+            {
+                logger.Verbose(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
+                return null;
             }
         }
 
@@ -312,14 +346,7 @@ namespace Orleans.Messaging
                 queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
             }
 #endif
-            if (_initialized)
-            {
-                MessageHandler(msg);
-            }
-            else
-            {
-                PendingInboundMessages.Post(msg);
-            }
+            PendingInboundMessages.Add(msg);
         }
 
         private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)
@@ -370,9 +397,9 @@ namespace Orleans.Messaging
 
         #endregion
 
-        private ITypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
+        private IClusterTypeManager GetTypeManager(SiloAddress destination, GrainFactory grainFactory)
         {
-            return grainFactory.GetSystemTarget<ITypeManager>(Constants.TypeManagerId, destination);
+            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()
@@ -385,6 +412,28 @@ namespace Orleans.Messaging
             }
 
             return gateway.ToSiloAddress();
+        }
+
+        internal void UpdateClientId(GrainId clientId)
+        {
+            if (ClientId.Category != UniqueKey.Category.Client)
+                throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
+
+            if (clientId.Category != UniqueKey.Category.GeoClient)
+                throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
+
+            ClientId = clientId;
+        }
+
+        public void Dispose()
+        {
+            PendingInboundMessages.Dispose();
+            if (gatewayConnections != null)
+                foreach (var item in gatewayConnections)
+                {
+                    item.Value.Dispose();
+                }
+            GatewayManager.Dispose();
         }
     }
 }

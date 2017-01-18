@@ -1,0 +1,35 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansRuntime</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans Runtime</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Runtime of Microsoft Orleans - OrleansRuntime.dll
+    </summary>
+    <description>
+      Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard1.5">
+        <dependency id="Microsoft.Orleans.Core" version="$version$" />
+
+        <dependency id="Microsoft.Extensions.DependencyInjection" version="1.1.0" />
+        <dependency id="System.Runtime" version="4.3.0" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansRuntime.XML" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansRuntime.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansRuntime.pdb" target="lib\netstandard1.5" />
+    <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
+  </files>
+</package>

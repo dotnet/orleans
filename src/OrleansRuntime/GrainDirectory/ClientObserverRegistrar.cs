@@ -20,15 +20,19 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ClusterConfiguration orleansConfig;
         private readonly Logger logger;
-        private GrainTimer clientRefreshTimer;
+        private IGrainTimer clientRefreshTimer;
         private Gateway gateway;
-       
 
-        internal ClientObserverRegistrar(SiloAddress myAddr, ILocalGrainDirectory dir, OrleansTaskScheduler scheduler, ClusterConfiguration config)
-            : base(Constants.ClientObserverRegistrarId, myAddr)
+
+        public ClientObserverRegistrar(
+            SiloInitializationParameters initializationParameters,
+            ILocalGrainDirectory dir,
+            OrleansTaskScheduler scheduler,
+            ClusterConfiguration config)
+            : base(Constants.ClientObserverRegistrarId, initializationParameters.SiloAddress)
         {
             grainDirectory = dir;
-            myAddress = myAddr;
+            myAddress = initializationParameters.SiloAddress;
             this.scheduler = scheduler;
             orleansConfig = config;
             logger = LogManager.GetLogger(typeof(ClientObserverRegistrar).Name);
@@ -71,7 +75,7 @@ namespace Orleans.Runtime
         {
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
-                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, force:true), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
+                () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, Orleans.GrainDirectory.UnregistrationCause.Force), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
                 this.SchedulingContext)
                         .Ignore();
         }

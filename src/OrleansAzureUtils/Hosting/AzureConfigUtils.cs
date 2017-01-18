@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Web;
 
 namespace Orleans.Runtime.Host
 {
@@ -125,18 +124,19 @@ namespace Orleans.Runtime.Host
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));
             });
-
+#if !NETSTANDARD
+            //System.Web namespace is deprecated in netstandard, considering drop this block, since it's expressing an obsolte way to looking for rootPath in IIS web app
             Utils.SafeExecute(() =>
             {
                 // Try using Server.MapPath to resolve for web roles running in IIS web apps
-                if (HttpContext.Current != null)
+                if (System.Web.HttpContext.Current != null)
                 {
-                    string appRootPath = HttpContext.Current.Server.MapPath(@"~\");
+                    string appRootPath = System.Web.HttpContext.Current.Server.MapPath(@"~\");
                     if (appRootPath != null)
                         locations.Add(new DirectoryInfo(appRootPath));
                 }
-            });
 
+            });
 
             Utils.SafeExecute(() =>
             {
@@ -146,7 +146,7 @@ namespace Orleans.Runtime.Host
                 if (appRootPath != null)
                     locations.Add(new DirectoryInfo(appRootPath));
             });
-
+#endif
             // Try current directory
             locations.Add(new DirectoryInfo("."));
             return locations;

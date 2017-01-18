@@ -1,7 +1,7 @@
 ﻿{
   "dependencies": {
     "AWSSDK.DynamoDBv2": "3.1.5.2",
-    "Newtonsoft.Json": "7.0.1"
+    "AWSSDK.SQS": "3.1.0.9"
   },
   "frameworks": {
     "net451": {}

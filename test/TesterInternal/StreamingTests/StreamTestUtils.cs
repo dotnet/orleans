@@ -6,6 +6,7 @@ using Orleans.Streams;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
+using System.Linq;
 
 namespace UnitTests.StreamingTests
 {
@@ -13,10 +14,10 @@ namespace UnitTests.StreamingTests
     {
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AzureQueueProvider";
 
-        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestingSiloHost siloHost)
+        internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, Logger logger, TestCluster siloHost)
         {
-            SiloAddress primSilo = siloHost.Primary.Silo.SiloAddress;
-            SiloAddress secSilo = siloHost.Secondary?.Silo.SiloAddress;
+            SiloAddress primSilo = siloHost.Primary.SiloAddress;
+            SiloAddress secSilo = siloHost.SecondarySilos.First()?.SiloAddress;
             logger.Info("\n\n**START********************** {0} ********************************* \n\n"
                         + "Running with initial silos Primary={1} Secondary={2} StreamId={3} StreamType={4} \n\n",
                 testName, primSilo, secSilo, streamId, streamProviderName);

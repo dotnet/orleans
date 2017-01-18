@@ -1,43 +1,56 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.HaloTests.Streaming
 {
+    [TestCategory("Streaming"), TestCategory("Halo")]
     public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            public const string SmsStreamProviderName = "SMSProvider";
+            public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    // StartSecondary = false,
-                    SiloConfigFile = new FileInfo("Config_StreamProviders.xml"),
-                });
+                var options = new TestClusterOptions();
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+                options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
+                options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", fireAndForgetDelivery: false, optimizeForImmutableData: false);
+
+                options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+                options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+                options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+
+                return new TestCluster(options);
             }
 
             public override void Dispose()
             {
                 var deploymentId = this.HostedCluster.DeploymentId;
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(AzureQueueStreamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;
@@ -56,11 +69,11 @@ namespace UnitTests.HaloTests.Streaming
             var deploymentId = this.HostedCluster.DeploymentId;
             if (_streamProvider != null && _streamProvider.Equals(AzureQueueStreamProviderName))
             {
-                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(_streamProvider, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ConsumerProducer()
         {
             logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -72,7 +85,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_SMS_ResubscribeTest_ProducerConsumer()
         {
             logger.Info("\n\n************************ Halo_SMS_ResubscribeTest_ProducerConsumer ********************************* \n\n");
@@ -84,7 +97,7 @@ namespace UnitTests.HaloTests.Streaming
             await ProducerConsumerTest(producerGuid, consumerGuid);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
             logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
@@ -96,7 +109,7 @@ namespace UnitTests.HaloTests.Streaming
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Halo")]
+        [Fact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
             logger.Info("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");

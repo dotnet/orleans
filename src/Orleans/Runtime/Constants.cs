@@ -34,13 +34,13 @@ namespace Orleans.Runtime
         public static readonly GrainId ClientObserverRegistrarId = GrainId.GetSystemTargetGrainId(13);
         public static readonly GrainId CatalogId = GrainId.GetSystemTargetGrainId(14);
         public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
-        public static readonly GrainId ReminderServiceId = GrainId.GetSystemTargetGrainId(16);
         public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
         public static readonly GrainId ProviderManagerSystemTargetId = GrainId.GetSystemTargetGrainId(19);
         public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
         public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
         public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
         public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
+        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
 
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
@@ -81,7 +81,6 @@ namespace Orleans.Runtime
             {CatalogId,"Catalog"},
             {MembershipOracleId,"MembershipOracle"},
             {MultiClusterOracleId,"MultiClusterOracle"},
-            {ReminderServiceId,"ReminderService"},
             {TypeManagerId,"TypeManagerId"},
             {ProviderManagerSystemTargetId, "ProviderManagerSystemTarget"},
             {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},

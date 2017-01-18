@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Orleans.Runtime.Configuration;
 
@@ -13,6 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationCollector : IActivationCollector
     {
+        internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets;
@@ -193,7 +193,7 @@ namespace Orleans.Runtime
                     ApproximateCount, 
                     buckets.Count,       
                     Utils.EnumerableToString(
-                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => (Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items").ToString(CultureInfo.InvariantCulture)));
+                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
         }
 
         /// <summary>
@@ -321,7 +321,7 @@ namespace Orleans.Runtime
             return result ?? nothing;
         }
 
-        private static void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
+        private void DecideToCollectActivation(ActivationData activation, ref List<ActivationData> condemned)
         {
             if (null == condemned)
             {
@@ -332,10 +332,7 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            if (Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation != null)
-            {
-                Silo.CurrentSilo.TestHook.Debug_OnDecideToCollectActivation(activation.Grain);
-            }
+            this.Debug_OnDecideToCollectActivation?.Invoke(activation.Grain);
         }
 
         private static void ThrowIfTicketIsInvalid(DateTime ticket, TimeSpan quantum)

@@ -9,12 +9,14 @@ namespace Orleans.CodeGenerator
     using Microsoft.CodeAnalysis;
     using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
+
     using Orleans;
     using Orleans.CodeGeneration;
     using Orleans.CodeGenerator.Utilities;
     using Orleans.Runtime;
     using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
     using SF = Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+    using Microsoft.CodeAnalysis.Emit;
 
     /// <summary>
     /// Methods common to multiple code generators.
@@ -45,13 +47,16 @@ namespace Orleans.CodeGenerator
         /// <param name="assemblyName">
         /// The name for the generated assembly.
         /// </param>
+        /// <param name="emitDebugSymbols">
+        /// Whether or not to emit debug symbols for the generated assembly.
+        /// </param>
         /// <returns>
         /// The raw assembly.
         /// </returns>
         /// <exception cref="CodeGenerationException">
         /// An error occurred generating code.
         /// </exception>
-        public static byte[] CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName)
+        public static GeneratedAssembly CompileAssembly(GeneratedSyntax generatedSyntax, string assemblyName, bool emitDebugSymbols)
         {
             // Add the generated code attribute.
             var code = AddGeneratedCodeAttribute(generatedSyntax);
@@ -67,6 +72,18 @@ namespace Orleans.CodeGenerator
 
             // Generate the code.
             var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+
+#if NETSTANDARD
+            // CoreFX bug https://github.com/dotnet/corefx/issues/5540 
+            // to workaround it, we are calling internal WithTopLevelBinderFlags(BinderFlags.IgnoreCorLibraryDuplicatedTypes) 
+            // TODO: this API will be public in the future releases of Roslyn. 
+            // This work is tracked in https://github.com/dotnet/roslyn/issues/5855 
+            // Once it's public, we should replace the internal reflection API call by the public one. 
+            var method = typeof(CSharpCompilationOptions).GetMethod("WithTopLevelBinderFlags", BindingFlags.NonPublic | BindingFlags.Instance);
+            // we need to pass BinderFlags.IgnoreCorLibraryDuplicatedTypes, but it's an internal class 
+            // http://source.roslyn.io/#Microsoft.CodeAnalysis.CSharp/Binder/BinderFlags.cs,00f268571bb66b73 
+            options = (CSharpCompilationOptions)method.Invoke(options, new object[] { 1u << 26 });
+#endif
 
             string source = null;
             if (logger.IsVerbose3)
@@ -87,9 +104,15 @@ namespace Orleans.CodeGenerator
                     .AddSyntaxTrees(code.SyntaxTree)
                     .AddReferences(assemblies)
                     .WithOptions(options);
-            using (var stream = new MemoryStream())
+
+            var outputStream = new MemoryStream();
+            var symbolStream = emitDebugSymbols ? new MemoryStream() : null;
+            try
             {
-                var compilationResult = compilation.Emit(stream);
+                var emitOptions = new EmitOptions()
+                    .WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
+
+                var compilationResult = compilation.Emit(outputStream, symbolStream, options: emitOptions);
                 if (!compilationResult.Success)
                 {
                     source = source ?? GenerateSourceCode(code);
@@ -102,9 +125,21 @@ namespace Orleans.CodeGenerator
                         source);
                     throw new CodeGenerationException(errors);
                 }
-                
-                logger.Verbose(ErrorCode.CodeGenCompilationSucceeded, "Compilation of assembly {0} succeeded.", assemblyName);
-                return stream.ToArray();
+
+                logger.Verbose(
+                    ErrorCode.CodeGenCompilationSucceeded,
+                    "Compilation of assembly {0} succeeded.",
+                    assemblyName);
+                return new GeneratedAssembly
+                {
+                    RawBytes = outputStream.ToArray(),
+                    DebugSymbolRawBytes = symbolStream?.ToArray()
+                };
+            }
+            finally
+            {
+                outputStream.Dispose();
+                symbolStream?.Dispose();
             }
         }
 

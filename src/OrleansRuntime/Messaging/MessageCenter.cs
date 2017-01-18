@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
         private IncomingMessageAcceptor ima;
         private static readonly Logger log = LogManager.GetLogger("Orleans.Messaging.MessageCenter");
         private Action<Message> rerouteHandler;
+        internal Func<Message, bool> ShouldDrop;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
@@ -39,9 +40,13 @@ namespace Orleans.Runtime.Messaging
 
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
 
-        public MessageCenter(IPEndPoint here, int generation, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)
+        public MessageCenter(SiloInitializationParameters silo, NodeConfiguration nodeConfig, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)
         {
-            Initialize(here, generation, config, metrics);
+            this.Initialize(silo.SiloAddress.Endpoint, nodeConfig.Generation, config, metrics);
+            if (nodeConfig.IsGatewayNode)
+            {
+                this.InstallGateway(nodeConfig.ProxyGatewayEndpoint);
+            }
         }
 
         private void Initialize(IPEndPoint here, int generation, IMessagingConfiguration config, ISiloPerformanceMetrics metrics = null)

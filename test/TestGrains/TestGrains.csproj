@@ -53,13 +53,16 @@
     <Compile Include="AsyncSimpleGrain.cs" />
     <Compile Include="CatalogTestGrain.cs" />
     <Compile Include="ChainedGrain.cs" />
+    <Compile Include="ClusterTestGrains.cs" />
     <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ActivateDeactivateWatcherGrain.cs" />
     <Compile Include="ConcurrentGrain.cs" />
     <Compile Include="ConsumerEventCountingGrain.cs" />
     <Compile Include="DeadlockGrain.cs" />
     <Compile Include="DerivedServiceType.cs" />
-    <Compile Include="EnumResultGrain.cs" />
+    <Compile Include="GrainService\CustomGrainService.cs" />
+    <Compile Include="GrainService\GrainServiceTestGrain.cs" />
+    <Compile Include="RoundtripSerializationGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="ExternalTypeGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
@@ -94,6 +97,7 @@
     <Compile Include="ReminderTestGrain.cs" />
     <Compile Include="RequestContextTestGrain.cs" />
     <Compile Include="SerializationGenerationGrain.cs" />
+    <Compile Include="MessageSerializationGrain.cs" />
     <Compile Include="ServiceType.cs" />
     <Compile Include="SimpleGenericGrain.cs" />
     <Compile Include="MultipleSubscriptionConsumerGrain.cs" />
@@ -109,14 +113,15 @@
     <Compile Include="SimpleObserverableGrain.cs" />
     <Compile Include="ObserverGrain.cs" />
     <Compile Include="SimpleGrain.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimplePersistentGrain.cs" />
     <Compile Include="GrainInterfaceHierarchyGrains.cs" />
     <Compile Include="LivenessTestGrain.cs" />
     <Compile Include="SpecializedSimpleGenericGrain.cs" />
+    <Compile Include="StatsCollectorGrain.cs" />
     <Compile Include="StreamCheckpoint.cs" />
     <Compile Include="StreamInterceptionGrain.cs" />
+    <Compile Include="StuckGrain.cs" />
     <Compile Include="ValueTypeTestGrain.cs" />
   </ItemGroup>
   <ItemGroup>

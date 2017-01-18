@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
@@ -13,9 +12,11 @@ using Orleans.Storage;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
+using Orleans.Runtime.Configuration;
+using TestExtensions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -28,27 +29,29 @@ namespace UnitTests.StorageTests
     /// </summary>
     public class PersistenceGrainTests_Local : OrleansTestingBase, IClassFixture<PersistenceGrainTests_Local.Fixture>, IDisposable
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_DevStorage.xml"),
-                    StartSecondary = false,
-                });
+                var options = new TestClusterOptions(initialSilosCount: 1);
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test1");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>("ErrorInjector");
+                options.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>("lowercase");
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+
+                return new TestCluster(options);
             }
         }
 
         const string ErrorInjectorStorageProvider = "ErrorInjector";
         private readonly ITestOutputHelper output;
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; }
 
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
             HostedCluster = fixture.HostedCluster;
-            SerializationManager.InitializeForTesting();
             SetErrorInjection(ErrorInjectorStorageProvider, ErrorInjectionPoint.None);
             ResetMockStorageProvidersHistory();
         }
@@ -59,16 +62,16 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
-        public void Persistence_Silo_StorageProviders()
+        public async Task Persistence_Silo_StorageProviders()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                List<string> providers = silo.Silo.TestHook.GetStorageProviderNames().ToList();
+                ICollection<string> providers = await silo.TestHook.GetStorageProviderNames();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
                 const string providerName = "test1";
-                IStorageProvider storageProvider = silo.Silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider storageProvider = silo.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(storageProvider);
             }
         }
@@ -80,7 +83,7 @@ namespace UnitTests.StorageTests
             foreach (var silo in silos)
             {
                 const string providerName = "LowerCase";
-                IStorageProvider storageProvider = silo.Silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider storageProvider = silo.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(storageProvider);
             }
         }
@@ -93,7 +96,7 @@ namespace UnitTests.StorageTests
             const string providerName = "NotPresent";
             Assert.Throws<KeyNotFoundException>(() =>
             {
-                IStorageProvider store = silo.Silo.TestHook.GetStorageProvider(providerName);
+                IStorageProvider store = silo.AppDomainTestHook.GetStorageProvider(providerName);
             });
         }
 
@@ -1021,40 +1024,6 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Func()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Func();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Predicate();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate_Class()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-            await grain.Test_Serialize_Predicate_Class();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
-        public async Task Grain_Serialize_Predicate_Class_Param()
-        {
-            Guid id = Guid.NewGuid();
-            ISerializationTestGrain grain = GrainClient.GrainFactory.GetGrain<ISerializationTestGrain>(id);
-
-            IMyPredicate pred = new MyPredicate(42);
-            await grain.Test_Serialize_Predicate_Class_Param(pred);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public void Serialize_GrainState_DeepCopy()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
@@ -1079,7 +1048,7 @@ namespace UnitTests.StorageTests
         public async Task Serialize_GrainState_DeepCopy_Stress()
         {
             int num = 100;
-            int loops = num * 1000;
+            int loops = num * 100;
             GrainStateContainingGrainReferences[] states = new GrainStateContainingGrainReferences[num];
             for (int i = 0; i < num; i++)
             {
@@ -1179,7 +1148,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 provider.SetValue<TState>(grainType, (GrainReference)grain, "Field1", newValue);
             }
         }
@@ -1189,7 +1158,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                ErrorInjectionStorageProvider provider = (ErrorInjectionStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 provider.SetErrorInjection(errorInjectionPoint);
             }
         }
@@ -1239,7 +1208,7 @@ namespace UnitTests.StorageTests
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                 Assert.NotNull(provider);
                 if (provider.ReadCount > 0)
                 {
@@ -1265,7 +1234,7 @@ namespace UnitTests.StorageTests
             {
                 foreach (var providerName in mockStorageProviders)
                 {
-                    MockStorageProvider provider = (MockStorageProvider)siloHandle.Silo.TestHook.GetStorageProvider(providerName);
+                    MockStorageProvider provider = (MockStorageProvider)siloHandle.AppDomainTestHook.GetStorageProvider(providerName);
                     if (provider != null)
                     {
                         provider.ResetHistory();

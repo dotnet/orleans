@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +11,8 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
@@ -23,10 +24,11 @@ using Xunit.Abstractions;
 
 namespace UnitTests.Streaming.Reliability
 {
-    public class StreamReliabilityTests : HostedTestClusterPerTest
+    [TestCategory("Streaming"), TestCategory("Reliability")]
+    public class StreamReliabilityTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper output;
-        public const string SMS_STREAM_PROVIDER_NAME = "SMSProvider";
+        public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
         private Guid _streamId;
@@ -36,25 +38,31 @@ namespace UnitTests.Streaming.Reliability
         private HashSet<IStreamReliabilityTestGrain> _usedGrains; 
 #endif
 
-        public override TestingSiloHost CreateSiloHost()
+        public override TestCluster CreateTestCluster()
         {
-            Guid serviceId = Guid.NewGuid();
-            var siloRunOptions = new TestingSiloOptions
-            {
-                StartSecondary = true,
-                SiloConfigFile = new FileInfo("Config_AzureStreamProviders.xml"),
-                LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable,
-                DataConnectionString = StorageTestConstants.DataConnectionString,
-                AdjustConfig = config => { config.Globals.ServiceId = serviceId; }
-            };
-            var clientRunOptions = new TestingClientOptions
-            {
-                ClientConfigFile = new FileInfo("ClientConfig_AzureStreamProviders.xml")
-            };
-            this.numExpectedSilos = siloRunOptions.StartSecondary ? 2 : 1;
-            return new TestingSiloHost(siloRunOptions, clientRunOptions);
+            this.numExpectedSilos = 2;
+            var options = new TestClusterOptions(initialSilosCount: (short)this.numExpectedSilos);
+            options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
+
+            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+
+            options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear: true);
+            options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
+
+            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
+
+            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
+            options.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
+
+            options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
+            options.ClientConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
+
+            return new TestCluster(options);
         }
-        
+
         public StreamReliabilityTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -78,11 +86,11 @@ namespace UnitTests.Streaming.Reliability
             base.Dispose();
             if (_streamProviderName != null && _streamProviderName.Equals(AZURE_QUEUE_STREAM_PROVIDER_NAME))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, StorageTestConstants.DataConnectionString).Wait();
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(_streamProviderName, deploymentId, TestDefaultConfiguration.DataConnectionString).Wait();
             }
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public void Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the silo test config is OK.
@@ -91,7 +99,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public void Baseline_StreamRel_RestartSilos()
         {
             // This test case is just a sanity-check that the silo test config is OK.
@@ -100,19 +108,19 @@ namespace UnitTests.Streaming.Reliability
 
             CheckSilosRunning("Before Restart", numExpectedSilos);
             SiloHandle prim1 = this.HostedCluster.Primary;
-            SiloHandle sec1 = this.HostedCluster.Secondary;
+            SiloHandle sec1 = this.HostedCluster.SecondarySilos.First();
 
             RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
 
             Assert.NotEqual(prim1, this.HostedCluster.Primary); // Should be different Primary silos after restart
-            Assert.NotEqual(sec1, this.HostedCluster.Secondary); // Should be different Secondary silos after restart
+            Assert.NotEqual(sec1, this.HostedCluster.SecondarySilos.First()); // Should be different Secondary silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the SMS test config is OK.
@@ -132,7 +140,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure")]
         public async Task AQ_Baseline_StreamRel()
         {
             // This test case is just a sanity-check that the AzureQueue test config is OK.
@@ -164,7 +172,7 @@ namespace UnitTests.Streaming.Reliability
             await Test_AddMany_Consumers(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_PubSub_MultiConsumerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiConsumerSameGrain";
@@ -172,7 +180,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiConsumerSameGrain not required - does not use PubSub
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_PubSub_MultiProducerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiProducerSameGrain";
@@ -180,7 +188,7 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_PubSub_MultiProducerSameGrain not required - does not use PubSub
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_PubSub_Unsubscribe()
         {
             const string testName = "SMS_PubSub_Unsubscribe";
@@ -189,7 +197,7 @@ namespace UnitTests.Streaming.Reliability
         // AQ_PubSub_Unsubscribe not required - does not use PubSub
 
         //TODO: This test fails because the resubscribe to streams after restart creates a new subscription, losing the events on the previous subscription.  Should be fixed when 'renew' subscription feature is added. - jbragg
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Failures")]
+        [Fact, TestCategory("Functional"), TestCategory("Failures")]
         public async Task SMS_StreamRel_AllSilosRestart_PubSubCounts()
         {
             const string testName = "SMS_StreamRel_AllSilosRestart_PubSubCounts";
@@ -197,14 +205,14 @@ namespace UnitTests.Streaming.Reliability
         }
         // AQ_StreamRel_AllSilosRestart_PubSubCounts not required - does not use PubSub
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_AllSilosRestart()
         {
             const string testName = "SMS_StreamRel_AllSilosRestart";
 
             await Test_AllSilosRestart(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_AllSilosRestart()
         {
             const string testName = "AQ_StreamRel_AllSilosRestart";
@@ -212,14 +220,14 @@ namespace UnitTests.Streaming.Reliability
             await Test_AllSilosRestart(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloJoins()
         {
             const string testName = "SMS_StreamRel_SiloJoins";
 
             await Test_SiloJoins(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloJoins()
         {
             const string testName = "AQ_StreamRel_SiloJoins";
@@ -227,52 +235,52 @@ namespace UnitTests.Streaming.Reliability
             await Test_SiloJoins(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloDies_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Consumer";
             await Test_SiloDies_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloDies_Producer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Producer()
         {
             const string testName = "AQ_StreamRel_SiloDies_Producer";
             await Test_SiloDies_Producer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Consumer";
             await Test_SiloRestarts_Consumer(testName, AZURE_QUEUE_STREAM_PROVIDER_NAME);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Producer";
             await Test_SiloRestarts_Producer(testName, SMS_STREAM_PROVIDER_NAME);
         }
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("Azure"), TestCategory("Queue")]
+        [Fact, TestCategory("Functional"), TestCategory("Azure"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "AQ_StreamRel_SiloRestarts_Producer";
@@ -551,7 +559,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [Fact, TestCategory("Functional")]
         public async Task SMS_AllSilosRestart_UnsubscribeConsumer()
         {
             const string testName = "SMS_AllSilosRestart_UnsubscribeConsumer";
@@ -669,8 +677,8 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -708,8 +716,8 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the producer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -749,8 +757,8 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -788,8 +796,8 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
-            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.Secondary;
+            bool isPrimary = siloAddress.Equals(this.HostedCluster.Primary.SiloAddress);
+            SiloHandle siloToKill = isPrimary ? this.HostedCluster.Primary : this.HostedCluster.SecondarySilos.First();
             StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -858,9 +866,9 @@ namespace UnitTests.Streaming.Reliability
             //await CheckReceivedCounts(when, consumerGrain, expectedReceived, 0);
 
             // Find a Consumer Grain on the new silo
-            IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.Silo.SiloAddress);
+            IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.SiloAddress);
             await newConsumer.AddConsumer(_streamId, _streamProviderName);
-            output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.Silo.SiloAddress);
+            output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.SiloAddress);
 
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
 
@@ -886,22 +894,26 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.Silo.SiloAddress, this.HostedCluster.Secondary.Silo.SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.SecondarySilos.First().SiloAddress);
 
-            this.HostedCluster.RestartDefaultSilos();
-            
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            {
+                this.HostedCluster.RestartSilo(silo);
+            }
+
             // Note: Needed to reinitialize client in this test case to connect to new silos
+            // this.HostedCluster.InitializeClient();
 
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            this.HostedCluster.Primary.Silo.SiloAddress, this.HostedCluster.Secondary.Silo.SiloAddress);
+                            this.HostedCluster.Primary.SiloAddress, this.HostedCluster.SecondarySilos.First().SiloAddress);
         }
 
         private void StopSilo(SiloHandle silo, bool kill, bool restart)
         {
-            SiloAddress oldSilo = silo.Silo.SiloAddress;
-            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary.Silo.SiloAddress);
+            SiloAddress oldSilo = silo.SiloAddress;
+            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary.SiloAddress);
             string siloType = isPrimary ? "Primary" : "Secondary";
             string action;
             if (restart)    action = kill ? "Kill+Restart" : "Stop+Restart";
@@ -914,19 +926,19 @@ namespace UnitTests.Streaming.Reliability
                 //RestartRuntime(silo, kill);
                 SiloHandle newSilo = this.HostedCluster.RestartSilo(silo);
 
-                logger.Info("Restarted new {0} silo {1}", siloType, newSilo.Silo.SiloAddress);
+                logger.Info("Restarted new {0} silo {1}", siloType, newSilo.SiloAddress);
 
-                Assert.NotEqual(oldSilo, newSilo.Silo.SiloAddress); //"Should be different silo address after Restart"
+                Assert.NotEqual(oldSilo, newSilo.SiloAddress); //"Should be different silo address after Restart"
             }
             else if (kill)
             {
                 this.HostedCluster.KillSilo(silo);
-               Assert.Null(silo.Silo);
+               Assert.False(silo.IsActive);
             }
             else
             {
                 this.HostedCluster.StopSilo(silo);
-               Assert.Null(silo.Silo);
+               Assert.False(silo.IsActive);
             }
 
             // WaitForLivenessToStabilize(!kill);
@@ -1002,7 +1014,7 @@ namespace UnitTests.Streaming.Reliability
 #else
             string grainType = typeof(StreamReliabilityTestGrain).FullName;
 #endif
-            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            IManagementGrain mgmtGrain = GrainClient.GrainFactory.GetGrain<IManagementGrain>(0);
 
             SimpleGrainStatistic[] grainStats = await mgmtGrain.GetSimpleGrainStatistics();
             output.WriteLine("Found grains " + Utils.EnumerableToString(grainStats));

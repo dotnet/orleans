@@ -4,11 +4,15 @@ using System.IO;
 using System.Linq;
 using Orleans;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
+using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading.Tasks;
+using Orleans.Runtime.TestHooks;
+using Orleans.Runtime;
 
 namespace UnitTests.Streaming
 {
@@ -36,7 +40,7 @@ namespace UnitTests.Streaming
         protected TestingSiloHost HostedCluster { get; private set; }
         private TestingSiloOptions SiloOptions;
         private Guid ServiceId;
-        public static readonly string STREAM_PROVIDER_NAME = "SMSProvider";
+        public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
 
         public StreamProvidersTests_ProviderConfigNotLoaded(ITestOutputHelper output, Fixture fixture)
@@ -69,14 +73,12 @@ namespace UnitTests.Streaming
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
-        public void ServiceId_ProviderRuntime()
+        public async Task ServiceId_ProviderRuntime()
         {
             Guid thisRunServiceId = this.HostedCluster.Globals.ServiceId;
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
-            Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId in Silo config"
-            serviceId = siloHandle.Silo.TestHook.ServiceId;
+            Guid serviceId = await siloHandle.TestHook.GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config
@@ -85,7 +87,7 @@ namespace UnitTests.Streaming
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
-        public void ServiceId_SiloRestart()
+        public async Task ServiceId_SiloRestart()
         {
             Guid configServiceId = this.HostedCluster.Globals.ServiceId;
 
@@ -107,9 +109,7 @@ namespace UnitTests.Streaming
             Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
 
             SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            Guid serviceId = siloHandle.Silo.GlobalConfig.ServiceId;
-            Assert.Equal(ServiceId, serviceId);  // "ServiceId in Silo config"
-            serviceId = siloHandle.Silo.TestHook.ServiceId;
+            Guid serviceId = await siloHandle.TestHook.GetServiceId();
             Assert.Equal(ServiceId, serviceId);  // "ServiceId active in silo"
 
             // ServiceId is not currently available in client config

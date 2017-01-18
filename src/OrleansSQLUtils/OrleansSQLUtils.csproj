@@ -54,6 +54,7 @@
     <Compile Include="OrleansRelationalDownloadStream.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReminderService\SqlReminderTable.cs" />
+    <Compile Include="Storage\AdoNetConfigurationExtensions.cs" />
     <Compile Include="Storage\AdoNetInvariants.cs" />
     <Compile Include="Storage\DbConstantsStore.cs" />
     <Compile Include="Storage\DbExtensions.cs" />
@@ -92,6 +93,9 @@
   <ItemGroup>
     <Content Include="CreateOrleansTables_MySql.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="CreateOrleansTables_PostgreSql.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="CreateOrleansTables_SqlServer.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

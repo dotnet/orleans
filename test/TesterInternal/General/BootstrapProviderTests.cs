@@ -3,14 +3,15 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
+using Tester;
+using Orleans.Runtime.Configuration;
+using TestExtensions;
 
 namespace UnitTests.General
 {
@@ -18,25 +19,25 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        public class Fixture : BaseClusterFixture
+        public class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    SiloConfigFile = new FileInfo("Config_BootstrapProviders.xml"),
-                    StartFreshOrleans = true,
-                    StartPrimary = true,
-                    StartSecondary = true,
-                },
-                new TestingClientOptions()
-                {
-                    ClientConfigFile = new FileInfo("ClientConfigurationForTesting.xml")
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.MockBootstrapProvider>("bootstrap1");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.GrainCallBootstrapper>("bootstrap2");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.LocalGrainInitBootstrapper>("bootstrap3");
+                options.ClusterConfiguration.Globals.RegisterBootstrapProvider<UnitTests.General.ControllableBootstrapProvider>("bootstrap4");
+
+                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
+                options.ClusterConfiguration.AddMemoryStorageProvider("Default", numStorageGrains: 1);
+
+                return new TestCluster(options);
             }
         }
 
-        protected TestingSiloHost HostedCluster { get; private set; }
+
+        protected TestCluster HostedCluster { get; private set; }
 
         public BootstrapProvidersTests(ITestOutputHelper output, Fixture fixture)
         {
@@ -96,15 +97,12 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in silos)
             {
-                IList<IBootstrapProvider> providers = silo.Silo.BootstrapProviders;
-                output.WriteLine("Found {0} bootstrap providers in silo {1}: {2}", 
-                    providers.Count, silo.Name, Utils.EnumerableToString(
-                        providers.Select(pr => pr.Name + "=" + pr.GetType().FullName)));
+                var providers = await silo.TestHook.GetAllSiloProviderNames();
 
-                Assert.Equal(4, providers.Count); // Found correct number of bootstrap providers
-                
-                Assert.True(providers.Any(bp => bp.Name.Equals(controllerName)), "Name found");
-                Assert.True(providers.Any(bp => bp.GetType().FullName.Equals(controllerType)), "Typefound");
+                Assert.Contains("bootstrap1", providers);
+                Assert.Contains("bootstrap2", providers);
+                Assert.Contains("bootstrap3", providers);
+                Assert.Contains("bootstrap4", providers);
             }
 
             IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
@@ -112,14 +110,14 @@ namespace UnitTests.General
             object[] replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
 
             command += 1;
             replies = await mgmtGrain.SendControlCommandToProvider(controllerType, controllerName, command, args);
 
             output.WriteLine("Got {0} replies {1}", replies.Length, Utils.EnumerableToString(replies));
-            Assert.Equal(numSilos,  replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
+            Assert.Equal(numSilos, replies.Length);  //  "Expected to get {0} replies to command {1}", numSilos, command
             Assert.True(replies.All(reply => reply.ToString().Equals(command.ToString())), $"Got command {command}");
         }
 
@@ -129,7 +127,7 @@ namespace UnitTests.General
             List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var siloHandle in silos)
             {
-                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.Silo.TestHook.GetBootstrapProvider(providerName);
+                MockBootstrapProvider provider = (MockBootstrapProvider)siloHandle.AppDomainTestHook.GetBootstrapProvider(providerName);
                 Assert.NotNull(provider);
                 providerInUse = provider;
             }

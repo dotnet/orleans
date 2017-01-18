@@ -56,10 +56,10 @@ namespace Orleans.Streams
             this.config = config;
             numMessages = 0;
 
-            logger = runtime.GetLogger(GrainId + "-" + streamProviderName);
+            logger = runtime.GetLogger(((ISystemTargetBase)this).GrainId + "-" + streamProviderName);
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
-                GetType().Name, GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);
@@ -91,7 +91,7 @@ namespace Orleans.Streams
         private void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
         {
             logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                GetType().Name, GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter;
@@ -335,12 +335,11 @@ namespace Orleans.Streams
                 }
 
                 if (IsShutdown) return; // timer was already removed, last tick
-                
-                int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown) // timer will be set to null when we are asked to shudown. 
                 {
+                    int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we breack out of loop
                     // If read fails, we try again, with backoff policy.
@@ -350,7 +349,7 @@ namespace Orleans.Streams
                         i => ReadFromQueue((QueueId)state, receiver, maxCacheAddCount),
                         AsyncExecutorWithRetries.INFINITE_RETRIES,
                         (e, i) => !IsShutdown,
-                        TimeSpan.MaxValue,
+                        Constants.INFINITE_TIMESPAN,
                         ReadLoopBackoff);
                     if (!moreData)
                         return;
@@ -407,7 +406,7 @@ namespace Orleans.Streams
                     return false;
                 }
 
-                // Retrive one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
+                // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
                 IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
 
                 if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.

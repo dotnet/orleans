@@ -13,7 +13,7 @@ namespace Orleans.ServiceBus.Providers
     public static class EventDataExtensions
     {
         private const string EventDataPropertyStreamNamespaceKey = "StreamNamespace";
-        private static readonly string[] SkipProperties = { nameof(EventData.Offset), nameof(EventData.SequenceNumber), nameof(EventData.EnqueuedTimeUtc), EventDataPropertyStreamNamespaceKey };
+        private static readonly string[] SkipProperties = { EventDataPropertyStreamNamespaceKey };
 
         /// <summary>
         /// Adds stream namespace to the EventData
@@ -49,7 +49,9 @@ namespace Orleans.ServiceBus.Providers
         {
             var writeStream = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(eventData.Properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
-            return writeStream.ToByteArray();
+            var result = writeStream.ToByteArray();
+            writeStream.ReleaseBuffers();
+            return result;
         }
 
         /// <summary>

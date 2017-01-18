@@ -533,6 +533,8 @@ namespace Orleans.Runtime.Configuration
                 PrintDataConnectionInfo(dataConnectionString));
         }
 
+        /// <summary>Removes private credential information about an azure connection string by truncating the account key from it.</summary>
+        /// <param name="azureConnectionString">The original connection string</param>
         public static string PrintDataConnectionInfo(string azureConnectionString)
         {
             if (String.IsNullOrEmpty(azureConnectionString)) return "null";
@@ -547,6 +549,8 @@ namespace Orleans.Runtime.Configuration
             return azureConnectionInfo;
         }
 
+        /// <summary>Removes private credential information about a SQL connection string by truncating the account password from it.</summary>
+        /// <param name="sqlConnectionString">The original connection string</param>
         public static string PrintSqlConnectionString(string sqlConnectionString)
         {
             if (String.IsNullOrEmpty(sqlConnectionString))
@@ -619,9 +623,13 @@ namespace Orleans.Runtime.Configuration
         public static string RuntimeVersionInfo()
         {
             var sb = new StringBuilder();
+            sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
+#if !NETSTANDARD_TODO
+			// TODO: could use Microsoft.Extensions.PlatformAbstractions package to get this info
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   Is .NET 4.5=").AppendLine(IsNet45OrNewer().ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
+#endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))

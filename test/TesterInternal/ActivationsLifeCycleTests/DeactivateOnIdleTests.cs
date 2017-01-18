@@ -1,21 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
+using UnitTests.TestHelper;
 using Xunit;
-using Xunit.Sdk;
+using Xunit.Abstractions;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {
+        private readonly ITestOutputHelper output;
         private TestCluster testCluster;
+
+        public DeactivateOnIdleTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
 
         private void Initialize(TestClusterOptions options = null)
         {
@@ -26,7 +32,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             testCluster = new TestCluster(options);
             testCluster.Deploy();
         }
-
+        
         public void Dispose()
         {
             testCluster?.StopAllSilos();
@@ -220,13 +226,13 @@ namespace UnitTests.ActivationsLifeCycleTests
                 // Its activation is located on the non Gateway silo as well.
                 ICollectionTestGrain grain = GrainClient.GrainFactory.GetGrain<ICollectionTestGrain>(i);
                 GrainId grainId = ((GrainReference)await grain.GetGrainReference()).GrainId;
-                SiloAddress primaryForGrain = testCluster.Primary.Silo.LocalGrainDirectory.GetPrimaryForGrain(grainId);
-                if (primaryForGrain.Equals(testCluster.Primary.Silo.SiloAddress))
+                SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(grainId, testCluster.Primary)).PrimaryForGrain;
+                if (primaryForGrain.Equals(testCluster.Primary.SiloAddress))
                 {
                     continue;
                 }
                 string siloHostingActivation = await grain.GetRuntimeInstanceId();
-                if (testCluster.Primary.Silo.SiloAddress.ToLongString().Equals(siloHostingActivation))
+                if (testCluster.Primary.SiloAddress.ToLongString().Equals(siloHostingActivation))
                 {
                     continue;
                 }
@@ -237,86 +243,173 @@ namespace UnitTests.ActivationsLifeCycleTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
-        public async Task MissingActivation_1()
+        public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo()
         {
+            var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
             var options = new TestClusterOptions(2);
+            // Disable retries in this case, to make test more predictable.
+            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
             options.ClientConfiguration.Gateways.RemoveAt(1);
             Initialize(options);
             for (int i = 0; i < 10; i++)
             {
-                await MissingActivation_Runner(i, false);
+                await MissingActivation_Runner(i, directoryLazyDeregistrationDelay);
             }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollector")]
-        public async Task MissingActivation_2()
+        public async Task MissingActivation_WithDirectoryLazyDeregistration_SingleSilo()
         {
-            var options = new TestClusterOptions(2);
-            options.ClientConfiguration.Gateways.RemoveAt(1);
+            var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
+            var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
+            var options = new TestClusterOptions(1);
+            options.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
+            // Disable retries in this case, to make test more predictable.
+            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
             Initialize(options);
+
             for (int i = 0; i < 10; i++)
             {
-                await MissingActivation_Runner(i, true);
+                await MissingActivation_Runner(i, lazyDeregistrationDelay);
             }
         }
 
-        private async Task MissingActivation_Runner(int grainId, bool doLazyDeregistration)
+        [Fact(Skip = "Needs investigation"), TestCategory("Functional"), TestCategory("ActivationCollector")]
+        public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo_SecondaryFirst()
+        {
+            var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
+            var options = new TestClusterOptions(2);
+            // Disable retries in this case, to make test more predictable.
+            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
+            options.ClientConfiguration.Gateways.RemoveAt(1);
+            Initialize(options);
+
+            await MissingActivation_Runner(1, lazyDeregistrationDelay, true);
+        }
+
+        private async Task MissingActivation_Runner(int grainId, TimeSpan lazyDeregistrationDelay, bool forceCreationInSecondary = false)
         {
             logger.Info("\n\n\n SMissingActivation_Runner.\n\n\n");
 
-            ITestGrain g = GrainClient.GrainFactory.GetGrain<ITestGrain>(grainId);
-            await g.SetLabel("hello_" + grainId);
-            var grain = ((GrainReference)await g.GetGrainReference()).GrainId;
+            var realGrainId = grainId;
+
+            ITestGrain grain;
+
+            var isMultipleSilosPresent = testCluster.SecondarySilos != null && testCluster.SecondarySilos.Count > 0;
+
+            if (!isMultipleSilosPresent && forceCreationInSecondary)
+            {
+                throw new InvalidOperationException("If 'forceCreationInSecondary' is true multiple silos must be present, check the test!");
+            }
+
+            var grainSiloAddress = String.Empty;
+            var primarySiloAddress = testCluster.Primary.SiloAddress.ToString();
+            var secondarySiloAddress = isMultipleSilosPresent ? testCluster.SecondarySilos[0].SiloAddress.ToString() : String.Empty;
+
+            //
+            // We only doing this for multiple silos.
+            //
+
+            if (isMultipleSilosPresent && forceCreationInSecondary)
+            {
+                //
+                // Make sure that we proceeding with a grain which is created in the secondary silo for first!
+                //
+
+                while (true)
+                {
+                    output.WriteLine($"GetGrain: {realGrainId}");
+
+                    grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(realGrainId);
+
+                    grainSiloAddress = await grain.GetRuntimeInstanceId();
+
+                    if (grainSiloAddress != secondarySiloAddress)
+                    {
+                        output.WriteLine($"GetGrain: {realGrainId} Primary, skipping.");
+
+                        realGrainId++;
+                    }
+                    else
+                    {
+                        output.WriteLine($"GetGrain: {realGrainId} Secondary, proceeding.");
+
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                grain = GrainClient.GrainFactory.GetGrain<ITestGrain>(realGrainId);
+            }
+
+            await grain.SetLabel("hello_" + grainId);
+            var grainReference = ((GrainReference)await grain.GetGrainReference()).GrainId;
 
             // Call again to make sure the grain is in all silo caches
             for (int i = 0; i < 10; i++)
             {
-                var label = await g.GetLabel();
+                var label = await grain.GetLabel();
             }
 
-            // Disable retries in this case, to make test more predictable.
-            testCluster.Primary.Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-            testCluster.SecondarySilos[0].Silo.TestHook.SetMaxForwardCount_ForTesting(0);
-
-            var lazyDeregistrationDelay = doLazyDeregistration ? TimeSpan.FromSeconds(2) : TimeSpan.FromMilliseconds(-1);
-
-            testCluster.Primary.Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
-            testCluster.SecondarySilos[0].Silo.TestHook.SetDirectoryLazyDeregistrationDelay_ForTesting(lazyDeregistrationDelay);
-
             // Now we know that there's an activation; try both silos and deactivate it incorrectly
-            int primaryActivation = testCluster.Primary.Silo.TestHook.UnregisterGrainForTesting(grain);
-            int secondaryActivation = testCluster.SecondarySilos[0].Silo.TestHook.UnregisterGrainForTesting(grain);
+            int primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grainReference);
+            int secondaryActivation = 0;
+
+            if (isMultipleSilosPresent)
+            {
+                secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grainReference);
+            }
+
             Assert.Equal(1, primaryActivation + secondaryActivation);
 
             // If we try again, we shouldn't find any
-            primaryActivation = testCluster.Primary.Silo.TestHook.UnregisterGrainForTesting(grain);
-            secondaryActivation = testCluster.SecondarySilos[0].Silo.TestHook.UnregisterGrainForTesting(grain);
+            primaryActivation = await testCluster.Primary.TestHook.UnregisterGrainForTesting(grainReference);
+            secondaryActivation = 0;
+
+            if (isMultipleSilosPresent)
+            {
+                secondaryActivation = await testCluster.SecondarySilos[0].TestHook.UnregisterGrainForTesting(grainReference);
+            }
+
             Assert.Equal(0, primaryActivation + secondaryActivation);
 
-
-            if (doLazyDeregistration)
+            if (lazyDeregistrationDelay > TimeSpan.Zero)
             {
                 // Wait a bit
                 TimeSpan pause = lazyDeregistrationDelay.Multiply(2);
-                logger.Info("Pausing for {0} because DoLazyDeregistration=True", pause);
-                Thread.Sleep(pause);
+                logger.Info($"Pausing for {0} because we are using lazy deregistration", pause);
+                await Task.Delay(pause);
             }
 
             // Now send a message again; it should fail);
-            var firstEx = await Assert.ThrowsAsync<OrleansException>(() => g.GetLabel());
+            var firstEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
             Assert.Contains("Non-existent activation", firstEx.Message);
             logger.Info("Got 1st Non-existent activation Exception, as expected.");
 
             // Try again; it should succeed or fail, based on doLazyDeregistration
-            
-            if (doLazyDeregistration)
+            if (lazyDeregistrationDelay > TimeSpan.Zero || forceCreationInSecondary)
             {
-                var newLabel = await g.GetLabel();
-                logger.Info("After 2nd call. newLabel = " + newLabel);
+                var newLabel = "";
+
+                newLabel = await grain.GetLabel();
+
+                // Since a new instance returned, we've to check that the label is no more prefixed with "hello_"
+                Assert.Equal(grainId.ToString(), newLabel);
+
+                logger.Info($"After 2nd call. newLabel = '{newLabel}'");
+
+                if (forceCreationInSecondary)
+                {
+                    grainSiloAddress = await grain.GetRuntimeInstanceId();
+
+                    output.WriteLine(grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
+                    logger.Info(grainSiloAddress == primarySiloAddress ? "Recreated in Primary" : "Recreated in Secondary");
+                }
             }
             else
             {
-                var secondEx = await Assert.ThrowsAsync<OrleansException>(() => g.GetLabel());
+                var secondEx = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLabel());
                 logger.Info("Got 2nd exception - " + secondEx.GetBaseException().Message);
                 Assert.True(secondEx.Message.Contains("duplicate activation") || secondEx.Message.Contains("Non-existent activation")
                                || secondEx.Message.Contains("Forwarding failed"),

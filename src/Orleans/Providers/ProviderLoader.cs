@@ -61,7 +61,6 @@ namespace Orleans.Providers
         {
             List<Task> tasks = new List<Task>();
             int count = providers.Count;
-            TProvider provider;
 
             if (providerConfigs != null) count = providerConfigs.Count;
             foreach (string providerName in providerNames)
@@ -120,7 +119,12 @@ namespace Orleans.Providers
                 {
                     string exceptionMsg = string.Format("Exception initializing provider Name={0} Type={1}", name, provider);
                     logger.Error(ErrorCode.Provider_ErrorFromInit, exceptionMsg, exc);
+#if !NETSTANDARD_TODO
+                    //deserialize constructor of ProviderInitializationException not port to vNext yet
                     throw new ProviderInitializationException(exceptionMsg, exc);
+#else
+                    throw;
+#endif
                 }
             }
         }
@@ -222,18 +226,21 @@ namespace Orleans.Providers
                 if (fullConfig.Type != typeName) continue;
                 
                 // Found one! Now look for an appropriate constructor; try TProvider(string, Dictionary<string,string>) first
-                var constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, constructorBindingTypes, null);
+                var constructor = TypeUtils.GetConstructorThatMatches(t, constructorBindingTypes);
                 var parms = new object[] { typeName, entry.Properties };
 
                 if (constructor == null)
                 {
                     // See if there's a default constructor to use, if there's no two-parameter constructor
-                    constructor = t.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                        null, Type.EmptyTypes, null);
+                    constructor = TypeUtils.GetConstructorThatMatches(t, Type.EmptyTypes);
                     parms = new object[0];
                 }
-                if (constructor == null) continue;
+                if (constructor == null)
+                {
+                    logger.Warn(ErrorCode.Provider_InstanceConstructionError1, $"Accessible constructor does not exist for type {t.Name}");
+
+                    continue;
+                }
 
                 TProvider instance;
                 try

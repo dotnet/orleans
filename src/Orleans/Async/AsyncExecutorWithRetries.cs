@@ -4,8 +4,6 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    using System.Runtime.ExceptionServices;
-
     /// <summary>
     /// This class a convinent utiliity class to execute a certain asyncronous function with retires, 
     /// allowing to specify custom retry filters and policies.
@@ -13,7 +11,6 @@ namespace Orleans
     internal static class AsyncExecutorWithRetries
     {
         public static readonly int INFINITE_RETRIES = -1;
-        private static readonly Func<Exception, int, bool> retryAllExceptionsFilter = (Exception exc, int i) => true;
 
         /// <summary>
         /// Execute a given function a number of times, based on retry configuration parameters.
@@ -114,75 +111,71 @@ namespace Orleans
             IBackoffProvider onSuccessBackOff = null,
             IBackoffProvider onErrorBackOff = null)
         {
-            if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
-            {
-                DateTime now = DateTime.UtcNow;
-                if (now - startExecutionTime > maxExecutionTime)
-                {
-                    Exception timeoutException = new TimeoutException(String.Format("ExecuteWithRetries has exceeded its max execution time of {0}. Now is {1}, started at {2}, passed {3}",
-                            maxExecutionTime, LogFormatter.PrintDate(now), LogFormatter.PrintDate(startExecutionTime), now - startExecutionTime));
-                    throw timeoutException;
-                }
-            }
             T result = default(T);
-            int counter = callCounter;
-            Exception exception = null;
-            try
-            {
-                callCounter++;
-                result = await function(counter);
+            bool retry;
 
-                bool retry = false;
-                if (callCounter < maxNumSuccessTries || maxNumSuccessTries == INFINITE_RETRIES) // -1 for infinite retries
-                {
-                    if (retryValueFilter != null)
-                        retry = retryValueFilter(result, counter);
-                }
-                if (retry)
-                {
-                    if (onSuccessBackOff == null)
-                    {
-                        return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
-                    }
-                    else
-                    {
-                        TimeSpan delay = onSuccessBackOff.Next(counter);
-                        await Task.Delay(delay);
-                        return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
-                    }
-                }
-                return result;
-            }
-            catch (Exception exc)
+            do
             {
-                exception = exc;
-            }
+                retry = false;
 
-            if (exception != null)
-            {
-                bool retry = false;
-                if (callCounter < maxNumErrorTries || maxNumErrorTries == INFINITE_RETRIES)
+                if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
                 {
-                    if (retryExceptionFilter != null)
-                        retry = retryExceptionFilter(exception, counter);
-                }
-                if (retry)
-                {
-                    if (onErrorBackOff == null)
+                    DateTime now = DateTime.UtcNow;
+                    if (now - startExecutionTime > maxExecutionTime)
                     {
-                        return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
-                    }
-                    else
-                    {
-                        TimeSpan delay = onErrorBackOff.Next(counter);
-                        await Task.Delay(delay);
-                        return await ExecuteWithRetriesHelper(function, callCounter, maxNumSuccessTries, maxNumErrorTries, maxExecutionTime, startExecutionTime, retryValueFilter, retryExceptionFilter, onSuccessBackOff, onErrorBackOff);
+                        throw new TimeoutException(
+                            $"ExecuteWithRetries has exceeded its max execution time of {maxExecutionTime}. Now is {LogFormatter.PrintDate(now)}, started at {LogFormatter.PrintDate(startExecutionTime)}, passed {now - startExecutionTime}");
                     }
                 }
 
-                ExceptionDispatchInfo.Capture(exception).Throw();
-            }
-            return result; // this return value is just for the compiler to supress "not all control paths return a value".
+                int counter = callCounter;
+
+                try
+                {
+                    callCounter++;
+                    result = await function(counter);
+
+                    if (callCounter < maxNumSuccessTries || maxNumSuccessTries == INFINITE_RETRIES) // -1 for infinite retries
+                    {
+                        if (retryValueFilter != null)
+                            retry = retryValueFilter(result, counter);
+                    }
+
+                    if (retry)
+                    {
+                        TimeSpan? delay = onSuccessBackOff?.Next(counter);
+
+                        if (delay.HasValue)
+                        {
+                            await Task.Delay(delay.Value);
+                        }
+                    }
+                }
+                catch (Exception exc)
+                {
+                    retry = false;
+
+                    if (callCounter < maxNumErrorTries || maxNumErrorTries == INFINITE_RETRIES)
+                    {
+                        if (retryExceptionFilter != null)
+                            retry = retryExceptionFilter(exc, counter);
+                    }
+
+                    if (!retry)
+                    {
+                        throw;
+                    }
+
+                    TimeSpan? delay = onErrorBackOff?.Next(counter);
+
+                    if (delay.HasValue)
+                    {
+                        await Task.Delay(delay.Value);
+                    }
+                }
+            } while (retry);
+
+            return result;
         }
     }
 

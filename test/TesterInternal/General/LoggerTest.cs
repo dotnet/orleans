@@ -8,7 +8,7 @@ using System.Threading;
 using Orleans;
 using Orleans.Runtime;
 using Tester;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

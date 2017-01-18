@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.CounterControl</id>
     <version>$version$</version>
     <title>Microsoft Orleans Performance Counter Tool</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
@@ -21,7 +21,8 @@
     <dependencies>
       <dependency id="Microsoft.Orleans.Core" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
-      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.0.0" />
+      <dependency id="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" version="$version$" />
+      <dependency id="Microsoft.CodeAnalysis.CSharp" version="1.3.2" />
     </dependencies>
   </metadata>
   <files>

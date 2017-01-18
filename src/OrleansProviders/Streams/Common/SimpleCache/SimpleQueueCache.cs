@@ -138,6 +138,10 @@ namespace Orleans.Providers.Streams.Common
             return itemsToRelease;
         }
 
+        /// <summary>
+        /// Add a list of message to the cache
+        /// </summary>
+        /// <param name="msgs"></param>
         public virtual void AddToCache(IList<IBatchContainer> msgs)
         {
             if (msgs == null) throw new ArgumentNullException("msgs");
@@ -150,6 +154,13 @@ namespace Orleans.Providers.Streams.Common
             }
         }
 
+        /// <summary>
+        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        ///   cache starting at the location indicated by the provided token.
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
         public virtual IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
         {
             if (token != null && !(token is EventSequenceToken))

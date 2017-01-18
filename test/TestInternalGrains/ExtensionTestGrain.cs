@@ -1,15 +1,22 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Runtime.Providers;
+using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ExtensionTestGrain : Grain, IExtensionTestGrain
+    internal class ExtensionTestGrain : Grain, IExtensionTestGrain
     {
+        private readonly ISiloRuntimeClient runtimeClient;
         public string ExtensionProperty { get; private set; }
         private TestExtension extender;
+
+        public ExtensionTestGrain(ISiloRuntimeClient runtimeClient)
+        {
+            this.runtimeClient = runtimeClient;
+        }
 
         public override Task OnActivateAsync()
         {
@@ -23,7 +30,7 @@ namespace UnitTests.Grains
             if (extender == null)
             {
                 extender = new TestExtension(this, GrainFactory);
-                if (!SiloProviderRuntime.Instance.TryAddExtension(extender))
+                if (!runtimeClient.TryAddExtension(extender))
                 {
                     throw new SystemException("Unable to add new extension");
                 }
@@ -34,7 +41,7 @@ namespace UnitTests.Grains
 
         public Task RemoveExtension()
         {
-            SiloProviderRuntime.Instance.RemoveExtension(extender);
+            runtimeClient.RemoveExtension(extender);
             extender = null;
             return TaskDone.Done;
         }
@@ -42,8 +49,14 @@ namespace UnitTests.Grains
 
     public class GenericExtensionTestGrain<T> : Grain, IGenericExtensionTestGrain<T>
     {
+        private readonly ISiloRuntimeClient runtimeClient;
         public T ExtensionProperty { get; private set; }
         private GenericTestExtension<T> extender;
+
+        public GenericExtensionTestGrain()
+        {
+            this.runtimeClient = this.ServiceProvider.GetRequiredService<ISiloRuntimeClient>();
+        }
 
         public override Task OnActivateAsync()
         {
@@ -57,7 +70,7 @@ namespace UnitTests.Grains
             if (extender == null)
             {
                 extender = new GenericTestExtension<T>(this);
-                if (!SiloProviderRuntime.Instance.TryAddExtension(extender))
+                if (!runtimeClient.TryAddExtension(extender))
                 {
                     throw new SystemException("Unable to add new extension");
                 }
@@ -68,15 +81,21 @@ namespace UnitTests.Grains
 
         public Task RemoveExtension()
         {
-            SiloProviderRuntime.Instance.RemoveExtension(extender);
+            runtimeClient.RemoveExtension(extender);
             extender = null;
             return TaskDone.Done;
         }
     }
 
-    public class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
+    internal class GenericGrainWithNonGenericExtension<T> : Grain, IGenericGrainWithNonGenericExtension<T>
     {
+        private readonly ISiloRuntimeClient runtimeClient;
         private SimpleExtension extender;
+
+        public GenericGrainWithNonGenericExtension(ISiloRuntimeClient runtimeClient)
+        {
+            this.runtimeClient = runtimeClient;
+        }
         
         public Task DoSomething() {
             return TaskDone.Done;
@@ -87,7 +106,7 @@ namespace UnitTests.Grains
             if (extender == null)
             {
                 extender = new SimpleExtension("A");
-                if (!SiloProviderRuntime.Instance.TryAddExtension(extender))
+                if (!runtimeClient.TryAddExtension(extender))
                 {
                     throw new SystemException("Unable to add new extension");
                 }

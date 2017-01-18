@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text;
 
 
@@ -100,7 +101,7 @@ namespace Orleans.Storage
             string keyExtension = null;
             if(IsLongKey)
             {
-                primaryKey = N1Key.ToString();
+                primaryKey = N1Key.ToString(CultureInfo.InvariantCulture);
                 keyExtension = StringKey;
             }
             else if(IsGuidKey)
@@ -114,7 +115,7 @@ namespace Orleans.Storage
             }
 
             const string GrainIdAndExtensionSeparator = "#";
-            return primaryKey + string.Format($"{primaryKey}{(keyExtension != null ? GrainIdAndExtensionSeparator + keyExtension : string.Empty)}");
+            return string.Format($"{primaryKey}{(keyExtension != null ? GrainIdAndExtensionSeparator + keyExtension : string.Empty)}");
         }
 
 

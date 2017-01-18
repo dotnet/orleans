@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.OrleansAWSUtils</id>
     <version>$version$</version>
     <title>Microsoft Orleans AWS Utilities</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
@@ -23,6 +23,7 @@
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
 
       <dependency id="AWSSDK.DynamoDBv2" version="3.1.5.2" />
+      <dependency id="AWSSDK.SQS" version="3.1.0.9" />
     </dependencies>
   </metadata>
   <files>

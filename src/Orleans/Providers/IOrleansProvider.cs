@@ -176,8 +176,10 @@ namespace Orleans.Providers
         public ProviderInitializationException(string msg, Exception exc)
             : base(msg, exc)
         { }
+#if !NETSTANDARD
         protected ProviderInitializationException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
+#endif
     }
 }

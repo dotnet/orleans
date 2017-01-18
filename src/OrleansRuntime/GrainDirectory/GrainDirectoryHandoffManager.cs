@@ -15,15 +15,17 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private const int HANDOFF_CHUNK_SIZE = 500;
         private readonly LocalGrainDirectory localDirectory;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
         private readonly Dictionary<SiloAddress, Task> lastPromise;
         private readonly Logger logger;
 
-        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, GlobalConfiguration config)
+        internal GrainDirectoryHandoffManager(LocalGrainDirectory localDirectory, ISiloStatusOracle siloStatusOracle)
         {
             logger = LogManager.GetLogger(this.GetType().FullName);
             this.localDirectory = localDirectory;
+            this.siloStatusOracle = siloStatusOracle;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
             silosHoldingMyPartition = new List<SiloAddress>();
             lastPromise = new Dictionary<SiloAddress, Task>();
@@ -35,7 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 foreach (var partition in directoryPartitionsMap.Values)
                 {
-                    var result = partition.LookUpGrain(grain);
+                    var result = partition.LookUpActivations(grain);
                     if (result.Addresses != null)
                         return result.Addresses;
                 }
@@ -93,7 +95,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory.SchedulingContext);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -139,6 +141,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // adjust copy for the predecessor of the failed silo
                     directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
                 }
+                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsVerbose) logger.Verbose("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
             }
@@ -213,7 +216,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListSingle.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
 
                     if (splitPartListMulti.Count > 0)
@@ -225,7 +228,7 @@ namespace Orleans.Runtime.GrainDirectory
                             splitPartListMulti.ForEach(
                                 activationAddress =>
                                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-                        }, localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                        }, localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
                     }
                 }
                 else
@@ -270,11 +273,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     logger.Warn(ErrorCode.DirectoryUnexpectedDelta, 
                         String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
-                            source, localDirectory.Membership.GetApproximateSiloStatus(source),
-                            localDirectory.Membership.GetApproximateSiloStatuses(true).Count));
+                            source, this.siloStatusOracle.GetApproximateSiloStatus(source),
+                            this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
                 }
 
-                directoryPartitionsMap[source] = new GrainDirectoryPartition();
+                directoryPartitionsMap[source] = new GrainDirectoryPartition(this.siloStatusOracle);
             }
 
             if (isFullCopy)
@@ -285,6 +288,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 directoryPartitionsMap[source].Update(partition);
             }
+
+            localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
         }
 
         internal void RemoveHandoffPartition(SiloAddress source)
@@ -309,7 +314,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
         }
     }
 }

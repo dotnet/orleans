@@ -81,6 +81,7 @@ namespace Orleans.Serialization
         FloatArray = 248,   // Single-dimension only; followed by the count of elements, then the elements
         DoubleArray = 249,  // Single-dimension only; followed by the count of elements, then the elements
         BoolArray = 250,    // Single-dimension only; followed by the count of elements, then the elements
+        SByteArray = 251,    // Single-dimension only; followed by the count of elements, then the elements
 
         // Last but not least...
         Error = 255,

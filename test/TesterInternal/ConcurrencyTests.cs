@@ -1,9 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.ConcurrencyTests
@@ -13,18 +15,14 @@ namespace UnitTests.ConcurrencyTests
     /// </summary>
     public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
-        private class Fixture : BaseClusterFixture
+        private class Fixture : BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
-                return new TestingSiloHost(new TestingSiloOptions
-                {
-                    StartSecondary = false,
-                    AdjustConfig = config =>
-                    {
-                        config.Overrides["Primary"].MaxActiveThreads = 2;
-                    }
-                });
+                var options = new TestClusterOptions();
+                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 2);
+
+                return new TestCluster(options);
             }
         }
 

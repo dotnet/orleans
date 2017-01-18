@@ -41,6 +41,7 @@ namespace Orleans.CodeGenerator
         {
         }
 
+#if !NETSTANDARD
         /// <summary>
         /// Initializes a new instance of the <see cref="CodeGenerationException"/> class.
         /// </summary>
@@ -54,5 +55,6 @@ namespace Orleans.CodeGenerator
             : base(info, context)
         {
         }
+#endif
     }
 }

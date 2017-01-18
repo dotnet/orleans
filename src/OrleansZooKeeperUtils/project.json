@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "Newtonsoft.Json": "7.0.1",
     "ZooKeeperNetEx": "3.4.8.5"
   },
   "frameworks": {

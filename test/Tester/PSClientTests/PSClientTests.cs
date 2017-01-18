@@ -6,12 +6,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using UnitTests.Tester;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using System;
+using TestExtensions;
 
 namespace Tester
 {
@@ -122,7 +122,7 @@ namespace Tester
 
             var getGrainCommand = new Command("Get-Grain");
             getGrainCommand.Parameters.Add("GrainType", typeof(IManagementGrain));
-            getGrainCommand.Parameters.Add("LongKey", RuntimeInterfaceConstants.SYSTEM_MANAGEMENT_ID);
+            getGrainCommand.Parameters.Add("LongKey", (long)0);
             _ps.Commands.AddCommand(getGrainCommand);
 
             var results = _ps.Invoke<IManagementGrain>();

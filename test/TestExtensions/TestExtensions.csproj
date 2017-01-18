@@ -34,16 +34,39 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BaseClusterFixture.cs" />
+    <Compile Include="DefaultClusterFixture.cs" />
+    <Compile Include="HostedTestClusterBase.cs" />
+    <Compile Include="MockStorageProvider.cs" />
+    <Compile Include="OrleansTestingBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestCategory.cs" />
+    <Compile Include="TestConstants.cs" />
+    <Compile Include="TestDefaultConfiguration.cs" />
     <Compile Include="TestOutputHelperExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="project.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
+      <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
+      <Name>OrleansProviders</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
+      <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
+      <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
+      <Name>OrleansTestingHost</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Orleans\Orleans.csproj">
+      <Project>{bc1bd60c-e7d8-4452-a21c-290aec8e2e74}</Project>
+      <Name>Orleans</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -3,7 +3,6 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     public interface IClientAddressableTestClientObject : IGrainWithIntegerKey
     {
         Task<string> OnHappyPath(string message);

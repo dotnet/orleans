@@ -68,6 +68,11 @@ namespace Orleans.Runtime.Host
             logger = LogManager.GetLogger("OrleansAzureSilo", LoggerType.Runtime);
         }
 
+        /// <summary>
+        /// Async method to validate specific cluster configuration
+        /// </summary>
+        /// <param name="config"></param>
+        /// <returns>Task object of boolean type for this async method </returns>
         public async Task<bool> ValidateConfiguration(ClusterConfiguration config)
         {
             if (config.Globals.LivenessType == GlobalConfiguration.LivenessProviderType.AzureTable)
@@ -94,6 +99,10 @@ namespace Orleans.Runtime.Host
             return true;
         }
 
+        /// <summary>
+        /// Default cluster configuration
+        /// </summary>
+        /// <returns>Default ClusterConfiguration </returns>
         public static ClusterConfiguration DefaultConfiguration()
         {
             return DefaultConfiguration(new ServiceRuntimeWrapper());
@@ -127,12 +136,28 @@ namespace Orleans.Runtime.Host
         #region Azure RoleEntryPoint methods
 
         /// <summary>
+        /// Initialize this Orleans silo for execution. Config data will be read from silo config file as normal
+        /// </summary>
+        /// <param name="deploymentId">Azure DeploymentId this silo is running under. If null, defaults to the value from the configuration.</param>
+		/// <param name="connectionString">Azure DataConnectionString. If null, defaults to the DataConnectionString setting from the Azure configuration for this role.</param>
+        /// <returns><c>true</c> is the silo startup was successful</returns>
+        public bool Start(string deploymentId = null, string connectionString = null)
+        {
+            return Start(null, deploymentId, connectionString);
+        }
+
+        /// <summary>
         /// Initialize this Orleans silo for execution
         /// </summary>
+        /// <param name="config">Use the specified config data.</param>
+		/// <param name="connectionString">Azure DataConnectionString. If null, defaults to the DataConnectionString setting from the Azure configuration for this role.</param>
         /// <returns><c>true</c> is the silo startup was successful</returns>
-        public bool Start()
+        public bool Start(ClusterConfiguration config, string connectionString = null)
         {
-            return Start(null);
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
+
+            return Start(config, null, connectionString);
         }
 
         /// <summary>
@@ -142,14 +167,13 @@ namespace Orleans.Runtime.Host
         /// <param name="deploymentId">Azure DeploymentId this silo is running under</param>
 		/// <param name="connectionString">Azure DataConnectionString. If null, defaults to the DataConnectionString setting from the Azure configuration for this role.</param>
         /// <returns><c>true</c> if the silo startup was successful</returns>
-        public bool Start(ClusterConfiguration config, string deploymentId = null, string connectionString = null)
+        internal bool Start(ClusterConfiguration config, string deploymentId, string connectionString)
         {
+            if (config != null && deploymentId != null)
+                throw new ArgumentException("Cannot use config and deploymentId on the same time");
+
             // Program ident
             Trace.TraceInformation("Starting {0} v{1}", this.GetType().FullName, RuntimeVersion.Current);
-
-            // Check if deployment id was specified
-            if (deploymentId == null)
-                deploymentId = serviceRuntimeWrapper.DeploymentId;
 
             // Read endpoint info for this instance from Azure config
             string instanceName = serviceRuntimeWrapper.InstanceName;
@@ -173,6 +197,13 @@ namespace Orleans.Runtime.Host
             int generation = SiloAddress.AllocateNewGeneration();
 
             // Bootstrap this Orleans silo instance
+
+            // If deploymentId was not direclty provided, take the value in the config. If it is not 
+            // in the config too, just take the DeploymentId from Azure
+            if (deploymentId == null)
+                deploymentId = string.IsNullOrWhiteSpace(host.Config.Globals.DeploymentId)
+                    ? serviceRuntimeWrapper.DeploymentId
+                    : host.Config.Globals.DeploymentId;
 
             myEntry = new SiloInstanceTableEntry
             {

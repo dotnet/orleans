@@ -1,12 +1,26 @@
 ﻿
-
 namespace Orleans.ServiceBus.Providers
 {
+    /// <summary>
+    /// EventHub settings inteface for a specific hub.
+    /// </summary>
     public interface IEventHubSettings
     {
+        /// <summary>
+        /// EventHub connection string.
+        /// </summary>
         string ConnectionString { get; }
+        /// <summary>
+        /// EventHub consumer group.
+        /// </summary>
         string ConsumerGroup { get; }
+        /// <summary>
+        /// Hub Path.
+        /// </summary>
         string Path { get; }
+        /// <summary>
+        /// Optional parameter which configures the EventHub reciever's prefetch count.
+        /// </summary>
         int? PrefetchCount { get; }
 
         /// <summary>

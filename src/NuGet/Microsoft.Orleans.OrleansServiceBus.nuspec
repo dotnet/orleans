@@ -4,7 +4,7 @@
     <id>Microsoft.Orleans.OrleansServiceBus</id>
     <version>$version$</version>
     <title>Microsoft Orleans ServiceBus Utilities</title>
-    <authors>Microsoft Research</authors>
+    <authors>Microsoft</authors>
     <owners>Microsoft,Orleans</owners>
     <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
     <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
@@ -22,8 +22,7 @@
       <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansProviders" version="$version$" />
       <dependency id="Microsoft.Orleans.OrleansAzureUtils" version="$version$" />
-      <dependency id="WindowsAzure.ServiceBus" version="3.2.2" />
-      <dependency id="WindowsAzure.Storage" version="5.0.2" />
+      <dependency id="WindowsAzure.ServiceBus" version="3.3.2" />
     </dependencies>
   </metadata>
   <files>

@@ -8,8 +8,8 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ReminderService;
-using Orleans.TestingHost;
 using Tester;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -46,7 +46,7 @@ namespace UnitTests.TimerTests
             {
                 ServiceId = ServiceId,
                 DeploymentId = "TMSLocalTesting",
-                DataConnectionString = StorageTestConstants.DataConnectionString
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
             await table.Init(config, log);
 
@@ -63,7 +63,7 @@ namespace UnitTests.TimerTests
             {
                 ServiceId = ServiceId,
                 DeploymentId = deploymentId,
-                DataConnectionString = StorageTestConstants.DataConnectionString
+                DataConnectionString = TestDefaultConfiguration.DataConnectionString
             };
             await table.Init(config, log);
 

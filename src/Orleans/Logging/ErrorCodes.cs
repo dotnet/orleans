@@ -386,6 +386,8 @@ namespace Orleans
         SiloLoadedDI                    = SiloBase + 45, // Not used anymore
         SiloFailedToLoadDI              = SiloBase + 46, // Not used anymore
         SiloFileNotFoundLoadingDI       = SiloBase + 47, // Not used anymore
+        SiloStartupEventFailure           = SiloBase + 48,
+        SiloShutdownEventFailure        = SiloBase + 49,
 
         CatalogBase                     = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
@@ -687,6 +689,9 @@ namespace Orleans
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
         Messaging_SimulatedMessageLoss          = MessagingBase + 34,
+        Messaging_Dispatcher_ReturnToOriginCluster    = MessagingBase + 35,
+        MessagingAcceptAsyncSocketException     = MessagingBase + 36,
+        Messaging_ExceptionReceiveAsync         = MessagingBase + 37,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
@@ -748,6 +753,7 @@ namespace Orleans
         ClientRegistrarFailedToRegister_2       = GatewayBase + 17,
         ClientRegistrarFailedToUnregister       = GatewayBase + 18,
         ClientRegistrarTimerFailed              = GatewayBase + 19,
+        GatewayAcceptor_WrongClusterId          = GatewayBase + 20,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability
@@ -821,8 +827,9 @@ namespace Orleans
         Dispatcher_InvalidActivation            = DispatcherBase + 38,
         InvokeWorkItem_UnhandledExceptionInInvoke = DispatcherBase + 39,
         Dispatcher_ErrorCreatingActivation      = DispatcherBase + 40,
+        Dispatcher_StuckActivation = DispatcherBase + 41,
 
-        SerializationBase                       = Runtime + 1600,
+        SerializationBase = Runtime + 1600,
         Ser_IncompatibleIntermediateType        = Runtime_Error_100033, // Backward compatability
         Ser_CannotConstructBaseObj              = Runtime_Error_100034, // Backward compatability
         Ser_IncompatibleType                    = Runtime_Error_100035, // Backward compatability
@@ -1081,7 +1088,16 @@ namespace Orleans
 
         CancellationTokenManagerBase        = Runtime + 4000,
         CancellationTokenCancelFailed       = CancellationTokenManagerBase + 1,
-        CancellationExtensionCreationFailed = CancellationTokenManagerBase + 2
+        CancellationExtensionCreationFailed = CancellationTokenManagerBase + 2,
+
+        GlobalSingleInstanceBase = Runtime + 4100,
+        GlobalSingleInstance_ProtocolError = GlobalSingleInstanceBase + 1,
+        GlobalSingleInstance_WarningInvalidOrigin = GlobalSingleInstanceBase + 2,
+        GlobalSingleInstance_MaintainerException = GlobalSingleInstanceBase + 3,
+        GlobalSingleInstance_MultipleOwners = GlobalSingleInstanceBase + 4,
+
+        TypeManagerBase = Runtime + 4200,
+        TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
     }
 }
 // ReSharper restore InconsistentNaming

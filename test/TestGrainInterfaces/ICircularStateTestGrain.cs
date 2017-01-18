@@ -21,6 +21,7 @@ namespace TestGrainInterfaces
     {
         public CircularTest2 CircularTest2 { get; set; }
     }
+
     [Serializable]
     public class CircularTest2
     {

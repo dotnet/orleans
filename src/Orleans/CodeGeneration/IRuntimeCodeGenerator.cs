@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Orleans.CodeGeneration
 {
     using System.Reflection;
@@ -13,12 +15,12 @@ namespace Orleans.CodeGeneration
         /// <param name="input">
         /// The assembly to generate code for.
         /// </param>
-        void GenerateAndLoadForAssembly(Assembly input);
+        GeneratedAssembly GenerateAndLoadForAssembly(Assembly input);
 
         /// <summary>
         /// Generates and loads code for the specified inputs.
         /// </summary>
         /// <param name="inputs">The assemblies to generate code for.</param>
-        void GenerateAndLoadForAssemblies(params Assembly[] inputs);
+        IReadOnlyList<GeneratedAssembly> GenerateAndLoadForAssemblies(params Assembly[] inputs);
     }
 }

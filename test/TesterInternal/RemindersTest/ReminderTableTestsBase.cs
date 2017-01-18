@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using UnitTests.MembershipTests;
 using UnitTests.StorageTests;
 using Xunit;
 

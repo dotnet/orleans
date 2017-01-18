@@ -111,12 +111,20 @@ namespace Orleans.Providers.Streams.Common
             return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }
 
+        /// <summary>
+        /// GetHashCode method for current EventSequenceToken
+        /// </summary>
+        /// <returns> Hash code for current EventSequenceToken object </returns>
         public override int GetHashCode()
         {
             // why 397?
             return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
         }
 
+        /// <summary>
+        /// ToString method
+        /// </summary>
+        /// <returns> A string which represent current EventSequenceToken object </returns>
         public override string ToString()
         {
             return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);

@@ -43,6 +43,8 @@
     <RunCodeAnalysis>true</RunCodeAnalysis>
     <Prefer32Bit>false</Prefer32Bit>
     <WarningsAsErrors>4014</WarningsAsErrors>
+    <DocumentationFile>
+    </DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -62,8 +64,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OrleansRuntime\OrleansRuntime.csproj">
-      <Project>{6FF2004C-CDF8-479C-BF27-C6BFE8EF93E0}</Project>
+      <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>
       <Name>OrleansRuntime</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansTelemetryConsumers.Counters\OrleansTelemetryConsumers.Counters.csproj">
+      <Project>{69f40a37-4a2f-44d4-a994-cc165c12fb91}</Project>
+      <Name>OrleansTelemetryConsumers.Counters</Name>
     </ProjectReference>
     <ProjectReference Include="..\Orleans\Orleans.csproj">
       <Project>{BC1BD60C-E7D8-4452-A21C-290AEC8E2E74}</Project>

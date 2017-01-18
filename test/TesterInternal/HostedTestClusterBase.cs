@@ -2,16 +2,21 @@
 using Orleans;
 using Orleans.Serialization;
 using Orleans.TestingHost;
-using UnitTests.Tester;
+using Tester;
+using TestExtensions;
 
 namespace UnitTests
 {
+    using System.Collections.Generic;
+    using System.Reflection;
+
     public abstract class BaseClusterFixture : IDisposable
     {
         protected BaseClusterFixture()
         {
+            TestDefaultConfiguration.InitializeDefaults();
             GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
+            SerializationTestEnvironment.Initialize();
             var hostedCluster = CreateClusterHost();
             this.HostedCluster = hostedCluster;
         }
@@ -22,29 +27,7 @@ namespace UnitTests
 
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
-        }
-    }
-
-    public abstract class HostedTestClusterPerTest : OrleansTestingBase, IDisposable
-    {
-        protected TestingSiloHost HostedCluster { get; private set; }
-
-        public HostedTestClusterPerTest()
-        {
-            GrainClient.Uninitialize();
-            SerializationManager.InitializeForTesting();
-            this.HostedCluster = this.CreateSiloHost();
-        }
-
-        public virtual TestingSiloHost CreateSiloHost()
-        {
-            return new TestingSiloHost(true);
-        }
-
-        public virtual void Dispose()
-        {
-            this.HostedCluster.StopAllSilos();
+            HostedCluster?.StopAllSilos();
         }
     }
 }

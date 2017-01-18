@@ -5,7 +5,7 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.SimpleMessageStream;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using UnitTests.Tester;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.StreamingTests

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if !NETSTANDARD_TODO
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -6,7 +7,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Orleans.Runtime;
 
-#if !NETSTANDARD1_6
+#if !NETSTANDARD
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
@@ -22,7 +23,7 @@ namespace Orleans.Serialization
             return itemType.GetTypeInfo().IsSerializable;
         }
 
-        public object DeepCopy(object source)
+        public object DeepCopy(object source, ICopyContext context)
         {
             if (source == null)
             {
@@ -43,8 +44,9 @@ namespace Orleans.Serialization
             return ret;
         }
 
-        public void Serialize(object item, BinaryTokenStreamWriter writer, Type expectedType)
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
+            var writer = context.StreamWriter;
             if (writer == null)
             {
                 throw new ArgumentNullException("writer");
@@ -69,11 +71,12 @@ namespace Orleans.Serialization
             writer.Write(bytes);
         }
 
-        public object Deserialize(Type expectedType, BinaryTokenStreamReader reader)
+        public object Deserialize(Type expectedType, IDeserializationContext context)
         {
+            var reader = context.StreamReader;
             if (reader == null)
             {
-                throw new ArgumentNullException("reader");
+                throw new ArgumentNullException(nameof(reader));
             }
 
             var n = reader.ReadInt();
@@ -123,4 +126,5 @@ namespace Orleans.Serialization
         }
     }
 }
+#endif
 #endif

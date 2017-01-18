@@ -43,7 +43,7 @@ namespace Orleans.TestingHost
         {
             grainFactory = providerRuntime.GrainFactory;
             await realStorageProvider.Init(name, providerRuntime, config);
-            Log = realStorageProvider.Log.GetSubLogger("-FaultInjection");
+            Log = realStorageProvider.Log.GetSubLogger("FaultInjection");
             Log.Info($"Initialized fault injection for storage provider {Name}");
         }
 

@@ -14,12 +14,13 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
 using Tester.TestStreamProviders.EventHub;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Tester;
 using Xunit;
 
 namespace UnitTests.StreamingTests
 {
+    [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHStreamPerPartitionTests : OrleansTestingBase, IClassFixture<EHStreamPerPartitionTests.Fixture>
     {
         private const string StreamProviderName = "EHStreamPerPartition";
@@ -28,15 +29,17 @@ namespace UnitTests.StreamingTests
         private const string EHCheckpointTable = "ehcheckpoint";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
 
-        private static readonly EventHubSettings EventHubConfig = new EventHubSettings(StorageTestConstants.EventHubConnectionString,
-                EHConsumerGroup, EHPath);
-
-        private static readonly EventHubStreamProviderConfig ProviderConfig =
-            new EventHubStreamProviderConfig(StreamProviderName);
+        private static readonly Lazy<EventHubSettings> EventHubConfig = new Lazy<EventHubSettings>(() =>
+            new EventHubSettings(
+                TestDefaultConfiguration.EventHubConnectionString,
+                EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(StorageTestConstants.DataConnectionString, EHCheckpointTable, CheckpointNamespace,
-                TimeSpan.FromSeconds(1));
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
+                EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
+
+        private static readonly EventHubStreamProviderSettings ProviderSettings =
+            new EventHubStreamProviderSettings(StreamProviderName);
 
         private class Fixture : BaseTestClusterFixture
         {
@@ -63,8 +66,8 @@ namespace UnitTests.StreamingTests
                 var settings = new Dictionary<string, string>();
 
                 // get initial settings from configs
-                ProviderConfig.WriteProperties(settings);
-                EventHubConfig.WriteProperties(settings);
+                ProviderSettings.WriteProperties(settings);
+                EventHubConfig.Value.WriteProperties(settings);
                 CheckpointerSettings.WriteProperties(settings);
 
                 // add queue balancer setting
@@ -74,7 +77,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [Fact]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
             logger.Info("************************ EH100StreamsTo4PartitionStreamsTest *********************************");

@@ -11,8 +11,15 @@ namespace UnitTests.GrainInterfaces
         //[ReadOnly]
         Task<int> GetCalculatedValue();
         Task SetNext(IChainedGrain next);
+        Task SetNextNested(ChainGrainHolder next);
         //[ReadOnly]
         Task Validate(bool nextIsSet);
         Task PassThis(IChainedGrain next);
+        Task PassThisNested(ChainGrainHolder next);
+    }
+    
+    public class ChainGrainHolder
+    {
+        public IChainedGrain Next { get; set; }
     }
 }
