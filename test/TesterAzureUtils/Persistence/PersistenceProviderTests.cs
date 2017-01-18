@@ -19,18 +19,8 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Persistence
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class PersistenceProviderTests_Local : IClassFixture<PersistenceProviderTests_Local.Fixture>, IDisposable
+    public class PersistenceProviderTests_Local : IDisposable
     {
-        public class Fixture
-        {
-            public Fixture()
-            {
-                BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
-                LogManager.Initialize(cfg);
-            }
-        }
-
         private readonly StorageProviderManager storageProviderManager;
         private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
         private readonly ITestOutputHelper output;

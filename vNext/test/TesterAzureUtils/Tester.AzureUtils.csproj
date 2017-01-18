@@ -56,6 +56,9 @@
     <Compile Include="..\..\..\test\TesterAzureUtils\AzureGossipTableTests.cs">
       <Link>AzureGossipTableTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TesterAzureUtils\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TesterAzureUtils\AzureMembershipTableTests.cs">
       <Link>AzureMembershipTableTests.cs</Link>
     </Compile>
