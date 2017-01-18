@@ -64,6 +64,9 @@
     <Compile Include="..\..\..\test\TesterInternal\TestUtils.cs">
       <Link>TestUtils.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\TesterInternal\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TesterInternal\GatewaySelectionTest.cs">
       <Link>GatewaySelectionTest.cs</Link>
     </Compile>
