@@ -75,7 +75,7 @@ namespace PSUtils.Tests
         [Fact, TestCategory("BVT"), TestCategory("Tooling")]
         public void ScriptCallTest()
         {
-            _ps.Commands.AddScript(File.ReadAllText(@".\PSClientTests\PSClientTests.ps1"));
+            _ps.Commands.AddScript(File.ReadAllText(@".\PSClient\PSClientTests.ps1"));
             _ps.Commands.AddParameter("clientConfig", _clientConfig);
             var results = _ps.Invoke();
             Assert.True(results.Count == 5);
