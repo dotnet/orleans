@@ -20,8 +20,7 @@ namespace AWSUtils.Tests.StorageTests
     public abstract class Base_PersistenceGrainTests_AWSStore : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;
-        private readonly BaseClusterFixture fixture;
-        protected TestingSiloHost HostedCluster { get; private set; }
+        protected TestCluster HostedCluster { get; private set; }
         private readonly double timingFactor;
 
         private const int LoopIterations_Grain = 1000;
@@ -29,8 +28,9 @@ namespace AWSUtils.Tests.StorageTests
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
+        private BaseTestClusterFixture fixture;
 
-        public Base_PersistenceGrainTests_AWSStore(ITestOutputHelper output, BaseClusterFixture fixture)
+        public Base_PersistenceGrainTests_AWSStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to DynamoDB simulator");
@@ -262,10 +262,10 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_AWSStore_SiloRestart()
         {
-            var initialServiceId = this.HostedCluster.Globals.ServiceId;
+            var initialServiceId = this.HostedCluster.ClusterConfiguration.Globals.ServiceId;
             var initialDeploymentId = this.HostedCluster.DeploymentId;
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
 
             Guid id = Guid.NewGuid();
             IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
@@ -277,12 +277,17 @@ namespace AWSUtils.Tests.StorageTests
             await grain.DoWrite(1);
 
             output.WriteLine("About to reset Silos");
-            this.HostedCluster.RestartDefaultSilos(true);
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            {
+                this.HostedCluster.RestartSilo(silo);
+            }
+            this.HostedCluster.InitializeClient();
+
             output.WriteLine("Silos restarted");
 
-            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.Globals.ServiceId);
-            Assert.Equal(initialServiceId, this.HostedCluster.Globals.ServiceId);  // "ServiceId same after restart."
-            Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
+            output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
+            Assert.Equal(initialServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
+            Assert.Equal(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId same after restart."
 
             val = await grain.GetValue();
             Assert.Equal(1, val);  // "Value after Write-1"

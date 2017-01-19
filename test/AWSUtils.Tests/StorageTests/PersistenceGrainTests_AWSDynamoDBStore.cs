@@ -1,8 +1,13 @@
 ﻿using Orleans;
+using Orleans.Providers;
+using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Storage;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using UnitTests;
 using UnitTests.GrainInterfaces;
@@ -16,34 +21,70 @@ namespace AWSUtils.Tests.StorageTests
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
-        public class Fixture : BaseClusterFixture
+        public class Fixture : TestExtensions.BaseTestClusterFixture
         {
-            protected override TestingSiloHost CreateClusterHost()
+            protected override TestCluster CreateTestCluster()
             {
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {
                     Guid serviceId = Guid.NewGuid();
                     string dataConnectionString = $"Service={AWSTestConstants.Service}";
-                    return new TestingSiloHost(new TestingSiloOptions
+                    var options = new TestClusterOptions(initialSilosCount: 4);
+
+
+                    options.ClusterConfiguration.Globals.ServiceId = serviceId;
+                    options.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
+
+                    options.ClusterConfiguration.Globals.MaxResendCount = 0;
+
+
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2", new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
+
+                    options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore", new Dictionary<string, string> { { "DeleteStateOnClear", "true" }, { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore1", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore2", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.DynamoDBStorageProvider>("DDBStore3", new Dictionary<string, string> { { "DataConnectionString", dataConnectionString } });
+                    options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedDDBStore");
+
+                    IProviderConfiguration providerConfig;
+                    if(options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
                     {
-                        SiloConfigFile = new FileInfo("Config_AWS_DynamoDB_Storage.xml"),
-                        StartPrimary = true,
-                        StartSecondary = false,
-                        AdjustConfig = config =>
-                        {
-                            config.Globals.ServiceId = serviceId;
-                            config.Globals.DataConnectionString = dataConnectionString;
-                        }
-                    });
+                        var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
+
+                        var providers = providerCategoriess.SelectMany(o => o.Value.Providers);
+
+                        IProviderConfiguration provider1 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore1");
+                        IProviderConfiguration provider2 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore2");
+                        IProviderConfiguration provider3 = GetNamedProviderConfigForShardedProvider(providers, "DDBStore3");
+                        providerConfig.AddChildConfiguration(provider1);
+                        providerConfig.AddChildConfiguration(provider2);
+                        providerConfig.AddChildConfiguration(provider3);
+                    }
+                    return new TestCluster(options);
                 }
                 return null;
+            }
+
+            private static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
+            {
+                var providerConfig = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
+
+                return providerConfig.First();
             }
         }
 
         public PersistenceGrainTests_AWSDynamoDBStore(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                output.WriteLine("Unable to connect to AWS DynamoDB simulator");
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+            
         }
 
         [SkippableFact, TestCategory("Functional")]

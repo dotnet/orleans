@@ -512,7 +512,7 @@ namespace Orleans.Runtime
 
             var siloProviderRuntime = Services.GetRequiredService<SiloProviderRuntime>();
             runtimeClient.CurrentStreamProviderRuntime = siloProviderRuntime;
-            statisticsProviderManager = new StatisticsProviderManager("Statistics", siloProviderRuntime);
+            statisticsProviderManager = new StatisticsProviderManager(ProviderCategoryConfiguration.STATISTICS_PROVIDER_CATEGORY_NAME, siloProviderRuntime);
             string statsProviderName =  statisticsProviderManager.LoadProvider(GlobalConfig.ProviderConfigurations)
                 .WaitForResultWithThrow(initTimeout);
             if (statsProviderName != null)

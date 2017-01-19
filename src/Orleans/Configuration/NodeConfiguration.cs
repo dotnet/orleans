@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Configuration
         /// <summary>
         /// The MaxActiveThreads attribute specifies the maximum number of simultaneous active threads the scheduler will allow.
         /// Generally this number should be roughly equal to the number of cores on the node.
-        /// Using a value of 0 will look at System.Environment.ProcessorCount to decide the number instead.
+        /// Using a value of 0 will look at System.Environment.ProcessorCount to decide the number instead, which is only valid when set from xml config
         /// </summary>
         public int MaxActiveThreads { get; set; }
 
