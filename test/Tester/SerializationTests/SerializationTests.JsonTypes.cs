@@ -35,7 +35,9 @@ namespace UnitTests.Serialization
             Assert.Equal(input.ToString(), output.ToString());
         }
 
+#pragma warning disable 618
         [RegisterSerializer]
+#pragma warning restore 618
         public class JObjectSerializationExample1
         {
             public static bool RegisterWasCalled;
@@ -62,6 +64,7 @@ namespace UnitTests.Serialization
 
             public static void Register()
             {
+                RegisterWasCalled = true;
                 SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }

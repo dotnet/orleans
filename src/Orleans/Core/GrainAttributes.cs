@@ -256,6 +256,7 @@ namespace Orleans
     /// Used to make a class for auto-registration as a serialization helper.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
+    [Obsolete("[RegisterSerializer] is obsolete, please use [Serializer(typeof(TargetType))] instead.")]
     public sealed class RegisterSerializerAttribute : Attribute
     {
     }

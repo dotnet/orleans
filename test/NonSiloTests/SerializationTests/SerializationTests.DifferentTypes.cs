@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
@@ -80,20 +81,15 @@ namespace UnitTests.Serialization
         }
 
         [Serializable]
-        internal class TestTypeA
+        private class TestTypeA
         {
             public ICollection<TestTypeA> Collection { get; set; }
         }
 
-        [Orleans.CodeGeneration.RegisterSerializerAttribute()]
+        [Serializer(typeof(TestTypeA))]
         internal class TestTypeASerialization
         {
-
-            static TestTypeASerialization()
-            {
-                Register();
-            }
-
+            [CopierMethod]
             public static object DeepCopier(object original, ICopyContext context)
             {
                 TestTypeA input = (TestTypeA)original;
@@ -103,23 +99,20 @@ namespace UnitTests.Serialization
                 return result;
             }
 
+            [SerializerMethod]
             public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 TestTypeA input = (TestTypeA)untypedInput;
                 SerializationManager.SerializeInner(input.Collection, context, typeof(ICollection<TestTypeA>));
             }
 
+            [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
                 TestTypeA result = new TestTypeA();
                 context.RecordObject(result);
                 result.Collection = (ICollection<TestTypeA>)SerializationManager.DeserializeInner(typeof(ICollection<TestTypeA>), context);
                 return result;
-            }
-
-            public static void Register()
-            {
-                SerializationManager.Register(typeof(TestTypeA), DeepCopier, Serializer, Deserializer);
             }
         }
 
