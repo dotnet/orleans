@@ -573,15 +573,19 @@ namespace Orleans.Serialization
 
             try
             {
-                var attr = typeInfo.GetCustomAttribute<SerializerAttribute>();
+                var serializerAttributes = Attribute.GetCustomAttributes(typeInfo, typeof(SerializerAttribute));
                 if (typeInfo.IsEnum)
                 {
                     Register(type);
                 }
-                else if (attr != null)
+                else if (serializerAttributes.Length > 0)
                 {
                     // This type is the serializer for another type.
-                    Register(attr.TargetType, type);
+                    foreach (var attr in serializerAttributes)
+                    {
+                        var serializerAttribute = (SerializerAttribute) attr;
+                        Register(serializerAttribute.TargetType, type);
+                    }
                 }
                 else if (!systemAssembly)
                 {
