@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26009.0
+VisualStudioVersion = 15.0.26020.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans", "Orleans\Orleans.csproj", "{AC1BD60C-E7D8-4452-A21C-290AEC8E2E7A}"
 EndProject
@@ -85,6 +85,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "..\test\TesterZooKeeperUtils\Tester.ZooKeeperUtils.csproj", "{DF733504-A366-4860-813E-D20AABE243B2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansEventSourcing", "OrleansEventSourcing\OrleansEventSourcing.csproj", "{D9718C48-7020-4A0F-ACA0-17B28DCD6339}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansConsulUtils", "OrleansConsulUtils\OrleansConsulUtils.csproj", "{E791C633-7D26-486B-AA32-D2540F6BD291}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Consul.Tests", "..\test\Consul.Tests\Consul.Tests.csproj", "{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -396,6 +400,30 @@ Global
 		{D9718C48-7020-4A0F-ACA0-17B28DCD6339}.Release|x64.Build.0 = Release|x64
 		{D9718C48-7020-4A0F-ACA0-17B28DCD6339}.Release|x86.ActiveCfg = Release|x86
 		{D9718C48-7020-4A0F-ACA0-17B28DCD6339}.Release|x86.Build.0 = Release|x86
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|x64.ActiveCfg = Debug|x64
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|x64.Build.0 = Debug|x64
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|x86.ActiveCfg = Debug|x86
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Debug|x86.Build.0 = Debug|x86
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|x64.ActiveCfg = Release|x64
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|x64.Build.0 = Release|x64
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|x86.ActiveCfg = Release|x86
+		{E791C633-7D26-486B-AA32-D2540F6BD291}.Release|x86.Build.0 = Release|x86
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|x64.ActiveCfg = Debug|x64
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|x64.Build.0 = Debug|x64
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|x86.ActiveCfg = Debug|x86
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Debug|x86.Build.0 = Debug|x86
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|x64.ActiveCfg = Release|x64
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|x64.Build.0 = Release|x64
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|x86.ActiveCfg = Release|x86
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -427,5 +455,7 @@ Global
 		{58E62584-5B28-4DBD-A1A0-4E7B95E5A3E8} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
 		{DF733504-A366-4860-813E-D20AABE243B2} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{D9718C48-7020-4A0F-ACA0-17B28DCD6339} = {22C57246-E750-4254-80D2-9BEF9C241189}
+		{E791C633-7D26-486B-AA32-D2540F6BD291} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
+		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal
