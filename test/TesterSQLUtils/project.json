@@ -2,7 +2,7 @@
   "dependencies": {
     "FluentAssertions": "4.0.0",
     "Microsoft.Data.SQLite": "1.1.0",
-    "MySql.Data": "7.0.6-IR31",
+    "MySql.Data": "6.9.9",
     "Newtonsoft.Json": "9.0.1",
     "Npgsql": "3.1.9",
     "system.data.sqlclient": "4.3.0",

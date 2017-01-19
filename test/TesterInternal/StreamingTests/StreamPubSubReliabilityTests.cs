@@ -58,6 +58,7 @@ namespace UnitTests.StreamingTests
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             this.HostedCluster = fixture.HostedCluster;
+            this.GrainFactory = fixture.GrainFactory;
             SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
         }
 

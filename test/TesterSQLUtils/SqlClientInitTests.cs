@@ -19,18 +19,18 @@ namespace Tester.SQLUtils
             protected override TestCluster CreateTestCluster()
             {
 
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, "OrleansStatisticsTestSQL")
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansStatisticsTestSQL")
                             .Result.CurrentConnectionString;
                 var options = new TestClusterOptions(initialSilosCount: 1);
 
                 options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.MemoryStorage>("MemoryStore");
-                options.ClusterConfiguration.Globals.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>("SQL", new Dictionary<string, string>() { { AdoNetInvariants.InvariantNameMySql, connectionString } });
-
+                options.ClusterConfiguration.Globals.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>(statisticProviderName, new Dictionary<string, string>() { { "ConnectionString", connectionString } });
+                options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsProviderName = statisticProviderName);
                 options.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.SqlServer;
                 options.ClusterConfiguration.Globals.DataConnectionString = connectionString;
                 options.ClusterConfiguration.ApplyToAllNodes(nc => nc.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10));
 
-                options.ClientConfiguration.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>("SQL", new Dictionary<string, string>() { { AdoNetInvariants.InvariantNameMySql, connectionString } });
+                options.ClientConfiguration.RegisterStatisticsProvider<Orleans.Providers.SqlServer.SqlStatisticsPublisher>(statisticProviderName, new Dictionary<string, string>() { { "ConnectionString", connectionString } });
                 options.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.SqlServer;
                 options.ClientConfiguration.DataConnectionString = connectionString;
                 options.ClientConfiguration.StatisticsMetricsTableWriteInterval = TimeSpan.FromSeconds(10);
@@ -40,6 +40,7 @@ namespace Tester.SQLUtils
 
         }
 
+        static string statisticProviderName = "SQL";
         protected TestCluster HostedCluster { get; private set; }
 
         public SqlClientInitTests(Fixture fixture)
@@ -61,11 +62,11 @@ namespace Tester.SQLUtils
             OutsideRuntimeClient ogc = (OutsideRuntimeClient)RuntimeClient.Current;
             Assert.NotNull(ogc.ClientStatistics); // Client Statistics Manager is setup
 
-            Assert.Equal("SQL", config.StatisticsProviderName);  // "Client.StatisticsProviderName"
+            Assert.Equal(statisticProviderName, config.StatisticsProviderName);  // "Client.StatisticsProviderName"
 
             SiloHandle silo = this.HostedCluster.Primary;
             Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
-            Assert.Equal("SQL", silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
+            Assert.Equal(statisticProviderName, silo.NodeConfiguration.StatisticsProviderName);  // "Silo.StatisticsProviderName"
         }
     }
 }

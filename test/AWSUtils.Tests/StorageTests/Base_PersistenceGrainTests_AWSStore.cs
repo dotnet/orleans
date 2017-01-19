@@ -28,6 +28,7 @@ namespace AWSUtils.Tests.StorageTests
 
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
+        private BaseTestClusterFixture fixture;
 
         public Base_PersistenceGrainTests_AWSStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
         {
@@ -276,7 +277,6 @@ namespace AWSUtils.Tests.StorageTests
             await grain.DoWrite(1);
 
             output.WriteLine("About to reset Silos");
-            //this.HostedCluster.RestartDefaultSilos(true);
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
                 this.HostedCluster.RestartSilo(silo);
@@ -287,7 +287,7 @@ namespace AWSUtils.Tests.StorageTests
 
             output.WriteLine("DeploymentId={0} ServiceId={1}", this.HostedCluster.DeploymentId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);
             Assert.Equal(initialServiceId, this.HostedCluster.ClusterConfiguration.Globals.ServiceId);  // "ServiceId same after restart."
-            Assert.NotEqual(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId different after restart."
+            Assert.Equal(initialDeploymentId, this.HostedCluster.DeploymentId);  // "DeploymentId same after restart."
 
             val = await grain.GetValue();
             Assert.Equal(1, val);  // "Value after Write-1"

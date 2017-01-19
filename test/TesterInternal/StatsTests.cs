@@ -46,7 +46,7 @@ namespace UnitTests.Stats
         {
             this.output = output;
             this.fixture = fixture;
-            this.fixture = fixture;
+            this.HostedCluster = fixture.HostedCluster;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Client"), TestCategory("Stats")]
@@ -63,7 +63,7 @@ namespace UnitTests.Stats
             Assert.True(await silo.TestHook.HasStatisticsProvider(), "Silo StatisticsProviderManager is setup");
 
             // Check we got some stats & metrics callbacks on both client and server.
-            var siloStatsCollector = GrainFactory.GetGrain<IStatsCollectorGrain>(0);
+            var siloStatsCollector = this.fixture.GrainFactory.GetGrain<IStatsCollectorGrain>(0);
             var clientStatsCollector = MockStatsCollectorClient.StatsPublisherInstance;
             var clientMetricsCollector = MockStatsCollectorClient.MetricsPublisherInstance;
 

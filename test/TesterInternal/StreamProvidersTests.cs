@@ -21,7 +21,6 @@ namespace UnitTests.Streaming
     {
 
         private static Guid ServiceId = Guid.NewGuid();
-
         public class Fixture : BaseTestClusterFixture
         {
             protected override TestCluster CreateTestCluster()
@@ -122,7 +121,7 @@ namespace UnitTests.Streaming
                 return new TestCluster(options);
             }
         }
-
+        private IGrainFactory grainFactory;
         public StreamProvidersTests_ProviderConfigLoaded(Fixture fixture)
         {
             this.grainFactory = fixture.GrainFactory;

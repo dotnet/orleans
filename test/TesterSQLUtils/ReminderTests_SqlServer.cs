@@ -4,11 +4,13 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime.Configuration;
+using Orleans.SqlUtils;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Tester;
+using UnitTests.General;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -25,8 +27,9 @@ namespace UnitTests.TimerTests
             protected override TestCluster CreateTestCluster()
             {
                 var options = new TestClusterOptions();
-
-                options.ClusterConfiguration.Globals.DataConnectionString = TestHelper.TestUtils.GetSqlConnectionString();
+                string connectionString = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, "OrleansRemiderTestSQL")
+                            .Result.CurrentConnectionString;
+                options.ClusterConfiguration.Globals.DataConnectionString = connectionString;
                 options.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.SqlServer;
 
                 return new TestCluster(options);
