@@ -21,3 +21,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.SQLUtils")]
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
