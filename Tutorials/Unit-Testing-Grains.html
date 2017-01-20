@@ -8,7 +8,7 @@
     <title>Unit Testing Grains | Microsoft Orleans Website </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Unit Testing Grains | Microsoft Orleans Website ">
-    <meta name="generator" content="docfx 2.10.1.0">
+    <meta name="generator" content="docfx 2.10.2.0">
     
     <link rel="shortcut icon" href="../favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -78,7 +78,7 @@ For a distributed application written in Orleans, you&#39;ll need load tests and
 <p>Orleans makes it possible to mock many of its parts (<a href="https://github.com/dotnet/orleans/tree/master/Samples/UnitTesting.Minimal">example</a>) but here we only focus on simply running grains in test silos.</p>
 <p>The steps are</p>
 <ul>
-<li>You should create a test project in your favorite unit testing framework.</li>
+<li>You should create a project using your favorite unit testing framework.</li>
 <li>Add references to <code>Microsoft.Orleans.TestingHost</code>, <code>Microsoft.Orleans.OrleansProviders</code> and <code>Microsoft.Orleans.OrleansTelemetryConsumers.Counters</code> packages from NuGet to the project.</li>
 <li>Reference your interfaces and collection projects in the test project.</li>
 <li>Inherit your test classes from <code>Orleans.TestingHost.TestingSiloHost</code>.</li>
@@ -90,21 +90,19 @@ For a distributed application written in Orleans, you&#39;ll need load tests and
 The test cases like ordinary grain code should call grains and then wait for the results using await and should not block the execution.</p>
 <h2 id="writing-the-code">Writing the code</h2>
 <p>The <code>TestingSiloHost</code> which we inherit from starts the silos up for us but we need to shutdown them ourselves.
-The samples here are using MS Test but you can use NUnit, XUnit or any other testing framework that you want. Let&#39;s use the hello world sample&#39;s code here as an example.</p>
+The samples here are using xUnit but you can use NUnit, MsTest, or any other testing framework that you want. Let&#39;s use the hello world sample&#39;s code here as an example.</p>
 <pre><code class="lang-csharp">using System;
 using System.Threading.Tasks;
 using HelloWorldInterfaces;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans;
 using Orleans.TestingHost;
+using Xunit;
 
 namespace Tests
 {
-    [TestClass]
-    public class HelloWorldSiloTests : TestingSiloHost
+    public class HelloWorldSiloTests : TestingSiloHost, IDisposable
     {
-        [ClassCleanup]
-        public static void ClassCleanup()
+        public void Dispose()
         {
             // Optional.
             // By default, the next test class which uses TestingSiloHost will
@@ -112,8 +110,8 @@ namespace Tests
             StopAllSilos();
         }
 
-        [TestMethod]
-        public async Task SayHelloTest()
+        [Fact]
+        public async Task SayHelloRespondsCorrectly()
         {
             // The Orleans silo / client test environment is already set up at this point.
 
@@ -125,9 +123,9 @@ namespace Tests
             // This will create and call a Hello grain with specified &#39;id&#39; in one of the test silos.
             string reply = await grain.SayHello(greeting);
 
-            Assert.IsNotNull(reply, &quot;Grain replied with some message&quot;);
-            string expected = string.Format(&quot;You said: &#39;{0}&#39;, I say: Hello!&quot;, greeting);
-            Assert.AreEqual(expected, reply, &quot;Grain replied with expected message&quot;);
+            Assert.NotNull(reply);
+            string expected = $&quot;You said: &#39;{greeting}&#39;, I say: Hello!&quot;;
+            Assert.AreEqual(expected, reply);
         }
     }
 }
