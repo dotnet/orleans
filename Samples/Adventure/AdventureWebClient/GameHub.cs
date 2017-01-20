@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Orleans;
 using AdventureGrainInterfaces;
+using System.Net;
 
 namespace AdventureWebClient
 {
@@ -99,6 +100,17 @@ namespace AdventureWebClient
 
                 var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
                 game.Player.SetRoomGrain(room1).Wait();
+
+                Clients.Caller.AddResponse(@"
+  ___      _                 _                  
+ / _ \    | |               | |                 
+/ /_\ \ __| |_   _____ _ __ | |_ _   _ _ __ ___ 
+|  _  |/ _` \ \ / / _ \ '_ \| __| | | | '__/ _ \
+| | | | (_| |\ V /  __/ | | | |_| |_| | | |  __/
+\_| |_/\__,_| \_/ \___|_| |_|\__|\__,_|_|  \___|");
+
+                Clients.Caller.AddResponse(string.Format("\r\nWelcome to {0} !\r\n", Dns.GetHostName()));
+                Clients.Caller.AddResponse(string.Format("It is {0} now !\r\n\r\n", DateTime.Now));
 
             }
 

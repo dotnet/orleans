@@ -12,11 +12,22 @@
     </style>
 </head>
 <body>
+    <style>
+        table {
+            border: 1px solid black;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        th {
+            font:13px courier;
+        }
+    </style>
+
     <div class="container">
-        <input type="text" id="message" />
+        <input type="text" id="message" onkeydown = "if (event.keyCode == 13) document.getElementById('sendmessage').click()"/>
         <input type="button" id="sendmessage" value="Send" />
         <input type="hidden" id="displayname" />
-        <ul id="discussion"></ul>
+        <table style="width:100%" id="adventuretext"></table>
     </div>
     <!--Script references. -->
     <!--Reference the jQuery library. -->
@@ -32,11 +43,24 @@
             var game = $.connection.gameHub;
             // Create a function that the hub can call to broadcast messages.
             game.client.AddResponse = function (message) {
-                // Html encode display name and message.
-                
+                // delete old log messages to avoid overflow
+                // Show only 10 rows
+                var tbl = document.getElementById("adventuretext");
+                console.log("rows:" + tbl.rows.length);
+                while(tbl.rows.length >5)
+                {
+                    tbl.deleteRow(0);
+                }
+                // Html encode display name and message.                
                 var encodedMsg = $('<div />').text(message).html();
+                // Map CR/LF to <br>
+                encodedMsg = encodedMsg.replace(/(?:\r\n|\r|\n)/g, '<br />');
+                // force whitespace
+                //encodedMsg = encodedMsg.replace(/ /g, '&nbsp;');
+
+                console.log(encodedMsg);
                 // Add the message to the page.
-                $('#discussion').append('<li>' + encodedMsg + '</li>');
+                $('#adventuretext').append('<tr><th>' + encodedMsg + '</th></tr>');
             };
 
             // Get the user name and store it to prepend to messages.
@@ -47,7 +71,7 @@
             $.connection.hub.qs = "userid=" + $('#displayname').val() ;
 
             // Start the connection.
-            $.connection.hub.start().done(function () {           
+            $.connection.hub.start().done(function () {
                 $('#sendmessage').click(function () {
                     // Call the Send method on the hub.                    
                     game.server.send( $('#message').val());

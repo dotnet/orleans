@@ -53,17 +53,17 @@ namespace AdventureSocketClient
         {
             killPlayer();
         }
- 
+
         private async void killPlayer()
         {
             if (_player != null)
             {
                 await _player.Play("End"); // disconnect
-                await _player.UnSubscribe(_messageInterface);
+                await _player.UnSubscribe(_messageInterface); // Unsubscribe - Observers pattern
             }
 
-            await GrainClient.GrainFactory.DeleteObjectReference<IMessage>(_messageInterface);            
-            
+            await GrainClient.GrainFactory.DeleteObjectReference<IMessage>(_messageInterface);
+
             _message = null;
             _messageInterface = null;
             _player = null;
@@ -73,45 +73,57 @@ namespace AdventureSocketClient
 
 
         private async void ProcessMessage(IChannelHandlerContext contex, string msg)
-        {            
-
+        {
             string response = "";
             bool close = false;
-            if (string.IsNullOrEmpty(msg))
+
+            try
             {
-                response = "Please type something.\r\n";
+
+                if (string.IsNullOrEmpty(msg))
+                {
+                    response = "Please type something.\r\n";
+                }
+                else if (waitingForName)
+                {
+                    waitingForName = false;
+
+                    // Create player
+                    Guid playerGuid = Guid.NewGuid();
+
+                    _player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerGuid);
+                    await _player.SetName(msg);
+
+
+                    // Implement Observers pattern - https://dotnet.github.io/orleans/Documentation/Getting-Started-With-Orleans/Observers.html
+                    _message = new Message(contex);
+
+                    //Create a reference for Message usable for subscribing to the observable grain.
+                    _messageInterface = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(_message);
+                    await _player.Subscribe(_messageInterface);
+
+                    // Put the player into the default Room
+                    var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
+                    await _player.SetRoomGrain(room1);
+
+                    response = await _player.Play("look");
+
+                }
+                else if (string.Equals("End", msg, StringComparison.OrdinalIgnoreCase))
+                {
+                    response = "Have a good day!\r\n";
+
+                    close = true;
+                }
+                else
+                {
+                    response = await _player.Play(msg);
+                }
             }
-            else if (waitingForName)
+            catch (Exception ex)
             {
-                waitingForName = false;
-
-                Guid playerGuid = Guid.NewGuid();
-
-                _player = GrainClient.GrainFactory.GetGrain<IPlayerGrain>(playerGuid);
-                await _player.SetName(msg);
-
-                _message = new Message(contex);
-
-                //Create a reference for Message usable for subscribing to the observable grain.
-                _messageInterface = await GrainClient.GrainFactory.CreateObjectReference<IMessage>(_message);
-                await _player.Subscribe(_messageInterface);
-
-                var room1 = GrainClient.GrainFactory.GetGrain<IRoomGrain>(0);
-                await _player.SetRoomGrain(room1);
-
-                response = await _player.Play("look");
-
-            }
-            else if (string.Equals("End", msg, StringComparison.OrdinalIgnoreCase))
-            {
-                response = "Have a good day!\r\n";                
-                killPlayer();
-
+                response = "Unexpected exception: " + ex;
                 close = true;
-            }
-            else
-            {
-                response = await _player.Play(msg);
             }
 
             Task wait_close = contex.WriteAndFlushAsync(response + "\r\n");
