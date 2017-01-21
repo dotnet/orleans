@@ -25,18 +25,6 @@ namespace Orleans.Messaging
 
         protected override void Run()
         {
-            if (gatewayConnection.MsgCenter.MessagingConfiguration.UseMessageBatching)
-            {
-                throw new OrleansException("UseMessageBatching is no longer supported for ClientReceiver.");
-            }
-            else
-            {
-                RunNonBatch();
-            }
-        }
-
-        protected void RunNonBatch()
-        {
             try
             {
                 while (!Cts.IsCancellationRequested)

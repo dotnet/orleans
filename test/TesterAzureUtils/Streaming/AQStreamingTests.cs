@@ -32,8 +32,6 @@ namespace Tester.AzureUtils.Streaming
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
             options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
-            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
-
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
             options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
 

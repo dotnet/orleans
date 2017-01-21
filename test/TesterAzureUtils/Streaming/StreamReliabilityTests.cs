@@ -54,7 +54,6 @@ namespace UnitTests.Streaming.Reliability
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AZURE_QUEUE_STREAM_PROVIDER_NAME);
             options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
-            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
             options.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
