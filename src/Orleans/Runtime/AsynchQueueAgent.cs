@@ -11,14 +11,14 @@ namespace Orleans.Runtime
     {
         private readonly IMessagingConfiguration config;
         private ManualResetEvent Completion = new ManualResetEvent(false);
-        private Action<T> requestHandler;
         private QueueTrackingStatistic queueTracking;
-        private readonly DedicatedThreadPool pool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
+        private readonly WaitCallback requestHandler;
+
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)
             : base(nameSuffix)
         {
             config = cfg;
-            requestHandler = new Action<T>(request =>
+            requestHandler = request =>
             {
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectQueueStats)
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
                     threadTracking.OnStartProcessing();
                 }
 #endif
-                Process(request);
+                Process((T)request);
 
 #if TRACK_DETAILED_STATS
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)
@@ -39,7 +39,7 @@ namespace Orleans.Runtime
                     threadTracking.IncrementNumberOfProcessed();
                 }
 #endif
-            });
+            };
 
             if (StatisticsCollector.CollectQueueStats)
             {
@@ -55,7 +55,7 @@ namespace Orleans.Runtime
                 queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
             }
 #endif
-             pool.QueueSystemWorkItem(() => requestHandler(request));
+             OrleansThreadPool.QueueSystemWorkItem(requestHandler, request);
         }
 
         protected abstract void Process(T request);

@@ -17,14 +17,15 @@ namespace Orleans.Runtime.Scheduler
         private readonly QueueTrackingStatistic mainQueueTracking;
         private readonly QueueTrackingStatistic systemQueueTracking;
         private readonly QueueTrackingStatistic tasksQueueTracking;
-        private readonly DedicatedThreadPool DedicatedThreadPool;
         public int Length =>1; // todo
         private OrleansTaskScheduler _scheduler;
         internal WorkQueue(OrleansTaskScheduler scheduler, int maxActiveThreads)
         {
             _scheduler = scheduler;
-           // DedicatedThreadPools = new DedicatedThreadPool(new DedicatedThreadPoolSettings(4));
-            DedicatedThreadPool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
+            processAction = item =>
+            {
+                ProcessWorkItem((IWorkItem) item);
+            };
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue");
@@ -48,7 +49,7 @@ namespace Orleans.Runtime.Scheduler
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         systemQueueTracking.OnEnQueueRequest(1, systemQueue.Count);
 #endif
-                    DedicatedThreadPool.QueueSystemWorkItem(() => ProcessWorkItem(_scheduler, workItem));
+                    OrleansThreadPool.QueueSystemWorkItem(processAction, workItem);
                 }
                 else
                 {
@@ -56,7 +57,7 @@ namespace Orleans.Runtime.Scheduler
                     if (StatisticsCollector.CollectShedulerQueuesStats)
                         mainQueueTracking.OnEnQueueRequest(1, mainQueue.Count);
 #endif
-                    DedicatedThreadPool.QueueUserWorkItem(() => ProcessWorkItem(_scheduler, workItem));
+                    OrleansThreadPool.QueueUserWorkItem(processAction, workItem);
                 }
 #else
 #if TRACK_DETAILED_STATS
@@ -90,18 +91,20 @@ namespace Orleans.Runtime.Scheduler
             systemQueueTracking.OnStopExecution();
             tasksQueueTracking.OnStopExecution();
         }
-        private static void ProcessWorkItem(TaskScheduler scheduler, IWorkItem item)
+
+        private readonly WaitCallback processAction;
+        private void ProcessWorkItem(IWorkItem item)
         {
             if (RuntimeContext.Current == null)
             {
                 RuntimeContext.Current = new RuntimeContext
                 {
-                    Scheduler = scheduler
+                    Scheduler = _scheduler
                 };
             }
             try
             {
-                TaskSchedulerUtils.RunWorkItemTask(item, scheduler);
+                TaskSchedulerUtils.RunWorkItemTask(item, _scheduler);
             }
             catch (Exception ex)
             {
