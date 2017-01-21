@@ -49,8 +49,6 @@ namespace UnitTests.StreamingTests
             options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
             options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
 
-            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
-
             return new TestCluster(options);
         }
 

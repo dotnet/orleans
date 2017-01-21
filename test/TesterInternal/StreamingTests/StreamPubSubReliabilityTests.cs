@@ -34,7 +34,6 @@ namespace UnitTests.StreamingTests
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
                 options.ClientConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
 
-                options.ClientConfiguration.MaxMessageBatchingSize = 100;
                 options.ClientConfiguration.ClientSenderBuckets = 8192;
                 options.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(30);
                 options.ClientConfiguration.MaxResendCount = 0;

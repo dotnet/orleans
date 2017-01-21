@@ -27,7 +27,6 @@ namespace AWSUtils.Tests.Streaming
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
 
             options.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
-            options.ClusterConfiguration.Globals.MaxMessageBatchingSize = 100;
 
             options.ClientConfiguration.AddSimpleMessageStreamProvider("SMSProvider", fireAndForgetDelivery: false);
 
