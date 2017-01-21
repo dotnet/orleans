@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -19,17 +18,13 @@ namespace Orleans.Runtime.Scheduler
         private readonly QueueTrackingStatistic systemQueueTracking;
         private readonly QueueTrackingStatistic tasksQueueTracking;
         private readonly DedicatedThreadPool DedicatedThreadPool;
-        private readonly ActionBlock<IWorkItem> mainQueueExecutor;
-        private readonly ActionBlock<IWorkItem> systemQueueExecutor;
-        public int Length => mainQueueExecutor.InputCount;
+        public int Length =>1; // todo
         private OrleansTaskScheduler _scheduler;
         internal WorkQueue(OrleansTaskScheduler scheduler, int maxActiveThreads)
         {
             _scheduler = scheduler;
-            mainQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
            // DedicatedThreadPools = new DedicatedThreadPool(new DedicatedThreadPoolSettings(4));
             DedicatedThreadPool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
-            systemQueueExecutor = GetWorkItemExecutor(scheduler, maxActiveThreads);
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking = new QueueTrackingStatistic("Scheduler.LevelOne.MainQueue");
@@ -85,39 +80,16 @@ namespace Orleans.Runtime.Scheduler
 
         public void DumpStatus(StringBuilder sb)
         {
-            if (systemQueueExecutor.InputCount > 0)
-            {
-                sb.AppendLine("System Queue:");
-                sb.AppendFormat("  {0}", systemQueueExecutor.InputCount).AppendLine();
-            }
-
-            if (mainQueueExecutor.InputCount <= 0) return;
-
-            sb.AppendLine("Main Queue:");
-            sb.AppendFormat("  {0}", mainQueueExecutor.InputCount).AppendLine();
         }
 
         public void RunDown()
         {
-            mainQueueExecutor.Complete();
-            systemQueueExecutor.Complete();
             if (!StatisticsCollector.CollectShedulerQueuesStats) return;
 
             mainQueueTracking.OnStopExecution();
             systemQueueTracking.OnStopExecution();
             tasksQueueTracking.OnStopExecution();
         }
-
-        internal static ActionBlock<IWorkItem> GetWorkItemExecutor(TaskScheduler scheduler, int maxActiveThreads)
-        {
-            return new ActionBlock<IWorkItem>(item => ProcessWorkItem(scheduler, item),
-                new ExecutionDataflowBlockOptions
-                {
-                    MaxDegreeOfParallelism = maxActiveThreads,
-                    EnsureOrdered = true,
-                });
-        }
-
         private static void ProcessWorkItem(TaskScheduler scheduler, IWorkItem item)
         {
             if (RuntimeContext.Current == null)

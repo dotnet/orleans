@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Concurrent;
-using System.Threading.Tasks.Dataflow;
+using System.Collections.Generic;
 
 
 namespace Orleans.Runtime.Messaging
@@ -8,11 +8,11 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly ITargetBlock<Message>[] messageQueues;
         private readonly Action<Message>[] messageHandlers;
         private readonly Logger log;
         private readonly QueueTrackingStatistic[] queueTracking;
-
+        private readonly List<Message>[] msgs; 
+            
         public int Count
         {
             get
@@ -30,17 +30,21 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue()
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            messageQueues = new ITargetBlock<Message>[n];
             queueTracking = new QueueTrackingStatistic[n];
+            msgs = new List<Message>[n];
             messageHandlers = new Action<Message>[n];
             for (int g = 0; g < n; g++)
             {
-                messageHandlers[g]= new Action<Message>(message => log.Error(0, "Message recieved before start"));
+                msgs[g] = new List<Message>();
+                var fff = g;
+                messageHandlers[g]= new Action<Message>(message =>
+                {
+                    msgs[fff].Add(message);
+                });
             }
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
-                messageQueues[i] = new BufferBlock<Message>();
                 if (StatisticsCollector.CollectQueueStats)
                 {
                     var queueName = "IncomingMessageAgent." + category;
@@ -54,10 +58,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Stop()
         {
-            if (messageQueues == null) return;
-            foreach (var q in messageQueues)
-                q.Complete();
-            
             if (!StatisticsCollector.CollectQueueStats) return;
 
             foreach (var q in queueTracking)
@@ -79,6 +79,9 @@ namespace Orleans.Runtime.Messaging
 
         public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
         {
+            // todo: make it pretty
+            msgs[(int)type].ForEach(actionBlock);
+            msgs[(int)type] = new List<Message>();
             messageHandlers[(int) type] = actionBlock;
         }
 

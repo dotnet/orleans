@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime

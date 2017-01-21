@@ -82,6 +82,7 @@ namespace Orleans.Messaging
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         public IMessagingConfiguration MessagingConfiguration { get; private set; }
+        public ManualResetEvent Completion { get; }
         private readonly QueueTrackingStatistic queueTracking;
 
         public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
@@ -261,6 +262,10 @@ namespace Orleans.Messaging
                 // If this happens, we reject if the message is targeted to a specific silo, or try again if not
                 RejectOrResend(msg);
             }
+        }
+
+        public void AddTargetBlock(Message.Categories type, Action<Message> actionBlock)
+        {
         }
 
         private void RejectOrResend(Message msg)

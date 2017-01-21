@@ -105,6 +105,7 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
+    <Compile Include="Runtime\DedicatedThreadPool.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
     <Compile Include="Runtime\RingRange.cs" />
@@ -438,14 +439,14 @@
     </PropertyGroup>
     <ItemGroup>
       <CodeGenArgs Include="/in:$(BootstrapOutputPath)$(TargetName)$(TargetExt)" />
-      <CodeGenArgs Include="/out:$(CodeGenFilename)"/>
+      <CodeGenArgs Include="/out:$(CodeGenFilename)" />
       <CodeGenArgs Include="@(ReferencePath->'/r:%(Identity)')" />
     </ItemGroup>
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)" />
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Invoking Code Generator" />
     <Exec Command="&quot;$(BootstrapOutputPath)ClientGenerator.exe&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(CodeGenFilename)">
-       <Output TaskParameter="Outputs" ItemName="Compile" />
-       <Output TaskParameter="Outputs" ItemName="FileWrites" />
+      <Output TaskParameter="Outputs" ItemName="Compile" />
+      <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>
   </Target>
 </Project>

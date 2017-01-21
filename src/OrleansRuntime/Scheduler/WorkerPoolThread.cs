@@ -3,8 +3,6 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
-
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -103,7 +101,6 @@ namespace Orleans.Runtime.Scheduler
                 WorkerThreadStatisticsNumber = SchedulerStatisticsGroup.RegisterWorkingThread(Name);
         }
 
-        private readonly ActionBlock<IWorkItem> _executor;
         protected override void Run()
         {
             // not used anymore
@@ -177,7 +174,6 @@ namespace Orleans.Runtime.Scheduler
                                     }
                                 }
 #endif
-                                _executor.Post(todo);
                             }
 #if !NETSTANDARD
                             catch (ThreadAbortException ex)

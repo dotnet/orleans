@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
@@ -14,7 +13,7 @@ namespace Orleans.Runtime
         private ManualResetEvent Completion = new ManualResetEvent(false);
         private Action<T> requestHandler;
         private QueueTrackingStatistic queueTracking;
-        private DedicatedThreadPool pool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
+        private readonly DedicatedThreadPool pool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)
             : base(nameSuffix)
         {
@@ -56,7 +55,7 @@ namespace Orleans.Runtime
                 queueTracking.OnEnQueueRequest(1, requestQueue.Count, request);
             }
 #endif
-            pool.QueueSystemWorkItem(() => requestHandler(request));
+             pool.QueueSystemWorkItem(() => requestHandler(request));
         }
 
         protected abstract void Process(T request);

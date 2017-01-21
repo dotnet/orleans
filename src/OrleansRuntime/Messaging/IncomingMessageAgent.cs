@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks.Dataflow;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
@@ -40,7 +39,7 @@ namespace Orleans.Runtime.Messaging
                     threadTracking.OnStartExecution();
                 }
 #endif
-                var pool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
+              var pool = DedicatedThreadPoolTaskScheduler.Instance.Pool;
 
                 messageCenter.AddTargetBlock(category, message => pool.QueueSystemWorkItem(() => ReceiveMessage(message)));
                 try

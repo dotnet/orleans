@@ -225,6 +225,10 @@ namespace Orleans.Messaging
             }
             return true;
         }
+        protected void DrainQueue(Action<Message> action)
+        {
+          // todo
+        }
 
         protected override void OnGetSendingSocketFailure(Message msg, string error)
         {
