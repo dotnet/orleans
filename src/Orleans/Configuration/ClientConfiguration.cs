@@ -566,7 +566,7 @@ namespace Orleans.Runtime.Configuration
         }
 
         /// <summary>
-        /// Retuurns a ClientConfiguration object for connecting to a local silo (for testing).
+        /// Returns a ClientConfiguration object for connecting to a local silo (for testing).
         /// </summary>
         /// <param name="gatewayPort">Client gateway TCP port</param>
         /// <returns>ClientConfiguration object that can be passed to GrainClient class for initialization</returns>
