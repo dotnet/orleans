@@ -698,11 +698,7 @@ namespace Orleans.Runtime
         static internal bool Dispatch()
         {
             var workQueue = ThreadPoolGlobals.workQueue;
-            //
-            // The clock is ticking!  We have ThreadPoolGlobals.TP_QUANTUM milliseconds to get some work done, and then
-            // we need to return to the VM.
-            //
-            int quantumStartTime = Environment.TickCount;
+        
 
             //
             // Update our records to indicate that an outstanding request for a thread has now been fulfilled.
@@ -730,7 +726,6 @@ namespace Orleans.Runtime
 
                 //
                 // Loop until our quantum expires.
-                //(Environment.TickCount - quantumStartTime) < ThreadPoolGlobals.TP_QUANTUM
                 while (true)
                 {
                     //
@@ -776,8 +771,8 @@ namespace Orleans.Runtime
                         // Execute the workitem outside of any finally blocks, so that it can be aborted if needed.
                         //
 
-                            workItem.ExecuteWorkItem();
-                            workItem = null;
+                        workItem.ExecuteWorkItem();
+                        workItem = null;
 
                         // 
                         // Notify the VM that we executed this workitem.  This is also our opportunity to ask whether Hill Climbing wants
@@ -787,9 +782,6 @@ namespace Orleans.Runtime
                         //	return false;
                     }
                 }
-
-                                                     // If we get here, it's because our quantum expired.  Tell the VM we're returning normally.
-                return true;
             }
 #if !NETSTANDARD
             catch (ThreadAbortException tae)
@@ -800,8 +792,7 @@ namespace Orleans.Runtime
                 // it was executed or not (in debug builds only).  Task uses this to communicate the ThreadAbortException to anyone
                 // who waits for the task to complete.
                 //
-                if (workItem != null)
-                    workItem.MarkAborted(tae);
+                workItem?.MarkAborted(tae);
 
                 //
                 // In this case, the VM is going to request another thread on our behalf.  No need to do it twice.
