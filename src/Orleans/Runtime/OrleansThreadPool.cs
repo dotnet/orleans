@@ -17,7 +17,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -234,7 +233,6 @@ namespace Orleans.Runtime
                     try
                     {
                         m_foreignLock.Enter(ref lockTaken);
-
                         if (m_tailIndex == int.MaxValue)
                         {
                             //
@@ -536,7 +534,6 @@ namespace Orleans.Runtime
                 return prevIndexes == oldIndexes;
             }
 
-            [ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
             public QueueSegment()
             {
                 Debug.Assert(QueueSegmentLength <= SixteenBits);
@@ -836,7 +833,7 @@ namespace Orleans.Runtime
                             //
                             // If we found work, there may be more work.  Ask for another thread so that the other work can be processed
                             // in parallel.  Note that this will only ask for a max of #procs threads, so it's safe to call it for every dequeue.
-                            // // todo: for now this isn't needed, as threads... 
+                            // // todo: for now this isn't needed, as threads arent being requested from VM
                             // workQueue.EnsureThreadRequested();
                         }
                     }
@@ -858,16 +855,16 @@ namespace Orleans.Runtime
                         // 
                         // Notify the VM that we executed this workitem.  This is also our opportunity to ask whether Hill Climbing wants
                         // us to return the thread to the pool or not.
-                        // todo
+                        // todo : for hill climbing 
                         //if (!ThreadPool.NotifyWorkItemComplete())
                         //	return false;
                     }
                 }
 
-                OrleansThreadPool.NotifyWorkItemComplete(); // todo: wasn't there
                                                      // If we get here, it's because our quantum expired.  Tell the VM we're returning normally.
                 return true;
             }
+#if !NETSTANDARD
             catch (ThreadAbortException tae)
             {
                 //
@@ -886,6 +883,7 @@ namespace Orleans.Runtime
                 workQueue.EnsureThreadRequested();
                 // throw;  //no need to explicitly rethrow a ThreadAbortException, and doing so causes allocations on amd64.
             }
+#endif
             finally
             {
                 //
@@ -980,7 +978,11 @@ namespace Orleans.Runtime
     internal interface IThreadPoolWorkItem
     {
         void ExecuteWorkItem();
-        void MarkAborted(ThreadAbortException tae);
+        void MarkAborted(
+#if !NETSTANDARD
+            ThreadAbortException tae
+#endif
+            );
     }
 
     internal sealed class QueueUserWorkItemCallback : IThreadPoolWorkItem
@@ -1035,7 +1037,11 @@ namespace Orleans.Runtime
             }
         }
 
-        void IThreadPoolWorkItem.MarkAborted(ThreadAbortException tae)
+        void IThreadPoolWorkItem.MarkAborted(
+#if !NETSTANDARD
+            ThreadAbortException tae
+#endif
+            )
         {
 #if DEBUG
 			// this workitem didn't execute because we got a ThreadAbortException prior to the call to ExecuteWorkItem.  
@@ -1093,10 +1099,13 @@ namespace Orleans.Runtime
 			MarkExecuted(false);
 #endif
             callback(state);
-            // todo: ExecutionContext.Run(ExecutionContext., ccb, this, true);
         }
 
-        void IThreadPoolWorkItem.MarkAborted(ThreadAbortException tae)
+        void IThreadPoolWorkItem.MarkAborted(
+#if !NETSTANDARD
+            ThreadAbortException tae
+#endif
+            )
         {
 #if DEBUG
 			// this workitem didn't execute because we got a ThreadAbortException prior to the call to ExecuteWorkItem.  
@@ -1148,7 +1157,7 @@ namespace Orleans.Runtime
             _semaphore.Release();
         }
 
-        // todo
+
         static OrleansThreadPool()
         {
             _workerThreads.AddRange(Enumerable.Range(1, Environment.ProcessorCount * 3)
@@ -1161,7 +1170,10 @@ namespace Orleans.Runtime
                             _semaphore.Wait();
                             ThreadPoolWorkQueue.Dispatch();
                         }
-                        catch (Exception ex) when (!(ex is ThreadAbortException))
+                        catch (Exception ex)
+#if !NETSTANDARD
+                        when (!(ex is ThreadAbortException))
+#endif
                         {
                             // todo: normalize logging
 
@@ -1195,43 +1207,22 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool QueueUserWorkItemHelper(WaitCallback callBack, Object state)
         {
-            bool success = true;
-
-            if (callBack != null)
-            {
-                //
-                // If we are able to create the workitem, we need to get it in the queue without being interrupted
-                // by a ThreadAbortException.
-                //
-                try { }
-                finally
-                {
-                    IThreadPoolWorkItem tpcallBack = new QueueUserWorkItemCallbackDefaultContext(callBack, state);
-
-                    ThreadPoolGlobals.workQueue.Enqueue(tpcallBack, false); // was true: todo: rewiev
-                    success = true;
-                }
-            }
-            else
-            {
-                throw new ArgumentNullException(nameof(WaitCallback));
-            }
-            return success;
-        }
-
-        // this one: todo
-        internal static void UnsafeQueueCustomWorkItem(IThreadPoolWorkItem workItem, bool forceGlobal)
-        {
-            Debug.Assert(null != workItem);
+            bool success = false;
 
             //
-            // Enqueue needs to be protected from ThreadAbort
+            // If we are able to create the workitem, we need to get it in the queue without being interrupted
+            // by a ThreadAbortException.
             //
             try { }
             finally
             {
-                ThreadPoolGlobals.workQueue.Enqueue(workItem, forceGlobal);
+                IThreadPoolWorkItem tpcallBack = new QueueUserWorkItemCallbackDefaultContext(callBack, state);
+
+                ThreadPoolGlobals.workQueue.Enqueue(tpcallBack, false);
+                success = true;
             }
+
+            return success;
         }
 
         // This method tries to take the target callback out of the current thread's queue.
@@ -1533,15 +1524,15 @@ namespace Orleans.Runtime
             {
                 if (Interlocked.CompareExchange(ref m_state.RawData, newState.RawData, currentState.RawData) == currentState.RawData)
                 {
-                    //Debug.Assert(newState.CountForSpinners <= MaxWorker, "CountForSpinners is greater than MaxWorker");
-                    //Debug.Assert(newState.CountForSpinners >= 0, "CountForSpinners is lower than zero");
-                    //Debug.Assert(newState.Spinners <= MaxWorker, "Spinners is greater than MaxWorker");
-                    //Debug.Assert(newState.Spinners >= 0, "Spinners is lower than zero");
-                    //Debug.Assert(newState.CountForWaiters <= MaxWorker, "CountForWaiters is greater than MaxWorker");
-                    //Debug.Assert(newState.CountForWaiters >= 0, "CountForWaiters is lower than zero");
-                    //Debug.Assert(newState.Waiters <= MaxWorker, "Waiters is greater than MaxWorker");
-                    //Debug.Assert(newState.Waiters >= 0, "Waiters is lower than zero");
-                    //Debug.Assert(newState.CountForSpinners + newState.CountForWaiters <= MaxWorker, "CountForSpinners + CountForWaiters is greater than MaxWorker");
+                    Debug.Assert(newState.CountForSpinners <= MaxWorker, "CountForSpinners is greater than MaxWorker");
+                    Debug.Assert(newState.CountForSpinners >= 0, "CountForSpinners is lower than zero");
+                    Debug.Assert(newState.Spinners <= MaxWorker, "Spinners is greater than MaxWorker");
+                    Debug.Assert(newState.Spinners >= 0, "Spinners is lower than zero");
+                    Debug.Assert(newState.CountForWaiters <= MaxWorker, "CountForWaiters is greater than MaxWorker");
+                    Debug.Assert(newState.CountForWaiters >= 0, "CountForWaiters is lower than zero");
+                    Debug.Assert(newState.Waiters <= MaxWorker, "Waiters is greater than MaxWorker");
+                    Debug.Assert(newState.Waiters >= 0, "Waiters is lower than zero");
+                    Debug.Assert(newState.CountForSpinners + newState.CountForWaiters <= MaxWorker, "CountForSpinners + CountForWaiters is greater than MaxWorker");
 
                     return true;
                 }
