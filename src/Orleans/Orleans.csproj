@@ -105,7 +105,7 @@
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Providers\ProviderStateManager.cs" />
-    <Compile Include="Runtime\DedicatedThreadPool.cs" />
+    <Compile Include="Runtime\OrleansThreadPool.cs" />
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
     <Compile Include="Runtime\RingRange.cs" />

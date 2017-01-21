@@ -771,13 +771,6 @@ namespace Orleans.Runtime
             }
         }
 
-
-        internal void DispatchTODO()
-        {
-
-            Dispatch();
-        }
-
         static internal bool Dispatch()
         {
             var workQueue = ThreadPoolGlobals.workQueue;
@@ -858,31 +851,9 @@ namespace Orleans.Runtime
                         //
                         // Execute the workitem outside of any finally blocks, so that it can be aborted if needed.
                         //
-                        if (ThreadPoolGlobals.enableWorkerTracking)
-                        {
-                            bool reportedStatus = false;
-                            try
-                            {
-                                try { }
-                                finally
-                                {
-                                    //	ThreadPool.ReportThreadStatus(true);
-                                    reportedStatus = true;
-                                }
-                                workItem.ExecuteWorkItem();
-                                workItem = null;
-                            }
-                            finally
-                            {
-                                //if (reportedStatus)
-                                //	ThreadPool.ReportThreadStatus(false);
-                            }
-                        }
-                        else
-                        {
+
                             workItem.ExecuteWorkItem();
                             workItem = null;
-                        }
 
                         // 
                         // Notify the VM that we executed this workitem.  This is also our opportunity to ask whether Hill Climbing wants
@@ -910,7 +881,7 @@ namespace Orleans.Runtime
 
                 //
                 // In this case, the VM is going to request another thread on our behalf.  No need to do it twice.
-                // //todo: it wount
+                // //todo: it wount, thus added EnsureThreadRequested
                 needAnotherThread = false;
                 workQueue.EnsureThreadRequested();
                 // throw;  //no need to explicitly rethrow a ThreadAbortException, and doing so causes allocations on amd64.
@@ -1148,7 +1119,8 @@ namespace Orleans.Runtime
 
     public static class OrleansThreadPool
     {
-        private static List<Thread> _thhhTodo = new List<Thread>();
+        private static readonly List<Thread> _workerThreads = new List<Thread>();
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool QueueUserWorkItem(WaitCallback callBack, Object state)
         {
@@ -1179,7 +1151,7 @@ namespace Orleans.Runtime
         // todo
         static OrleansThreadPool()
         {
-            _thhhTodo.AddRange(Enumerable.Range(1, Environment.ProcessorCount * 3)
+            _workerThreads.AddRange(Enumerable.Range(1, Environment.ProcessorCount * 3)
                 .Select(v => new Thread(() =>
                 {
                     while (true)
@@ -1187,23 +1159,23 @@ namespace Orleans.Runtime
                         try
                         {
                             _semaphore.Wait();
-                            ThreadPoolGlobals.workQueue.DispatchTODO();
+                            ThreadPoolWorkQueue.Dispatch();
                         }
                         catch (Exception ex) when (!(ex is ThreadAbortException))
                         {
+                            // todo: normalize logging
+
                             LogManager.GetLogger("OrleansThreadPool").Log(0, Severity.Error, "", null, ex);
-                       //     Console.WriteLine(ex.ToString());
-                               // todo
                        }
                     }
                 })).ToList());
 
-            for (var i = 0; i < _thhhTodo.Count; i++)
+            for (var i = 0; i < _workerThreads.Count; i++)
             {
-                _thhhTodo[i].Name = $"OrleansThreadPoolThread_{i.ToString()}";
+                _workerThreads[i].Name = $"OrleansThreadPoolThread_{i.ToString()}";
             }
 
-            _thhhTodo.ForEach(v => v.Start());
+            _workerThreads.ForEach(v => v.Start());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -291,7 +291,7 @@ namespace Orleans.Runtime.Scheduler
             //bool canExecuteInline = WorkerPoolThread.CurrentContext != null;
 
             var ctx = RuntimeContext.Current;
-            bool canExecuteInline = ctx == null || ctx.ActivationContext==null;
+            bool canExecuteInline = true;// ctx == null || ctx.ActivationContext==null;
 
 #if DEBUG
             if (logger.IsVerbose2) 
