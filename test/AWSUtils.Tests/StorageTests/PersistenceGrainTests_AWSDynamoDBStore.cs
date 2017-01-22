@@ -1,4 +1,5 @@
-﻿using Orleans;
+﻿#if !NETSTANDARD_TODO
+using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Storage;
@@ -51,7 +52,7 @@ namespace AWSUtils.Tests.StorageTests
                     options.ClusterConfiguration.Globals.RegisterStorageProvider<Orleans.Storage.ShardedStorageProvider>("ShardedDDBStore");
 
                     IProviderConfiguration providerConfig;
-                    if(options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
+                    if (options.ClusterConfiguration.Globals.TryGetProviderConfiguration("Orleans.Storage.ShardedStorageProvider", "ShardedDDBStore", out providerConfig))
                     {
                         var providerCategoriess = options.ClusterConfiguration.Globals.ProviderConfigurations;
 
@@ -84,7 +85,7 @@ namespace AWSUtils.Tests.StorageTests
                 output.WriteLine("Unable to connect to AWS DynamoDB simulator");
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             }
-            
+
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -217,3 +218,5 @@ namespace AWSUtils.Tests.StorageTests
         }
     }
 }
+
+#endif
