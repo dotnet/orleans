@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -93,6 +93,9 @@
     </Compile>
     <Compile Include="..\..\..\test\AWSUtils.Tests\Streaming\SQSSubscriptionMultiplicityTests.cs">
       <Link>Streaming\SQSSubscriptionMultiplicityTests.cs</Link>
+    </Compile>
+    <Compile Include="..\..\..\test\AWSUtils.Tests\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
