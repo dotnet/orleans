@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils;
 using Orleans.Providers;
@@ -176,10 +177,20 @@ namespace Orleans.Storage
                 await tableDataManager.Write(record);
                 grainState.ETag = record.ETag;
             }
+            catch (StorageException exc)
+            {
+                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
+                    $"Error Writing: GrainType={grainType} Grainid={grainReference} ETag={grainState.ETag} to Table={tableName} Exception={exc.Message}", exc);
+                if (exc.IsUpdateConditionNotSatisfiedError())
+                {
+                    throw new InconsistentStateException("Conditions not satisfied", exc);
+                }
+                throw;
+            }
             catch (Exception exc)
             {
-                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.ETag, tableName, exc.Message), exc);
+                Log.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
+                    $"Error Writing: GrainType={grainType} Grainid={grainReference} ETag={grainState.ETag} to Table={tableName} Exception={exc.Message}", exc);
                 throw;
             }
         }

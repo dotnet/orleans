@@ -91,7 +91,11 @@ namespace Orleans.Core
 
                 string errMsgToLog = MakeErrorMsg(what, errorOccurred);
                 store.Log.Error((int) ErrorCode.StorageProvider_WriteFailed, errMsgToLog, errorOccurred);
-                errorOccurred = new OrleansException(errMsgToLog, errorOccurred);
+                // If error is not specialization of OrleansException, wrap it
+                if (!errorOccurred.GetType().IsInstanceOfType(typeof(OrleansException)))
+                {
+                    errorOccurred = new OrleansException(errMsgToLog, errorOccurred);
+                }
 
 #if REREAD_STATE_AFTER_WRITE_FAILED
                 // Force rollback to previously stored state
