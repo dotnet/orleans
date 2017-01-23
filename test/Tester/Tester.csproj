@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CancellationTests\GrainCancellationTokenTests.cs" />
+    <Compile Include="ClientConnectionTests\ClientDisconnectionEventTests.cs" />
     <Compile Include="CollectionFixtures.cs" />
     <Compile Include="EventSourcingTests\JournaledGrainTests.cs" />
     <Compile Include="FakeSerializer.cs" />

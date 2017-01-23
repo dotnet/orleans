@@ -373,7 +373,10 @@ namespace Orleans.Messaging
         /// </summary>
         public void Disconnect()
         {
-            throw new NotImplementedException("Disconnect");
+            foreach (var connection in gatewayConnections.Values)
+            {
+                connection.Stop();
+            }
         }
 
         /// <summary>
