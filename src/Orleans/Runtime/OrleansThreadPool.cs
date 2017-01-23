@@ -1115,7 +1115,7 @@ namespace Orleans.Runtime
             return QueueUserWorkItemHelper(callBack, null);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)] // Methods containing StackCrawlMark local var has to be marked non-inlineable
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool QueueSystemWorkItem(WaitCallback callBack)
         {
 

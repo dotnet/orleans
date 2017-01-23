@@ -46,29 +46,6 @@ namespace Orleans.Runtime.Messaging
         // Used for holding enough info to handle receive completion
         internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection)
         {
-            qwqq = state =>
-            {
-                var e = (SocketAsyncEventArgs) state;
-                var rcc = e.UserToken as ReceiveCallbackContext;
-                Socket sock = rcc.Socket;
-                try
-                {
-                    rcc.ProcessReceived(e);
-                }
-                catch (Exception ex)
-                {
-                    rcc.IMA.Log.Error(ErrorCode.Messaging_IMA_BadBufferReceived,
-                        $"ProcessReceivedBuffer exception with RemoteEndPoint {rcc.RemoteEndPoint}: ", ex);
-
-                    // There was a problem with the buffer, presumably data corruption, so give up
-                    rcc.IMA.SafeCloseSocket(rcc.Socket);
-                    FreeSocketAsyncEventArgs(e);
-                    // And we're done
-                    return;
-                }
-
-                StartReceiveAsync(sock, e, rcc.IMA);
-            };
             MessageCenter = msgCtr;
             listenAddress = here;
             if (here == null)
@@ -511,7 +488,6 @@ namespace Orleans.Runtime.Messaging
             StartReceiveAsync(sock, e, rcc.IMA);
         }
 
-        private WaitCallback qwqq;
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
             // See it's a Ping message, and if so, short-circuit it

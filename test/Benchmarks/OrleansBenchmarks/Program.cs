@@ -25,9 +25,7 @@ namespace OrleansBenchmarks
                 },
                      benchmark =>
                      {
-                         var z = Stopwatch.StartNew();
                          benchmark.Bench().Wait();
-                         Console.WriteLine(z.ElapsedMilliseconds);
                      },
                 benchmark => benchmark.Teardown());
             },

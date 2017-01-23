@@ -36,11 +36,11 @@ namespace Orleans.Runtime.Messaging
             for (int g = 0; g < n; g++)
             {
                 msgs[g] = new List<Message>();
-                var fff = g;
-                messageHandlers[g]= new Action<Message>(message =>
+                var ind = g;
+                messageHandlers[g] = message =>
                 {
-                    msgs[fff].Add(message);
-                });
+                    msgs[ind].Add(message);
+                };
             }
             int i = 0;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
