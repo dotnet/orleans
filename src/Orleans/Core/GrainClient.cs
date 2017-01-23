@@ -36,7 +36,7 @@ namespace Orleans
         
         // RuntimeClient.Current is set to something different than OutsideRuntimeClient - it can only be set to InsideRuntimeClient, since we only have 2.
         // That means we are running in side a silo.
-        private static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
+        public static bool IsRunningInsideSilo { get { return RuntimeClient.Current != null && !(RuntimeClient.Current is OutsideRuntimeClient); } }
 
         //TODO: prevent client code from using this from inside a Grain or provider
         public static IGrainFactory GrainFactory
