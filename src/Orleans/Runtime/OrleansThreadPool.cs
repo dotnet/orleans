@@ -1103,6 +1103,7 @@ namespace Orleans.Runtime
             for (var i = 0; i < _workerThreads.Count; i++)
             {
                 _workerThreads[i].Name = $"OrleansThreadPoolThread_{i.ToString()}";
+                _workerThreads[i].IsBackground = true;
             }
 
             _workerThreads.ForEach(v => v.Start());
