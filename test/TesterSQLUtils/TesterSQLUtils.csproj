@@ -58,6 +58,7 @@
     <Compile Include="..\..\src\Build\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="CollectionFixtures.cs" />
     <Compile Include="MySqlMembershipTableTests.cs" />
     <Compile Include="MySqlRemindersTableTests.cs" />
     <Compile Include="PostgreSqlMembershipTableTests.cs" />
