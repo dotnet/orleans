@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+﻿<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
   <PropertyGroup Label="Configuration">
     <DefineConstants>NETSTANDARD;NETSTANDARD_TODO</DefineConstants>
   </PropertyGroup>
@@ -35,6 +35,7 @@
     <PackageReference Include="Xunit.SkippableFact" Version="1.2.14" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Orleans.PlatformServices\Orleans.PlatformServices.csproj" />
     <ProjectReference Include="..\..\src\OrleansCodeGenerator\OrleansCodeGenerator.csproj" />
     <ProjectReference Include="..\..\src\OrleansAWSUtils\OrleansAWSUtils.csproj" />
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj" />
