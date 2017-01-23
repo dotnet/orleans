@@ -24,16 +24,17 @@ namespace Orleans.Providers.Streams.Common
 
         internal bool IsSet => Element != null;
 
-        internal void Reset(StreamSequenceToken token)
+        internal void Set(LinkedListNode<SimpleQueueCacheItem> item)
+        {
+            if (item == null) throw new NullReferenceException(nameof(item));
+            Element = item;
+            SequenceToken = item.Value.SequenceToken;
+        }
+
+        internal void UnSet(StreamSequenceToken token)
         {
             Element = null;
             SequenceToken = token;
-        }
-
-        internal void Set(LinkedListNode<SimpleQueueCacheItem> item)
-        {
-            Element = item;
-            SequenceToken = item.Value.SequenceToken;
         }
 
         /// <summary>
@@ -46,7 +47,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (cache == null)
             {
-                throw new ArgumentNullException("cache");
+                throw new ArgumentNullException(nameof(cache));
             }
             this.cache = cache;
             this.streamIdentity = streamIdentity;
@@ -98,11 +99,11 @@ namespace Orleans.Providers.Streams.Common
         /// Refresh that cache cursor. Called when new data is added into a cache.
         /// </summary>
         /// <returns></returns>
-        public virtual void Refresh()
+        public virtual void Refresh(StreamSequenceToken sequenceToken)
         {
             if (!IsSet)
             {
-                cache.InitializeCursor(this, SequenceToken, false);
+                cache.RefreshCursor(this, sequenceToken);
             }
         }
 
@@ -142,7 +143,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (disposing)
             {
-                cache.ResetCursor(this, null);
+                cache.UnsetCursor(this, null);
             }
         }
 
@@ -154,8 +155,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public override string ToString()
         {
-            return
-                $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";
+            return $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";
         }
     }
 }
