@@ -1,0 +1,19 @@
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="CopyOrleansCounterControlTools" BeforeTargets="AfterBuild">
+    <ItemGroup>
+      <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\OrleansCounterControl.exe.config" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(OutDir)" />
+  </Target>
+
+  <Target Name="DeleteOrleansCounterControlTools" BeforeTargets="AfterClean">
+    <ItemGroup>
+      <FilesToClean Include="$(OutDir)OrleansCounterControl.exe.config" />
+    </ItemGroup>
+
+    <Delete Files="@(FilesToClean)" />
+  </Target>
+
+</Project>
