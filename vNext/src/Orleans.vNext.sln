@@ -41,6 +41,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansProviders", "Orleans
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184-D9FE-4DD7-85A0-CA52D53A5421}"
 	ProjectSection(SolutionItems) = preProject
+		NuGet\BondSerializerInstall.ps1 = NuGet\BondSerializerInstall.ps1
+		NuGet\BondSerializerUninstall.ps1 = NuGet\BondSerializerUninstall.ps1
 		NuGet\ClientInstall.ps1 = NuGet\ClientInstall.ps1
 		NuGet\CreateOrleansPackages.bat = NuGet\CreateOrleansPackages.bat
 		NuGet\EmptyFile.cs = NuGet\EmptyFile.cs
@@ -57,6 +59,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184
 		NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec = NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec = NuGet\Microsoft.Orleans.OrleansZooKeeperUtils.nuspec
 		NuGet\Microsoft.Orleans.PlatformServices.nuspec = NuGet\Microsoft.Orleans.PlatformServices.nuspec
+		NuGet\Microsoft.Orleans.Serialization.Bond.nuspec = NuGet\Microsoft.Orleans.Serialization.Bond.nuspec
 		NuGet\Microsoft.Orleans.Server.nuspec = NuGet\Microsoft.Orleans.Server.nuspec
 		NuGet\Microsoft.Orleans.TestingHost.nuspec = NuGet\Microsoft.Orleans.TestingHost.nuspec
 		NuGet\ServerInstall.ps1 = NuGet\ServerInstall.ps1
@@ -95,6 +98,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansAWSUtils", "OrleansAWSUtils\OrleansAWSUtils.csproj", "{1E88B709-1880-4007-BFB6-CFC2932AF391}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AWSUtils.Tests", "..\test\AWSUtils.Tests\AWSUtils.Tests.csproj", "{027200B3-73AB-476E-BFAE-71E35AB3E7EA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansBondUtils", "OrleansBondUtils\OrleansBondUtils.csproj", "{F7927171-B237-4E19-A5D4-7B7985F6A1C4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BondUtils.Tests", "..\test\BondUtils.Tests\BondUtils.Tests.csproj", "{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -454,6 +461,30 @@ Global
 		{027200B3-73AB-476E-BFAE-71E35AB3E7EA}.Release|x64.Build.0 = Release|x64
 		{027200B3-73AB-476E-BFAE-71E35AB3E7EA}.Release|x86.ActiveCfg = Release|x86
 		{027200B3-73AB-476E-BFAE-71E35AB3E7EA}.Release|x86.Build.0 = Release|x86
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|x64.ActiveCfg = Debug|x64
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|x64.Build.0 = Debug|x64
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|x86.ActiveCfg = Debug|x86
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Debug|x86.Build.0 = Debug|x86
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|x64.ActiveCfg = Release|x64
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|x64.Build.0 = Release|x64
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|x86.ActiveCfg = Release|x86
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4}.Release|x86.Build.0 = Release|x86
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|x64.ActiveCfg = Debug|x64
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|x64.Build.0 = Debug|x64
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|x86.ActiveCfg = Debug|x86
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Debug|x86.Build.0 = Debug|x86
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x64.ActiveCfg = Release|x64
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x64.Build.0 = Release|x64
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x86.ActiveCfg = Release|x86
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -489,5 +520,7 @@ Global
 		{65F9C1EB-C07B-4DAA-A275-7C45363AB6A3} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{1E88B709-1880-4007-BFB6-CFC2932AF391} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
 		{027200B3-73AB-476E-BFAE-71E35AB3E7EA} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
+		{F7927171-B237-4E19-A5D4-7B7985F6A1C4} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
+		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal
