@@ -266,6 +266,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 log.Verbose($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
             }
+            base.OnPurge(lastItemPurged, newestItem);
         }
 
         /// <summary>
