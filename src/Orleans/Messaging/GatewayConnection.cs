@@ -77,8 +77,7 @@ namespace Orleans.Messaging
             }
             if (s == null) return;
 
-            SocketManager.CloseSocket(s);
-            NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
+            CloseSocket(s);
         }
 
         // passed the exact same socket on which it got SocketException. This way we prevent races between connect and disconnect.
@@ -101,13 +100,11 @@ namespace Orleans.Messaging
             }
             if (s != null)
             {
-                SocketManager.CloseSocket(s);
-                NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
+                CloseSocket(s);
             }
             if (socket2Disconnect == s) return;
 
-            SocketManager.CloseSocket(socket2Disconnect);
-            NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
+            CloseSocket(socket2Disconnect);
         }
 
         public void MarkAsDead()
@@ -163,6 +160,7 @@ namespace Orleans.Messaging
                         Socket = new Socket(Silo.Endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                         Socket.Connect(Silo.Endpoint);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
+                        MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
                         return;
@@ -298,6 +296,13 @@ namespace Orleans.Messaging
             msg.TargetActivation = null;
             msg.TargetSilo = null;
             MsgCenter.SendMessage(msg);
+        }
+
+        private void CloseSocket(Socket socket)
+        {
+            SocketManager.CloseSocket(socket);
+            NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
+            MsgCenter.OnGatewayConnectionClosed();
         }
     }
 }

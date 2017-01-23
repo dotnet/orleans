@@ -381,6 +381,15 @@ namespace Orleans
             return RuntimeClient.Current.CurrentStreamProviderManager.GetProvider(name) as Streams.IStreamProvider;
         }
 
+        public delegate void ConnectionToClusterLostHandler(object sender, EventArgs e);
+
+        public static event ConnectionToClusterLostHandler ClusterConnectionLost;
+
+        internal static void NotifyClusterConnectionLost()
+        {
+            ClusterConnectionLost?.Invoke(null, null);
+        }
+
         internal static IList<Uri> Gateways
         {
             get
