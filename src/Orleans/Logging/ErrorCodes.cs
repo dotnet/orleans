@@ -1068,7 +1068,7 @@ namespace Orleans
         PersistentStreamPullingManager_PeriodicPrint    = PersistentStreamPullingManagerBase + 23,
         
         AzureServiceRuntimeWrapper          = Runtime + 3700,
-        AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,
+        AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper + 1,
         AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper + 2,
 
         CodeGenBase                         = Runtime + 3800,
