@@ -1,0 +1,32 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.OrleansGoogleUtils</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans AWS Utilities</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <projectUrl>https://github.com/dotnet/Orleans</projectUrl>
+    <licenseUrl>https://github.com/dotnet/Orleans#license</licenseUrl>
+    <iconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</iconUrl>
+    <summary>
+      Google Utilities Library of Microsoft Orleans - OrleansGoogleUtils.dll
+    </summary>
+    <description>
+      Library of utility types for Google of Microsoft Orleans.
+    </description>
+    <copyright>Copyright Microsoft 2015</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Google Protobuf Distributed-Systems C# .NET</tags>
+    <dependencies>
+      <dependency id="Microsoft.Orleans.Core" version="$version$" />
+      <dependency id="Microsoft.Orleans.OrleansRuntime" version="$version$" />
+      <dependency id="Google.Protobuf" version="3.1.0" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="netstandard1.5\OrleansGoogleUtils.dll" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansGoogleUtils.pdb" target="lib\netstandard1.5" />
+    <file src="netstandard1.5\OrleansGoogleUtils.xml" target="lib\netstandard1.5" />
+    <file src="$SRC_DIR$OrleansGoogleUtils\**\*.cs" exclude="$SRC_DIR$OrleansGoogleUtils\obj\**\*.*;$SRC_DIR$OrleansGoogleUtils\bin\**\*.*" target="src" />
+  </files>
+</package>

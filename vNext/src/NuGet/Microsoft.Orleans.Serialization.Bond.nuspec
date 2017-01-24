@@ -27,7 +27,7 @@
     <file src="netstandard1.5\OrleansBondUtils.dll" target="lib\netstandard1.5" />
     <file src="netstandard1.5\OrleansBondUtils.pdb" target="lib\netstandard1.5" />
     <file src="netstandard1.5\OrleansBondUtils.xml" target="lib\netstandard1.5" />
-	<file src="BondSerializerInstall.ps1" target="tools\Install.ps1" />
+	  <file src="BondSerializerInstall.ps1" target="tools\Install.ps1" />
     <file src="BondSerializerUninstall.ps1" target="tools\Uninstall.ps1" />
     <file src="$SRC_DIR$OrleansBondUtils\**\*.cs" exclude="$SRC_DIR$OrleansBondUtils\obj\**\*.*;$SRC_DIR$OrleansBondUtils\bin\**\*.*" target="src" />
   </files>

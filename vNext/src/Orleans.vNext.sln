@@ -54,6 +54,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NuGet", "NuGet", "{146C4184
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.Build.nuspec
 		NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec = NuGet\Microsoft.Orleans.OrleansCodeGenerator.nuspec
 		NuGet\Microsoft.Orleans.OrleansConsulUtils.nuspec = NuGet\Microsoft.Orleans.OrleansConsulUtils.nuspec
+		NuGet\Microsoft.Orleans.OrleansGoogleUtils.nuspec = NuGet\Microsoft.Orleans.OrleansGoogleUtils.nuspec
 		NuGet\Microsoft.Orleans.OrleansProviders.nuspec = NuGet\Microsoft.Orleans.OrleansProviders.nuspec
 		NuGet\Microsoft.Orleans.OrleansRuntime.nuspec = NuGet\Microsoft.Orleans.OrleansRuntime.nuspec
 		NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec = NuGet\Microsoft.Orleans.OrleansSqlUtils.nuspec
@@ -102,6 +103,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansBondUtils", "OrleansBondUtils\OrleansBondUtils.csproj", "{F7927171-B237-4E19-A5D4-7B7985F6A1C4}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BondUtils.Tests", "..\test\BondUtils.Tests\BondUtils.Tests.csproj", "{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansGoogleUtils", "OrleansGoogleUtils\OrleansGoogleUtils.csproj", "{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GoogleUtils.Tests", "..\test\GoogleUtils.Tests\GoogleUtils.Tests.csproj", "{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -485,6 +490,30 @@ Global
 		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x64.Build.0 = Release|x64
 		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x86.ActiveCfg = Release|x86
 		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE}.Release|x86.Build.0 = Release|x86
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|x64.ActiveCfg = Debug|x64
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|x64.Build.0 = Debug|x64
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|x86.ActiveCfg = Debug|x86
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Debug|x86.Build.0 = Debug|x86
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|x64.ActiveCfg = Release|x64
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|x64.Build.0 = Release|x64
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|x86.ActiveCfg = Release|x86
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD}.Release|x86.Build.0 = Release|x86
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|x64.ActiveCfg = Debug|x64
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|x64.Build.0 = Debug|x64
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|x86.ActiveCfg = Debug|x86
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Debug|x86.Build.0 = Debug|x86
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|x64.ActiveCfg = Release|x64
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|x64.Build.0 = Release|x64
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|x86.ActiveCfg = Release|x86
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -522,5 +551,7 @@ Global
 		{027200B3-73AB-476E-BFAE-71E35AB3E7EA} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 		{F7927171-B237-4E19-A5D4-7B7985F6A1C4} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
 		{5D3FB7DC-1E0B-4639-A2AA-30528FB8ADEE} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
+		{3A3B04CE-243A-4F6D-9F00-D6FAB9619BBD} = {7B982A96-66A1-4E08-AA68-8A56905A53CA}
+		{1A1D22E6-BFDC-4098-9171-9F3836E7EE1F} = {224EAB7B-DBF8-4652-AC71-6C6ABBAB22AD}
 	EndGlobalSection
 EndGlobal
