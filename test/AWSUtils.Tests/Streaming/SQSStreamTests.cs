@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿#if !NETSTANDARD_TODO
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AWSUtils.Tests.StorageTests;
 using Orleans.Providers.Streams;
@@ -188,3 +189,5 @@ namespace AWSUtils.Tests.Streaming
         }
     }
 }
+
+#endif

@@ -59,6 +59,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\..\test\TesterSQLUtils\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\TesterSQLUtils\RelationalUtilities\MySqlStorageForTesting.cs">
       <Link>RelationalUtilities\MySqlStorageForTesting.cs</Link>
     </Compile>

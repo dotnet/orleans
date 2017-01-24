@@ -1,11 +1,11 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using Orleans.CodeGeneration;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("TestExtensions")]
+[assembly: AssemblyTitle("OrleansTelemetryConsumers.AI")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 
@@ -15,10 +15,5 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("8380c2c1-dcac-43bd-a1e9-74bf8f904cc7")]
-
-[assembly: InternalsVisibleTo("Orleans.NonSiloTests")]
-[assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
-[assembly: InternalsVisibleTo("TesterInternal")]
-[assembly: InternalsVisibleTo("AWSUtils.Tests")]
+[assembly: Guid("99a8e011-3a30-423a-9f67-d1349fd8b1cd")]
+[assembly: SkipCodeGeneration]

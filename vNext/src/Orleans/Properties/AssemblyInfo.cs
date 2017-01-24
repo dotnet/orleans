@@ -21,6 +21,8 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("TestInternalGrains")]
 [assembly: InternalsVisibleTo("TestExtensions")]
 [assembly: InternalsVisibleTo("OrleansAzureUtils")]
+[assembly: InternalsVisibleTo("OrleansAWSUtils")]
+[assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester")]
