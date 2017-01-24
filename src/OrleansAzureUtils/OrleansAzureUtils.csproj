@@ -83,6 +83,7 @@
     <Compile Include="Storage\AzureTableDataManager.cs" />
     <Compile Include="Storage\AzureTableDefaultPolicies.cs" />
     <Compile Include="Storage\ClientMetricsTableDataManager.cs" />
+    <Compile Include="Storage\Exceptions.cs" />
     <Compile Include="Storage\OrleansSiloInstanceManager.cs" />
     <Compile Include="Storage\SiloMetricsTableDataManager.cs" />
     <Compile Include="Storage\StatsTableDataManager.cs" />

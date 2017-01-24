@@ -92,7 +92,7 @@ namespace Orleans.Core
                 string errMsgToLog = MakeErrorMsg(what, errorOccurred);
                 store.Log.Error((int) ErrorCode.StorageProvider_WriteFailed, errMsgToLog, errorOccurred);
                 // If error is not specialization of OrleansException, wrap it
-                if (!errorOccurred.GetType().IsInstanceOfType(typeof(OrleansException)))
+                if (!(errorOccurred is OrleansException))
                 {
                     errorOccurred = new OrleansException(errMsgToLog, errorOccurred);
                 }

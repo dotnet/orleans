@@ -183,7 +183,7 @@ namespace Orleans.Storage
                     $"Error Writing: GrainType={grainType} Grainid={grainReference} ETag={grainState.ETag} to Table={tableName} Exception={exc.Message}", exc);
                 if (exc.IsUpdateConditionNotSatisfiedError())
                 {
-                    throw new InconsistentStateException("Conditions not satisfied", exc);
+                    throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", grainState.ETag, exc);
                 }
                 throw;
             }
