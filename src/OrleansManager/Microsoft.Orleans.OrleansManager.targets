@@ -3,7 +3,7 @@
   <Target Name="CopyOrleansManagerTools" BeforeTargets="AfterBuild">
     <ItemGroup>
       <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\OrleansManager.exe.config" />
-      <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\ClientConfiguration.xml" />
+      <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\ClientConfiguration.xml" Condition="!Exists('$(OutDir)ClientConfiguration.xml')" />
     </ItemGroup>
 
     <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(OutDir)" />
