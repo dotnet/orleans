@@ -83,12 +83,14 @@
     <Compile Include="Storage\AzureTableDataManager.cs" />
     <Compile Include="Storage\AzureTableDefaultPolicies.cs" />
     <Compile Include="Storage\ClientMetricsTableDataManager.cs" />
+    <Compile Include="Storage\Exceptions.cs" />
     <Compile Include="Storage\OrleansSiloInstanceManager.cs" />
     <Compile Include="Storage\SiloMetricsTableDataManager.cs" />
     <Compile Include="Storage\StatsTableDataManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Storage\RemindersTableManager.cs" />
     <Compile Include="Hosting\ServiceRuntimeWrapper.cs" />
+    <Compile Include="Storage\StorageExceptionExtensions.cs" />
     <Compile Include="Storage\TableQueryFilterBuilder.cs" />
   </ItemGroup>
   <ItemGroup>
