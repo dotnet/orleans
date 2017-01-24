@@ -24,8 +24,9 @@
   <files>
     <file src="OrleansManager.exe" target="lib\net451" />
     <file src="OrleansManager.pdb" target="lib\net451" />
-    <file src="OrleansManager.exe.config" target="lib\net451" />
-    <file src="ClientConfiguration.xml" target="lib\net451" />
+    <file src="OrleansManager.exe.config" target="tools" />
+    <file src="ClientConfiguration.xml" target="tools" />
     <file src="$SRC_DIR$OrleansManager\**\*.cs" target="src" />
+    <file src="Microsoft.Orleans.OrleansManager.targets" target="build" />
   </files>
 </package>

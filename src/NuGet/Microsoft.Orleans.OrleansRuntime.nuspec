@@ -24,9 +24,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansRuntime.XML" target="lib\net451" />
     <file src="OrleansRuntime.dll" target="lib\net451" />
     <file src="OrleansRuntime.pdb" target="lib\net451" />
+    <file src="OrleansRuntime.xml" target="lib\net451" />
     <file src="$SRC_DIR$OrleansRuntime\**\*.cs" target="src" />
   </files>
 </package>

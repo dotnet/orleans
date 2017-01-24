@@ -1,0 +1,21 @@
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="CopyOrleansManagerTools" BeforeTargets="AfterBuild">
+    <ItemGroup>
+      <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\OrleansManager.exe.config" />
+      <FilesToCopy Include="$(MSBuildThisFileDirectory)..\tools\ClientConfiguration.xml" Condition="!Exists('$(OutDir)ClientConfiguration.xml')" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(OutDir)" />
+  </Target>
+
+  <Target Name="DeleteOrleansManagerTools" BeforeTargets="AfterClean">
+    <ItemGroup>
+      <FilesToClean Include="$(OutDir)OrleansManager.exe.config" />
+      <FilesToClean Include="$(OutDir)ClientConfiguration.xml" />
+    </ItemGroup>
+
+    <Delete Files="@(FilesToClean)" />
+  </Target>
+
+</Project>

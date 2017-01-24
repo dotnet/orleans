@@ -25,10 +25,9 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="OrleansTestingHost.XML" target="lib\net451" />
     <file src="OrleansTestingHost.dll" target="lib\net451" />
     <file src="OrleansTestingHost.pdb" target="lib\net451" />
-    
+    <file src="OrleansTestingHost.xml" target="lib\net451" />
     <file src="$SRC_DIR$OrleansTestingHost\**\*.cs" target="src" />
   </files>
 </package>
