@@ -19,14 +19,6 @@
     <Compile Include="..\..\..\src\OrleansBondUtils\**\*.cs" Exclude="..\..\..\src\OrleansBondUtils\Properties\*.cs;..\..\..\src\OrleansBondUtils\obj\**\*.cs;..\..\..\src\OrleansBondUtils\bin\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="BondSerializerInstall.ps1">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="BondSerializerUninstall.ps1">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="NETStandard.Library" Version="1.6.1" />
     <PackageReference Include="Bond.Core.CSharp" Version="5.1.0" />
   </ItemGroup>
