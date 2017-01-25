@@ -60,7 +60,7 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// Identifies a class that contains all the serializer methods for a type.
     /// </summary>
-    [AttributeUsage(System.AttributeTargets.Class)]
+    [AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
     public sealed class SerializerAttribute : GeneratedAttribute
     {
         /// <summary>

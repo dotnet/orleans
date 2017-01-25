@@ -573,15 +573,18 @@ namespace Orleans.Serialization
 
             try
             {
-                var attr = typeInfo.GetCustomAttribute<SerializerAttribute>();
+                var serializerAttributes = typeInfo.GetCustomAttributes<SerializerAttribute>().ToArray();
                 if (typeInfo.IsEnum)
                 {
                     Register(type);
                 }
-                else if (attr != null)
+                else if (serializerAttributes.Length > 0)
                 {
                     // This type is the serializer for another type.
-                    Register(attr.TargetType, type);
+                    foreach (var attr in serializerAttributes)
+                    {
+                        Register(attr.TargetType, type);
+                    }
                 }
                 else if (!systemAssembly)
                 {
@@ -590,7 +593,9 @@ namespace Orleans.Serialization
                             || (!typeInfo.Namespace.Equals("System", StringComparison.Ordinal)
                                 && !typeInfo.Namespace.StartsWith("System.", StringComparison.Ordinal))))
                     {
+#pragma warning disable 618
                         if (typeInfo.GetCustomAttributes(typeof(RegisterSerializerAttribute), false).Any())
+#pragma warning restore 618
                         {
                             // Call the static Register method on the type
                             if (logger.IsVerbose3)

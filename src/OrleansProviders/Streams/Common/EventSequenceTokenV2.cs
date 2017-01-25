@@ -5,9 +5,8 @@ using Orleans.Serialization;
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
-    /// Stream sequcen token that tracks sequence nubmer and event index
+    /// Stream sequence token that tracks sequence number and event index
     /// </summary>
-    [RegisterSerializer]
     public class EventSequenceTokenV2 : EventSequenceToken
     {
         /// <summary>
@@ -28,19 +27,12 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Register the serializers
-        /// </summary>
-        public static void Register()
-        {
-            SerializationManager.Register(typeof(EventSequenceTokenV2), DeepCopy, Serialize, Deserialize);
-        }
-
-        /// <summary>
         /// Create a deep copy of the token.
         /// </summary>
         /// <param name="original">The token to copy</param>
         /// <param name="context">The serialization context.</param>
         /// <returns>A copy</returns>
+        [CopierMethod]
         public static object DeepCopy(object original, ICopyContext context)
         {
             var source = original as EventSequenceTokenV2;
@@ -60,6 +52,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="untypedInput">The object to serialize.</param>
         /// <param name="context">The serialization context.</param>
         /// <param name="expected">The expected type.</param>
+        [SerializerMethod]
         public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
             var writer = context.StreamWriter;
@@ -80,6 +73,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="expected">The expected type.</param>
         /// <param name="context">The deserialization context.</param>
         /// <returns></returns>
+        [DeserializerMethod]
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
             var reader = context.StreamReader;

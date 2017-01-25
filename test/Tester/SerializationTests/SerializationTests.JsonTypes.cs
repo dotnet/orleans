@@ -35,13 +35,12 @@ namespace UnitTests.Serialization
             Assert.Equal(input.ToString(), output.ToString());
         }
 
-        [RegisterSerializerAttribute]
+#pragma warning disable 618
+        [RegisterSerializer]
+#pragma warning restore 618
         public class JObjectSerializationExample1
         {
-            static JObjectSerializationExample1()
-            {
-                Register();
-            }
+            public static bool RegisterWasCalled;
 
             public static object DeepCopier(object original, ICopyContext context)
             {
@@ -65,10 +64,17 @@ namespace UnitTests.Serialization
 
             public static void Register()
             {
+                RegisterWasCalled = true;
                 SerializationManager.Register(typeof(JObject), DeepCopier, Serializer, Deserializer);
             }
         }
-        
+
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void SerializationTests_RegisterMethod_IsCalled()
+        {
+            Assert.True(JObjectSerializationExample1.RegisterWasCalled);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_InnerTypes_TypeNameHandling()
         {
@@ -133,7 +139,12 @@ namespace UnitTests.Serialization
         /// <summary>
         /// A different way to configure Json serializer.
         /// </summary>
-        [RegisterSerializer]
+        [Serializer(typeof(JObject))]
+        [Serializer(typeof(JArray))]
+        [Serializer(typeof(JToken))]
+        [Serializer(typeof(JValue))]
+        [Serializer(typeof(JProperty))]
+        [Serializer(typeof(JConstructor))]
         public class JsonSerializationExample2
         {
             internal static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
@@ -142,11 +153,7 @@ namespace UnitTests.Serialization
                 TypeNameHandling = TypeNameHandling.All
             };
 
-            static JsonSerializationExample2()
-            {
-                Register();
-            }
-
+            [CopierMethod]
             public static object DeepCopier(object original, ICopyContext context)
             {
                 // I assume JObject is immutable, so no need to deep copy.
@@ -154,27 +161,18 @@ namespace UnitTests.Serialization
                 return original;
             }
 
+            [SerializerMethod]
             public static void Serialize(object obj, ISerializationContext context, Type expected)
             {
                 var str = JsonConvert.SerializeObject(obj, Settings);
                 SerializationManager.Serialize(str, context.StreamWriter);
             }
 
+            [DeserializerMethod]
             public static object Deserialize(Type expected, IDeserializationContext context)
             {
                 var str = (string)SerializationManager.Deserialize(typeof(string), context.StreamReader);
                 return JsonConvert.DeserializeObject(str, expected);
-            }
-
-            public static void Register()
-            {
-                foreach (var type in new[]
-                    {
-                        typeof(JObject), typeof(JArray), typeof(JToken), typeof(JValue), typeof(JProperty), typeof(JConstructor), 
-                    })
-                {
-                    SerializationManager.Register(type, DeepCopier, Serialize, Deserialize);
-                }
             }
         }
     }

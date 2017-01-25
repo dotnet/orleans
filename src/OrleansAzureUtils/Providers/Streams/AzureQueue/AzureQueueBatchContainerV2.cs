@@ -9,7 +9,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
-    [RegisterSerializer]
     internal class AzureQueueBatchContainerV2 : AzureQueueBatchContainer
     {
         [JsonConstructor]
@@ -42,6 +41,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="original">The object to create a copy of</param>
         /// <param name="context">The copy context.</param>
         /// <returns>The copy.</returns>
+        [CopierMethod]
         public static object DeepCopy(object original, ICopyContext context)
         {
             var source = original as AzureQueueBatchContainerV2;
@@ -74,6 +74,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="untypedInput">The object to serialize</param>
         /// <param name="context">The serialization context.</param>
         /// <param name="expected">The expected type</param>
+        [SerializerMethod]
         public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
         {
             var typed = untypedInput as AzureQueueBatchContainerV2;
@@ -95,6 +96,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="expected">The expected type</param>
         /// <param name="context">The deserialization context.</param>
         /// <returns>The deserialized value</returns>
+        [DeserializerMethod]
         public static object Deserialize(Type expected, IDeserializationContext context)
         {
             var reader = context.StreamReader;
@@ -107,14 +109,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             var ctx = SerializationManager.DeserializeInner<Dictionary<string, object>>(context);
             deserialized.SetValues(guid, ns, events, ctx, eventToken);
             return deserialized;
-        }
-
-        /// <summary>
-        /// Register the serializer methods.
-        /// </summary>
-        public static void Register()
-        {
-            SerializationManager.Register(typeof(AzureQueueBatchContainerV2), DeepCopy, Serialize, Deserialize);
         }
 
         private static void WriteOrSerializeInner<T>(T val, ISerializationContext context) where T : class

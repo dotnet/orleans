@@ -10,6 +10,7 @@ using Orleans.ServiceBus.Providers;
 using OrleansServiceBus.Providers.Streams.EventHub;
 using Xunit;
 using Tester.Serialization;
+using TestExtensions;
 
 namespace UnitTests.Serialization
 {
@@ -18,9 +19,7 @@ namespace UnitTests.Serialization
         public StreamTypeSerializationTests()
         {
             // FakeSerializer definied in ExternalSerializerTest.cs
-            SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
-            EventSequenceTokenV2.Register();
-            EventHubSequenceTokenV2.Register();
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
@@ -11,6 +8,7 @@ using Xunit;
 using Orleans.Streams;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Tester.Serialization;
+using TestExtensions;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -19,9 +17,7 @@ namespace Tester.AzureUtils.Streaming
         public StreamTypeSerializationTests()
         {
             // FakeSerializer definied in ExternalSerializerTest.cs
-            SerializationManager.InitializeForTesting(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
-            EventSequenceTokenV2.Register();
-            AzureQueueBatchContainerV2.Register();
+            SerializationTestEnvironment.Initialize(new List<TypeInfo> { typeof(FakeSerializer).GetTypeInfo() });
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
