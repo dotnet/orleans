@@ -174,7 +174,7 @@ namespace Orleans.Providers.Streams.Generator
                 return true;
             }
 
-            public void Refresh()
+            public void Refresh(StreamSequenceToken token)
             {
             }
 

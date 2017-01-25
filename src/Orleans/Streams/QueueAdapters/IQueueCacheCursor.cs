@@ -31,7 +31,7 @@ namespace Orleans.Streams
         /// Refresh that cache cursor. Called when new data is added into a cache.
         /// </summary>
         /// <returns></returns>
-        void Refresh();
+        void Refresh(StreamSequenceToken token);
 
         /// <summary>
         /// Record that delivery of the current event has failed

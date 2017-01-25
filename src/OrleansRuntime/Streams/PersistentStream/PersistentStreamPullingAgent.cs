@@ -423,15 +423,16 @@ namespace Orleans.Streams
                     .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
                 {
                     var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
+                    StreamSequenceToken startToken = group.First().SequenceToken;
                     StreamConsumerCollection streamData;
                     if (pubSubCache.TryGetValue(streamId, out streamData))
                     {
                         streamData.RefreshActivity(now);
-                        StartInactiveCursors(streamData); // if this is an existing stream, start any inactive cursors
+                        StartInactiveCursors(streamData, startToken); // if this is an existing stream, start any inactive cursors
                     }
                     else
                     {
-                        RegisterStream(streamId, group.First().SequenceToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                        RegisterStream(streamId, startToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
                     }
                 }
                 return true;
@@ -475,18 +476,15 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamConsumerCollection streamData)
+        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken)
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
+                consumerData.Cursor?.Refresh(startToken);
                 if (consumerData.State == StreamConsumerDataState.Inactive)
                 {
                     // wake up inactive consumers
                     RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
-                }
-                else
-                {
-                    consumerData.Cursor?.Refresh();
                 }
             }
         }
