@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Providers
         
         private InvokeInterceptor invokeInterceptor;
 
-        public IGrainFactory GrainFactory { get; }
+        public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider { get; }
 
         public Guid ServiceId { get; }
@@ -33,15 +33,15 @@ namespace Orleans.Runtime.Providers
         public SiloProviderRuntime(
             SiloInitializationParameters siloDetails,
             GlobalConfiguration config,
-            IGrainFactory grainFactory,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
-            IServiceProvider serviceProvider,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             ISiloStatusOracle siloStatusOracle,
             OrleansTaskScheduler scheduler,
-            ActivationDirectory activationDirectory)
+            ActivationDirectory activationDirectory,
+            IServiceProvider serviceProvider)
         {
+            this.ServiceProvider = serviceProvider;
             this.siloDetails = siloDetails;
             this.siloStatusOracle = siloStatusOracle;
             this.scheduler = scheduler;
@@ -50,8 +50,6 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.ServiceId = config.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-            this.GrainFactory = grainFactory;
-            this.ServiceProvider = serviceProvider;
 
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(implicitStreamSubscriberTable);

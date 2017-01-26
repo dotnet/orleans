@@ -20,6 +20,7 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class AzureQueueAdapterTests : IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -29,14 +30,15 @@ namespace Tester.AzureUtils.Streaming
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
 
         private static readonly SafeRandom Random = new SafeRandom();
-        
-        public AzureQueueAdapterTests(ITestOutputHelper output)
+        private readonly TestEnvironmentFixture fixture;
+
+        public AzureQueueAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.deploymentId = MakeDeploymentId();
             LogManager.Initialize(new NodeConfiguration());
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.InitializeForTesting();
+            this.fixture = fixture;
         }
         
         public void Dispose()

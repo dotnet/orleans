@@ -254,7 +254,7 @@ namespace Orleans.Runtime
             numberOfInducedGCsPF.Dispose();
             largeObjectHeapSizePF.Dispose();
             promotedFinalizationMemoryFromGen0PF.Dispose();
-            cpuUsageTimer.Dispose();
+            this.cpuUsageTimer?.Dispose();
         }
     }
 }

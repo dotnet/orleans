@@ -14,7 +14,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
-        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride(typeof (ZookeeperMembershipTableTests).Name, Severity.Verbose3);
         }

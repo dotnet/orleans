@@ -44,6 +44,9 @@
     <Compile Include="..\..\..\test\NonSiloTests\ConfigTests.cs">
       <Link>ConfigTests.cs</Link>
     </Compile>
+    <Compile Include="..\..\..\test\NonSiloTests\CollectionFixtures.cs">
+      <Link>CollectionFixtures.cs</Link>
+    </Compile>
     <Compile Include="..\..\..\test\NonSiloTests\AsynchAgentRestartTest.cs">
       <Link>AsynchAgentRestartTest.cs</Link>
     </Compile>

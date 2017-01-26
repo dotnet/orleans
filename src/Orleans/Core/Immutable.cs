@@ -1,5 +1,3 @@
-using Orleans.Serialization;
-
 namespace Orleans.Concurrency
 {
     /// <summary>
@@ -28,15 +26,6 @@ namespace Orleans.Concurrency
         public Immutable(T value)
         {
             this.value = value;
-        }
-
-        /// <summary>
-        /// Create a deep copy of the original value stored in this Immutable wrapper.
-        /// </summary>
-        /// <returns></returns>
-        public T GetCopy()
-        {
-            return (T)SerializationManager.DeepCopy(Value);
         }
     }
 
