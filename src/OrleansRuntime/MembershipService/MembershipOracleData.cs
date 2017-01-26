@@ -210,7 +210,7 @@ namespace Orleans.Runtime.MembershipService
 
         internal void UpdateMyFaultAndUpdateZone(MembershipEntry entry)
         {
-            this.myFaultAndUpdateZones = new UpdateFaultCombo(entry.FaultZone, entry.UpdateZone);
+            this.myFaultAndUpdateZones = new UpdateFaultCombo(entry.UpdateZone, entry.FaultZone);
         }
 
         internal bool TryUpdateStatusAndNotify(MembershipEntry entry)
