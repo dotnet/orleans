@@ -38,7 +38,7 @@ namespace ServiceBus.Tests.StreamingTests
                 EHConsumerGroup, EHPath));
 
         private static readonly EventHubCheckpointerSettings CheckpointerSettings =
-            new EventHubCheckpointerSettings(TestDefaultConfiguration.EventHubConnectionString,
+            new EventHubCheckpointerSettings(TestDefaultConfiguration.DataConnectionString,
                 EHCheckpointTable, CheckpointNamespace, TimeSpan.FromSeconds(1));
 
         private static readonly EventHubStreamProviderSettings ProviderSettings =
