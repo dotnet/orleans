@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Remoting.Channels;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Core;
@@ -24,6 +23,16 @@ namespace Tester
         {
             return GrainService.GetServiceConfigProperty(propertyName);
         }
+
+        public Task<bool> HasStarted()
+        {
+            return GrainService.HasStarted();
+        }
+
+        public Task<bool> HasStartedInBackground()
+        {
+            return GrainService.HasStartedInBackground();
+        }
     }
 
     public class CustomGrainService : GrainService, ICustomGrainService
@@ -31,6 +40,15 @@ namespace Tester
         public CustomGrainService(IGrainIdentity id, Silo silo, IGrainServiceConfiguration config) : base(id, silo, config)
         {
             
+        }
+
+        private bool m_Started = false;
+        private bool m_StartedInBackground = false;
+
+        public override Task Start()
+        {
+            m_Started = true;
+            return base.Start();
         }
 
         public Task<string> GetHelloWorldUsingCustomService(GrainReference reference)
@@ -45,7 +63,18 @@ namespace Tester
 
         protected override Task StartInBackground()
         {
+            m_StartedInBackground = true;
             return TaskDone.Done;
+        }
+
+        public Task<bool> HasStarted()
+        {
+            return Task.FromResult(m_Started);
+        }
+
+        public Task<bool> HasStartedInBackground()
+        {
+            return Task.FromResult(m_StartedInBackground);
         }
     }
 }

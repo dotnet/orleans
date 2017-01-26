@@ -8,11 +8,16 @@ namespace Tester
     {
         Task<string> GetHelloWorldUsingCustomService();
         Task<string> GetServiceConfigProperty(string propertyName);
+        Task<bool> HasStarted();
+        Task<bool> HasStartedInBackground();
     }
 
     public interface ICustomGrainService : IGrainService
     {
         Task<string> GetHelloWorldUsingCustomService(GrainReference reference);
         Task<string> GetServiceConfigProperty(string propertyName);
+
+        Task<bool> HasStarted();
+        Task<bool> HasStartedInBackground();
     }
 }

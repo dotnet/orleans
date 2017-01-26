@@ -23,6 +23,16 @@ namespace UnitTests.Grains
         {
             this.customGrainServiceClient = customGrainServiceClient;
         }
+
+        public Task<bool> CallHasStarted()
+        {
+            return this.customGrainServiceClient.HasStarted();
+        }
+
+        public Task<bool> CallHasStartedInBackground()
+        {
+            return this.customGrainServiceClient.HasStartedInBackground();
+        }
     }
 
 }

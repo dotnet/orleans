@@ -33,6 +33,30 @@ namespace Tester
             var prop = await grain.GetServiceConfigProperty("test-property");
             Assert.Equal("xyz", prop);
         }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStarted()
+        {
+            // We need to get the Silo to create the GrainService instances and register them as SystemTargets.
+
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grainId = await grain.GetHelloWorldUsingCustomService();
+            Assert.Equal("Hello World from Grain Service", grainId);
+            var prop = await grain.CallHasStarted();
+            Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStartedInBackground()
+        {
+            // We need to get the Silo to create the GrainService instances and register them as SystemTargets.
+
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grainId = await grain.GetHelloWorldUsingCustomService();
+            Assert.Equal("Hello World from Grain Service", grainId);
+            var prop = await grain.CallHasStartedInBackground();
+            Assert.True(prop);
+        }
     }
 
 
