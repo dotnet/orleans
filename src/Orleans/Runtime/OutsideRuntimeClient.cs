@@ -175,8 +175,8 @@ namespace Orleans
                 config.CheckGatewayProviderSettings();
 
                 var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-                var gatewayListProvider = GatewayProviderFactory.CreateGatewayListProvider(config)
-                    .WithTimeout(initTimeout).Result;
+                var gatewayListProvider = new GatewayProviderFactory(this.config).CreateGatewayListProvider();
+                gatewayListProvider.InitializeGatewayListProvider(this.config, LogManager.GetLogger(gatewayListProvider.GetType().Name)).WaitWithThrow(initTimeout);
                 transport = new ProxiedMessageCenter(config, localAddress, generation, handshakeClientId, gatewayListProvider);
 
                 if (StatisticsCollector.CollectThreadTimeTrackingStats)

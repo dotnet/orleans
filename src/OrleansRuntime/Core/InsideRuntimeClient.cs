@@ -699,28 +699,6 @@ namespace Orleans.Runtime
 
         public IGrainTypeResolver GrainTypeResolver { get; private set; }
 
-        private void CheckValidReminderServiceType(string doingWhat)
-        {
-            var remType = Config.Globals.ReminderServiceType;
-            if (remType.Equals(GlobalConfiguration.ReminderServiceProviderType.NotSpecified) ||
-                remType.Equals(GlobalConfiguration.ReminderServiceProviderType.Disabled))
-            {
-                throw new InvalidOperationException(
-                    string.Format("Cannot {0} when ReminderServiceProviderType is {1}",
-                    doingWhat, remType));
-            }
-        }
-
-        private SiloAddress MapGrainReferenceToSiloRing(GrainReference grainRef)
-        {
-            var hashCode = grainRef.GetUniformHashCode();
-            return ConsistentRingProvider.GetPrimaryTargetSilo(hashCode);
-        }
-
-        public IGrainMethodInvoker GetInvoker(int interfaceId, string genericGrainType = null)
-        {
-            return typeManager.GetInvoker(interfaceId, genericGrainType);
-        }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

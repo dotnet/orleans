@@ -4,6 +4,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.SqlUtils;
+using TestExtensions;
 using UnitTests.General;
 using Xunit;
 
@@ -11,7 +12,7 @@ namespace UnitTests.MembershipTests
 {
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {
-        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture) : base(fixture)
+        public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment)
         {
             LogManager.AddTraceLevelOverride(typeof(PostgreSqlMembershipTableTests).Name, Severity.Verbose3);
         }

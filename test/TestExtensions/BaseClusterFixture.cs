@@ -17,9 +17,9 @@ namespace TestExtensions
         {
             GrainClient.Uninitialize();
             var testCluster = CreateTestCluster();
-            if (testCluster.Primary == null)
+            if (testCluster?.Primary == null)
             {
-                testCluster.Deploy();
+                testCluster?.Deploy();
             }
             this.HostedCluster = testCluster;
         }
@@ -32,7 +32,7 @@ namespace TestExtensions
 
         public virtual void Dispose()
         {
-            this.HostedCluster.StopAllSilos();
+            this.HostedCluster?.StopAllSilos();
         }
     }
 }

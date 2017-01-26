@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using TestExtensions;
 using UnitTests.StorageTests;
 using Xunit;
 
@@ -23,8 +24,11 @@ namespace UnitTests.MembershipTests
         internal static readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
         internal static readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
     }
+
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
+        private readonly TestEnvironmentFixture environment;
         private static readonly string hostName = Dns.GetHostName();
         private readonly Logger logger;
         private readonly IMembershipTable membershipTable;
@@ -33,8 +37,9 @@ namespace UnitTests.MembershipTests
 
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
 
-        protected MembershipTableTestsBase(ConnectionStringFixture fixture)
+        protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
         {
+            this.environment = environment;
             LogManager.Initialize(new NodeConfiguration());
             logger = LogManager.GetLogger(GetType().Name, LoggerType.Application);
             deploymentId = "test-" + Guid.NewGuid();
@@ -66,6 +71,8 @@ namespace UnitTests.MembershipTests
             gatewayListProvider = CreateGatewayListProvider(logger);
             gatewayListProvider.InitializeGatewayListProvider(clientConfiguration, logger).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
+
+        public IGrainFactory GrainFactory => this.environment.GrainFactory;
 
         public void Dispose()
         {

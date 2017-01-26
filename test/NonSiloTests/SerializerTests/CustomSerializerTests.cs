@@ -69,12 +69,15 @@ namespace NonSiloTests.UnitTests.SerializerTests
         }
     }
 
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class CustomSerializerTests
     {
-        public CustomSerializerTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public CustomSerializerTests(TestEnvironmentFixture fixture)
         {
+            this.fixture = fixture;
             LogManager.Initialize(new NodeConfiguration());
-            SerializationTestEnvironment.Initialize();
         }
 
         [Fact, TestCategory("Serialization")]

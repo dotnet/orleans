@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal class IncomingMessageAcceptor : AsynchAgent
     {
-        private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(CreateSocketReceiveAsyncEventArgsPoolWrapper);
+        private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;
         private const int SocketBufferSize = 1024 * 128; // 128 kb
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
@@ -48,6 +48,7 @@ namespace Orleans.Runtime.Messaging
         {
             MessageCenter = msgCtr;
             listenAddress = here;
+            this.receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(() => this.CreateSocketReceiveAsyncEventArgsPoolWrapper());
             if (here == null)
                 listenAddress = MessageCenter.MyAddress.Endpoint;
 
@@ -401,7 +402,7 @@ namespace Orleans.Runtime.Messaging
             return saea.SocketAsyncEventArgs;
         }
 
-        private static SaeaPoolWrapper CreateSocketReceiveAsyncEventArgsPoolWrapper()
+        private SaeaPoolWrapper CreateSocketReceiveAsyncEventArgsPoolWrapper()
         {
             SocketAsyncEventArgs readEventArgs = new SocketAsyncEventArgs();
             readEventArgs.Completed += OnReceiveCompleted;
@@ -602,6 +603,7 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly IncomingMessageBuffer _buffer;
             private Socket socket;
+
             public Socket Socket {
                 get { return socket; }
                 internal set

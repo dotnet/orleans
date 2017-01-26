@@ -3,16 +3,20 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime
 {
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class ExceptionsTests
     {
-        public ExceptionsTests()
+        private readonly TestEnvironmentFixture fixture;
+
+        public ExceptionsTests(TestEnvironmentFixture fixture)
         {
+            this.fixture = fixture;
             BufferPool.InitGlobalBufferPool(new MessagingConfiguration(false));
-            SerializationManager.Initialize(null);
         }
 
 #if !NETSTANDARD

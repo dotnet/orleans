@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Exception thrown when a storage provider detects an Etag inconsistency when attemptiong to perform a WriteStateAsync operation.
+    /// Exception thrown when a storage provider detects an Etag inconsistency when attempting to perform a WriteStateAsync operation.
     /// </summary>
     [Serializable]
     public class TableStorageUpdateConditionNotSatisfiedException : InconsistentStateException
@@ -27,7 +27,7 @@ namespace Orleans.Storage
             : base(errorMsg, storedEtag, currentEtag, storageException)
         {
             this.GrainType = grainType;
-            this.GrainId = grainId;
+            this.GrainId = grainId.ToKeyString();
             this.TableName = tableName;
         }
 
@@ -48,7 +48,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Id of grain
         /// </summary>
-        public GrainReference GrainId { get; }
+        public string GrainId { get; }
 
         /// <summary>
         /// Type of grain that throw this exception
@@ -101,7 +101,7 @@ namespace Orleans.Storage
             : base(info, context)
         {
             this.GrainType = info.GetString("GrainType");
-            this.GrainId = GrainReference.FromKeyString(info.GetString("GrainId"));
+            this.GrainId = info.GetString("GrainId");
             this.TableName = info.GetString("TableName");
         }
 
@@ -111,7 +111,7 @@ namespace Orleans.Storage
             if (info == null) throw new ArgumentNullException(nameof(info));
 
             info.AddValue("GrainType", this.GrainType);
-            info.AddValue("GrainId", this.GrainId.ToKeyString());
+            info.AddValue("GrainId", this.GrainId);
             info.AddValue("TableName", this.TableName);
             base.GetObjectData(info, context);
         }

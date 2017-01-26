@@ -1,5 +1,5 @@
-﻿using Orleans.Serialization;
-using TestExtensions;
+﻿using TestExtensions;
+using UnitTests.Serialization;
 using Xunit;
 
 namespace Orleans.NonSiloTests
