@@ -3,12 +3,12 @@
   <TemplateData>
     <Name>Orleans Grain Class</Name>
     <Description>An empty Orleans grain class</Description>
-    <Icon>GrainImplementationVB.ico</Icon>
-    <ProjectType>VisualBasic</ProjectType>
-    <TemplateID>37320fcc-3ef4-4945-b4ca-cc489e3c7667</TemplateID>
+    <Icon>GrainImplementationFSharp.ico</Icon>
+    <ProjectType>FSharp</ProjectType>
+    <TemplateID>Orleans.Templates.Item.GrainClass</TemplateID>
     <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
     <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
-    <DefaultName>MyGrain.vb</DefaultName>
+    <DefaultName>Grain.fs</DefaultName>
   </TemplateData>
   <TemplateContent>
     <References>
@@ -19,6 +19,6 @@
         <Assembly>Orleans</Assembly>
       </Reference>
     </References>
-    <ProjectItem ReplaceParameters="true">GrainImplementationClassTemplate.vb</ProjectItem>
+    <ProjectItem ReplaceParameters="true">GrainImplementationClassTemplate.fs</ProjectItem>
   </TemplateContent>
 </VSTemplate>
