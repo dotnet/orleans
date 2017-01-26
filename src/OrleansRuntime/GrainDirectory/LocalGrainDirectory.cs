@@ -1028,7 +1028,7 @@ namespace Orleans.Runtime.GrainDirectory
             sb.AppendLine("   Since last call:");
             sb.AppendFormat("      Local lookups: {0}", localLookupsDelta).AppendLine();
             sb.AppendFormat("      Local found: {0}", localLookupsSucceededDelta).AppendLine();
-            if (localLookupsCurrent > 0)
+            if (localLookupsDelta > 0)
                 sb.AppendFormat("      Hit rate: {0:F1}%", (100.0 * localLookupsSucceededDelta) / localLookupsDelta).AppendLine();
             
             sb.AppendFormat("      Full lookups: {0}", fullLookupsDelta).AppendLine();
