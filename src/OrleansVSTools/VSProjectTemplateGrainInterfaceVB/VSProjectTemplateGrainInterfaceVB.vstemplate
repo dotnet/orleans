@@ -1,16 +1,18 @@
-﻿<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
-<TemplateData>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <TemplateData>
     <Name>Orleans Grain Interface Collection</Name>
     <Description>A project for defining a collection of grain communication interfaces and their payloads</Description>
-    <Icon>Orleans.ico</Icon>
+    <Icon>GrainInterfaceVB.ico</Icon>
     <ProjectType>VisualBasic</ProjectType>
     <TemplateID>28135ac9-c356-469d-8ce2-4d4a9d7e48d7</TemplateID>
-    <SortOrder>1000</SortOrder>
-    <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
-    <CreateNewFolder>true</CreateNewFolder>
-    <DefaultName>IGrain1</DefaultName>
-    <ProvideDefaultName>true</ProvideDefaultName>
+    <TemplateGroupID>Orleans</TemplateGroupID>
     <RequiredFrameworkVersion>4.5.1</RequiredFrameworkVersion>
+    <CreateNewFolder>true</CreateNewFolder>
+    <ProvideDefaultName>true</ProvideDefaultName>
+    <PromptForSaveOnCreation>true</PromptForSaveOnCreation>
+    <NumberOfParentCategoriesToRollUp>1</NumberOfParentCategoriesToRollUp>
+    <DefaultName>GrainInterfaces</DefaultName>
   </TemplateData>
   <TemplateContent>
     <Project File="ProjectTemplate.vbproj" ReplaceParameters="true">
@@ -33,10 +35,11 @@
       <package id="Microsoft.Orleans.Core" version="1.4.0" />
     </packages>
     <Assets>
-      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterface" d:TargetPath="|VSProjectTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
-      <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterface" d:TargetPath="|VSItemTemplateGrainInterface;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
-      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceCSharp" d:TargetPath="|VSItemTemplateGrainInterfaceCSharp;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
       <Asset Type="Microsoft.VisualStudio.ItemTemplate" d:Source="Project" d:ProjectName="VSItemTemplateGrainInterfaceVB" d:TargetPath="|VSItemTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ItemTemplates" d:VsixSubPath="ItemTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceCSharp" d:TargetPath="|VSProjectTemplateGrainInterfaceCSharp;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+      <Asset Type="Microsoft.VisualStudio.ProjectTemplate" d:Source="Project" d:ProjectName="VSProjectTemplateGrainInterfaceVB" d:TargetPath="|VSProjectTemplateGrainInterfaceVB;TemplateProjectOutputGroup|" Path="ProjectTemplates" d:VsixSubPath="ProjectTemplates" />
+
       <Asset Type="Microsoft.Orleans.Core.1.4.0.nupkg" d:Source="File" Path="Packages\Microsoft.Orleans.Core.1.4.0.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="System.Collections.Immutable.1.1.37.nupkg" d:Source="File" Path="Packages\System.Collections.Immutable.1.1.37.nupkg" d:VsixSubPath="Packages" />
       <Asset Type="Newtonsoft.Json.7.0.1.nupkg" d:Source="File" Path="Packages\Newtonsoft.Json.7.0.1.nupkg" d:VsixSubPath="Packages" />
