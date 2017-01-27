@@ -64,7 +64,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public int Compare(TestCachedMessage cachedMessage, StreamSequenceToken token)
             {
-                var realToken = (EventSequenceToken)token;
+                var realToken = (EventSequenceTokenV2)token;
                 return cachedMessage.SequenceNumber != realToken.SequenceNumber
                     ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
                     : 0 - realToken.EventIndex;
@@ -88,7 +88,7 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 if (bufferPool == null)
                 {
-                    throw new ArgumentNullException("bufferPool");
+                    throw new ArgumentNullException(nameof(bufferPool));
                 }
                 this.bufferPool = bufferPool;
             }

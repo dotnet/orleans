@@ -2,7 +2,6 @@
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.Streaming;
 using UnitTests.StreamingTests;
@@ -16,24 +15,22 @@ namespace Tester.AzureUtils.Streaming
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-        private SingleStreamTestRunner runner;
+        private readonly SingleStreamTestRunner runner;
 
         public override TestCluster CreateTestCluster()
         {
             var options = new TestClusterOptions(initialSilosCount: 2);
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
+            options.ClusterConfiguration.AddMemoryStorageProvider();
 
             options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore", deleteOnClear : true);
             options.ClusterConfiguration.AddAzureTableStorageProvider("PubSubStore", deleteOnClear: true, useJsonFormat: false);
 
             options.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-
-            options.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-            options.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
-
             options.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-            options.ClientConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
+
+            options.ClusterConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
+            options.ClientConfiguration.AddAzureQueueStreamProviderV2(AzureQueueStreamProviderName);
 
             return new TestCluster(options);
         }

@@ -44,7 +44,7 @@ namespace Orleans.Providers.Streams.Generator
 
             public int Compare(CachedMessage cachedMessage, StreamSequenceToken token)
             {
-                var realToken = (EventSequenceToken)token;
+                var realToken = (EventSequenceTokenV2)token;
                 return cachedMessage.SequenceNumber != realToken.SequenceNumber
                     ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
                     : 0 - realToken.EventIndex;
@@ -68,7 +68,7 @@ namespace Orleans.Providers.Streams.Generator
             {
                 if (bufferPool == null)
                 {
-                    throw new ArgumentNullException("bufferPool");
+                    throw new ArgumentNullException(nameof(bufferPool));
                 }
                 this.bufferPool = bufferPool;
             }
@@ -102,7 +102,7 @@ namespace Orleans.Providers.Streams.Generator
                     {
                         string errmsg = Format(CultureInfo.InvariantCulture,
                             "Message size is to big. MessageSize: {0}", size);
-                        throw new ArgumentOutOfRangeException("queueMessage", errmsg);
+                        throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }
                 }
                 Buffer.BlockCopy(serializedPayload, 0, segment.Array, segment.Offset, size);

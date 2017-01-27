@@ -15,7 +15,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private class TestQueueMessage
         {
             public Guid StreamGuid { get; set; }
-            public EventSequenceToken SequenceToken { get; set; }
+            public EventSequenceTokenV2 SequenceToken { get; set; }
         }
 
         private struct TestCachedMessage
@@ -213,14 +213,14 @@ namespace UnitTests.OrleansRuntime.Streams
             int streamIndex;
             Assert.True(block.TryFindFirstMessage(streams[0], TestCacheDataComparer.Instance, out streamIndex));
             Assert.Equal(0, streamIndex);
-            Assert.Equal(0, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+            Assert.Equal(0, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
 
             // find stream1 messages
             int iteration = 1;
             while (block.TryFindNextMessage(streamIndex + 1, streams[0], TestCacheDataComparer.Instance, out streamIndex))
             {
                 Assert.Equal(iteration * 2, streamIndex);
-                Assert.Equal(iteration * 4, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+                Assert.Equal(iteration * 4, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
@@ -228,14 +228,14 @@ namespace UnitTests.OrleansRuntime.Streams
             // get index of first stream
             Assert.True(block.TryFindFirstMessage(streams[1], TestCacheDataComparer.Instance, out streamIndex));
             Assert.Equal(1, streamIndex);
-            Assert.Equal(2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+            Assert.Equal(2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
 
             // find stream1 messages
             iteration = 1;
             while (block.TryFindNextMessage(streamIndex + 1, streams[1], TestCacheDataComparer.Instance, out streamIndex))
             {
                 Assert.Equal(iteration * 2 + 1, streamIndex);
-                Assert.Equal(iteration * 4 + 2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceToken).SequenceNumber);
+                Assert.Equal(iteration * 4 + 2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
