@@ -662,8 +662,15 @@ namespace Orleans.Runtime
 
                 var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
                 var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(0, typeCode);
-                var grainService = (SystemTarget) ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId, serviceConfig.Value);
+                var grainService = (GrainService)ActivatorUtilities.CreateInstance(this.Services, serviceType, grainId, serviceConfig.Value);
                 RegisterSystemTarget(grainService);
+
+                this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WaitWithThrow(this.initTimeout);
+                this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WaitWithThrow(this.initTimeout);
+                if (this.logger.IsVerbose)
+                {
+                    this.logger.Verbose(String.Format("{0} Grain Service started successfully.", serviceConfig.Value.Name));
+                }
             }
         }
 

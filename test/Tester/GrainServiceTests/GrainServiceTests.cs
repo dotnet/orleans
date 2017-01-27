@@ -25,13 +25,35 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
-            // We need to get the Silo to create the GrainService instances and register them as SystemTargets.
-
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var grainId = await grain.GetHelloWorldUsingCustomService();
             Assert.Equal("Hello World from Grain Service", grainId);
             var prop = await grain.GetServiceConfigProperty("test-property");
             Assert.Equal("xyz", prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStarted()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasStarted();
+            Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasStartedInBackground()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasStartedInBackground();
+            Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceWasInit()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var prop = await grain.CallHasInit();
+            Assert.True(prop);
         }
     }
 
