@@ -10,6 +10,7 @@ namespace Tester
         Task<string> GetServiceConfigProperty(string propertyName);
         Task<bool> HasStarted();
         Task<bool> HasStartedInBackground();
+        Task<bool> HasInit();
     }
 
     public interface ICustomGrainService : IGrainService
@@ -19,5 +20,6 @@ namespace Tester
 
         Task<bool> HasStarted();
         Task<bool> HasStartedInBackground();
+        Task<bool> HasInit();
     }
 }

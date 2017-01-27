@@ -33,6 +33,11 @@ namespace UnitTests.Grains
         {
             return this.customGrainServiceClient.HasStartedInBackground();
         }
+
+        public Task<bool> CallHasInit()
+        {
+            return this.customGrainServiceClient.HasInit();
+        }
     }
 
 }

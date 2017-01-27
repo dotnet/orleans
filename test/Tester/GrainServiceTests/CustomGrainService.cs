@@ -33,6 +33,11 @@ namespace Tester
         {
             return GrainService.HasStartedInBackground();
         }
+
+        public Task<bool> HasInit()
+        {
+            return GrainService.HasInit();
+        }
     }
 
     public class CustomGrainService : GrainService, ICustomGrainService
@@ -44,6 +49,13 @@ namespace Tester
 
         private bool m_Started = false;
         private bool m_StartedInBackground = false;
+        private bool m_Init = false;
+
+        public override Task Init(IServiceProvider serviceProvider)
+        {
+            m_Init = true;
+            return base.Init(serviceProvider);
+        }
 
         public override Task Start()
         {
@@ -75,6 +87,11 @@ namespace Tester
         public Task<bool> HasStartedInBackground()
         {
             return Task.FromResult(m_StartedInBackground);
+        }
+
+        public Task<bool> HasInit()
+        {
+            return Task.FromResult(m_Init);
         }
     }
 }
