@@ -8,14 +8,9 @@ using Orleans.Streams;
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
-    public class AzureQueueAdapterFactory : IQueueAdapterFactory
+    public class AzureQueueAdapterFactory<TDataAdapter> : IQueueAdapterFactory
+        where TDataAdapter : IAzureQueueDataAdapter, new()
     {
-        internal const int CacheSizeDefaultValue = 4096;
-        internal const string NumQueuesPropertyName = "NumQueues";
-
-        /// <summary> Default number of Azure Queue used in this stream provider.</summary>
-        public const int NumQueuesDefaultValue = 8; // keep as power of 2.
-        
         private string deploymentId;
         private string dataConnectionString;
         private string providerName;
@@ -25,13 +20,6 @@ namespace Orleans.Providers.Streams.AzureQueue
         private HashRingBasedStreamQueueMapper streamQueueMapper;
         private IQueueAdapterCache adapterCache;
 
-        /// <summary>"DataConnectionString".</summary>
-        public const string DataConnectionStringPropertyName = "DataConnectionString";
-        /// <summary>"DeploymentId".</summary>
-        public const string DeploymentIdPropertyName = "DeploymentId";
-        /// <summary>"MessageVisibilityTimeout".</summary>
-        public const string MessageVisibilityTimeoutPropertyName = "VisibilityTimeout";
-
         /// <summary>
         /// Application level failure handler override.
         /// </summary>
@@ -40,19 +28,19 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary> Init the factory.</summary>
         public virtual void Init(IProviderConfiguration config, string providerName, Logger logger, IServiceProvider serviceProvider)
         {
-            if (config == null) throw new ArgumentNullException("config");
-            if (!config.Properties.TryGetValue(DataConnectionStringPropertyName, out dataConnectionString))
-                throw new ArgumentException(String.Format("{0} property not set", DataConnectionStringPropertyName));
-            if (!config.Properties.TryGetValue(DeploymentIdPropertyName, out deploymentId))
-                throw new ArgumentException(String.Format("{0} property not set", DeploymentIdPropertyName));
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            if (!config.Properties.TryGetValue(AzureQueueAdapterConstants.DataConnectionStringPropertyName, out dataConnectionString))
+                throw new ArgumentException($"{AzureQueueAdapterConstants.DataConnectionStringPropertyName} property not set");
+            if (!config.Properties.TryGetValue(AzureQueueAdapterConstants.DeploymentIdPropertyName, out deploymentId))
+                throw new ArgumentException($"{AzureQueueAdapterConstants.DeploymentIdPropertyName} property not set");
             string messageVisibilityTimeoutRaw;
-            if (config.Properties.TryGetValue(MessageVisibilityTimeoutPropertyName, out messageVisibilityTimeoutRaw))
+            if (config.Properties.TryGetValue(AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName, out messageVisibilityTimeoutRaw))
             {
                 TimeSpan messageVisibilityTimeoutTemp;
                 if (!TimeSpan.TryParse(messageVisibilityTimeoutRaw, out messageVisibilityTimeoutTemp))
                 {
-                    throw new ArgumentException(String.Format("Failed to parse {0} value '{1}' as a TimeSpan",
-                        MessageVisibilityTimeoutPropertyName, messageVisibilityTimeoutRaw));
+                    throw new ArgumentException(
+                        $"Failed to parse {AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName} value '{messageVisibilityTimeoutRaw}' as a TimeSpan");
                 }
 
                 messageVisibilityTimeout = messageVisibilityTimeoutTemp;
@@ -62,14 +50,14 @@ namespace Orleans.Providers.Streams.AzureQueue
                 messageVisibilityTimeout = null;
             }
             
-            cacheSize = SimpleQueueAdapterCache.ParseSize(config, CacheSizeDefaultValue);
+            cacheSize = SimpleQueueAdapterCache.ParseSize(config, AzureQueueAdapterConstants.CacheSizeDefaultValue);
 
             string numQueuesString;
-            numQueues = NumQueuesDefaultValue;
-            if (config.Properties.TryGetValue(NumQueuesPropertyName, out numQueuesString))
+            numQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue;
+            if (config.Properties.TryGetValue(AzureQueueAdapterConstants.NumQueuesPropertyName, out numQueuesString))
             {
                 if (!int.TryParse(numQueuesString, out numQueues))
-                    throw new ArgumentException(String.Format("{0} invalid.  Must be int", NumQueuesPropertyName));
+                    throw new ArgumentException($"{AzureQueueAdapterConstants.NumQueuesPropertyName} invalid.  Must be int");
             }
 
             this.providerName = providerName;
@@ -85,7 +73,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(streamQueueMapper, dataConnectionString, deploymentId, providerName, messageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

@@ -49,13 +49,13 @@ namespace Tester.AzureUtils.Streaming
         {
             var properties = new Dictionary<string, string>
                 {
-                    {AzureQueueAdapterFactory.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
-                    {AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId},
-                    {AzureQueueAdapterFactory.MessageVisibilityTimeoutPropertyName, "00:00:30" }
+                    {AzureQueueAdapterConstants.DataConnectionStringPropertyName, TestDefaultConfiguration.DataConnectionString},
+                    {AzureQueueAdapterConstants.DeploymentIdPropertyName, deploymentId},
+                    {AzureQueueAdapterConstants.MessageVisibilityTimeoutPropertyName, "00:00:30" }
                 };
             var config = new ProviderConfiguration(properties, "type", "name");
 
-            var adapterFactory = new AzureQueueAdapterFactory();
+            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>();
             adapterFactory.Init(config, AZURE_QUEUE_STREAM_PROVIDER_NAME, LogManager.GetLogger("AzureQueueAdapter", LoggerType.Application), null);
             await SendAndReceiveFromQueueAdapter(adapterFactory, config);
         }

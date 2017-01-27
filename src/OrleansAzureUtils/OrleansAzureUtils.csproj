@@ -57,7 +57,9 @@
     <Compile Include="MultiClusterNetwork\GossipTableInstanceManager.cs" />
     <Compile Include="Providers\AzureConfigurationExtensions.cs" />
     <Compile Include="Providers\Storage\AzureBlobStorage.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\AzureQueueAdapterConstants.cs" />
     <Compile Include="Providers\Streams\AzureQueue\AzureQueueBatchContainerV2.cs" />
+    <Compile Include="Providers\Streams\AzureQueue\IAzureQueueDataAdapter.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\AzureTableStorageStreamFailureHandler.cs" />
     <Compile Include="Providers\Streams\PersistentStreams\StreamDeliveryFailureEntity.cs" />
     <Compile Include="Storage\AzureBasedMembershipTable.cs" />
@@ -112,11 +114,25 @@
     <None Include="project.json" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <!-- Begin Orleans: Without these lines the project won't build properly -->
+  <PropertyGroup>
+    <OrleansProjectType>Server</OrleansProjectType>
+  </PropertyGroup>
+  <!-- Set path to ClientGenerator.exe -->
+  <Choose>
+    <When Condition="'$(builduri)' != ''">
+      <PropertyGroup>
+        <!-- TFS build -->
+        <OrleansReferencesBase>$(TargetDir)</OrleansReferencesBase>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <!-- Visual Studio or MsBuild .sln build -->
+        <OrleansReferencesBase>$(ProjectDir)..\ClientGenerator\$(OutputPath)</OrleansReferencesBase>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  <Import Project="$(ProjectDir)..\Orleans.SDK.targets" />
+  <!--End Orleans -->
 </Project>
