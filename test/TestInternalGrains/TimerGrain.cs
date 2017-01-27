@@ -28,7 +28,7 @@ namespace UnitTestGrains
             ThrowIfDeactivating();
             logger = (Logger)this.GetLogger("TimerGrain_" + base.Data.Address.ToString());
             context = RuntimeContext.Current.ActivationContext;
-            defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, TimeSpan.Zero, period);
+            defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return TaskDone.Done;
         }
