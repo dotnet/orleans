@@ -47,19 +47,19 @@ namespace Tester
             
         }
 
-        private bool m_Started = false;
-        private bool m_StartedInBackground = false;
-        private bool m_Init = false;
+        private bool started = false;
+        private bool startedInBackground = false;
+        private bool init = false;
 
         public override Task Init(IServiceProvider serviceProvider)
         {
-            m_Init = true;
+            init = true;
             return base.Init(serviceProvider);
         }
 
         public override Task Start()
         {
-            m_Started = true;
+            started = true;
             return base.Start();
         }
 
@@ -75,23 +75,23 @@ namespace Tester
 
         protected override Task StartInBackground()
         {
-            m_StartedInBackground = true;
+            startedInBackground = true;
             return TaskDone.Done;
         }
 
         public Task<bool> HasStarted()
         {
-            return Task.FromResult(m_Started);
+            return Task.FromResult(started);
         }
 
         public Task<bool> HasStartedInBackground()
         {
-            return Task.FromResult(m_StartedInBackground);
+            return Task.FromResult(startedInBackground);
         }
 
         public Task<bool> HasInit()
         {
-            return Task.FromResult(m_Init);
+            return Task.FromResult(init);
         }
     }
 }
