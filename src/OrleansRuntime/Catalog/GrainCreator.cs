@@ -55,21 +55,28 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Install the storage bridge into a stateful grain.
+        /// Create a new instance of a grain
         /// </summary>
-        /// <param name="grain">The grain.</param>
-        /// <param name="grainType">The grain type.</param>
-        /// <param name="stateType">The type of the state it persists.</param>
-        /// <param name="storageProvider">The provider used to store the state.</param>
-        public void InstallStorageBridge(Grain grain, Type grainType, Type stateType, IStorageProvider storageProvider)
-        {
-            var statefulgrain = (IStatefulGrain) grain;
+        /// <param name="grainType"></param>
+        /// <param name="identity">Identity for the new grain</param>
+        /// <param name="stateType">If the grain is a stateful grain, the type of the state it persists.</param>
+        /// <param name="storage">If the grain is a stateful grain, the storage used to persist the state.</param>
+        /// <returns></returns>
+        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType, IStorage storage)
+		{
+            //Create a new instance of the grain
+            var grain = CreateGrainInstance(grainType, identity);
 
-            var storage = new GrainStateStorageBridge(grainType.FullName, statefulgrain, storageProvider);
+            var statefulGrain = grain as IStatefulGrain;
+
+            if (statefulGrain == null)
+                return grain;
 
             //Inject state and storage data into the grain
-            statefulgrain.GrainState.State = Activator.CreateInstance(stateType);
-            statefulgrain.SetStorage(storage);
+            statefulGrain.GrainState.State = Activator.CreateInstance(stateType);
+            statefulGrain.SetStorage(storage);
+
+            return grain;
         }
 
 

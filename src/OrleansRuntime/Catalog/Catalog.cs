@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
 using Orleans.Providers;
@@ -715,7 +716,12 @@ namespace Orleans.Runtime
                 if (grain is IStatefulGrain)
                 {
                     SetupStorageProvider(grainType, data);
-                    grainCreator.InstallStorageBridge(grain, grainType, grainTypeData.StateObjectType, data.StorageProvider);
+
+                    var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
+
+                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, storage);
+
+                    storage.SetGrain(grain);
                 }
 
                 //for log-view grains, install log-view adaptor
