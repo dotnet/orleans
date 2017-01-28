@@ -1,4 +1,6 @@
-﻿namespace Orleans.Serialization
+﻿using System.Runtime.Serialization;
+
+namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
@@ -145,7 +147,16 @@
                 {
                     exception.AdditionalData = innerContext.StreamReader.ReadBytes(additionalDataLength);
                 }
-                
+
+                // If a particular type is expected, but the actual type is not available, throw an exception to avoid 
+                if (expectedType != null && !expectedType.IsAssignableFrom(typeof(RemoteNonDeserializableException)))
+                {
+                    throw new SerializationException(
+                        $"Unable to deserialize exception of unavailable type {exception.OriginalTypeName} into expected type {expectedType}. " +
+                        $" See {nameof(Exception.InnerException)} for recovered information.",
+                        exception);
+                }
+
                 result = exception;
             }
             

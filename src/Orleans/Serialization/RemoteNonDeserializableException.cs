@@ -18,17 +18,11 @@ namespace Orleans.Serialization
         /// Gets the type name of the original <see cref="Exception"/> represented by this instance.
         /// </summary>
         public string OriginalTypeName { get; internal set; }
-
+        
         /// <summary>
-        /// Gets or sets a value indicating whether the original type of this exception can be reconstructed during
-        /// deserialization.
+        /// Gets or sets the additional data deserialized alongside this instance, for example, exception subclass fields.
         /// </summary>
-        internal bool CanAttemptReconstruction { get; set; }
-
-        /// <summary>
-        /// Gets or sets the additional data deserialized alongside this 
-        /// </summary>
-        internal byte[] AdditionalData { get; set; }
+        public byte[] AdditionalData { get; internal set; }
 
         /// <summary>
         /// Returns a <see cref="string"/> representation of this instance.
@@ -58,7 +52,7 @@ namespace Orleans.Serialization
         }
         
 #if !NETSTANDARD
-        protected RemoteNonDeserializableException(SerializationInfo info, StreamingContext context)
+        public RemoteNonDeserializableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.OriginalTypeName = info.GetString(nameof(this.OriginalTypeName));
