@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
@@ -9,7 +10,7 @@ namespace Orleans.Serialization
     /// Represents an exception which cannot be fully deserialized.
     /// </summary>
     [Serializable]
-    public class RemoteNonDeserializableException : Exception
+    public class RemoteNonDeserializableException : OrleansException
     {
         public RemoteNonDeserializableException() { }
 
