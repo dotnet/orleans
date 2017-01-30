@@ -1,12 +1,12 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
-using Orleans.Serialization;
+using Orleans.Runtime;
 using Orleans.Streams;
-using RuntimeRequestContext = Orleans.Runtime.RequestContext;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -14,54 +14,48 @@ namespace Orleans.Providers.Streams.AzureQueue
     internal class AzureQueueBatchContainer : IBatchContainer
     {
         [JsonProperty]
-        protected EventSequenceToken sequenceToken;
+        private EventSequenceToken sequenceToken;
 
         [JsonProperty]
-        protected List<object> events;
+        private readonly List<object> events;
 
         [JsonProperty]
-        protected Dictionary<string, object> requestContext;
+        private readonly Dictionary<string, object> requestContext;
 
-        [NonSerialized]
-        // Need to store reference to the original AQ CloudQueueMessage to be able to delete it later on.
-        // Don't need to serialize it, since we are never interested in sending it to stream consumers.
-        internal CloudQueueMessage CloudQueueMessage;
+        public Guid StreamGuid { get; private set; }
 
-        public Guid StreamGuid { get; protected set; }
-
-        public String StreamNamespace { get; protected set; }
-
-        internal Dictionary<string, object> RequestContext => this.requestContext;
+        public String StreamNamespace { get; private set; }
 
         public StreamSequenceToken SequenceToken
         {
             get { return sequenceToken; }
         }
 
+        internal EventSequenceToken RealSequenceToken
+        {
+            set { sequenceToken = value; }
+        }
+
         [JsonConstructor]
-        internal AzureQueueBatchContainer(
-            Guid streamGuid, 
+        public AzureQueueBatchContainer(
+            Guid streamGuid,
             String streamNamespace,
             List<object> events,
-            Dictionary<string, object> requestContext, 
+            Dictionary<string, object> requestContext,
             EventSequenceToken sequenceToken)
             : this(streamGuid, streamNamespace, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
         }
 
-        protected AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
+        public AzureQueueBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
         {
             if (events == null) throw new ArgumentNullException("events", "Message contains no events");
-            
+
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
             this.events = events;
             this.requestContext = requestContext;
-        }
-
-        protected AzureQueueBatchContainer()
-        {
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
@@ -79,35 +73,11 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false; // Consumer is not interested in any of these events, so don't send.
         }
 
-        internal void SetSequenceToken(EventSequenceToken token)
-        {
-            this.sequenceToken = token;
-        }
-
-        internal static CloudQueueMessage ToCloudQueueMessage<T>(Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
-        {
-            var azureQueueBatchMessage = new AzureQueueBatchContainerV2(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
-            var rawBytes = SerializationManager.SerializeToByteArray(azureQueueBatchMessage);
-
-            //new CloudQueueMessage(byte[]) not supported in netstandard, taking a detour to set it
-            var cloudQueueMessage = new CloudQueueMessage(null as string);
-            cloudQueueMessage.SetMessageContent(rawBytes);
-            return cloudQueueMessage;
-        }
-
-        internal static AzureQueueBatchContainer FromCloudQueueMessage(CloudQueueMessage cloudMsg, long sequenceId)
-        {
-            var azureQueueBatch = SerializationManager.DeserializeFromByteArray<AzureQueueBatchContainer>(cloudMsg.AsBytes);
-            azureQueueBatch.CloudQueueMessage = cloudMsg;
-            azureQueueBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
-            return azureQueueBatch;
-        }
-
         public bool ImportRequestContext()
         {
             if (requestContext != null)
             {
-                RuntimeRequestContext.Import(requestContext);
+                RequestContext.Import(requestContext);
                 return true;
             }
             return false;

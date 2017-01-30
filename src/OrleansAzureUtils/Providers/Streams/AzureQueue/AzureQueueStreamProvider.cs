@@ -4,8 +4,16 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>
     /// Persistent stream provider that uses azure queue for persistence
+    /// WARNING: This version is maintained for compatability purposes.  New services should use AzureQueueStreamProviderV2 as it supports external serializers.
     /// </summary>
-    public class AzureQueueStreamProvider : PersistentStreamProvider<AzureQueueAdapterFactory>
+    public class AzureQueueStreamProvider : PersistentStreamProvider<AzureQueueAdapterFactory<AzureQueueDataAdapterV1>>
+    {
+    }
+
+    /// <summary>
+    /// Persistent stream provider that uses azure queue for persistence
+    /// </summary>
+    public class AzureQueueStreamProviderV2 : PersistentStreamProvider<AzureQueueAdapterFactory<AzureQueueDataAdapterV2>>
     {
     }
 }

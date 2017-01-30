@@ -51,11 +51,6 @@ namespace Orleans.Providers.Streams.Common
             return new EventSequenceToken(SequenceNumber, eventInd);
         }
 
-        internal static long Distance(EventSequenceToken first, EventSequenceToken second)
-        {
-            return first.SequenceNumber - second.SequenceNumber;
-        }
-
         /// <summary>
         /// Determines whether the specified object is equal to the current object.
         /// </summary>
