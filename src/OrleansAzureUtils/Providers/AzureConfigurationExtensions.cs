@@ -100,9 +100,9 @@ namespace Orleans.Runtime.Configuration
             this ClusterConfiguration config,
             string providerName,
             string connectionString = null,
-            int numberOfQueues = AzureQueueAdapterFactory.NumQueuesDefaultValue,
+            int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
-            int cacheSize = AzureQueueAdapterFactory.CacheSizeDefaultValue,
+            int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
@@ -110,6 +110,33 @@ namespace Orleans.Runtime.Configuration
             deploymentId = deploymentId ?? config.Globals.DeploymentId;
             var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
             config.Globals.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
+        }
+
+        /// <summary>
+        /// Adds a stream provider of type <see cref="AzureQueueStreamProviderV2"/>.
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name</param>
+        /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
+        /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
+        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="cacheSize">The cache size.</param>
+        /// <param name="startupState">The startup state of the persistent stream provider.</param>
+        /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>
+        public static void AddAzureQueueStreamProviderV2(
+            this ClusterConfiguration config,
+            string providerName,
+            string connectionString = null,
+            int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
+            string deploymentId = null,
+            int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+            PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+            PersistentStreamProviderConfig persistentStreamProviderConfig = null)
+        {
+            connectionString = GetConnectionString(connectionString, config);
+            deploymentId = deploymentId ?? config.Globals.DeploymentId;
+            var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
+            config.Globals.RegisterStreamProvider<AzureQueueStreamProviderV2>(providerName, properties);
         }
 
         /// <summary>
@@ -127,9 +154,9 @@ namespace Orleans.Runtime.Configuration
             this ClientConfiguration config,
             string providerName,
             string connectionString = null,
-            int numberOfQueues = AzureQueueAdapterFactory.NumQueuesDefaultValue,
+            int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
             string deploymentId = null,
-            int cacheSize = AzureQueueAdapterFactory.CacheSizeDefaultValue,
+            int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
             PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
             PersistentStreamProviderConfig persistentStreamProviderConfig = null)
         {
@@ -139,6 +166,33 @@ namespace Orleans.Runtime.Configuration
             config.RegisterStreamProvider<AzureQueueStreamProvider>(providerName, properties);
         }
 
+        /// <summary>
+        /// Adds a stream provider of type <see cref="AzureQueueStreamProviderV2"/>.
+        /// </summary>
+        /// <param name="config">The cluster configuration object to add provider to.</param>
+        /// <param name="providerName">The provider name</param>
+        /// <param name="connectionString">The azure storage connection string. If none is provided, it will use the same as in the Globals configuration.</param>
+        /// <param name="numberOfQueues">The number of queues to use as partitions.</param>
+        /// <param name="deploymentId">The deployment ID used for partitioning. If none is specified, the provider will use the same DeploymentId as the Cluster.</param>
+        /// <param name="cacheSize">The cache size.</param>
+        /// <param name="startupState">The startup state of the persistent stream provider.</param>
+        /// <param name="persistentStreamProviderConfig">Settings related to all persistent stream providers.</param>
+        public static void AddAzureQueueStreamProviderV2(
+            this ClientConfiguration config,
+            string providerName,
+            string connectionString = null,
+            int numberOfQueues = AzureQueueAdapterConstants.NumQueuesDefaultValue,
+            string deploymentId = null,
+            int cacheSize = AzureQueueAdapterConstants.CacheSizeDefaultValue,
+            PersistentStreamProviderState startupState = AzureQueueStreamProvider.StartupStateDefaultValue,
+            PersistentStreamProviderConfig persistentStreamProviderConfig = null)
+        {
+            connectionString = GetConnectionString(connectionString, config);
+            deploymentId = deploymentId ?? config.DeploymentId;
+            var properties = GetAzureQueueStreamProviderProperties(providerName, connectionString, numberOfQueues, deploymentId, cacheSize, startupState, persistentStreamProviderConfig);
+            config.RegisterStreamProvider<AzureQueueStreamProviderV2>(providerName, properties);
+        }
+
         private static Dictionary<string, string> GetAzureQueueStreamProviderProperties(string providerName, string connectionString, int numberOfQueues, string deploymentId, int cacheSize, PersistentStreamProviderState startupState, PersistentStreamProviderConfig persistentStreamProviderConfig)
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
@@ -146,9 +200,9 @@ namespace Orleans.Runtime.Configuration
 
             var properties = new Dictionary<string, string>
             {
-                { AzureQueueAdapterFactory.DataConnectionStringPropertyName, connectionString },
-                { AzureQueueAdapterFactory.NumQueuesPropertyName, numberOfQueues.ToString() },
-                { AzureQueueAdapterFactory.DeploymentIdPropertyName, deploymentId },
+                { AzureQueueAdapterConstants.DataConnectionStringPropertyName, connectionString },
+                { AzureQueueAdapterConstants.NumQueuesPropertyName, numberOfQueues.ToString() },
+                { AzureQueueAdapterConstants.DeploymentIdPropertyName, deploymentId },
                 { SimpleQueueAdapterCache.CacheSizePropertyName, cacheSize.ToString() },
                 { AzureQueueStreamProvider.StartupStatePropertyName, startupState.ToString() },
             };

@@ -17,7 +17,7 @@ namespace OrleansAWSUtils.Streams
     internal class SQSBatchContainer : IBatchContainer
     {
         [JsonProperty]
-        private EventSequenceToken sequenceToken;
+        private EventSequenceTokenV2 sequenceToken;
 
         [JsonProperty]
         private readonly List<object> events;
@@ -45,7 +45,7 @@ namespace OrleansAWSUtils.Streams
             String streamNamespace,
             List<object> events,
             Dictionary<string, object> requestContext,
-            EventSequenceToken sequenceToken)
+            EventSequenceTokenV2 sequenceToken)
             : this(streamGuid, streamNamespace, events, requestContext)
         {
             this.sequenceToken = sequenceToken;

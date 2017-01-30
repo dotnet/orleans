@@ -80,7 +80,6 @@
     <Compile Include="Streaming\StreamLimitTests.cs" />
     <Compile Include="Streaming\StreamReliabilityTests.cs" />
     <Compile Include="Streaming\TestAzureQueueStreamProvider.cs" />
-    <Compile Include="StreamTypeSerializationTests.cs" />
     <Compile Include="UnitTestAzureTableDataManager.cs" />
   </ItemGroup>
   <ItemGroup>
