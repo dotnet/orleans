@@ -112,6 +112,7 @@
     <Compile Include="Runtime\IGrainTimer.cs" />
     <Compile Include="Runtime\ILocalSiloDetails.cs" />
     <Compile Include="Runtime\RingRange.cs" />
+    <Compile Include="Serialization\ILBasedExceptionSerializer.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />
     <Compile Include="Configuration\LimitNames.cs" />
     <Compile Include="Configuration\LimitValue.cs" />
@@ -156,6 +157,8 @@
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
     <Compile Include="Services\IGrainServiceClient.cs" />
     <Compile Include="Services\IGrainService.cs" />
+    <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
+    <Compile Include="Serialization\TypeSerializer.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />

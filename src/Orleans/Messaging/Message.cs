@@ -599,14 +599,14 @@ namespace Orleans.Runtime
                 // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
                 // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually
                 // pretty high (an array allocation plus a bunch of copying).
-                bodyBytes = bodyStream.ToBytes() as List<ArraySegment<byte>>;
+                bodyBytes = bodyStream.ToBytes();
             }
 
             if (headerBytes != null)
             {
                 BufferPool.GlobalPool.Release(headerBytes);
             }
-            headerBytes = context.StreamWriter.ToBytes() as List<ArraySegment<byte>>;
+            headerBytes = context.StreamWriter.ToBytes();
             int headerLength = context.StreamWriter.CurrentOffset;
             int bodyLength = BufferLength(bodyBytes);
 
