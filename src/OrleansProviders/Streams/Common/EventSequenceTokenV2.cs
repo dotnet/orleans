@@ -7,6 +7,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Stream sequence token that tracks sequence number and event index
     /// </summary>
+    [Serializable]
     public class EventSequenceTokenV2 : StreamSequenceToken
     {
         /// <summary>
